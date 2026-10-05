@@ -19,7 +19,8 @@ foreach ($key in $settings.Keys) {
 }
 try {
     Push-Location $projectRoot
-    & $GimpPath --new-instance --no-data --no-fonts --no-splash --console-messages --batch-interpreter=python-fu-eval --batch "exec(open('scripts/gimp/build_face_study.py', encoding='utf-8').read())" --quit
+    $batchCode = "exec(open('scripts/gimp/build_face_registration.py', encoding='utf-8').read())"
+    & $GimpPath --new-instance --no-data --no-fonts --no-splash --console-messages --batch-interpreter=python-fu-eval --batch $batchCode --quit
     if ($LASTEXITCODE -ne 0) { throw "GIMP batch failed: $LASTEXITCODE" }
 } finally {
     Pop-Location

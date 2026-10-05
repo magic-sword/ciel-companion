@@ -5,6 +5,7 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 シエルの原画・パーツ分け・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) に整理しています。
 制作を始める際は、採用済みの [シエル外観参考 v1](docs/assets/ciel/ciel-approved-appearance-v1.png) を確認してください。控えめな鼻と滑らかな白磁の肌を基準にします。
 画像編集はGIMP 3.2.6を使用します。顔パーツの試作XCF・PSDは `.\scripts\build-ciel-face-study.ps1` で再生成できます。出力先・検証範囲は上記の制作仕様書を参照してください。
+現在の作業基準は [通常顔の分割・再合成比較](docs/assets/ciel/production/ciel-face-registration-v1-comparison.png) です。左が採用画像の等倍切り出し、右が5領域の再合成で、画素差分ゼロを確認済みです。まだ可動用の完成パーツではありません。
 
 ## Unity開発環境
 
