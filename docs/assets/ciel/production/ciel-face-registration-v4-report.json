@@ -1,0 +1,657 @@
+{
+  "source": "docs/assets/ciel/ciel-approved-appearance-v1.png",
+  "source_sha256": "f8cb6fa5359ebb834467226b813a8af3e47e18dae89cf8592af97569e6c115ad",
+  "crop": [
+    330,
+    235,
+    280,
+    195
+  ],
+  "canvas": [
+    280,
+    195
+  ],
+  "scale": 1,
+  "gimp": "3.2.6",
+  "stage": "Visible-region registration baseline, not rig-ready parts",
+  "regions": {
+    "Eye_R_VisibleRegion": [
+      [
+        36,
+        67
+      ],
+      [
+        52,
+        49
+      ],
+      [
+        84,
+        47
+      ],
+      [
+        107,
+        61
+      ],
+      [
+        113,
+        82
+      ],
+      [
+        101,
+        104
+      ],
+      [
+        62,
+        110
+      ],
+      [
+        44,
+        94
+      ]
+    ],
+    "Eye_L_VisibleRegion": [
+      [
+        167,
+        62
+      ],
+      [
+        188,
+        48
+      ],
+      [
+        221,
+        47
+      ],
+      [
+        240,
+        66
+      ],
+      [
+        239,
+        91
+      ],
+      [
+        217,
+        110
+      ],
+      [
+        181,
+        105
+      ],
+      [
+        168,
+        84
+      ]
+    ],
+    "Nose_VisibleRegion": [
+      [
+        128,
+        103
+      ],
+      [
+        152,
+        103
+      ],
+      [
+        152,
+        127
+      ],
+      [
+        128,
+        127
+      ]
+    ],
+    "Mouth_Closed_VisibleRegion": [
+      [
+        116,
+        133
+      ],
+      [
+        165,
+        133
+      ],
+      [
+        165,
+        149
+      ],
+      [
+        116,
+        149
+      ]
+    ]
+  },
+  "eye_geometry": {
+    "R": {
+      "iris": [
+        [
+          72,
+          59
+        ],
+        [
+          89,
+          58
+        ],
+        [
+          104,
+          65
+        ],
+        [
+          108,
+          80
+        ],
+        [
+          106,
+          96
+        ],
+        [
+          99,
+          104
+        ],
+        [
+          77,
+          105
+        ],
+        [
+          67,
+          94
+        ],
+        [
+          65,
+          76
+        ]
+      ],
+      "opening": [
+        [
+          53,
+          77
+        ],
+        [
+          60,
+          68
+        ],
+        [
+          73,
+          63
+        ],
+        [
+          95,
+          62
+        ],
+        [
+          107,
+          73
+        ],
+        [
+          106,
+          91
+        ],
+        [
+          100,
+          101
+        ],
+        [
+          79,
+          103
+        ],
+        [
+          60,
+          99
+        ],
+        [
+          53,
+          91
+        ]
+      ],
+      "pupil": [
+        87,
+        79,
+        4.5,
+        7.5
+      ],
+      "lower_y": 98
+    },
+    "L": {
+      "iris": [
+        [
+          180,
+          58
+        ],
+        [
+          194,
+          56
+        ],
+        [
+          209,
+          60
+        ],
+        [
+          216,
+          73
+        ],
+        [
+          216,
+          88
+        ],
+        [
+          209,
+          102
+        ],
+        [
+          188,
+          103
+        ],
+        [
+          176,
+          98
+        ],
+        [
+          173,
+          82
+        ],
+        [
+          175,
+          67
+        ]
+      ],
+      "opening": [
+        [
+          171,
+          73
+        ],
+        [
+          181,
+          62
+        ],
+        [
+          200,
+          58
+        ],
+        [
+          217,
+          64
+        ],
+        [
+          226,
+          72
+        ],
+        [
+          226,
+          88
+        ],
+        [
+          214,
+          98
+        ],
+        [
+          192,
+          101
+        ],
+        [
+          178,
+          97
+        ],
+        [
+          173,
+          86
+        ]
+      ],
+      "pupil": [
+        193,
+        77,
+        4.0,
+        7.5
+      ],
+      "lower_y": 98
+    }
+  },
+  "ownership_colors": {
+    "Face_Context_Remainder": [
+      244,
+      246,
+      250
+    ],
+    "Nose_VisibleRegion": [
+      160,
+      100,
+      200
+    ],
+    "Mouth_UpperLine_Visible": [
+      230,
+      80,
+      110
+    ],
+    "Mouth_LowerEdge_Context": [
+      240,
+      170,
+      120
+    ],
+    "Eye_R_Sclera_Visible": [
+      180,
+      205,
+      240
+    ],
+    "Eye_R_Iris_Visible": [
+      0,
+      175,
+      205
+    ],
+    "Eye_R_Pupil_Visible": [
+      35,
+      40,
+      90
+    ],
+    "Eye_R_Highlight_Visible": [
+      255,
+      220,
+      30
+    ],
+    "Eye_R_UpperLash_Visible": [
+      180,
+      55,
+      65
+    ],
+    "Eye_R_LowerLid_Visible": [
+      240,
+      130,
+      45
+    ],
+    "Eye_R_EdgeContext": [
+      210,
+      210,
+      210
+    ],
+    "Eye_L_Sclera_Visible": [
+      180,
+      205,
+      240
+    ],
+    "Eye_L_Iris_Visible": [
+      0,
+      175,
+      205
+    ],
+    "Eye_L_Pupil_Visible": [
+      35,
+      40,
+      90
+    ],
+    "Eye_L_Highlight_Visible": [
+      255,
+      220,
+      30
+    ],
+    "Eye_L_UpperLash_Visible": [
+      180,
+      55,
+      65
+    ],
+    "Eye_L_LowerLid_Visible": [
+      240,
+      130,
+      45
+    ],
+    "Eye_L_EdgeContext": [
+      210,
+      210,
+      210
+    ],
+    "Eye_R_UpperOcclusion_Visible": [
+      150,
+      75,
+      210
+    ],
+    "Eye_L_UpperOcclusion_Visible": [
+      150,
+      75,
+      210
+    ]
+  },
+  "assigned_pixel_counts": {
+    "Face_Context_Remainder": 45950,
+    "Nose_VisibleRegion": 576,
+    "Mouth_UpperLine_Visible": 490,
+    "Mouth_LowerEdge_Context": 294,
+    "Eye_R_Sclera_Visible": 383,
+    "Eye_R_Iris_Visible": 1330,
+    "Eye_R_Pupil_Visible": 100,
+    "Eye_R_Highlight_Visible": 24,
+    "Eye_R_UpperLash_Visible": 553,
+    "Eye_R_LowerLid_Visible": 9,
+    "Eye_R_EdgeContext": 1028,
+    "Eye_L_Sclera_Visible": 313,
+    "Eye_L_Iris_Visible": 1349,
+    "Eye_L_Pupil_Visible": 96,
+    "Eye_L_Highlight_Visible": 28,
+    "Eye_L_UpperLash_Visible": 603,
+    "Eye_L_LowerLid_Visible": 8,
+    "Eye_L_EdgeContext": 1033,
+    "Eye_R_UpperOcclusion_Visible": 207,
+    "Eye_L_UpperOcclusion_Visible": 226
+  },
+  "hidden_fills": {
+    "Eye_R_Sclera_HiddenFill": {
+      "filled_pixels": 1454,
+      "source": "Eye_R_Sclera_Visible",
+      "sample_count": 382,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_R_Iris_HiddenFill": {
+      "filled_pixels": 331,
+      "source": "Eye_R_Iris_Visible",
+      "sample_count": 945,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_L_Sclera_HiddenFill": {
+      "filled_pixels": 1473,
+      "source": "Eye_L_Sclera_Visible",
+      "sample_count": 309,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_L_Iris_HiddenFill": {
+      "filled_pixels": 350,
+      "source": "Eye_L_Iris_Visible",
+      "sample_count": 969,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    }
+  },
+  "fill_coverage": {
+    "R_stage_1": {
+      "exposed_pixels": 124,
+      "nonopaque_pixels": 0
+    },
+    "L_stage_1": {
+      "exposed_pixels": 124,
+      "nonopaque_pixels": 0
+    },
+    "R_stage_2": {
+      "exposed_pixels": 1454,
+      "nonopaque_pixels": 0
+    },
+    "L_stage_2": {
+      "exposed_pixels": 1473,
+      "nonopaque_pixels": 0
+    }
+  },
+  "checks": {
+    "in_memory": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5"
+    },
+    "xcf": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+      "layer_names": [
+        "Eye_L_UpperOcclusion_Visible",
+        "Eye_R_UpperOcclusion_Visible",
+        "Eye_L_EdgeContext",
+        "Eye_L_LowerLid_Visible",
+        "Eye_L_UpperLash_Visible",
+        "Eye_L_Highlight_Visible",
+        "Eye_L_Pupil_Visible",
+        "Eye_L_Iris_Visible",
+        "Eye_L_Sclera_Visible",
+        "Eye_R_EdgeContext",
+        "Eye_R_LowerLid_Visible",
+        "Eye_R_UpperLash_Visible",
+        "Eye_R_Highlight_Visible",
+        "Eye_R_Pupil_Visible",
+        "Eye_R_Iris_Visible",
+        "Eye_R_Sclera_Visible",
+        "Mouth_LowerEdge_Context",
+        "Mouth_UpperLine_Visible",
+        "Nose_VisibleRegion",
+        "Face_Context_Remainder",
+        "Eye_L_Iris_HiddenFill",
+        "Eye_L_Sclera_HiddenFill",
+        "Eye_R_Iris_HiddenFill",
+        "Eye_R_Sclera_HiddenFill"
+      ],
+      "partition_match": true
+    },
+    "psd": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+      "layer_names": [
+        "Eye_L_UpperOcclusion_Visible",
+        "Eye_R_UpperOcclusion_Visible",
+        "Eye_L_EdgeContext",
+        "Eye_L_LowerLid_Visible",
+        "Eye_L_UpperLash_Visible",
+        "Eye_L_Highlight_Visible",
+        "Eye_L_Pupil_Visible",
+        "Eye_L_Iris_Visible",
+        "Eye_L_Sclera_Visible",
+        "Eye_R_EdgeContext",
+        "Eye_R_LowerLid_Visible",
+        "Eye_R_UpperLash_Visible",
+        "Eye_R_Highlight_Visible",
+        "Eye_R_Pupil_Visible",
+        "Eye_R_Iris_Visible",
+        "Eye_R_Sclera_Visible",
+        "Mouth_LowerEdge_Context",
+        "Mouth_UpperLine_Visible",
+        "Nose_VisibleRegion",
+        "Face_Context_Remainder",
+        "Eye_L_Iris_HiddenFill",
+        "Eye_L_Sclera_HiddenFill",
+        "Eye_R_Iris_HiddenFill",
+        "Eye_R_Sclera_HiddenFill"
+      ],
+      "partition_match": true
+    }
+  },
+  "gaze_translation_checks": {
+    "-4": {
+      "offset_pixels": -4,
+      "moved_pixels": 2831,
+      "clipped_pixels": 529,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3081,
+        "max_channel_difference": 249,
+        "sha256": "9d6c307bf5d14d19b358ca5a296f332afbf559227e9a85d299a8817c860342be"
+      }
+    },
+    "-2": {
+      "offset_pixels": -2,
+      "moved_pixels": 2888,
+      "clipped_pixels": 472,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2975,
+        "max_channel_difference": 251,
+        "sha256": "b5962c1b5b12f2d6f75327347f8c75544345926ff30d7537144c766c68dc57e3"
+      }
+    },
+    "0": {
+      "offset_pixels": 0,
+      "moved_pixels": 2927,
+      "clipped_pixels": 433,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": true,
+        "changed_pixels": 0,
+        "max_channel_difference": 0,
+        "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5"
+      }
+    },
+    "2": {
+      "offset_pixels": 2,
+      "moved_pixels": 2858,
+      "clipped_pixels": 502,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2955,
+        "max_channel_difference": 251,
+        "sha256": "b6b592e673c93e3f27cf72777b8f26879a9c5fc98d150dc7707bb864f778967c"
+      }
+    },
+    "4": {
+      "offset_pixels": 4,
+      "moved_pixels": 2797,
+      "clipped_pixels": 563,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3051,
+        "max_channel_difference": 248,
+        "sha256": "2bd6b94dde0e9a5f544f98e5248dbaddbddda0e0e6cb2ec7e0539078c240f232"
+      }
+    }
+  },
+  "upper_occlusion_rule": {
+    "max_y_exclusive": 72,
+    "max_green_exclusive": 110
+  },
+  "feature_removal_changed_pixels": {
+    "Eye_L_UpperOcclusion_Visible": 226,
+    "Eye_R_UpperOcclusion_Visible": 207,
+    "Eye_L_EdgeContext": 1033,
+    "Eye_L_LowerLid_Visible": 8,
+    "Eye_L_UpperLash_Visible": 603,
+    "Eye_L_Highlight_Visible": 28,
+    "Eye_L_Pupil_Visible": 96,
+    "Eye_L_Iris_Visible": 1345,
+    "Eye_L_Sclera_Visible": 313,
+    "Eye_R_EdgeContext": 1028,
+    "Eye_R_LowerLid_Visible": 9,
+    "Eye_R_UpperLash_Visible": 553,
+    "Eye_R_Highlight_Visible": 24,
+    "Eye_R_Pupil_Visible": 100,
+    "Eye_R_Iris_Visible": 1322,
+    "Eye_R_Sclera_Visible": 383,
+    "Mouth_LowerEdge_Context": 294,
+    "Mouth_UpperLine_Visible": 490,
+    "Nose_VisibleRegion": 576
+  },
+  "limitations": [
+    "Semantic boundaries are provisional manual polygons and color rules",
+    "EdgeContext retains original skin/hair and antialias pixels",
+    "Hidden fills are interpolated prototypes, not approved hand-painted textures",
+    "Iris outside its currently visible outline is not reconstructed",
+    "Background retained; no clean character silhouette yet",
+    "Horizontal integer translation preview only; no Cubism or mesh deformation tests",
+    "Upper occlusion is a provisional opaque holdout, not a translucent shadow",
+    "No blink/open-mouth shapes; some mixed boundary pixels remain",
+    "Original resolution retained; not final production resolution"
+  ]
+}

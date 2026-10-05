@@ -6,6 +6,9 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 制作を始める際は、採用済みの [シエル外観参考 v1](docs/assets/ciel/ciel-approved-appearance-v1.png) を確認してください。控えめな鼻と滑らかな白磁の肌を基準にします。
 画像編集はGIMP 3.2.6を使用します。顔パーツの試作XCF・PSDは `.\scripts\build-ciel-face-study.ps1` で再生成できます。出力先・検証範囲は上記の制作仕様書を参照してください。
 現在の作業基準は [通常顔の分割・再合成比較](docs/assets/ciel/production/ciel-face-registration-v1-comparison.png) です。左が採用画像の等倍切り出し、右が5領域の再合成で、画素差分ゼロを確認済みです。まだ可動用の完成パーツではありません。
+現在は目の上端の影・輪郭を別レイヤーにした [通常顔v4](docs/assets/ciel/production/ciel-face-registration-v4-comparison.png)（24レイヤー）まで進んでいます。通常顔の画素差分はゼロです。既定の再生成コマンドはv4を出力します。検証範囲と残作業は制作仕様書を参照してください。
+
+[視線移動の検査画像](docs/assets/ciel/production/ciel-face-registration-v4-gaze-inspection.png) は、左から画面上の移動量−4px・−2px・0px・＋2px・＋4px。中央は採用した通常顔と一致します。上端の分離部分は固定されていますが、補完色の境目は調整中です。整数画素の平行移動による試験で、Cubismの動作確認はまだです。
 
 ## Unity開発環境
 
