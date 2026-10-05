@@ -1,0 +1,28 @@
+# Unity generated files
+/unity/[Ll]ibrary/
+/unity/[Tt]emp/
+/unity/[Oo]bj/
+/unity/[Ll]ogs/
+/unity/[Uu]ser[Ss]ettings/
+/unity/[Bb]uild/
+/unity/[Bb]uilds/
+/unity/.vs/
+/unity/.idea/
+*.csproj
+*.sln
+*.slnx
+*.pidb
+*.user
+*.userprefs
+*.apk
+*.aab
+*.unitypackage
+
+# Local tools, logs, credentials and private source assets
+/.local/
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+/assets/private/
