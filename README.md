@@ -3,6 +3,7 @@
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。
 要件は [仕様書](docs/specification-ja.md) を参照してください。
 シエルの原画・パーツ分け・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) に整理しています。
+制作を始める際は、採用済みの [シエル外観参考 v1](docs/assets/ciel/ciel-approved-appearance-v1.png) を確認してください。控えめな鼻と滑らかな白磁の肌を基準にします。
 
 ## Unity開発環境
 
