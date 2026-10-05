@@ -1,0 +1,576 @@
+{
+  "gimp": "3.2.6",
+  "canvas": [
+    1086,
+    1448
+  ],
+  "status": "B1 study; not rig-ready",
+  "layers": [
+    {
+      "name": "Reference_Neutral_v2",
+      "source": "ciel-neutral-source-v2.png",
+      "crop": [
+        0,
+        0,
+        1086,
+        1448
+      ],
+      "size": [
+        1086,
+        1448
+      ],
+      "position": [
+        0,
+        0
+      ],
+      "visible": false,
+      "alpha_cutoff": null
+    },
+    {
+      "name": "Face_Base_Trial",
+      "source": "face-base-study-v1.png",
+      "crop": [
+        330,
+        326,
+        426,
+        512
+      ],
+      "size": [
+        256,
+        307
+      ],
+      "position": [
+        415,
+        363
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_R_Sclera",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        115,
+        535,
+        345,
+        215
+      ],
+      "size": [
+        85,
+        53
+      ],
+      "position": [
+        431,
+        513
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_R_Iris",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        200,
+        828,
+        225,
+        236
+      ],
+      "size": [
+        48,
+        51
+      ],
+      "position": [
+        451,
+        511
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_R_UpperLash",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        85,
+        1140,
+        370,
+        210
+      ],
+      "size": [
+        100,
+        57
+      ],
+      "position": [
+        422,
+        497
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_L_Sclera",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        625,
+        535,
+        345,
+        215
+      ],
+      "size": [
+        85,
+        53
+      ],
+      "position": [
+        566,
+        513
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_L_Iris",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        660,
+        828,
+        225,
+        236
+      ],
+      "size": [
+        48,
+        51
+      ],
+      "position": [
+        586,
+        511
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Eye_L_UpperLash",
+      "source": "eye-components-study-v1.png",
+      "crop": [
+        632,
+        1140,
+        370,
+        210
+      ],
+      "size": [
+        100,
+        57
+      ],
+      "position": [
+        557,
+        497
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Mouth_Open_Study",
+      "source": "mouth-components-study-v1.png",
+      "crop": [
+        1110,
+        140,
+        320,
+        235
+      ],
+      "size": [
+        40,
+        29
+      ],
+      "position": [
+        523,
+        600
+      ],
+      "visible": false,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Mouth_Cavity",
+      "source": "mouth-components-study-v1.png",
+      "crop": [
+        600,
+        630,
+        340,
+        235
+      ],
+      "size": [
+        40,
+        28
+      ],
+      "position": [
+        523,
+        600
+      ],
+      "visible": false,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Mouth_Teeth",
+      "source": "mouth-components-study-v1.png",
+      "crop": [
+        1120,
+        620,
+        295,
+        110
+      ],
+      "size": [
+        37,
+        14
+      ],
+      "position": [
+        525,
+        600
+      ],
+      "visible": false,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Mouth_Tongue",
+      "source": "mouth-components-study-v1.png",
+      "crop": [
+        1135,
+        748,
+        270,
+        130
+      ],
+      "size": [
+        33,
+        16
+      ],
+      "position": [
+        527,
+        613
+      ],
+      "visible": false,
+      "alpha_cutoff": 180
+    },
+    {
+      "name": "Mouth_Closed",
+      "source": "mouth-components-study-v1.png",
+      "crop": [
+        105,
+        222,
+        350,
+        70
+      ],
+      "size": [
+        39,
+        8
+      ],
+      "position": [
+        524,
+        607
+      ],
+      "visible": true,
+      "alpha_cutoff": 180
+    }
+  ],
+  "roundtrip": {
+    ".xcf": {
+      "layer_count": 13,
+      "metadata_match": true,
+      "layers": [
+        {
+          "name": "Mouth_Closed",
+          "width": 39,
+          "height": 8,
+          "offsets": [
+            524,
+            607
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Tongue",
+          "width": 33,
+          "height": 16,
+          "offsets": [
+            527,
+            613
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Teeth",
+          "width": 37,
+          "height": 14,
+          "offsets": [
+            525,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Cavity",
+          "width": 40,
+          "height": 28,
+          "offsets": [
+            523,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Open_Study",
+          "width": 40,
+          "height": 29,
+          "offsets": [
+            523,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_UpperLash",
+          "width": 100,
+          "height": 57,
+          "offsets": [
+            557,
+            497
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_Iris",
+          "width": 48,
+          "height": 51,
+          "offsets": [
+            586,
+            511
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_Sclera",
+          "width": 85,
+          "height": 53,
+          "offsets": [
+            566,
+            513
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_UpperLash",
+          "width": 100,
+          "height": 57,
+          "offsets": [
+            422,
+            497
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_Iris",
+          "width": 48,
+          "height": 51,
+          "offsets": [
+            451,
+            511
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_Sclera",
+          "width": 85,
+          "height": 53,
+          "offsets": [
+            431,
+            513
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Face_Base_Trial",
+          "width": 256,
+          "height": 307,
+          "offsets": [
+            415,
+            363
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Reference_Neutral_v2",
+          "width": 1086,
+          "height": 1448,
+          "offsets": [
+            0,
+            0
+          ],
+          "visible": false,
+          "alpha": true
+        }
+      ]
+    },
+    ".psd": {
+      "layer_count": 13,
+      "metadata_match": true,
+      "layers": [
+        {
+          "name": "Mouth_Closed",
+          "width": 39,
+          "height": 8,
+          "offsets": [
+            524,
+            607
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Tongue",
+          "width": 33,
+          "height": 16,
+          "offsets": [
+            527,
+            613
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Teeth",
+          "width": 37,
+          "height": 14,
+          "offsets": [
+            525,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Cavity",
+          "width": 40,
+          "height": 28,
+          "offsets": [
+            523,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Mouth_Open_Study",
+          "width": 40,
+          "height": 29,
+          "offsets": [
+            523,
+            600
+          ],
+          "visible": false,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_UpperLash",
+          "width": 100,
+          "height": 57,
+          "offsets": [
+            557,
+            497
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_Iris",
+          "width": 48,
+          "height": 51,
+          "offsets": [
+            586,
+            511
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_L_Sclera",
+          "width": 85,
+          "height": 53,
+          "offsets": [
+            566,
+            513
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_UpperLash",
+          "width": 100,
+          "height": 57,
+          "offsets": [
+            422,
+            497
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_Iris",
+          "width": 48,
+          "height": 51,
+          "offsets": [
+            451,
+            511
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Eye_R_Sclera",
+          "width": 85,
+          "height": 53,
+          "offsets": [
+            431,
+            513
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Face_Base_Trial",
+          "width": 256,
+          "height": 307,
+          "offsets": [
+            415,
+            363
+          ],
+          "visible": true,
+          "alpha": true
+        },
+        {
+          "name": "Reference_Neutral_v2",
+          "width": 1086,
+          "height": 1448,
+          "offsets": [
+            0,
+            0
+          ],
+          "visible": false,
+          "alpha": true
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Prototype hard alpha masks require edge review",
+    "Coordinates are approximate; silhouette not approved",
+    "Brows, lower lids, closed-eye forms and hair not included",
+    "Cubism import and animation not tested"
+  ]
+}
