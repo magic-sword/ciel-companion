@@ -2,6 +2,7 @@
 
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。
 要件は [仕様書](docs/specification-ja.md) を参照してください。
+シエルの原画・パーツ分け・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) に整理しています。
 
 ## Unity開発環境
 
