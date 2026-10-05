@@ -26,3 +26,12 @@
 *.keystore
 *.jks
 /assets/private/
+
+# Live2D is installed separately under its own license, including sample assets.
+/unity/Assets/Live2D/
+/unity/Assets/Live2D.meta
+# Locally generated SDK verification scene and connection settings.
+/unity/Assets/Scenes/SdkCheck.unity
+/unity/Assets/Scenes/SdkCheck.unity.meta
+/unity/Assets/Settings/LiveKitTokenSource.asset
+/unity/Assets/Settings/LiveKitTokenSource.asset.meta
