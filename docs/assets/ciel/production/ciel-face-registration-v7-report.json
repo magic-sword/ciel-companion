@@ -1,0 +1,844 @@
+{
+  "source": "docs/assets/ciel/ciel-approved-appearance-v1.png",
+  "source_sha256": "f8cb6fa5359ebb834467226b813a8af3e47e18dae89cf8592af97569e6c115ad",
+  "crop": [
+    330,
+    235,
+    280,
+    195
+  ],
+  "canvas": [
+    280,
+    195
+  ],
+  "scale": 1,
+  "gimp": "3.2.6",
+  "stage": "Visible-region registration baseline, not rig-ready parts",
+  "regions": {
+    "Eye_R_VisibleRegion": [
+      [
+        36,
+        67
+      ],
+      [
+        52,
+        49
+      ],
+      [
+        84,
+        47
+      ],
+      [
+        107,
+        61
+      ],
+      [
+        113,
+        82
+      ],
+      [
+        101,
+        104
+      ],
+      [
+        62,
+        110
+      ],
+      [
+        44,
+        94
+      ]
+    ],
+    "Eye_L_VisibleRegion": [
+      [
+        167,
+        62
+      ],
+      [
+        188,
+        48
+      ],
+      [
+        221,
+        47
+      ],
+      [
+        240,
+        66
+      ],
+      [
+        239,
+        91
+      ],
+      [
+        217,
+        110
+      ],
+      [
+        181,
+        105
+      ],
+      [
+        168,
+        84
+      ]
+    ],
+    "Nose_VisibleRegion": [
+      [
+        128,
+        103
+      ],
+      [
+        152,
+        103
+      ],
+      [
+        152,
+        127
+      ],
+      [
+        128,
+        127
+      ]
+    ],
+    "Mouth_Closed_VisibleRegion": [
+      [
+        116,
+        133
+      ],
+      [
+        165,
+        133
+      ],
+      [
+        165,
+        149
+      ],
+      [
+        116,
+        149
+      ]
+    ]
+  },
+  "eye_geometry": {
+    "R": {
+      "iris": [
+        [
+          72,
+          59
+        ],
+        [
+          89,
+          58
+        ],
+        [
+          104,
+          65
+        ],
+        [
+          108,
+          80
+        ],
+        [
+          106,
+          96
+        ],
+        [
+          99,
+          104
+        ],
+        [
+          77,
+          105
+        ],
+        [
+          67,
+          94
+        ],
+        [
+          65,
+          76
+        ]
+      ],
+      "opening": [
+        [
+          53,
+          77
+        ],
+        [
+          60,
+          68
+        ],
+        [
+          73,
+          63
+        ],
+        [
+          95,
+          62
+        ],
+        [
+          107,
+          73
+        ],
+        [
+          106,
+          91
+        ],
+        [
+          100,
+          101
+        ],
+        [
+          79,
+          103
+        ],
+        [
+          60,
+          99
+        ],
+        [
+          53,
+          91
+        ]
+      ],
+      "pupil": [
+        87,
+        79,
+        4.5,
+        7.5
+      ],
+      "lower_y": 98
+    },
+    "L": {
+      "iris": [
+        [
+          180,
+          58
+        ],
+        [
+          194,
+          56
+        ],
+        [
+          209,
+          60
+        ],
+        [
+          216,
+          73
+        ],
+        [
+          216,
+          88
+        ],
+        [
+          209,
+          102
+        ],
+        [
+          188,
+          103
+        ],
+        [
+          176,
+          98
+        ],
+        [
+          173,
+          82
+        ],
+        [
+          175,
+          67
+        ]
+      ],
+      "opening": [
+        [
+          171,
+          73
+        ],
+        [
+          181,
+          62
+        ],
+        [
+          200,
+          58
+        ],
+        [
+          217,
+          64
+        ],
+        [
+          226,
+          72
+        ],
+        [
+          226,
+          88
+        ],
+        [
+          214,
+          98
+        ],
+        [
+          192,
+          101
+        ],
+        [
+          178,
+          97
+        ],
+        [
+          173,
+          86
+        ]
+      ],
+      "pupil": [
+        193,
+        77,
+        4.0,
+        7.5
+      ],
+      "lower_y": 98
+    }
+  },
+  "ownership_colors": {
+    "Face_Context_Remainder": [
+      244,
+      246,
+      250
+    ],
+    "Nose_VisibleRegion": [
+      160,
+      100,
+      200
+    ],
+    "Mouth_UpperLine_Visible": [
+      230,
+      80,
+      110
+    ],
+    "Mouth_LowerEdge_Context": [
+      240,
+      170,
+      120
+    ],
+    "Eye_R_Sclera_Visible": [
+      180,
+      205,
+      240
+    ],
+    "Eye_R_Iris_Visible": [
+      0,
+      175,
+      205
+    ],
+    "Eye_R_Pupil_Visible": [
+      35,
+      40,
+      90
+    ],
+    "Eye_R_Highlight_Visible": [
+      255,
+      220,
+      30
+    ],
+    "Eye_R_UpperLash_Visible": [
+      180,
+      55,
+      65
+    ],
+    "Eye_R_LowerLid_Visible": [
+      240,
+      130,
+      45
+    ],
+    "Eye_R_EdgeContext": [
+      210,
+      210,
+      210
+    ],
+    "Eye_L_Sclera_Visible": [
+      180,
+      205,
+      240
+    ],
+    "Eye_L_Iris_Visible": [
+      0,
+      175,
+      205
+    ],
+    "Eye_L_Pupil_Visible": [
+      35,
+      40,
+      90
+    ],
+    "Eye_L_Highlight_Visible": [
+      255,
+      220,
+      30
+    ],
+    "Eye_L_UpperLash_Visible": [
+      180,
+      55,
+      65
+    ],
+    "Eye_L_LowerLid_Visible": [
+      240,
+      130,
+      45
+    ],
+    "Eye_L_EdgeContext": [
+      210,
+      210,
+      210
+    ],
+    "Eye_R_UpperOcclusion_Visible": [
+      150,
+      75,
+      210
+    ],
+    "Eye_L_UpperOcclusion_Visible": [
+      150,
+      75,
+      210
+    ]
+  },
+  "assigned_pixel_counts": {
+    "Face_Context_Remainder": 45950,
+    "Nose_VisibleRegion": 576,
+    "Mouth_UpperLine_Visible": 490,
+    "Mouth_LowerEdge_Context": 294,
+    "Eye_R_Sclera_Visible": 383,
+    "Eye_R_Iris_Visible": 1330,
+    "Eye_R_Pupil_Visible": 100,
+    "Eye_R_Highlight_Visible": 24,
+    "Eye_R_UpperLash_Visible": 553,
+    "Eye_R_LowerLid_Visible": 9,
+    "Eye_R_EdgeContext": 1028,
+    "Eye_L_Sclera_Visible": 313,
+    "Eye_L_Iris_Visible": 1349,
+    "Eye_L_Pupil_Visible": 96,
+    "Eye_L_Highlight_Visible": 28,
+    "Eye_L_UpperLash_Visible": 603,
+    "Eye_L_LowerLid_Visible": 8,
+    "Eye_L_EdgeContext": 1033,
+    "Eye_R_UpperOcclusion_Visible": 207,
+    "Eye_L_UpperOcclusion_Visible": 226
+  },
+  "hidden_fills": {
+    "Eye_R_Sclera_HiddenFill": {
+      "filled_pixels": 1454,
+      "source": "Eye_R_Sclera_Visible",
+      "sample_count": 382,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_R_Iris_HiddenFill": {
+      "filled_pixels": 331,
+      "source": "Eye_R_Iris_Visible",
+      "sample_count": 945,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_L_Sclera_HiddenFill": {
+      "filled_pixels": 1473,
+      "source": "Eye_L_Sclera_Visible",
+      "sample_count": 309,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    },
+    "Eye_L_Iris_HiddenFill": {
+      "filled_pixels": 350,
+      "source": "Eye_L_Iris_Visible",
+      "sample_count": 969,
+      "method": "8-neighbor inverse-distance RGB interpolation; y distance weighted 4x"
+    }
+  },
+  "fill_coverage": {
+    "R_stage_1": {
+      "exposed_pixels": 124,
+      "nonopaque_pixels": 0
+    },
+    "L_stage_1": {
+      "exposed_pixels": 124,
+      "nonopaque_pixels": 0
+    },
+    "R_stage_2": {
+      "exposed_pixels": 1454,
+      "nonopaque_pixels": 0
+    },
+    "L_stage_2": {
+      "exposed_pixels": 1473,
+      "nonopaque_pixels": 0
+    }
+  },
+  "checks": {
+    "in_memory": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5"
+    },
+    "xcf": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+      "layer_names": [
+        "Eye_L_UpperOcclusion_Visible",
+        "Eye_R_UpperOcclusion_Visible",
+        "Eye_L_EdgeContext",
+        "Eye_L_LowerLid_Visible",
+        "Eye_L_UpperLash_Visible",
+        "Eye_L_Highlight_Visible",
+        "Eye_L_Pupil_Visible",
+        "Eye_L_Iris_Visible",
+        "Eye_L_Sclera_Visible",
+        "Eye_R_EdgeContext",
+        "Eye_R_LowerLid_Visible",
+        "Eye_R_UpperLash_Visible",
+        "Eye_R_Highlight_Visible",
+        "Eye_R_Pupil_Visible",
+        "Eye_R_Iris_Visible",
+        "Eye_R_Sclera_Visible",
+        "Mouth_LowerEdge_Context",
+        "Mouth_UpperLine_Visible",
+        "Nose_VisibleRegion",
+        "Face_Context_Remainder",
+        "Eye_L_Iris_HiddenFill",
+        "Eye_L_Sclera_HiddenFill",
+        "Eye_R_Iris_HiddenFill",
+        "Eye_R_Sclera_HiddenFill"
+      ],
+      "partition_match": true
+    },
+    "psd": {
+      "equal": true,
+      "changed_pixels": 0,
+      "max_channel_difference": 0,
+      "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+      "layer_names": [
+        "Eye_L_UpperOcclusion_Visible",
+        "Eye_R_UpperOcclusion_Visible",
+        "Eye_L_EdgeContext",
+        "Eye_L_LowerLid_Visible",
+        "Eye_L_UpperLash_Visible",
+        "Eye_L_Highlight_Visible",
+        "Eye_L_Pupil_Visible",
+        "Eye_L_Iris_Visible",
+        "Eye_L_Sclera_Visible",
+        "Eye_R_EdgeContext",
+        "Eye_R_LowerLid_Visible",
+        "Eye_R_UpperLash_Visible",
+        "Eye_R_Highlight_Visible",
+        "Eye_R_Pupil_Visible",
+        "Eye_R_Iris_Visible",
+        "Eye_R_Sclera_Visible",
+        "Mouth_LowerEdge_Context",
+        "Mouth_UpperLine_Visible",
+        "Nose_VisibleRegion",
+        "Face_Context_Remainder",
+        "Eye_L_Iris_HiddenFill",
+        "Eye_L_Sclera_HiddenFill",
+        "Eye_R_Iris_HiddenFill",
+        "Eye_R_Sclera_HiddenFill"
+      ],
+      "partition_match": true
+    }
+  },
+  "gaze_translation_checks": {
+    "-4.0": {
+      "offset_pixels": -4.0,
+      "moved_pixels": 2831,
+      "feathered_contour_pixels": 134,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3083,
+        "max_channel_difference": 249,
+        "sha256": "36c25b6d0ce2194112178e7f2a68ee0f870f04d391e22724aee243b27213a9a7"
+      }
+    },
+    "-3.5": {
+      "offset_pixels": -3.5,
+      "moved_pixels": 2896,
+      "feathered_contour_pixels": 239,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3075,
+        "max_channel_difference": 246,
+        "sha256": "d4d4363629a7a0a9ef1b0a09e5c25a1f656c3ca0b9b0a7cda2f6c3d94e3644e5"
+      }
+    },
+    "-3.0": {
+      "offset_pixels": -3.0,
+      "moved_pixels": 2861,
+      "feathered_contour_pixels": 141,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3036,
+        "max_channel_difference": 250,
+        "sha256": "5aa70d99a395aebbceca854eb7957239e4f92d9eafca63afa13ecfb3fcd62b63"
+      }
+    },
+    "-2.5": {
+      "offset_pixels": -2.5,
+      "moved_pixels": 2928,
+      "feathered_contour_pixels": 255,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3022,
+        "max_channel_difference": 247,
+        "sha256": "96bc1be06e03a109bfa9f794387ac28a60e2365e6f74068e38125e4f8ffb7c17"
+      }
+    },
+    "-2.0": {
+      "offset_pixels": -2.0,
+      "moved_pixels": 2888,
+      "feathered_contour_pixels": 152,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2978,
+        "max_channel_difference": 251,
+        "sha256": "ccc822d075b7a108ba01f56af3f9d23c12c2789c1a8bf5275d59e13e5f24b8b0"
+      }
+    },
+    "-1.5": {
+      "offset_pixels": -1.5,
+      "moved_pixels": 2954,
+      "feathered_contour_pixels": 275,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2955,
+        "max_channel_difference": 216,
+        "sha256": "8e285a59061d984bb7dac3f0a0aff977c665f23b58ff9cbbe73cb45171ca8338"
+      }
+    },
+    "-1.0": {
+      "offset_pixels": -1.0,
+      "moved_pixels": 2909,
+      "feathered_contour_pixels": 165,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2886,
+        "max_channel_difference": 193,
+        "sha256": "a80b386741ef489cb3d79ced82d1ec9b0e33409bf28b6d7a62addb1e108ea861"
+      }
+    },
+    "-0.5": {
+      "offset_pixels": -0.5,
+      "moved_pixels": 2980,
+      "feathered_contour_pixels": 305,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2732,
+        "max_channel_difference": 96,
+        "sha256": "0af0174d2900642b35b433ca81ae903342fa2bfd57228554fbe44b3f9aaa2192"
+      }
+    },
+    "0.0": {
+      "offset_pixels": 0.0,
+      "moved_pixels": 2927,
+      "feathered_contour_pixels": 0,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": true,
+        "changed_pixels": 0,
+        "max_channel_difference": 0,
+        "sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5"
+      }
+    },
+    "0.5": {
+      "offset_pixels": 0.5,
+      "moved_pixels": 2962,
+      "feathered_contour_pixels": 290,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2705,
+        "max_channel_difference": 97,
+        "sha256": "ff1278e616bee53f664fbfa06dca312d8e4a0eeada62d97817f35cba4f87c7a2"
+      }
+    },
+    "1.0": {
+      "offset_pixels": 1.0,
+      "moved_pixels": 2891,
+      "feathered_contour_pixels": 149,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2866,
+        "max_channel_difference": 194,
+        "sha256": "192e1d0dfc475ae1f42ca87a6a8e35ec16ffed6e70ef57287dad764c1dcc229d"
+      }
+    },
+    "1.5": {
+      "offset_pixels": 1.5,
+      "moved_pixels": 2927,
+      "feathered_contour_pixels": 250,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2922,
+        "max_channel_difference": 214,
+        "sha256": "63779ee1225d3bcabb71aa7f455c092df4e71ef01d26c5ede96aaa0e14e9b618"
+      }
+    },
+    "2.0": {
+      "offset_pixels": 2.0,
+      "moved_pixels": 2858,
+      "feathered_contour_pixels": 144,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2956,
+        "max_channel_difference": 251,
+        "sha256": "f6804e5a5cbff2809ad209141760247db0b8eda6dc10eab660c49c53c214032a"
+      }
+    },
+    "2.5": {
+      "offset_pixels": 2.5,
+      "moved_pixels": 2894,
+      "feathered_contour_pixels": 242,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 2998,
+        "max_channel_difference": 250,
+        "sha256": "6d24bfe7fbbc083b4811ef8df5455fa7a37976a9e2dd0e8f641841cfe561ba96"
+      }
+    },
+    "3.0": {
+      "offset_pixels": 3.0,
+      "moved_pixels": 2827,
+      "feathered_contour_pixels": 137,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3005,
+        "max_channel_difference": 250,
+        "sha256": "baca73c2056299996ecf85e78b285f77f04fdaf4059a9be276ed7ffeaed3eecc"
+      }
+    },
+    "3.5": {
+      "offset_pixels": 3.5,
+      "moved_pixels": 2862,
+      "feathered_contour_pixels": 236,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3044,
+        "max_channel_difference": 249,
+        "sha256": "3196f1a77e5938f7282e1b5f296276f1f2b13f78900d33c9dc532895ddc51100"
+      }
+    },
+    "4.0": {
+      "offset_pixels": 4.0,
+      "moved_pixels": 2797,
+      "feathered_contour_pixels": 133,
+      "nonopaque_eye_pixels": 0,
+      "changed_pixels_outside_eyes": 0,
+      "changed_upper_occlusion_pixels": 0,
+      "comparison": {
+        "equal": false,
+        "changed_pixels": 3049,
+        "max_channel_difference": 248,
+        "sha256": "701b06a51f4dbdf07c30979eed3e0079aaeaa9bb1232563323aa2f3e33252b6d"
+      }
+    }
+  },
+  "upper_occlusion_rule": {
+    "max_y_exclusive": 72,
+    "max_green_exclusive": 110
+  },
+  "iris_fill_continuity": {
+    "Eye_R_Iris_HiddenFill": {
+      "method": "4-neighbor harmonic continuation; visible iris fixed",
+      "iterations": 113,
+      "max_update": 0.004839303036092701,
+      "boundary_edges": 155,
+      "mean_boundary_rgb_step_before": 17.713978494623657,
+      "mean_boundary_rgb_step_after": 12.453763440860214
+    },
+    "Eye_L_Iris_HiddenFill": {
+      "method": "4-neighbor harmonic continuation; visible iris fixed",
+      "iterations": 115,
+      "max_update": 0.004984495521796362,
+      "boundary_edges": 184,
+      "mean_boundary_rgb_step_before": 19.44927536231884,
+      "mean_boundary_rgb_step_after": 12.494565217391305
+    }
+  },
+  "motion_contour_method": "Premultiplied horizontal interpolation at 0.5px intervals; contour strength min(abs(dx),1); zero offset exact; preview only",
+  "feature_removal_changed_pixels": {
+    "Eye_L_UpperOcclusion_Visible": 226,
+    "Eye_R_UpperOcclusion_Visible": 207,
+    "Eye_L_EdgeContext": 1033,
+    "Eye_L_LowerLid_Visible": 8,
+    "Eye_L_UpperLash_Visible": 603,
+    "Eye_L_Highlight_Visible": 28,
+    "Eye_L_Pupil_Visible": 96,
+    "Eye_L_Iris_Visible": 1345,
+    "Eye_L_Sclera_Visible": 313,
+    "Eye_R_EdgeContext": 1028,
+    "Eye_R_LowerLid_Visible": 9,
+    "Eye_R_UpperLash_Visible": 553,
+    "Eye_R_Highlight_Visible": 24,
+    "Eye_R_Pupil_Visible": 100,
+    "Eye_R_Iris_Visible": 1322,
+    "Eye_R_Sclera_Visible": 383,
+    "Mouth_LowerEdge_Context": 294,
+    "Mouth_UpperLine_Visible": 490,
+    "Nose_VisibleRegion": 576
+  },
+  "limitations": [
+    "Semantic boundaries are provisional manual polygons and color rules",
+    "EdgeContext retains original skin/hair and antialias pixels",
+    "Hidden fills are interpolated prototypes, not approved hand-painted textures",
+    "Iris outside its currently visible outline is not reconstructed",
+    "Background retained; no clean character silhouette yet",
+    "Horizontal subpixel translation preview only; no Cubism or mesh deformation tests",
+    "Upper occlusion is a provisional opaque holdout, not a translucent shadow",
+    "No blink/open-mouth shapes; some mixed boundary pixels remain",
+    "Original resolution retained; not final production resolution"
+  ]
+}

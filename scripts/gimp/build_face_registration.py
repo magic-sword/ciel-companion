@@ -6,12 +6,13 @@ and the original background stay intact. No hidden reference supplies the previe
 import hashlib
 import json
 import os
+import math
 from pathlib import Path
 from gi.repository import Gimp, Gio, Gegl
 
 ROOT = Path(os.environ['CIEL_PROJECT_ROOT'])
 SOURCE = ROOT / 'docs/assets/ciel/ciel-approved-appearance-v1.png'
-OUT = ROOT / 'assets/private/ciel/live2d/gimp/face-registration-v4'
+OUT = ROOT / 'assets/private/ciel/live2d/gimp/face-registration-v7'
 OUT.mkdir(parents=True, exist_ok=True)
 FMT = "R'G'B'A u8"
 # Coordinates in the approved sheet's large left-hand portrait. No resizing.
@@ -136,6 +137,46 @@ for side in ['R', 'L']:
 
 fills = {}
 fill_records = {}
+continuity_records = {}
+
+
+def smooth_hidden_iris(rgba, targets, visible):
+    """Harmonic continuation with visible iris pixels held fixed; holes only."""
+    unknown = set(targets)
+    fixed = {i for i in range(0, len(reference), 4) if visible[i + 3]}
+    domain = unknown | fixed
+    neighbors = {}
+    for i in targets:
+        x, y = (i // 4) % W, (i // 4) // W
+        candidates = []
+        if x > 0: candidates.append(i - 4)
+        if x + 1 < W: candidates.append(i + 4)
+        if y > 0: candidates.append(i - W * 4)
+        if y + 1 < H: candidates.append(i + W * 4)
+        neighbors[i] = [j for j in candidates if j in domain]
+        assert neighbors[i]
+    edges = [(i, j) for i in targets for j in neighbors[i] if j in fixed]
+    assert edges
+    def seam(data):
+        return sum(abs(data[i + c] - visible[j + c]) for i, j in edges for c in range(3)) / (len(edges) * 3)
+    before = seam(rgba)
+    values = {i: [float(v) for v in rgba[i:i + 3]] for i in targets}
+    boundary = {i: list(visible[i:i + 3]) for i in fixed}
+    for iteration in range(2000):
+        delta = 0.0
+        for i in targets:
+            adjacent = [values[j] if j in unknown else boundary[j] for j in neighbors[i]]
+            value = [sum(v[c] for v in adjacent) / len(adjacent) for c in range(3)]
+            delta = max(delta, max(abs(value[c] - values[i][c]) for c in range(3)))
+            values[i] = value
+        if delta < 0.005:
+            break
+    assert delta < 0.005, 'Hidden iris continuation did not converge'
+    for i, rgb in values.items():
+        rgba[i:i + 4] = bytes([round(v) for v in rgb] + [255])
+    return dict(method='4-neighbor harmonic continuation; visible iris fixed',
+                iterations=iteration + 1, max_update=delta, boundary_edges=len(edges),
+                mean_boundary_rgb_step_before=before, mean_boundary_rgb_step_after=seam(rgba))
 
 
 def interpolate(samples, x, y):
@@ -170,6 +211,8 @@ for side in ['R', 'L']:
         rgba = bytearray(W * H * 4)
         for i in targets:
             rgba[i:i + 4] = interpolate(samples, (i // 4) % W, (i // 4) // W)
+        if kind == 'Iris':
+            continuity_records[name] = smooth_hidden_iris(rgba, targets, buffers[source_name])
         fills[name] = rgba
         fill_records[name] = dict(filled_pixels=len(targets), source=source_name,
                                  sample_count=len(samples), method='8-neighbor inverse-distance RGB interpolation; y distance weighted 4x')
@@ -199,7 +242,7 @@ checks = {'in_memory': compare(composite(image))}
 if not checks['in_memory']['equal']:
     raise RuntimeError(f'Reconstruction mismatch: {checks}')
 for suffix, proc in [('xcf', 'gimp-xcf-save'), ('psd', 'file-psd-export')]:
-    path = OUT / ('ciel-face-registration-v4.' + suffix)
+    path = OUT / ('ciel-face-registration-v7.' + suffix)
     run_proc(proc, image=image, file=Gio.File.new_for_path(str(path)))
     loaded = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(str(path)))
     checks[suffix] = compare(composite(loaded))
@@ -268,10 +311,15 @@ gaze_base = composite(image)
 for layer in image.get_layers():
     layer.set_visible(True)
 gaze_records = {}
+gaze_frames = {}
 gaze_sheet = Gimp.Image.new(W * 5, H, Gimp.ImageBaseType.RGB)
-for column, dx in enumerate([-4, -2, 0, 2, 4]):
+edge_sheet = Gimp.Image.new(W * 5, H * 2, Gimp.ImageBaseType.RGB)
+motion_doc = Gimp.Image.new(W, H, Gimp.ImageBaseType.RGB)
+sequence = Gimp.Image.new(W * 17, H, Gimp.ImageBaseType.RGB)
+for frame, dx in enumerate([n / 2 for n in range(-8, 9)]):
     gaze = bytearray(gaze_base)
-    clipped = 0
+    hard_gaze = bytearray(gaze_base)
+    feathered = 0
     moved = 0
     allowed = set()
     for side in ['R', 'L']:
@@ -285,15 +333,37 @@ for column, dx in enumerate([-4, -2, 0, 2, 4]):
             for i in range(0, len(reference), 4):
                 if part[i + 3]:
                     moving[i:i + 4] = part[i:i + 4]
-        for i in range(0, len(reference), 4):
-            if not moving[i + 3]:
+        for target in opening:
+            x, y = (target // 4) % W, (target // 4) // W
+            source_x = x - dx
+            left = math.floor(source_x)
+            fraction = source_x - left
+            rgb, hard_rgb = [0.0] * 3, [0.0] * 3
+            alpha = hard_alpha = 0.0
+            for sx, weight in [(left, 1 - fraction), (left + 1, fraction)]:
+                if not 0 <= sx < W or weight == 0:
+                    continue
+                i = 4 * (y * W + sx)
+                if not moving[i + 3]:
+                    continue
+                neighbors = [(sx - 1, y), (sx + 1, y), (sx, y - 1), (sx, y + 1)]
+                occupied = sum(0 <= nx < W and 0 <= ny < H and moving[4 * (ny * W + nx) + 3] != 0
+                               for nx, ny in neighbors)
+                # Continuously fade in the contour treatment over the first pixel.
+                coverage_alpha = 1 - min(abs(dx), 1) * (4 - occupied) / 8
+                a = weight * coverage_alpha
+                alpha += a
+                hard_alpha += weight
+                for c in range(3):
+                    rgb[c] += moving[i + c] * a
+                    hard_rgb[c] += moving[i + c] * weight
+            if hard_alpha == 0:
                 continue
-            x = (i // 4) % W
-            target = i + dx * 4
-            if not 0 <= x + dx < W or target not in opening:
-                clipped += 1
-                continue
-            gaze[target:target + 4] = moving[i:i + 4]
+            feathered += alpha < hard_alpha
+            gaze[target:target + 4] = bytes([round(rgb[c] + gaze_base[target + c] * (1 - alpha))
+                                            for c in range(3)] + [255])
+            hard_gaze[target:target + 4] = bytes([round(hard_rgb[c] + gaze_base[target + c] * (1 - hard_alpha))
+                                                 for c in range(3)] + [255])
             moved += 1
     outside_changes = sum(gaze[i:i + 4] != reference[i:i + 4]
                           for i in range(0, len(reference), 4) if i not in allowed)
@@ -306,14 +376,32 @@ for column, dx in enumerate([-4, -2, 0, 2, 4]):
     if dx == 0:
         assert bytes(gaze) == reference
     gaze_records[str(dx)] = dict(offset_pixels=dx, moved_pixels=moved,
-                                  clipped_pixels=clipped, nonopaque_eye_pixels=holes,
+                                  feathered_contour_pixels=feathered,
+                                  nonopaque_eye_pixels=holes,
                                   changed_pixels_outside_eyes=outside_changes,
                                   changed_upper_occlusion_pixels=fixed_changes,
                                   comparison=compare(gaze))
-    new_layer(gaze_sheet, f'Gaze_dx_{dx}', gaze, column * W)
+    if dx in [-4, -2, 0, 2, 4]:
+        column = [-4, -2, 0, 2, 4].index(dx)
+        new_layer(gaze_sheet, f'Gaze_dx_{dx}', gaze, column * W)
+        new_layer(edge_sheet, f'Before_dx_{dx}', hard_gaze, column * W)
+        new_layer(edge_sheet, f'After_dx_{dx}', gaze, column * W).set_offsets(column * W, H)
+    new_layer(sequence, f'Frame_{frame}', gaze, frame * W)
+    gaze_frames[frame] = bytes(gaze)
+    new_layer(motion_doc, f'Preview_dx_{dx}', gaze).set_visible(dx == 0)
 run_proc('file-png-export', image=gaze_sheet,
          file=Gio.File.new_for_path(str(OUT / 'gaze-inspection.png')))
 gaze_sheet.delete()
+run_proc('file-png-export', image=sequence,
+         file=Gio.File.new_for_path(str(OUT / 'gaze-sequence.png')))
+sequence.delete()
+run_proc('file-png-export', image=edge_sheet,
+         file=Gio.File.new_for_path(str(OUT / 'edge-comparison.png')))
+edge_sheet.delete()
+assert composite(motion_doc) == reference
+run_proc('gimp-xcf-save', image=motion_doc,
+         file=Gio.File.new_for_path(str(OUT / 'gaze-preview.xcf')))
+motion_doc.delete()
 assert compare(composite(image))['equal']
 
 # Ownership preview highlights provisional edges without changing production pixels.
@@ -339,17 +427,21 @@ report = dict(source='docs/assets/ciel/ciel-approved-appearance-v1.png',
               regions=regions, eye_geometry=eye_geometry, ownership_colors=legend,
               assigned_pixel_counts=counts, hidden_fills=fill_records, fill_coverage=coverage, checks=checks,
               gaze_translation_checks=gaze_records, upper_occlusion_rule=shadow_rule,
+              iris_fill_continuity=continuity_records,
+              motion_contour_method='Premultiplied horizontal interpolation at 0.5px intervals; contour strength min(abs(dx),1); zero offset exact; preview only',
               feature_removal_changed_pixels=ablation,
               limitations=['Semantic boundaries are provisional manual polygons and color rules',
                            'EdgeContext retains original skin/hair and antialias pixels',
                            'Hidden fills are interpolated prototypes, not approved hand-painted textures',
                            'Iris outside its currently visible outline is not reconstructed',
                            'Background retained; no clean character silhouette yet',
-                           'Horizontal integer translation preview only; no Cubism or mesh deformation tests',
+                           'Horizontal subpixel translation preview only; no Cubism or mesh deformation tests',
                            'Upper occlusion is a provisional opaque holdout, not a translucent shadow',
                            'No blink/open-mouth shapes; some mixed boundary pixels remain',
                            'Original resolution retained; not final production resolution'])
 (OUT / 'verification.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 print('CIEL_REGISTRATION_OK ' + json.dumps(checks), flush=True)
+exec(compile((ROOT / 'scripts/gimp/build_face_expressions.py').read_text(encoding='utf-8'),
+             'build_face_expressions.py', 'exec'))
 image.delete()
 original.delete()

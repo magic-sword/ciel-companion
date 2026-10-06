@@ -1,7 +1,7 @@
 # シエル Live2Dモデル制作仕様書
 
 - 作成日：2026-10-05（日本時間）
-- 版：0.17／目の上端の影・輪郭を別レイヤーにした24レイヤーのv4。通常顔の画素差分ゼロを維持。可動用パーツ・リギングは未完了。
+- 版：0.21／視線・瞬き・口の開閉を組み合わせた表情試作v1。通常顔の画素差分ゼロを維持。最終原画・Cubism用パーツ・リギングは未完了。
 - 用途：CIEL Companionのスマートフォン向け音声会話画面。
 - 上位要件：[アプリケーション仕様書](specification-ja.md)。
 - 本書の「必須」は今回の制作案における受け入れ条件。「提案」「暫定」「要確認」は、キャラクターの正式設定や実測済み性能を意味しない。
@@ -437,4 +437,104 @@ XCF・PSDはGit除外の制作領域に保存し、比較画像・検証記録�
 本工程は暗い上端の画素を不透明な固定領域として分けた試作で、半透明の落ち影を物理的に分離した完成素材ではない。
 明るい境界画素や残る影、補完色の継ぎ目は引き続き調整が必要。±4pxの可動範囲やCubismでの品質は未確定。
 次は補完した虹彩の色の連続性と上端のマスクを整え、その後に閉眼形状へ進む。
-既定の `.\scripts\build-ciel-face-study.ps1` はv4を再生成する。
+v4は上端の分離試作時点の記録として保持する。
+
+### 通常顔v5：虹彩の補完色の連続性（2026-10-06）
+
+v4の可視画素と分割境界は保持し、虹彩の隠れ部分だけを調整した。全24レイヤー。
+近傍8点の補間を初期値とし、可視虹彩を固定したまま上下左右4近傍の平均へ反復更新する。
+暗い可視虹彩も境界条件に含めることで、補完部分だけが明るく浮く傾向を抑える。
+白目、鼻、肌、通常顔に見えている画素は変更しない。
+
+- [通常顔の比較](assets/ciel/production/ciel-face-registration-v5-comparison.png)
+- [視線移動の検査画像](assets/ciel/production/ciel-face-registration-v5-gaze-inspection.png)
+- [補完部分の検査画像](assets/ciel/production/ciel-face-registration-v5-fill-inspection.png)：左から通常、瞳孔・ハイライト非表示、虹彩も非表示。表情案ではない。
+- [検証記録](assets/ciel/production/ciel-face-registration-v5-report.json)
+- 編集原本：`assets/private/ciel/live2d/gimp/face-registration-v5/ciel-face-registration-v5.xcf`
+- PSD：同フォルダの `ciel-face-registration-v5.psd`
+
+補完画素と隣接する可視虹彩画素のRGB絶対差平均（0〜255）は、R側17.71→12.45、L側19.45→12.49へ低下した。
+この数値は補完境界の局所的な色差であり、見た目全体の品質評価ではない。
+通常顔は分割直後・XCF再読み込み・PSD再読み込みのすべてで変更画素数0。24レイヤーの画素一致も確認した。
+左右2px・4px移動時にも透明穴0、目の外と固定上端の変更画素数0を維持。
+
+目視では通常顔を保持できているが、上端の不透明マスクと虹彩輪郭の硬さは残る。
+元の模様を復元したものではなく、色を連続させた補完試作。最終解像度の原画化・Cubism検証は未実施。
+次は上端と虹彩輪郭の境界処理を整え、閉眼形状の制作へ進む。
+v5は補完色の調整時点の記録として保持する。
+
+### 通常顔v6：移動時の虹彩輪郭の処理（2026-10-06）
+
+視線移動の検査合成に、虹彩輪郭の内側1pxの被覆率処理を追加した。
+周囲4画素の虹彩の有無に応じて縁を下の白目となじませる。虹彩内部の模様は処理対象にしない。
+中央0pxではこの処理を適用せず、承認された通常顔の画素を保持する。
+本処理は検査合成用で、通常顔の24レイヤーの元画素・境界マスクはv5と同じ。Cubism用アルファ素材への反映は未実施。
+
+- [通常顔の比較](assets/ciel/production/ciel-face-registration-v6-comparison.png)
+- [視線移動](assets/ciel/production/ciel-face-registration-v6-gaze-inspection.png)
+- [処理前後の比較](assets/ciel/production/ciel-face-registration-v6-edge-comparison.png)：上段が処理前、下段が処理後。左から−4px・−2px・0px・＋2px・＋4px。
+- [検証記録](assets/ciel/production/ciel-face-registration-v6-report.json)
+- 編集原本：`assets/private/ciel/live2d/gimp/face-registration-v6/ciel-face-registration-v6.xcf`
+- PSD：同フォルダの `ciel-face-registration-v6.psd`
+- 視線切替用：同フォルダの `gaze-preview.xcf`。各レイヤーは合成済みの検査画像。初期表示は0pxのみで、別の視線を見るときは表示レイヤーを1枚だけにする。リギング用パーツではない。
+
+通常顔は分割直後・XCFとPSDの再読み込み後に変更画素数0、全24レイヤーの画素一致を確認。
+左右2px・4pxの検査では縁の133〜152画素を処理し、透明穴0、目の外の変更0、固定上端の変更0を維持した。
+前後比較を目視確認した。縁の変化は小さく、上まぶたの不透明マスクの硬さや元背景が混ざる画素は残る。
+0pxと移動状態の処理が異なるため、連続アニメーション時の見え方は未検証。閉眼・開口・最終原画化も未完了。
+v6は整数画素での輪郭処理の記録として保持する。
+
+### 通常顔v7：中央付近の移動と連続再生用プレビュー（2026-10-06）
+
+視線の検査合成を0.5px刻み、−4〜＋4pxの17段階へ拡張した。
+透明部分のRGBがにじまないよう、色と被覆率を別々に重み付けして水平補間する。
+輪郭処理の強さは中央からの移動量0〜1pxに比例させ、v6の「中央だけ処理なし」という切り替えを連続した式へ置き換えた。
+通常顔の24レイヤーは変更せず、追加処理は検査画像の合成時に行う。
+
+- [視線プレビュー](assets/ciel/production/ciel-gaze-preview.html)：ブラウザーでローカルファイルを開く。再生・停止・中央へ戻す・スライダー操作に対応。画像PNGを同じフォルダに置く。自動再生はしない。
+- [5段階の比較](assets/ciel/production/ciel-face-registration-v7-gaze-inspection.png)
+- [通常顔の比較](assets/ciel/production/ciel-face-registration-v7-comparison.png)
+- [17コマの画像](assets/ciel/production/ciel-face-registration-v7-gaze-sequence.png)
+- [検証記録](assets/ciel/production/ciel-face-registration-v7-report.json)
+- 編集原本：`assets/private/ciel/live2d/gimp/face-registration-v7/ciel-face-registration-v7.xcf`
+- PSD：同フォルダの `ciel-face-registration-v7.psd`
+- 切替用XCF：同フォルダの `gaze-preview.xcf`。17枚の合成済み検査画像から1枚だけ表示する。
+
+通常顔のXCF・PSD再読み込み後も元画像との変更画素数0、24レイヤーの画素一致を確認。
+全17段階で透明穴0、目の外側の変更0、固定上端の変更0を確認した。5段階の画像を目視確認した。
+確認ページは100msごとにコマを切り替える往復再生。ブラウザーでの実際の操作・連続動画の目視検証は未実施。
+式の連続性と画素検査は、自然なアニメーションの完成を保証しない。上まぶたの不透明な境界、閉眼・開口、Cubismでの変形検証は残っている。
+既定の `.\scripts\build-ciel-face-study.ps1` はv7を再生成する。
+
+### 表情試作v1：視線・瞬き・口の開閉（2026-10-06）
+
+ユーザー指定の調整範囲は「瞬き・口の開閉まで」。通常顔を保持し、視線17段階に瞬き5段階と口の開閉5段階を組み合わせる確認用試作を作成した。
+本工程の到達点は動作と外観を比較できる試作。新しい閉眼・開口の形が正式に承認されたことや、最終原画・Cubismモデルの完成を意味しない。
+
+- [表情プレビュー](assets/ciel/production/ciel-gaze-preview.html)：既存の視線ページを拡張。ブラウザーで開き、各スライダー、まとめて再生、1回まばたき、通常顔に戻すで確認する。
+- [瞬き・口の5段階比較](assets/ciel/production/ciel-face-expressions-v1-comparison.png)：上段は閉眼率0・25・50・75・100%、下段は開口率0・25・50・75・100%。
+- [表情素材の検証記録](assets/ciel/production/ciel-face-expressions-v1-report.json)
+- [ブラウザー検証記録](assets/ciel/production/ciel-face-expressions-v1-browser-report.json)
+- [生成スクリプト](../scripts/gimp/build_face_expressions.py)：通常顔分割スクリプトからGIMP内で実行。
+- [ブラウザー検証スクリプト](../scripts/check-ciel-preview.mjs)
+- 編集用XCF：`assets/private/ciel/live2d/gimp/face-expressions-v1/expression-states.xcf`
+- PSD：同フォルダの `expression-states.psd`。通常顔1枚、瞬き5枚、口5枚の計11枚。各レイヤーは合成済みの確認画像で、1枚だけ表示して切り替える。Cubism用に分離したパーツではない。
+
+瞬きは虹彩の元の画素を上下につぶさず、上下まぶたの曲線で覆う。隠す部分の肌色は白い頬から補間し、閉じたまつげは新規の曲線で描画した。
+元の輪郭が点状に残った初回案、まぶたの肌が暗く浮いた案、虹彩が縮む案を比較して修正した。
+口は元の閉口線の位置を基準とした小さな楕円形。口内と舌は新規の暫定描画で、歯は追加していない。通常状態の鼻・肌・顔立ちは変更しない。
+
+検証範囲：
+
+- 通常顔へ戻したときは元画像とRGBAで画素一致。
+- 瞬き85状態（視線17×瞬き5）と口5状態で、対象領域外の変更画素数0、透明穴0。
+- XCF・PSD再読み込みで通常顔が一致し、11枚の表情レイヤーも保存前の画素と一致。
+- 実Chromeで再生・停止、通常顔復帰、瞬き・口の手動操作、1回まばたき後の復帰を検証。
+- ブラウザーで425通りの合成を検査し、不透明性と目・口の外接領域外が変わらないことを確認。JavaScript実行エラー0。
+- 比較画像とブラウザー画面を目視確認。自動検査は表情の美的な完成判定ではない。
+
+再生成は `.\scripts\build-ciel-face-study.ps1`。通常顔v7に続いて表情試作v1を生成する。
+公開プレビュー用のPNG・JSONは `docs/assets/ciel/production/`、編集原本は従来どおりGit除外領域で管理する。
+ブラウザー検証は専用のヘッドレスChrome（ローカルポート9228）に `node scripts/check-ciel-preview.mjs` で接続する。通常のブラウザープロファイルは使用しない。
+
+残る本制作工程は、閉眼・開口の外観承認、まつげの細部と口形の追加、高解像度原画化、背景除去と実際のパーツ分離、Cubismでの変形とUnity組み込み。
