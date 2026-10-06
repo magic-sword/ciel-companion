@@ -1,0 +1,33 @@
+{
+  "status": "material_candidate_cubism_import_pending",
+  "neutral_changed_pixels": 0,
+  "neutral_rgba_sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+  "roundtrip": {
+    "xcf": {
+      "neutral_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 22
+    },
+    "psd": {
+      "neutral_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 22
+    }
+  },
+  "changes": {
+    "R": {
+      "hidden_sclera_pixels_cleared": 1197
+    },
+    "L": {
+      "hidden_sclera_pixels_cleared": 1361
+    }
+  },
+  "estimated_hair_pixels": 14,
+  "psd_sha256": "f6d9053d0acf002fca14099ccc64bcec69a91f48794ef24894b9e5b0c161fce2",
+  "limits": [
+    "Estimated alpha, not original source alpha",
+    "Neutral GIMP equality does not prove Cubism blend equality",
+    "Existing meshes may need regeneration after aperture changes",
+    "Movement and hair occlusion in Cubism not yet verified"
+  ]
+}

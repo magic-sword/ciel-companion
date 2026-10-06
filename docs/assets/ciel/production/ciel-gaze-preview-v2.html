@@ -10,7 +10,7 @@ body{font-family:system-ui,sans-serif;background:#edf2f7;color:#233246;max-width
 <p>通常顔と見比べながら、視線・瞬き・口の開閉を確認できます。</p>
 <div class="views">
 <figure><canvas id="normal" width="280" height="195" aria-label="採用した通常顔"></canvas><figcaption>採用した通常顔</figcaption></figure>
-<figure><canvas id="motion" width="280" height="195" aria-label="視線・瞬き・口の開閉の試作"></canvas><figcaption>承認された閉眼デザインの動作試作</figcaption></figure>
+<figure><canvas id="motion" width="280" height="195" aria-label="視線・瞬き・口の開閉の試作"></canvas><figcaption>表情のリメイク v2</figcaption></figure>
 </div>
 <p id="status" role="status">画像を読み込んでいます。</p>
 <div class="controls">
@@ -20,7 +20,7 @@ body{font-family:system-ui,sans-serif;background:#edf2f7;color:#233246;max-width
 </div>
 <button id="play" disabled>まとめて再生</button><button id="once" disabled>1回まばたき</button><button id="reset" disabled>通常顔に戻す</button>
 <label for="speed">再生速度 <select id="speed"><option value="1">通常</option><option value="0.25">ゆっくり（¼倍）</option></select></label>
-<p class="note">承認された閉眼見本のまつ毛と肌を分離し、通常顔からつなぐ確認用の試作です。原寸280×195pxを拡大表示しています。通常顔は採用画像と一致します。今回の新素材を使ったCubismモデルとUnity表示は未検証です。</p>
+<p class="note">髪際と目の周りの輪郭を、瞬きで消えないよう分離した確認用の試作です。原寸280×195pxを拡大表示しています。通常顔は採用画像と一致します。Cubismでは片目を検証中で、Unity表示と最終的な仕上がりは未確認です。</p>
 <script>
 const byId=id=>document.getElementById(id);
 const slider=byId('frame'),blink=byId('blink'),mouth=byId('mouth');
@@ -58,7 +58,7 @@ reset.addEventListener('click',()=>{stop();slider.value=8;blink.value=mouth.valu
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
 byId('speed').addEventListener('change',stop);
 function load(src,width,height){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>img.naturalWidth===width&&img.naturalHeight===height?resolve(img):reject(Error('画像サイズが一致しません'));img.onerror=()=>reject(Error(`${src} を読み込めません`));img.src=src;});}
-Promise.all([load('ciel-approved-eye-motion-v1-blink-atlas.png',4760,195*(Number(blink.max)+1)),load('ciel-approved-eye-motion-v1-mouth-atlas.png',280*(Number(mouth.max)+1),195)])
+Promise.all([load('ciel-face-remake-v2-blink-atlas.png',4760,195*(Number(blink.max)+1)),load('ciel-face-remake-v2-mouth-atlas.png',280*(Number(mouth.max)+1),195)])
  .then(([eyes,lips])=>{eyeSprite=eyes;mouthSprite=lips;byId('normal').getContext('2d').drawImage(eyes,8*280,0,280,195,0,0,280,195);draw();for(const control of [slider,blink,mouth,play,once,reset])control.disabled=false;byId('status').textContent=`視線17段階・瞬き${Number(blink.max)+1}段階・口${Number(mouth.max)+1}段階を読み込みました。`;})
  .catch(error=>{byId('status').textContent=`${error.message}。HTMLと画像を同じフォルダに置いてください。`;});
 </script>

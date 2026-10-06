@@ -1,0 +1,909 @@
+{
+  "status": "material_candidate_cubism_import_pending",
+  "neutral_changed_pixels": 0,
+  "neutral_rgba_sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+  "roundtrip": {
+    "xcf": {
+      "neutral_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 22
+    },
+    "psd": {
+      "neutral_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 22
+    }
+  },
+  "changes": {
+    "R": {
+      "hidden_sclera_pixels_cleared": 1197,
+      "iris_underpaint_pixels": 134,
+      "pupil_and_highlight_have_opaque_underpaint": true,
+      "estimated_iris_perimeter": [
+        {
+          "pixel": [
+            71,
+            62
+          ],
+          "alpha": 235
+        },
+        {
+          "pixel": [
+            70,
+            63
+          ],
+          "alpha": 87
+        },
+        {
+          "pixel": [
+            70,
+            64
+          ],
+          "alpha": 207
+        },
+        {
+          "pixel": [
+            69,
+            65
+          ],
+          "alpha": 148
+        },
+        {
+          "pixel": [
+            69,
+            66
+          ],
+          "alpha": 236
+        },
+        {
+          "pixel": [
+            68,
+            67
+          ],
+          "alpha": 130
+        },
+        {
+          "pixel": [
+            68,
+            68
+          ],
+          "alpha": 226
+        },
+        {
+          "pixel": [
+            101,
+            69
+          ],
+          "alpha": 232
+        },
+        {
+          "pixel": [
+            67,
+            70
+          ],
+          "alpha": 157
+        },
+        {
+          "pixel": [
+            67,
+            71
+          ],
+          "alpha": 226
+        },
+        {
+          "pixel": [
+            102,
+            71
+          ],
+          "alpha": 223
+        },
+        {
+          "pixel": [
+            103,
+            72
+          ],
+          "alpha": 88
+        },
+        {
+          "pixel": [
+            103,
+            73
+          ],
+          "alpha": 146
+        },
+        {
+          "pixel": [
+            66,
+            74
+          ],
+          "alpha": 130
+        },
+        {
+          "pixel": [
+            103,
+            74
+          ],
+          "alpha": 208
+        },
+        {
+          "pixel": [
+            66,
+            75
+          ],
+          "alpha": 147
+        },
+        {
+          "pixel": [
+            66,
+            76
+          ],
+          "alpha": 164
+        },
+        {
+          "pixel": [
+            66,
+            77
+          ],
+          "alpha": 166
+        },
+        {
+          "pixel": [
+            104,
+            77
+          ],
+          "alpha": 75
+        },
+        {
+          "pixel": [
+            66,
+            78
+          ],
+          "alpha": 156
+        },
+        {
+          "pixel": [
+            104,
+            78
+          ],
+          "alpha": 108
+        },
+        {
+          "pixel": [
+            66,
+            79
+          ],
+          "alpha": 133
+        },
+        {
+          "pixel": [
+            104,
+            79
+          ],
+          "alpha": 126
+        },
+        {
+          "pixel": [
+            66,
+            80
+          ],
+          "alpha": 104
+        },
+        {
+          "pixel": [
+            104,
+            80
+          ],
+          "alpha": 147
+        },
+        {
+          "pixel": [
+            66,
+            81
+          ],
+          "alpha": 69
+        },
+        {
+          "pixel": [
+            104,
+            81
+          ],
+          "alpha": 152
+        },
+        {
+          "pixel": [
+            105,
+            82
+          ],
+          "alpha": 93
+        },
+        {
+          "pixel": [
+            105,
+            83
+          ],
+          "alpha": 73
+        },
+        {
+          "pixel": [
+            105,
+            84
+          ],
+          "alpha": 146
+        },
+        {
+          "pixel": [
+            67,
+            85
+          ],
+          "alpha": 238
+        },
+        {
+          "pixel": [
+            104,
+            85
+          ],
+          "alpha": 150
+        },
+        {
+          "pixel": [
+            67,
+            86
+          ],
+          "alpha": 101
+        },
+        {
+          "pixel": [
+            104,
+            86
+          ],
+          "alpha": 78
+        },
+        {
+          "pixel": [
+            67,
+            87
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            104,
+            87
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            68,
+            88
+          ],
+          "alpha": 165
+        },
+        {
+          "pixel": [
+            103,
+            88
+          ],
+          "alpha": 203
+        },
+        {
+          "pixel": [
+            68,
+            89
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            103,
+            89
+          ],
+          "alpha": 144
+        },
+        {
+          "pixel": [
+            68,
+            90
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            103,
+            90
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            69,
+            91
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            102,
+            91
+          ],
+          "alpha": 233
+        },
+        {
+          "pixel": [
+            69,
+            92
+          ],
+          "alpha": 219
+        },
+        {
+          "pixel": [
+            102,
+            92
+          ],
+          "alpha": 104
+        },
+        {
+          "pixel": [
+            70,
+            93
+          ],
+          "alpha": 219
+        },
+        {
+          "pixel": [
+            102,
+            93
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            101,
+            94
+          ],
+          "alpha": 92
+        },
+        {
+          "pixel": [
+            100,
+            95
+          ],
+          "alpha": 183
+        },
+        {
+          "pixel": [
+            99,
+            96
+          ],
+          "alpha": 185
+        },
+        {
+          "pixel": [
+            98,
+            97
+          ],
+          "alpha": 193
+        },
+        {
+          "pixel": [
+            97,
+            99
+          ],
+          "alpha": 164
+        },
+        {
+          "pixel": [
+            90,
+            100
+          ],
+          "alpha": 207
+        },
+        {
+          "pixel": [
+            91,
+            100
+          ],
+          "alpha": 164
+        },
+        {
+          "pixel": [
+            92,
+            100
+          ],
+          "alpha": 108
+        },
+        {
+          "pixel": [
+            93,
+            100
+          ],
+          "alpha": 85
+        },
+        {
+          "pixel": [
+            83,
+            101
+          ],
+          "alpha": 231
+        },
+        {
+          "pixel": [
+            84,
+            101
+          ],
+          "alpha": 178
+        },
+        {
+          "pixel": [
+            85,
+            101
+          ],
+          "alpha": 123
+        },
+        {
+          "pixel": [
+            86,
+            101
+          ],
+          "alpha": 75
+        },
+        {
+          "pixel": [
+            87,
+            101
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            88,
+            101
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            89,
+            101
+          ],
+          "alpha": 64
+        }
+      ]
+    },
+    "L": {
+      "hidden_sclera_pixels_cleared": 1361,
+      "iris_underpaint_pixels": 129,
+      "pupil_and_highlight_have_opaque_underpaint": true,
+      "estimated_iris_perimeter": [
+        {
+          "pixel": [
+            206,
+            61
+          ],
+          "alpha": 252
+        },
+        {
+          "pixel": [
+            185,
+            63
+          ],
+          "alpha": 235
+        },
+        {
+          "pixel": [
+            183,
+            64
+          ],
+          "alpha": 189
+        },
+        {
+          "pixel": [
+            184,
+            64
+          ],
+          "alpha": 230
+        },
+        {
+          "pixel": [
+            182,
+            65
+          ],
+          "alpha": 227
+        },
+        {
+          "pixel": [
+            211,
+            65
+          ],
+          "alpha": 230
+        },
+        {
+          "pixel": [
+            212,
+            67
+          ],
+          "alpha": 198
+        },
+        {
+          "pixel": [
+            212,
+            68
+          ],
+          "alpha": 251
+        },
+        {
+          "pixel": [
+            213,
+            69
+          ],
+          "alpha": 108
+        },
+        {
+          "pixel": [
+            213,
+            70
+          ],
+          "alpha": 152
+        },
+        {
+          "pixel": [
+            175,
+            71
+          ],
+          "alpha": 210
+        },
+        {
+          "pixel": [
+            176,
+            71
+          ],
+          "alpha": 139
+        },
+        {
+          "pixel": [
+            213,
+            71
+          ],
+          "alpha": 182
+        },
+        {
+          "pixel": [
+            175,
+            72
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            213,
+            72
+          ],
+          "alpha": 204
+        },
+        {
+          "pixel": [
+            175,
+            73
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            213,
+            73
+          ],
+          "alpha": 215
+        },
+        {
+          "pixel": [
+            175,
+            74
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            213,
+            74
+          ],
+          "alpha": 224
+        },
+        {
+          "pixel": [
+            175,
+            75
+          ],
+          "alpha": 104
+        },
+        {
+          "pixel": [
+            213,
+            75
+          ],
+          "alpha": 227
+        },
+        {
+          "pixel": [
+            175,
+            76
+          ],
+          "alpha": 136
+        },
+        {
+          "pixel": [
+            213,
+            76
+          ],
+          "alpha": 227
+        },
+        {
+          "pixel": [
+            175,
+            77
+          ],
+          "alpha": 162
+        },
+        {
+          "pixel": [
+            213,
+            77
+          ],
+          "alpha": 220
+        },
+        {
+          "pixel": [
+            174,
+            78
+          ],
+          "alpha": 146
+        },
+        {
+          "pixel": [
+            213,
+            78
+          ],
+          "alpha": 218
+        },
+        {
+          "pixel": [
+            174,
+            79
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            214,
+            79
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            174,
+            80
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            214,
+            80
+          ],
+          "alpha": 205
+        },
+        {
+          "pixel": [
+            174,
+            81
+          ],
+          "alpha": 73
+        },
+        {
+          "pixel": [
+            214,
+            81
+          ],
+          "alpha": 205
+        },
+        {
+          "pixel": [
+            174,
+            82
+          ],
+          "alpha": 114
+        },
+        {
+          "pixel": [
+            214,
+            82
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            174,
+            83
+          ],
+          "alpha": 73
+        },
+        {
+          "pixel": [
+            214,
+            83
+          ],
+          "alpha": 73
+        },
+        {
+          "pixel": [
+            174,
+            84
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            175,
+            85
+          ],
+          "alpha": 71
+        },
+        {
+          "pixel": [
+            175,
+            86
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            175,
+            87
+          ],
+          "alpha": 170
+        },
+        {
+          "pixel": [
+            176,
+            88
+          ],
+          "alpha": 131
+        },
+        {
+          "pixel": [
+            176,
+            89
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            177,
+            90
+          ],
+          "alpha": 207
+        },
+        {
+          "pixel": [
+            177,
+            91
+          ],
+          "alpha": 84
+        },
+        {
+          "pixel": [
+            178,
+            92
+          ],
+          "alpha": 241
+        },
+        {
+          "pixel": [
+            178,
+            93
+          ],
+          "alpha": 66
+        },
+        {
+          "pixel": [
+            179,
+            94
+          ],
+          "alpha": 151
+        },
+        {
+          "pixel": [
+            180,
+            95
+          ],
+          "alpha": 188
+        },
+        {
+          "pixel": [
+            180,
+            96
+          ],
+          "alpha": 243
+        },
+        {
+          "pixel": [
+            181,
+            97
+          ],
+          "alpha": 122
+        },
+        {
+          "pixel": [
+            182,
+            98
+          ],
+          "alpha": 89
+        },
+        {
+          "pixel": [
+            183,
+            98
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            184,
+            99
+          ],
+          "alpha": 222
+        },
+        {
+          "pixel": [
+            196,
+            100
+          ],
+          "alpha": 111
+        },
+        {
+          "pixel": [
+            197,
+            100
+          ],
+          "alpha": 67
+        },
+        {
+          "pixel": [
+            198,
+            100
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            199,
+            100
+          ],
+          "alpha": 64
+        },
+        {
+          "pixel": [
+            200,
+            100
+          ],
+          "alpha": 86
+        },
+        {
+          "pixel": [
+            201,
+            100
+          ],
+          "alpha": 160
+        }
+      ]
+    }
+  },
+  "estimated_hair_pixels": 14,
+  "psd_sha256": "44076d3fe9fb4409a17c854348ee4b5dcdc3134487469b95b4bb6829222ebc9d",
+  "limits": [
+    "Hair and iris alpha are estimates, not original source alpha",
+    "Neutral GIMP equality does not prove Cubism blend equality",
+    "Existing meshes may need regeneration after aperture changes",
+    "Movement and hair occlusion in Cubism not yet verified"
+  ]
+}

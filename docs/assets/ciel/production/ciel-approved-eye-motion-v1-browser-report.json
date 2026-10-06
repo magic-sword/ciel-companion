@@ -1,0 +1,25 @@
+{
+  "initialNormalExact": true,
+  "playbackChangesFrame": true,
+  "stopStable": true,
+  "resetNormalExact": true,
+  "expressions": {
+    "blink": true,
+    "mouth": true
+  },
+  "oneShotBlinkReturnsNormal": true,
+  "quarterSpeedBlinkReturnsNormal": true,
+  "opaqueCombinationsWithUnchangedOutside": 18513,
+  "foregroundHoldoutsPreserved": true,
+  "closedEyesIndependentOfGaze": true,
+  "primaryHighlightsFollowIris": true,
+  "runtimeErrors": [],
+  "artifactSha256": {
+    "ciel-gaze-preview.html": "1277ad66d394a42336fd78426664d93647fb515a502866dfea145569b6dad7ee",
+    "ciel-approved-eye-motion-v1-blink-atlas.png": "5a5f5251c6e42db5f4741e885780c8aed0cba55657afa2f4925bd6dc80b4746a",
+    "ciel-approved-eye-motion-v1-mouth-atlas.png": "caa4da203b8cb9a94733d390699c9baa48ea877d2b37da6259c7e8c23d3b9025",
+    "ciel-approved-eye-motion-v1-report.json": "e1f5481b9e481771e74a9e9fead160973caf00916e5e69e7d9fade582331e3c4"
+  },
+  "estimatedHairAlphaCompositingVerified": true,
+  "stationaryContourPixelsPreserved": 520
+}

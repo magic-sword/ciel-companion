@@ -1,0 +1,67 @@
+{
+  "status": "specific_misclassified_pixels_fixed_not_global_material_approval",
+  "layout": {
+    "rows": [
+      "L (screen right)",
+      "R (screen left)"
+    ],
+    "columns": [
+      "UpperLash",
+      "UpperFold"
+    ]
+  },
+  "ownership_checks": [
+    {
+      "part": "L_UpperLash",
+      "pixel": [
+        219,
+        53
+      ],
+      "alpha": 255
+    },
+    {
+      "part": "L_UpperLash",
+      "pixel": [
+        225,
+        59
+      ],
+      "alpha": 255
+    },
+    {
+      "part": "L_UpperLash",
+      "pixel": [
+        230,
+        63
+      ],
+      "alpha": 255
+    },
+    {
+      "part": "L_UpperFold",
+      "pixel": [
+        219,
+        53
+      ],
+      "alpha": 0
+    },
+    {
+      "part": "L_UpperFold",
+      "pixel": [
+        225,
+        59
+      ],
+      "alpha": 0
+    },
+    {
+      "part": "L_UpperFold",
+      "pixel": [
+        230,
+        63
+      ],
+      "alpha": 0
+    }
+  ],
+  "limits": [
+    "Three known black lash pixels checked, not every source edge",
+    "Pale antialiased fringes still require production-resolution material work"
+  ]
+}

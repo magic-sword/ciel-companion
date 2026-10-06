@@ -1,0 +1,50 @@
+{
+  "status": "candidate_visual_review_pending_not_cubism_material",
+  "rows": [
+    "previous software rendering",
+    "redesigned aperture and independent lower contour"
+  ],
+  "columns": [
+    "normal",
+    "half closed",
+    "closed"
+  ],
+  "side": "L (screen right)",
+  "source": "docs\\assets\\ciel\\ciel-approved-appearance-v1.png",
+  "neutral_equal": true,
+  "checks": [
+    {
+      "closure": 0,
+      "outside_left_eye_changes": 0,
+      "opaque_hair_changes": 0
+    },
+    {
+      "closure": 0.5,
+      "outside_left_eye_changes": 0,
+      "opaque_hair_changes": 0
+    },
+    {
+      "closure": 1,
+      "outside_left_eye_changes": 0,
+      "opaque_hair_changes": 0
+    }
+  ],
+  "source_contour": {
+    "file": "lower-contour-import.psd",
+    "name": "L_LowerContour",
+    "nontransparent_pixels": 138,
+    "parent_plan": "L_EyeOpening",
+    "opacity_plan": {
+      "open": 0,
+      "half": 70,
+      "closed": 0
+    },
+    "note": "Import candidate only; match actual deformed edge before adoption"
+  },
+  "limitations": [
+    "Same 280x195 source crop; no new illustration detail",
+    "Closed pose retains the existing procedural upper lash",
+    "XCF contains comparison poses, not rig-ready separated parts",
+    "Cubism and Unity appearance not validated"
+  ]
+}

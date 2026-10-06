@@ -10,17 +10,16 @@ body{font-family:system-ui,sans-serif;background:#edf2f7;color:#233246;max-width
 <p>通常顔と見比べながら、視線・瞬き・口の開閉を確認できます。</p>
 <div class="views">
 <figure><canvas id="normal" width="280" height="195" aria-label="採用した通常顔"></canvas><figcaption>採用した通常顔</figcaption></figure>
-<figure><canvas id="motion" width="280" height="195" aria-label="視線・瞬き・口の開閉の試作"></canvas><figcaption>承認された閉眼デザインの動作試作</figcaption></figure>
+<figure><canvas id="motion" width="280" height="195" aria-label="視線・瞬き・口の開閉の試作"></canvas><figcaption>表情の試作</figcaption></figure>
 </div>
 <p id="status" role="status">画像を読み込んでいます。</p>
 <div class="controls">
 <label for="frame">左右の視線<input id="frame" type="range" min="0" max="16" step="1" value="8" disabled><output id="offset" for="frame">0 px</output></label>
-<label for="blink">目を閉じる<input id="blink" type="range" min="0" max="32" step="1" value="0" disabled><output id="blinkValue" for="blink">0%</output></label>
-<label for="mouth">口を開く<input id="mouth" type="range" min="0" max="32" step="1" value="0" disabled><output id="mouthValue" for="mouth">0%</output></label>
+<label for="blink">目を閉じる<input id="blink" type="range" min="0" max="4" step="1" value="0" disabled><output id="blinkValue" for="blink">0%</output></label>
+<label for="mouth">口を開く<input id="mouth" type="range" min="0" max="4" step="1" value="0" disabled><output id="mouthValue" for="mouth">0%</output></label>
 </div>
 <button id="play" disabled>まとめて再生</button><button id="once" disabled>1回まばたき</button><button id="reset" disabled>通常顔に戻す</button>
-<label for="speed">再生速度 <select id="speed"><option value="1">通常</option><option value="0.25">ゆっくり（¼倍）</option></select></label>
-<p class="note">承認された閉眼見本のまつ毛と肌を分離し、通常顔からつなぐ確認用の試作です。原寸280×195pxを拡大表示しています。通常顔は採用画像と一致します。今回の新素材を使ったCubismモデルとUnity表示は未検証です。</p>
+<p class="note">閉眼・開口は新しく作成した仕上げ案です。原寸280×195pxの試作を拡大表示しています。通常顔に戻すと採用画像の画素に一致します。Cubismでの変形検証と最終解像度の原画化は別工程です。</p>
 <script>
 const byId=id=>document.getElementById(id);
 const slider=byId('frame'),blink=byId('blink'),mouth=byId('mouth');
@@ -33,21 +32,21 @@ function draw(){
   ctx.drawImage(eyeSprite,f*280,b*195,280,195,0,0,280,195);
   ctx.drawImage(mouthSprite,m*280+116,133,50,24,116,133,50,24);
   byId('offset').textContent=`${(f-8)/2} px`;
-  byId('blinkValue').textContent=`${Math.round(b/Number(blink.max)*1000)/10}%`;
-  byId('mouthValue').textContent=`${Math.round(m/Number(mouth.max)*1000)/10}%`;
+  byId('blinkValue').textContent=`${b*25}%`;
+  byId('mouthValue').textContent=`${m*25}%`;
 }
 function stop(){if(request!==null)cancelAnimationFrame(request);request=null;mode='';play.textContent='まとめて再生';}
-function blinkLevel(time){return time>=0&&time<400?Math.round(Number(blink.max)*Math.sin(Math.PI*time/400)):0;}
+function blinkLevel(time){return time>=0&&time<400?Math.round(4*Math.sin(Math.PI*time/400)):0;}
 function tick(now){
   if(!mode)return;
-  const elapsed=(now-start)*Number(byId('speed').value);
+  const elapsed=now-start;
   if(mode==='once'){
     blink.value=blinkLevel(elapsed);
     if(elapsed>=400){blink.value=0;draw();stop();return;}
   }else{
     slider.value=Math.round(8+8*Math.sin(elapsed*Math.PI/3000));
     blink.value=blinkLevel(elapsed%3400-1400);
-    mouth.value=Math.round(Number(mouth.max)*Math.max(0,Math.sin(elapsed*Math.PI/360)));
+    mouth.value=Math.round(4*Math.max(0,Math.sin(elapsed*Math.PI/360)));
   }
   draw();request=requestAnimationFrame(tick);
 }
@@ -56,10 +55,9 @@ play.addEventListener('click',()=>{if(mode){stop();return;}mode='all';start=perf
 once.addEventListener('click',()=>{stop();mode='once';start=performance.now();request=requestAnimationFrame(tick);});
 reset.addEventListener('click',()=>{stop();slider.value=8;blink.value=mouth.value=0;draw();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
-byId('speed').addEventListener('change',stop);
 function load(src,width,height){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>img.naturalWidth===width&&img.naturalHeight===height?resolve(img):reject(Error('画像サイズが一致しません'));img.onerror=()=>reject(Error(`${src} を読み込めません`));img.src=src;});}
-Promise.all([load('ciel-approved-eye-motion-v1-blink-atlas.png',4760,195*(Number(blink.max)+1)),load('ciel-approved-eye-motion-v1-mouth-atlas.png',280*(Number(mouth.max)+1),195)])
- .then(([eyes,lips])=>{eyeSprite=eyes;mouthSprite=lips;byId('normal').getContext('2d').drawImage(eyes,8*280,0,280,195,0,0,280,195);draw();for(const control of [slider,blink,mouth,play,once,reset])control.disabled=false;byId('status').textContent=`視線17段階・瞬き${Number(blink.max)+1}段階・口${Number(mouth.max)+1}段階を読み込みました。`;})
+Promise.all([load('ciel-face-expressions-v1-blink-atlas.png',4760,975),load('ciel-face-expressions-v1-mouth-atlas.png',1400,195)])
+ .then(([eyes,lips])=>{eyeSprite=eyes;mouthSprite=lips;byId('normal').getContext('2d').drawImage(eyes,8*280,0,280,195,0,0,280,195);draw();for(const control of [slider,blink,mouth,play,once,reset])control.disabled=false;byId('status').textContent='視線17段階・瞬き5段階・口5段階を読み込みました。';})
  .catch(error=>{byId('status').textContent=`${error.message}。HTMLと画像を同じフォルダに置いてください。`;});
 </script>
 </html>

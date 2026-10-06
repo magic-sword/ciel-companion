@@ -1,0 +1,26 @@
+{
+  "status": "diagnostic_only_temporary_change_undone",
+  "layout": [
+    "Left: EyeLOpen 0.5, UpperFold opacity 0",
+    "Right: same state, UpperFold opacity 100"
+  ],
+  "model_sha256": "9b967f017f2b7f91d9388851687856e8694e3726436e27694635b5176b0046d0",
+  "source_screenshots": [
+    {
+      "path": ".local/iris-alpha-half.png",
+      "sha256": "f31fd2f73498c67f0cddadfdec553b319d1da8b8993005f4e39b95603ce12359"
+    },
+    {
+      "path": ".local/fold-preserved-half.png",
+      "sha256": "00535cf6c1524c699929332b8fe2dcaa0d92a62e2462af0821dc4d02bb1b8108"
+    }
+  ],
+  "observation": "Showing the fold restores pale hair-adjacent contours but also leaves dark isolated marks above the moving lash.",
+  "conclusion": "Neither whole-layer fading nor whole-layer retention is accepted. Split stationary hair/skin from lash remnants before retesting.",
+  "limits": [
+    "One half-blink at centered gaze only",
+    "No full animation approval",
+    "Dark marks are visually suspected lash remnants; anatomical tracing still required"
+  ],
+  "next_action": "Trace the mixed UpperFold material and reassign stationary contours; do not tune opacity as a substitute for correct material separation."
+}

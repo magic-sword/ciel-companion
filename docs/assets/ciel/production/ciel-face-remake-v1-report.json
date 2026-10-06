@@ -1,0 +1,124 @@
+{
+  "stage": "In-progress semantic material study; not approved, not a Cubism rig",
+  "source": "docs\\assets\\ciel\\ciel-approved-appearance-v1.png",
+  "crop": [
+    330,
+    235,
+    280,
+    195
+  ],
+  "normal_sha256": "ea440b6c0a41d9f14ba446aae4a1e8becd1600e932e4ec060cb1bcfad37435f5",
+  "normal_changed_pixels": 0,
+  "foreground_holdout_pixels": 61,
+  "roundtrip": {
+    "xcf": {
+      "composite_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 20
+    },
+    "psd": {
+      "composite_equal": true,
+      "all_parts_equal": true,
+      "layer_count": 20
+    }
+  },
+  "checks": [
+    {
+      "gaze_px": -4,
+      "closure": 0,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": -4,
+      "closure": 0.25,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": -4,
+      "closure": 0.5,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": -4,
+      "closure": 0.75,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": -4,
+      "closure": 1,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 0,
+      "closure": 0,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 0,
+      "closure": 0.25,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 0,
+      "closure": 0.5,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 0,
+      "closure": 0.75,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 0,
+      "closure": 1,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 4,
+      "closure": 0,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 4,
+      "closure": 0.25,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 4,
+      "closure": 0.5,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 4,
+      "closure": 0.75,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    },
+    {
+      "gaze_px": 4,
+      "closure": 1,
+      "hair_holdout_changes": 0,
+      "outside_eye_changes": 0
+    }
+  ],
+  "limitations": [
+    "280x195 source crop, not final-resolution illustration",
+    "Small flattened hair holdouts preserve reference pixels; true hair alpha is not recovered",
+    "Lid fold, lash edges and hidden sclera still require visual refinement",
+    "PSD contains diagnostic material partitions; clipping and deformers are not authored",
+    "Cubism import, rig deformation and Unity verification are pending"
+  ]
+}

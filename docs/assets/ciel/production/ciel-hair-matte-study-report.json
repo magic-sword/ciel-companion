@@ -1,0 +1,120 @@
+{
+  "status": "candidate_not_approved",
+  "neutral_equal": true,
+  "editable_material": {
+    "layer_count": 2,
+    "composite_space": "RGB_NON_LINEAR",
+    "reference_difference": {
+      "changed_pixels": 0,
+      "max_channel_delta": 0
+    },
+    "roundtrip": {
+      "xcf": {
+        "layers_equal": true,
+        "composite_equal_to_gimp": true,
+        "reference_difference": {
+          "changed_pixels": 0,
+          "max_channel_delta": 0
+        }
+      },
+      "psd": {
+        "layers_equal": true,
+        "composite_equal_to_gimp": true,
+        "reference_difference": {
+          "changed_pixels": 0,
+          "max_channel_delta": 0
+        }
+      }
+    }
+  },
+  "baseline_frames_checked": 15,
+  "baseline_changes": [
+    {
+      "gaze": -4,
+      "closure": 0,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": -4,
+      "closure": 0.25,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": -4,
+      "closure": 0.5,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": -4,
+      "closure": 0.75,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": -4,
+      "closure": 1,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 0,
+      "closure": 0,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 0,
+      "closure": 0.25,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 0,
+      "closure": 0.5,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 0,
+      "closure": 0.75,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 0,
+      "closure": 1,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 4,
+      "closure": 0,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 4,
+      "closure": 0.25,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 4,
+      "closure": 0.5,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 4,
+      "closure": 0.75,
+      "changed_pixels": 0
+    },
+    {
+      "gaze": 4,
+      "closure": 1,
+      "changed_pixels": 0
+    }
+  ],
+  "foreground_pixels": 152,
+  "estimated_translucent_pixels": 14,
+  "alpha_range": [
+    133,
+    248
+  ],
+  "limits": [
+    "Estimated alpha, not recovered original alpha",
+    "Only existing traced foreground pixels are covered",
+    "Encoded RGB compositing; Cubism pixel equivalence is not checked by this script",
+    "Estimated hair alpha is integrated into the preview, but not the existing Cubism expression rig"
+  ]
+}

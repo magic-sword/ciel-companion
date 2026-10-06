@@ -1,0 +1,61 @@
+{
+  "status": "psd_import_kit_not_rigged",
+  "layer_count": 26,
+  "normal_equal": true,
+  "closed_equal": true,
+  "psd_xcf_all_parts_equal": true,
+  "initial_closed_layer_opacity": 0,
+  "layer_names": [
+    "Hair_Foreground",
+    "L_Closed_lash",
+    "L_Closed_skin",
+    "R_Closed_lash",
+    "R_Closed_skin",
+    "Context",
+    "L_UpperFold",
+    "L_LowerRim",
+    "L_UpperLash",
+    "L_Highlight",
+    "L_Pupil",
+    "L_Iris",
+    "L_Sclera",
+    "L_Iris_Hidden",
+    "L_Sclera_Hidden",
+    "L_Skin_Backfill",
+    "R_UpperFold",
+    "R_LowerRim",
+    "R_UpperLash",
+    "R_Highlight",
+    "R_Pupil",
+    "R_Iris",
+    "R_Sclera",
+    "R_Iris_Hidden",
+    "R_Sclera_Hidden",
+    "R_Skin_Backfill"
+  ],
+  "outputs": {
+    "xcf": {
+      "file": "open-closed-import-kit.xcf",
+      "sha256": "afceacdee95123a3936a3748b81dfcd36be5c7a67cc55c0465af778b3b4e1824"
+    },
+    "psd": {
+      "file": "open-closed-import-kit.psd",
+      "sha256": "3a4e4d7c0e65e79144a51406019ee0b0fd49fd8702cc896b1b2d90062feeda31"
+    }
+  },
+  "inputs": [
+    {
+      "path": "assets/private/ciel/live2d/gimp/cubism-eye-material-v5/semantic-hair-parts.psd",
+      "sha256": "b7f864475842a7926fdc59b855e54a3e8006b46cb91302f58829c75159bbaa57"
+    },
+    {
+      "path": "assets/private/ciel/live2d/gimp/approved-eye-motion-v1/closed-materials.psd",
+      "sha256": "f8441a85787d7430ac0bf09ea77c4976152b489e9858ce5815f46839190e4833"
+    }
+  ],
+  "limits": [
+    "Cubism import of this kit not verified",
+    "No meshes, keyforms or motion in this PSD",
+    "Intermediate shapes require alignment before opacity blending"
+  ]
+}

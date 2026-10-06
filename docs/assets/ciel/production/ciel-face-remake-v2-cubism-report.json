@@ -1,0 +1,575 @@
+{
+  "date": "2026-10-06",
+  "editor": "Live2D Cubism Editor 5.3.04 FREE",
+  "status": "in_progress_not_approved",
+  "model": "assets/private/ciel/live2d/gimp/face-remake-v2/semantic-parts-import-check.cmo3",
+  "saved_model_sha256": "6fb229193ef147d9e0711ef0240fe3145e8b10544006eb6193a376191f8af317",
+  "saved_model_bytes": 1047854,
+  "latest_reload_inspection": {
+    "status": "visual_motion_check_not_final_appearance_approval",
+    "model_sha256": "47feeb4826741444eb352da452d2cdcf49aa359cf28117b8b7ac462a6dadc753",
+    "rows": [
+      "gaze -1",
+      "gaze +1"
+    ],
+    "columns": [
+      "open 1",
+      "open 0.5",
+      "open 0"
+    ],
+    "closed_crops_equal": true,
+    "observation": "Stationary contours retained after reload. Iris perimeter serration remains visible at gaze extremes.",
+    "eye": "character left, screen right",
+    "crop": [
+      1340,
+      350,
+      300,
+      220
+    ],
+    "screenshots": [
+      {
+        "file": ".local\\latest-minus-top.png",
+        "sha256": "ce9a06e9df5a412c0a88cc29209f347f37aabb1744bdb4c020a4266148d70447",
+        "gaze": -1,
+        "eye_open": 1
+      },
+      {
+        "file": ".local\\latest-minus-half.png",
+        "sha256": "a24cc2bd5b8806a6d5b01232de5be818f585a667d1b77937b785195b8994359a",
+        "gaze": -1,
+        "eye_open": 0.5
+      },
+      {
+        "file": ".local\\latest-minus-closed.png",
+        "sha256": "5ce7b1ac58004dda13243ea1438209a46d4d6efbf6d6476c89ca893491f664c2",
+        "gaze": -1,
+        "eye_open": 0
+      },
+      {
+        "file": ".local\\latest-plus-open-corrected.png",
+        "sha256": "e8fbdd0a958aeacdc1194e7737c58aa22808002136c783d03ecad2149f59d24a",
+        "gaze": 1,
+        "eye_open": 1
+      },
+      {
+        "file": ".local\\latest-plus-half-corrected.png",
+        "sha256": "afced4aad330f56f481b25eec25194232850af7c9afba1d1d45cfc877f5f163a",
+        "gaze": 1,
+        "eye_open": 0.5
+      },
+      {
+        "file": ".local\\latest-plus-controls-corrected.png",
+        "sha256": "6d12ee2bda42f71187ab4f83d254ef9205bef928c049cfba5e90544ff8b88244",
+        "gaze": 1,
+        "eye_open": 0
+      }
+    ],
+    "limits": [
+      "Editor screenshot crops, not exported runtime textures",
+      "Only the left eye rig is tested",
+      "Edges and hair remain unfinished"
+    ]
+  },
+  "hair_alpha_material_import": {
+    "model": "assets/private/ciel/live2d/gimp/hair-matte-study/hair-matte-import-check.cmo3",
+    "sha256": "1ee57f5913b4f1f9392190baf14794c009027780901bb27a581bd220fec550ce",
+    "bytes": 136302,
+    "layers": [
+      "Hair_EstimatedAlpha",
+      "Neutral_Underpainting"
+    ],
+    "observation": "Imported as a separate new Cubism 5.3 model; normal face displayed with the two layers in order",
+    "evidence_local_untracked": ".local/cubism-hair-imported.png",
+    "limits": [
+      "Visual inspection only in Cubism",
+      "Two-layer material study, not a deformable eye rig",
+      "Estimated alpha is not original source alpha",
+      "Not integrated into the Cubism expression rig; preview integration tracked separately"
+    ],
+    "status": "imported_visual_check_only"
+  },
+  "left_eye_gaze": {
+    "deformer_name": "L_EyeGaze",
+    "deformer_id": "WarpEyeGazeL",
+    "children": [
+      "L_Highlight",
+      "L_Pupil",
+      "L_Iris",
+      "L_Iris_Hidden"
+    ],
+    "parameter": "ParamEyeBallX",
+    "keys": [
+      -1,
+      0,
+      1
+    ],
+    "authored_translation": "14 screen pixels left/right at 347.7 percent zoom, approximately 4 source pixels; whole deformer translated at editing level 3",
+    "structure": "Sibling of eyelid and eye-opening deformers, with sclera clipping retained on eye contents",
+    "combinations_inspected": {
+      "gaze": [
+        -1,
+        1
+      ],
+      "left_eye_open": [
+        0,
+        0.5,
+        1
+      ]
+    },
+    "observations": [
+      "Iris, pupil and highlights translate together at open endpoints",
+      "Half-open iris and pupil track gaze while eyelid remains in place",
+      "Eye contents hidden at full closure for both gaze endpoints",
+      "Normal face restored at gaze zero and eye open one"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-gaze-left-open.png",
+      ".local/cubism-gaze-left-half.png",
+      ".local/cubism-gaze-left-closed.png",
+      ".local/cubism-gaze-right-open.png",
+      ".local/cubism-gaze-right-half.png",
+      ".local/cubism-gaze-right-closed.png",
+      ".local/cubism-gaze-restored.png"
+    ],
+    "limits": [
+      "Visual inspection with Editor selection overlays, not pixel-level equivalence",
+      "Right-eye gaze rig and vertical gaze not authored",
+      "Lash and material edges remain rough",
+      "Latest saved model not yet reloaded"
+    ],
+    "status": "structure_verified_visual_finish_pending",
+    "reference": "https://docs.live2d.com/cubism-editor-manual/keyform-xydirection/"
+  },
+  "blink_sweep_inspection": {
+    "method": "Native slider drag from open to closed and back; 21 screenshots per direction, 140 ms minimum delay per sample",
+    "latest_samples": 42,
+    "evidence_local_untracked": ".local/cubism-blink-sweep/",
+    "coverage_limit": "Selected captured frames inspected; not a frame-by-frame video review, and slider values are rounded in the UI",
+    "found": "A thin blue iris remnant remained at full closure before the fix",
+    "fix": {
+      "parts": [
+        "L_Iris",
+        "L_Iris_Hidden",
+        "L_Pupil",
+        "L_Highlight"
+      ],
+      "parameter": "ParamEyeLOpen",
+      "opacity_percent_keys": {
+        "0": 0,
+        "0.1": 100,
+        "1": 100
+      },
+      "reason": "Suppress eye-content residuals at closure while retaining full opacity outside the last tenth of closing"
+    },
+    "observed_after_fix": [
+      "Blue remnant absent at fully closed endpoint",
+      "Normal face restored at open endpoint",
+      "Highlight opacity interpolates to 50 percent near the closed endpoint"
+    ],
+    "remaining": [
+      "Lash edge and lower-rim overlap remain rough",
+      "Near-closed intermediate mask alignment still needs refinement",
+      "Gaze combinations and semi-transparent hair boundaries remain unverified"
+    ],
+    "status": "not_approved"
+  },
+  "input_application": {
+    "initial_accessibility_text_update": "did_not_persist_after_reselection",
+    "fix": "Focus text field and send native Enter after setting text",
+    "reselection_readback": "R_Highlight retained R_Sclera , R_Sclera_Hidden"
+  },
+  "right_eye_clipping_test": {
+    "method": "Temporarily scale only R_Sclera and R_Sclera_Hidden to zero using Editor scaling dialog",
+    "observation": "Iris, pupil and eye highlights disappeared together; opposite eye remained visible",
+    "evaluation": "visual inspection of Editor screenshot, not pixel-level verification",
+    "evidence_local_untracked": ".local/cubism-mask-test-passed.png",
+    "restoration": "Undo temporary scaling; inspect normal face; save",
+    "restored_evidence_local_untracked": ".local/cubism-mask-restored.png"
+  },
+  "left_eye_clipping_test": {
+    "method": "Temporarily scale L_Sclera and L_Sclera_Hidden to zero",
+    "observation": "Iris, pupil and highlights disappeared together; opposite eye remained visible",
+    "evidence_local_untracked": ".local/cubism-left-mask-test.png",
+    "restoration": "Undo temporary scaling"
+  },
+  "left_eye_rig_preparation": {
+    "mesh": "Auto mesh preset: large deformation; applied to L_Sclera and L_Sclera_Hidden",
+    "deformer_name": "L_EyeOpening",
+    "deformer_id": "WarpEyeOpeningL",
+    "children": [
+      "L_Sclera",
+      "L_Sclera_Hidden",
+      "L_LowerRim"
+    ],
+    "parameter_label": "左目 開閉",
+    "keys": [
+      0,
+      0.5,
+      1
+    ],
+    "key_shapes": "Key 0 converges control rows onto the closed lash curve. Key 0.5 lowers the upper mask boundary to remove the gap and iris leakage above the lash. Key 1 retains normal shape. Still provisional.",
+    "saved_parameter_value": 1,
+    "evidence_local_untracked": ".local/cubism-mask-refined-open.png",
+    "closed_evidence_local_untracked": ".local/cubism-mask-aligned-zero.png",
+    "half_evidence_local_untracked": ".local/cubism-mask-half-refined.png",
+    "canvas_input": "Native mouse input after confirming foreground window; unused dialogs closed",
+    "limitation": "Closed mask placement and intermediate shape require refinement"
+  },
+  "left_upper_lid": {
+    "deformer_name": "L_UpperLid",
+    "deformer_id": "WarpUpperLidL",
+    "child": "L_UpperLash",
+    "parameter_label": "左目 開閉",
+    "keys": [
+      0,
+      1
+    ],
+    "closed_shape": "Central control column lowered; side-column spans reduced to thin lash ends; provisional shape",
+    "fold_opacity_percent": {
+      "0": 0,
+      "0.5": 0,
+      "0.75": 0,
+      "1": 100
+    },
+    "residual_line_diagnosis": "Black line left in original position disappeared when L_UpperFold opacity became zero",
+    "closed_evidence_local_untracked": ".local/cubism-fold-hidden.png",
+    "restored_evidence_local_untracked": ".local/cubism-lash-open-restored.png",
+    "limitations": [
+      "Lash width and edge quality need further refinement",
+      "Continuous motion and hair-boundary behavior remain unverified"
+    ]
+  },
+  "left_lower_rim": {
+    "mesh": "Auto mesh large-deformation preset",
+    "parent": "WarpEyeOpeningL",
+    "closed_observation": "Rim mesh follows closed eye-opening curve rather than staying at original lower edge",
+    "closed_evidence_local_untracked": ".local/cubism-lower-rim-parent.png",
+    "restored_evidence_local_untracked": ".local/cubism-lower-rim-open.png",
+    "limitations": "Intermediate appearance and closed-lash overlap still need refinement"
+  },
+  "pending": [
+    "Author actual closed and intermediate shapes and remaining blink deformers",
+    "Refine intermediate eyelid shape and hair occlusion; left gaze hierarchy and six blink combinations inspected",
+    "Refine source edges and evaluate semi-transparent hair boundaries",
+    "Unity rendering verification"
+  ],
+  "reopen_verification": {
+    "model_sha256_checked": "62b85d6d39312cae09c2439cae1a02a358bedea365a81ac591e03ffbf7ae9908",
+    "confirmed": [
+      "Normal face renders",
+      "L_EyeOpening children and L_UpperLid child retained",
+      "L_Highlight clipping field retained",
+      "Closed shape reproduced after selecting parameter again"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-reopened.png",
+      ".local/cubism-closed-reloaded-confirmed.png"
+    ],
+    "note": "Parameter selection and search-panel binding must be refreshed after reopening"
+  },
+  "intermediate_inspection": {
+    "requested_open_values": [
+      0.25,
+      0.5,
+      0.75
+    ],
+    "status": "not_approved",
+    "evidence_local_untracked": [
+      ".local/cubism-lid-refined-0.25.png",
+      ".local/cubism-lid-refined-0.5.png",
+      ".local/cubism-lid-refined-0.75.png"
+    ],
+    "followup_fixes": [
+      "Lowered left and center upper mask control points at key 0.5",
+      "Added key 0.75 with zero fold opacity"
+    ],
+    "followup_observations": [
+      "Blue rim above lash no longer visible in inspected 0.25 and 0.5 screenshots",
+      "Original fold-line residue no longer visible at 0.75",
+      "Normal appearance restored at 1"
+    ],
+    "followup_evidence_local_untracked": [
+      ".local/cubism-mask-edge-after.png",
+      ".local/cubism-edge-025-recheck.png",
+      ".local/cubism-fold-075-corrected.png"
+    ],
+    "next_checks": [
+      "Continuous opening and closing",
+      "Hair boundary and lash edge quality",
+      "Gaze combinations"
+    ],
+    "saved_open_evidence_local_untracked": ".local/cubism-edge-refined-open.png"
+  },
+  "material_revision": {
+    "status": "imported_and_saved_basic_motion_checked_not_appearance_approved",
+    "psd_sha256": "3905302ec80625bef8ff084d8cef9dce453031cb076d96778f3eff427004b119",
+    "change": "L_UpperLash outer contour reclaims black lash fragments from L_UpperFold",
+    "browser_report_sha256": "23467a1165e81e44a62fc89dfe0f673616d274460ace58074742a554b0860428",
+    "note": "Contour-only revision predates integrated_hair_material; see that entry for the current rig material",
+    "attempt": {
+      "status": "reimport_undone_after_failed_blink_check",
+      "procedure": "Existing model selected, then replace semantic-parts.psd selected",
+      "observed": [
+        "New semantic-parts.psd group appeared",
+        "Eye remained open at ParamEyeLOpen 0.5 and 0",
+        "Undo removed added group and restored closed-eye deformation"
+      ],
+      "diagnosis": "Superseded: accessibility selection was not visually verified; native selection of replace succeeded without manual remapping",
+      "backup_local_untracked": ".local/cubism-before-material-reimport-20261006.cmo3",
+      "evidence_local_untracked": [
+        ".local/cubism-material-reimported.png",
+        ".local/cubism-reimport-left-closed.png",
+        ".local/cubism-reimport-undo-closed.png",
+        ".local/cubism-original-layer-names.png"
+      ],
+      "next": "Resolve PSD-to-existing-ArtMesh matching before saving; check default face and blink after remapping",
+      "reference": "https://docs.live2d.com/cubism-editor-manual/psd-re-import/"
+    },
+    "verification": {
+      "selection_evidence": [
+        ".local/cubism-model-target-selected.png",
+        ".local/cubism-replace-target-selected.png"
+      ],
+      "old_source_unused": true,
+      "old_source_retained_in_model": true,
+      "observed": [
+        "Left eye open/half/closed deformation retained",
+        "Left iris and highlight move at gaze -1 and +1",
+        "Returned to open, visually central gaze and saved; unsaved marker gone"
+      ],
+      "evidence_local_untracked": [
+        ".local/cubism-reimport-confirmed.png",
+        ".local/cubism-confirmed-reimport-closed.png",
+        ".local/cubism-confirmed-reimport-half.png",
+        ".local/cubism-confirmed-reimport-gaze-minus.png",
+        ".local/cubism-confirmed-reimport-gaze-plus.png",
+        ".local/cubism-reimport-save-complete.png"
+      ],
+      "limitations": [
+        "No reload check for this saved revision yet",
+        "Lash thickness and iris fringe still need refinement",
+        "No full six-combination check for this revision",
+        "Editor screenshots are not pixel-equality evidence"
+      ]
+    }
+  },
+  "closed_lash_thinning": {
+    "status": "saved_improvement_not_final_approval",
+    "changed": "L_UpperLid closed key vertically compressed and translated back toward the closed-eye line; open key not edited",
+    "checked": [
+      "Closed band visibly thinner",
+      "Half-open renders",
+      "Open appearance visually maintained",
+      "LowerRim opacity experiment did not remove thin residual line and was undone, including added keys"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-closed-grid-thinning.png",
+      ".local/cubism-thinning-final-closed.png",
+      ".local/cubism-lid-thinned-half.png",
+      ".local/cubism-thinning-restored-open.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-lid-thinning.cmo3",
+    "remaining": [
+      "Residual line investigated and reduced by subsequent closed_mask_alignment change",
+      "Half-open lash and iris edge quality remain unfinished",
+      "Saved revision reloaded and eight static states checked; see latest_reload_inspection"
+    ]
+  },
+  "closed_mask_alignment": {
+    "status": "saved_visual_improvement_not_final_approval",
+    "diagnosis": "Temporarily hiding L_Sclera_Hidden removed most thin residual line; original Sclera alone had much smaller residue",
+    "changes": [
+      "L_Sclera_Hidden opacity keys: EyeLOpen 0=0%, 0.1=100%, 1=100%",
+      "Compressed closed L_EyeOpening vertically toward lash line, keeping open and half-open keys intact",
+      "Restored both sclera visibility switches after diagnostic"
+    ],
+    "observed": [
+      "Closed residual line reduced",
+      "At EyeLOpen 0.1, large blue wedge above lash no longer visible",
+      "At requested 0.25 iris is below lash",
+      "Returned to open and saved with original PSD retained"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-residual-line-baseline.png",
+      ".local/cubism-only-hidden-sclera-off.png",
+      ".local/cubism-sclera-fade-key.png",
+      ".local/cubism-mask-aligned-near-close.png",
+      ".local/cubism-aligned-mask-closed.png",
+      ".local/cubism-aligned-mask-quarter.png"
+    ],
+    "limits": [
+      "Eight states checked after reload, but not all continuous values",
+      "Runtime and Unity rendering not verified",
+      "Hair and iris edges unfinished"
+    ]
+  },
+  "integrated_hair_material": {
+    "status": "imported_and_saved_not_final_appearance_approval",
+    "psd": "assets/private/ciel/live2d/gimp/cubism-hair-material/semantic-hair-parts.psd",
+    "psd_sha256": "f6d9053d0acf002fca14099ccc64bcec69a91f48794ef24894b9e5b0c161fce2",
+    "changes": [
+      "14 estimated translucent hair pixels",
+      "Reconstructed lash pixels below hair",
+      "Hidden sclera bounded to anatomical open-eye aperture"
+    ],
+    "verified": [
+      "GIMP neutral pixel equality",
+      "XCF and PSD reload: all 22 parts and composite equal",
+      "Cubism existing-model replacement selected visually",
+      "Normal/half/slit/closed visually inspected and model saved"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-alpha-replace-selected.png",
+      ".local/cubism-alpha-imported-normal.png",
+      ".local/cubism-alpha-half.png",
+      ".local/cubism-alpha-slit.png",
+      ".local/cubism-alpha-closed.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-hair-alpha.cmo3",
+    "remaining": [
+      "Central half-open gap addressed by subsequent half_lid_alignment; other gaze values still need checking",
+      "Cubism neutral pixel equality not measured",
+      "This revision has not been reloaded or checked at gaze extremes",
+      "Hair boundary and iris edge quality not approved"
+    ]
+  },
+  "half_lid_alignment": {
+    "status": "saved_visual_improvement_not_final_approval",
+    "change": "Added EyeLOpen 0.5 key on L_UpperLid and moved it down 5 display pixels at 347.7% zoom; open and closed keys unchanged",
+    "observed": [
+      "Central half-open white gap above iris no longer visible",
+      "Requested open 0.25 and 0.75 checked",
+      "Open and closed endpoints visually maintained"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-alpha-half.png",
+      ".local/cubism-half-gap-corrected.png",
+      ".local/cubism-half-key-quarter.png",
+      ".local/cubism-half-key-three-quarter.png",
+      ".local/cubism-half-key-closed.png",
+      ".local/cubism-half-key-open.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-half-lid-adjust.cmo3",
+    "remaining": [
+      "Gaze extremes and reload not yet checked for this revision",
+      "Hair boundary and iris fringes remain rough",
+      "Continuous blink and runtime verification pending"
+    ]
+  },
+  "iris_underpainting": {
+    "status": "imported_and_saved_visual_improvement_not_final_approval",
+    "psd": "assets/private/ciel/live2d/gimp/cubism-eye-material-v2/semantic-hair-parts.psd",
+    "psd_sha256": "826680dff3359e60fc4d41c3a2152e0eb7b95babb530fd8aa382616b8b6094e5",
+    "change": "Filled iris beneath opaque pupil/highlight masks using neighboring iris colors: R 134 pixels, L 129 pixels; no duplicate baked pupil or highlight",
+    "verified": [
+      "GIMP neutral RGBA equality and 22-layer XCF/PSD roundtrip",
+      "Existing-model PSD replacement visually selected",
+      "Open and half-open inspected; internal seams visibly reduced",
+      "Returned to open and saved with old source images retained"
+    ],
+    "evidence_local_untracked": [
+      ".local/cubism-underpaint-replace-selected.png",
+      ".local/cubism-underpaint-open.png",
+      ".local/cubism-underpaint-half.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-iris-underpaint.cmo3",
+    "remaining": [
+      "Outer iris fringe remains rough",
+      "Visual improvement not a pixel-level Cubism comparison",
+      "Latest revision reload and gaze combinations pending"
+    ]
+  },
+  "iris_perimeter_alpha": {
+    "status": "imported_saved_quality_not_approved",
+    "psd": "assets/private/ciel/live2d/gimp/cubism-eye-material-v3/semantic-hair-parts.psd",
+    "psd_sha256": "44076d3fe9fb4409a17c854348ee4b5dcdc3134487469b95b4bb6829222ebc9d",
+    "estimated_boundary_pixels": {
+      "R": 64,
+      "L": 60
+    },
+    "verified": [
+      "Neutral GIMP RGBA equality",
+      "22-layer XCF and PSD roundtrip equality",
+      "Existing model and current PSD selected before replacement",
+      "Open and half-open visually inspected",
+      "Returned to open and saved; old source images retained"
+    ],
+    "visual_result": "No sufficient improvement established. Half-open still shows jagged iris edges and a broad pale upper-lid region. Alpha correction alone does not satisfy the quality gate.",
+    "evidence_local_untracked": [
+      ".local/iris-alpha-open.png",
+      ".local/iris-alpha-half.png",
+      ".local/iris-alpha-replace-selected.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-iris-alpha.cmo3",
+    "remaining": [
+      "Revisit eyelid geometry and hair occlusion",
+      "Latest saved model reload and gaze combinations",
+      "Second-eye rig and mouth validation",
+      "Final preview integration and visual acceptance"
+    ]
+  },
+  "stationary_fold_separation": {
+    "status": "imported_saved_partial_visual_improvement_not_final_approval",
+    "psd": "assets/private/ciel/live2d/gimp/cubism-eye-material-v4/semantic-hair-parts.psd",
+    "psd_sha256": "4626ba9e7f0f72d12e8288336efdb73e7c3b2799bab6e82a3b445b4132e3dde1",
+    "reassigned_pixels": {
+      "R": 288,
+      "L": 232
+    },
+    "rule": "UpperFold pixels above outer lash curve minus 2.5 source pixels moved to stationary Context. Nearest 1.5px band retained in UpperFold.",
+    "verified": [
+      "GIMP neutral pixel difference zero",
+      "22-layer XCF and PSD roundtrip equality",
+      "Actual existing-model replacement selected",
+      "Centered left half-blink and closed state visually inspected",
+      "Restored open state and saved with old originals retained"
+    ],
+    "visual_result": "Stationary pale contours remain during blink. Dark fragments seen in whole-fold retention reduced. Iris serration and lid quality remain unresolved.",
+    "evidence_local_untracked": [
+      ".local/fold-separated-half.png",
+      ".local/fold-separated-closed.png",
+      ".local/fold-replace-selected.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-fold-separation.cmo3",
+    "remaining": [
+      "Latest model reload and gaze extremes",
+      "Fine lash-edge ownership and intermediate shape",
+      "Second eye and mouth rig validation",
+      "Preview integration and full acceptance"
+    ]
+  },
+  "continuous_sclera_mask": {
+    "status": "imported_saved_partial_improvement_not_final_approval",
+    "psd": "assets/private/ciel/live2d/gimp/cubism-eye-material-v5/semantic-hair-parts.psd",
+    "psd_sha256": "b7f864475842a7926fdc59b855e54a3e8006b46cb91302f58829c75159bbaa57",
+    "overlap_pixels": {
+      "R": 535,
+      "L": 468
+    },
+    "diagnosis": "Iris mesh spans the full image; removing iris clipping temporarily reduced the side fringe. Clipping was restored before PSD replacement.",
+    "change": "Hidden sclera now extends beneath visible sclera inside the aperture, removing complementary internal cutouts near iris edges.",
+    "verified": [
+      "Neutral GIMP pixels unchanged",
+      "22-layer XCF/PSD roundtrip",
+      "Existing-model replacement",
+      "Centered open, half-open, closed inspected",
+      "Returned to neutral and saved"
+    ],
+    "result": "Open-eye side fringe visibly reduced; lower half-blink edge remains rough. No visible iris leak at full closure.",
+    "evidence_local_untracked": [
+      ".local/iris-mesh-selected.png",
+      ".local/iris-without-clipping.png",
+      ".local/iris-clipping-restored.png",
+      ".local/continuous-mask-neutral.png",
+      ".local/continuous-mask-half.png",
+      ".local/continuous-mask-closed.png"
+    ],
+    "backup_local_untracked": ".local/cubism-before-iris-mesh.cmo3",
+    "remaining": [
+      "Latest revision reload and gaze extremes",
+      "Half-blink lower edge quality",
+      "Second eye and mouth rig validation",
+      "Unity validation"
+    ]
+  }
+}

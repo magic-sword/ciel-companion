@@ -1,0 +1,52 @@
+{
+    "before":  {
+                   "1e-06":  {
+                                 "mean_channel_delta":  2.5114531509121063,
+                                 "max_channel_delta":  201
+                             },
+                   "0.03125":  {
+                                   "mean_channel_delta":  5.562344527363184,
+                                   "max_channel_delta":  152
+                               },
+                   "0.5":  {
+                               "mean_channel_delta":  52.29342868988391,
+                               "max_channel_delta":  243
+                           },
+                   "0.999":  {
+                                 "mean_channel_delta":  77.68594527363184,
+                                 "max_channel_delta":  244
+                             },
+                   "1":  {
+                             "mean_channel_delta":  77.74170812603649,
+                             "max_channel_delta":  244
+                         }
+               },
+    "after":  {
+                  "1e-06":  {
+                                "mean_channel_delta":  0.0,
+                                "max_channel_delta":  0
+                            },
+                  "0.03125":  {
+                                  "mean_channel_delta":  4.914438225538972,
+                                  "max_channel_delta":  164
+                              },
+                  "0.5":  {
+                              "mean_channel_delta":  52.373237976782754,
+                              "max_channel_delta":  243
+                          },
+                  "0.999":  {
+                                "mean_channel_delta":  77.73388266998342,
+                                "max_channel_delta":  244
+                            },
+                  "1":  {
+                            "mean_channel_delta":  77.74170812603649,
+                            "max_channel_delta":  244
+                        }
+              },
+    "status":  "candidate_probe_not_full_atlas_verification",
+    "normal_exact":  true,
+    "closed_gaze_independent":  true,
+    "before_renderer_sha256":  "0eeca298f9e3d1dd549de15e1ab31e4734960844e4e87cb2da274e584c7416b6",
+    "after_renderer_sha256":  "24203c7b4dc2d635c28006eb596426248fb9b333283d0ff14e2c87569a074884",
+    "image_layout":  "Rows: before, after. Columns: open, 1/32 closed, half closed, fully closed. Centered gaze."
+}
