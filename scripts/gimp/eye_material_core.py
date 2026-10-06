@@ -11,7 +11,7 @@ from pathlib import Path
 from gi.repository import Gimp, Gio, Gegl
 
 ROOT = Path(os.environ['CIEL_PROJECT_ROOT'])
-OUT = ROOT / 'assets/private/ciel/live2d/gimp/face-remake-v2'
+OUT = ROOT / 'assets/private/ciel/live2d/gimp/approved-eye-motion-v1'
 OUT.mkdir(parents=True, exist_ok=True)
 W, H = 280, 195
 CROP = (330, 235, W, H)
@@ -231,82 +231,32 @@ for item in data.values():
     for i in item['opening']:opening_mask[i+3]=255
     item['opening_mask']=opening_mask
 
-def render(dx,closure,include_foreground=True,refined_lid_side=None):
+def render_neutral(dx,include_foreground=True):
+    """Render the approved open eye with gaze; blinking belongs to the motion builder."""
     result=bytearray(reference)
     for side,item in data.items():
       g,b=item['g'],item['buffers']
       for i in item['domain']:
         if i in stationary_fold_indices:continue
         x,y=(i//4)%W,(i//4)//W
-        u,d=curve(g['upper'],x+.5),curve(g['lower'],x+.5)
-        t=max(0,min(1,(x+.5-g['x'][0])/(g['x'][1]-g['x'][0])))
-        # Closed key shape: corner positions stay anchored; a smooth arc avoids
-        # carrying individual open-eye pixels into a serrated closed lash.
-        close=(1-t)*g['upper'][0][1]+t*g['upper'][-1][1]+10*math.sin(math.pi*t)
-        top=u+(close-u)*closure
-        bottom=d+(close-d)*closure
+        u=curve(g['upper'],x+.5)
         rgb=list(b['Skin_Backfill'][i:i+3])
-        # Deform the source aperture continuously. Switching from the original
-        # ownership mask to an analytical mask at any nonzero closure caused a
-        # visible jump. Pixel centers map identically at the neutral endpoint.
-        if closure==0:aperture=1.0 if i in item['opening'] else 0.0
-        elif closure>=1 or d<=u:aperture=0.0
-        else:
-            ratio=(d-u)/max(.001,bottom-top)
-            aperture=sum(sample(item['opening_mask'],x,
-                u+(y+.5+offset*closure-top)*ratio-.5)[1]
-                for offset in [-.375,-.125,.125,.375])/4
-        if side==refined_lid_side and 0<closure<1:
-            # Study candidate: trace an optical aperture rather than deforming
-            # binary source pixels. Ease in to preserve the neutral endpoint.
-            analytic=sum(top<=y+sy<=bottom for sy in
-                         [.0625,.1875,.3125,.4375,.5625,.6875,.8125,.9375])/8
-            blend=min(1,closure/.25)
-            blend=blend*blend*(3-2*blend)
-            aperture=aperture*(1-blend)+analytic*blend
-        white=list(item['sclera'][i:i+3])
+        aperture=1.0 if i in item['opening'] else 0.0
         fg,alpha=sample(item['iris'],x-dx,y)
-        eye=over(white,fg,alpha)
+        eye=over(list(item['sclera'][i:i+3]),fg,alpha)
         rgb=[eye[c]*aperture+rgb[c]*(1-aperture) for c in range(3)]
-        # Upper lash carries its own reflection and moves with the lid, not gaze.
-        thickness=1-.68*closure
-        source_y=u+(y-top)/thickness
-        if closure:
-            samples=[sample(item['lash_motion'],x,source_y+offset*closure/thickness) for offset in [-.375,-.125,.125,.375]]
-            fg=[sum(s[0][c] for s in samples)/4 for c in range(3)]
-            alpha=sum(s[1] for s in samples)/4
-        else:fg,alpha=sample(item['lash_motion'],x,source_y)
-        textured=over(rgb,fg,alpha)
-        taper=math.sin(math.pi*t)**.45
-        stroke_width=(u-curve(g['outer'],x+.5))*(1-closure)+1.8*taper*closure
-        coverage=max(0,min(1,y+1-(top-stroke_width),top+.5-y))
-        drawn=over(rgb,[v*coverage for v in (48,53,67)],coverage)
-        key_weight=closure**2
-        rgb=[textured[c]*(1-key_weight)+drawn[c]*key_weight for c in range(3)]
-        fg,alpha=sample(b['LowerRim'],x,y-(bottom-d))
-        fg=[v*(1-closure) for v in fg];alpha*=1-closure
+        fg,alpha=sample(item['lash_motion'],x,u+(y-u))
         rgb=over(rgb,fg,alpha)
-        if side==refined_lid_side and 0<closure<1:
-            # Independent lower-lid contour, strongest at half closure.
-            # It must not travel with iris gaze or alter the approved neutral.
-            width=.7*math.sin(math.pi*t)**.6
-            coverage=sum(abs(y+sy-bottom)<width/2 for sy in
-                         [.0625,.1875,.3125,.4375,.5625,.6875,.8125,.9375])/8
-            alpha=coverage*.7*4*closure*(1-closure)
-            rgb=over(rgb,[v*alpha for v in (105,119,145)],alpha)
-        # This source partition includes the old lash rim, not just a skin fold.
-        # Fade it out by 25% closure so a second line cannot stay above the lid.
-        # Smoothstep keeps the neutral endpoint and the cutoff continuous.
-        fold_progress=min(1,closure/.25)
-        fold_visibility=1-fold_progress*fold_progress*(3-2*fold_progress)
-        fold_alpha=b['UpperFold'][i+3]/255*fold_visibility
+        fg,alpha=sample(b['LowerRim'],x,y)
+        rgb=over(rgb,fg,alpha)
+        fold_alpha=b['UpperFold'][i+3]/255
         rgb=over(rgb,[b['UpperFold'][i+c]*fold_alpha for c in range(3)],fold_alpha)
         result[i:i+4]=bytes([max(0,min(255,round(v))) for v in rgb]+[255])
     if include_foreground:
         if hair_matte is None:
             for i in hair_indices:result[i:i+4]=reference[i:i+4]
         else:
-            hair_underlay_samples[(dx,closure)]=[list(result[i:i+3]) for i in translucent_hair_indices]
+            hair_underlay_samples[(dx,0)]=[list(result[i:i+3]) for i in translucent_hair_indices]
             for i in hair_indices:
                 a=hair_matte[i+3]/255
                 result[i:i+3]=bytes(round(hair_matte[i+c]*a+result[i+c]*(1-a)) for c in range(3))
@@ -314,7 +264,7 @@ def render(dx,closure,include_foreground=True,refined_lid_side=None):
 
 # Estimate only the existing traced hair pixels. The GIMP/PSD two-layer study
 # separately verifies this encoded-RGB alpha equation and exact neutral rebuild.
-hair_base=render(0,0,include_foreground=False)
+hair_base=render_neutral(0,include_foreground=False)
 hair_matte=bytearray(W*H*4)
 for i in sorted(hair_indices):
     c,b=reference[i:i+3],hair_base[i:i+3]
@@ -333,62 +283,3 @@ for i in sorted(hair_indices):
 translucent_hair_indices=sorted(i for i in hair_indices if hair_matte[i+3]<255)
 opaque_hair_indices=hair_indices-set(translucent_hair_indices)
 
-normal=render(0,0)
-changed=sum(normal[i:i+4]!=reference[i:i+4] for i in range(0,len(reference),4))
-print('REMAKE_NORMAL_DIFF',changed,flush=True)
-assert changed==0
-png('normal',normal)
-png('hair-foreground',parts['Hair_Foreground'])
-png('hair-foreground-estimated',hair_matte)
-png('reference',reference)
-png('closed',render(0,1))
-for name,rgba in parts.items():png('part-'+name,rgba)
-
-# Inspect semantic masks and extremes before accepting the new renderer.
-doc=Gimp.Image.new(W*5,H*3,Gimp.ImageBaseType.RGB)
-for row,dx in enumerate([-4,0,4]):
-    for col,closure in enumerate([0,.25,.5,.75,1]):
-        layer(doc,f'{dx}_{closure}',render(dx,closure),col*W,row*H)
-run_proc('file-png-export',image=doc,file=Gio.File.new_for_path(str(OUT/'comparison.png')));doc.delete()
-doc=Gimp.Image.new(W,H,Gimp.ImageBaseType.RGB)
-for name,rgba in parts.items():layer(doc,name,rgba)
-assert composite(doc)==reference, 'Semantic layer composite differs from approved face'
-roundtrip={}
-for suffix,proc in [('xcf','gimp-xcf-save'),('psd','file-psd-export')]:
-    path=OUT/('semantic-parts.'+suffix)
-    run_proc(proc,image=doc,file=Gio.File.new_for_path(str(path)))
-    loaded=Gimp.file_load(Gimp.RunMode.NONINTERACTIVE,Gio.File.new_for_path(str(path)))
-    actual={item.get_name():pixels(item) for item in loaded.get_layers()}
-    roundtrip[suffix]=dict(composite_equal=composite(loaded)==reference,
-        all_parts_equal=actual=={n:bytes(v) for n,v in parts.items()},layer_count=len(actual))
-    assert roundtrip[suffix]['composite_equal'] and roundtrip[suffix]['all_parts_equal']
-    loaded.delete()
-doc.delete()
-(OUT/'geometry.json').write_text(json.dumps(geometry,indent=2),encoding='utf-8')
-checks=[]
-closed=render(0,1)
-for dx in [-4,0,4]:
-    for closure in [0,.25,.5,.75,1]:
-        rgba=render(dx,closure)
-        hair_changed=sum(rgba[i:i+4]!=reference[i:i+4] for i in opaque_hair_indices)
-        outside_changed=sum(rgba[i:i+4]!=reference[i:i+4] for i in range(0,len(reference),4) if i not in eye_indices)
-        assert hair_changed==outside_changed==0
-        fixed_changed=sum(rgba[i:i+4]!=reference[i:i+4] for i in stationary_fold_indices)
-        assert fixed_changed==0, 'Stationary upper contours changed during blink'
-        if closure==1:assert rgba==closed, 'Gaze remains visible after full closure'
-        checks.append(dict(gaze_px=dx,closure=closure,hair_holdout_changes=hair_changed,
-                           outside_eye_changes=outside_changed,stationary_fold_changes=fixed_changed))
-report=dict(stage='In-progress semantic material study; not approved, not a Cubism rig',
-    source=str(SOURCE.relative_to(ROOT)),crop=list(CROP),
-    normal_sha256=hashlib.sha256(normal).hexdigest(),normal_changed_pixels=changed,
-    foreground_holdout_pixels=len(opaque_hair_indices),foreground_source_pixels=len(hair_indices),
-    estimated_translucent_hair_pixels=len(translucent_hair_indices),roundtrip=roundtrip,checks=checks,
-    stationary_fold_pixels=stationary_fold_by_side,
-    limitations=['280x195 source crop, not final-resolution illustration',
-        'Hair alpha is estimated from a flattened image, not recovered original alpha',
-        'Lid fold, lash edges and hidden sclera still require visual refinement',
-        'Semantic PSD retains opaque hair partitions; estimated alpha is integrated in the preview and separate two-layer material only',
-        'Cubism import, rig deformation and Unity verification are pending'])
-(OUT/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
-print('REMAKE_INSPECTION_READY',flush=True)
-exec((ROOT/'scripts/gimp/build_face_remake_expressions.py').read_text(encoding='utf-8'))

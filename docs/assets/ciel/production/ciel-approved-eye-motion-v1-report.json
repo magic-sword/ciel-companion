@@ -2109,7 +2109,7 @@
       "lash_nontransparent_pixels": 684
     }
   ],
-  "generator_sha256": "55a73ea3c5653a33cd956ac30d34cd1a37db8983b1fffdb165aab2eaa5444892",
+  "generator_sha256": "a6456ec669e828938a5755e96dc2461c05ca8bf3fe7d2b0a8347fb77f860d50a",
   "limitations": [
     "280x195 source-resolution prototype",
     "Cubism keyforms and Unity rendering not implemented for this new material"

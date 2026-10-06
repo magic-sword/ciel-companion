@@ -2,11 +2,9 @@
 from pathlib import Path
 import os,json,hashlib
 ROOT=Path(os.environ['CIEL_PROJECT_ROOT'])
-source=ROOT/'scripts/gimp/build_face_remake.py'
-exec(source.read_text(encoding='utf-8').split('normal=render(0,0)')[0])
-SOFT_MASK=os.environ.get('CIEL_CUBISM_SOFT_MASK')=='1'
-OUT=ROOT/('assets/private/ciel/live2d/gimp/cubism-eye-material-v6' if SOFT_MASK else
-          'assets/private/ciel/live2d/gimp/cubism-eye-material-v5')
+source=ROOT/'scripts/gimp/eye_material_core.py'
+exec(source.read_text(encoding='utf-8'))
+OUT=ROOT/'assets/private/ciel/live2d/gimp/open-eye-materials'
 OUT.mkdir(parents=True,exist_ok=True)
 prepared={name:bytearray(rgba) for name,rgba in parts.items()}
 changes={}
@@ -15,9 +13,7 @@ for side,item in data.items():
     cleared=0; mask_overlap=0; soft_boundary=0
     for i in item['domain']:
         x,y=(i//4)%W,(i//4)//W
-        coverage=(sum(curve(g['upper'],x+sx)<=y+sy<=curve(g['lower'],x+sx)
-            for sx in [.125,.375,.625,.875] for sy in [.125,.375,.625,.875])/16
-            if SOFT_MASK else float(curve(g['upper'],x+.5)<=y+.5<=curve(g['lower'],x+.5)))
+        coverage=float(curve(g['upper'],x+.5)<=y+.5<=curve(g['lower'],x+.5))
         in_aperture=coverage>0
         # A complementary cutout for the visible sclera creates internal mask
         # edges at the iris perimeter. Fill beneath the visible sclera too so
@@ -100,7 +96,6 @@ for name,rgba in prepared.items():
 actual=composite(doc)
 diff=sum(actual[i:i+4]!=reference[i:i+4] for i in range(0,len(reference),4))
 png('neutral',actual)
-png('fold-half-fixed-context',render(0,.5))
 print('CUBISM_HAIR_NEUTRAL_DIFF',diff,flush=True)
 assert diff==0, 'New moving-part composite must preserve neutral exactly'
 roundtrip={}

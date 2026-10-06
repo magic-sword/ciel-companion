@@ -1,20 +1,18 @@
 # CIEL Companion
 
-Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。
-要件は [仕様書](docs/specification-ja.md) を参照してください。
-シエルの原画・パーツ分け・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) に整理しています。
-制作を始める際は、採用済みの [シエル外観参考 v1](docs/assets/ciel/ciel-approved-appearance-v1.png) を確認してください。控えめな鼻と滑らかな白磁の肌を基準にします。
-画像編集はGIMP 3.2.6を使用します。顔パーツの試作XCF・PSDは `.\scripts\build-ciel-face-study.ps1` で再生成できます。出力先・検証範囲は上記の制作仕様書を参照してください。
-現在の作業基準は [通常顔の分割・再合成比較](docs/assets/ciel/production/ciel-face-registration-v1-comparison.png) です。左が採用画像の等倍切り出し、右が5領域の再合成で、画素差分ゼロを確認済みです。まだ可動用の完成パーツではありません。
-現在は [承認された閉眼デザイン](docs/assets/ciel/production/ciel-eye-appearance-study-v1.png) を基準に、通常顔から閉眼への動作試作を制作しています。以前の [通常顔v7](docs/assets/ciel/production/ciel-face-registration-v7-comparison.png) は比較用に保持し、旧方式は `-Study Legacy` で再生成できます。
+Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。要件は [仕様書](docs/specification-ja.md)、原画・パーツ・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) を参照してください。
 
-[視線移動の検査画像](docs/assets/ciel/production/ciel-face-registration-v7-gaze-inspection.png) は、左から画面上の移動量−4px・−2px・0px・＋2px・＋4px。中央は採用した通常顔と一致します。上端の分離部分は固定されていますが、境界の硬さはまだ残っています。0.5px刻みの平行移動による試験で、Cubismの動作確認はまだです。
+制作基準は [シエル外観参考](docs/assets/ciel/ciel-approved-appearance-v1.png) と [承認済みの閉眼デザイン](docs/assets/ciel/production/ciel-eye-appearance-study-v1.png) です。控えめな鼻と、滑らかな白磁の肌を維持します。画像編集はGIMP 3.2.6を使用します。
 
-制作確認用の [表情プレビュー](docs/assets/ciel/production/ciel-gaze-preview.html) は、承認された閉眼のまつ毛を使う版へ更新しました。視線17段階・瞬き33段階・口の開閉33段階を組み合わせられ、¼倍速での確認もできます。[5段階の瞬き比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-comparison.png) と [視線・瞬き・開口の比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-combined-comparison.png) も保存しています。これは280×195pxのソフトウェア描画試作で、最終原画・Cubismリグ・Unity表示の完成を意味しません。
+動作確認の入口は [表情プレビュー](docs/assets/ciel/production/ciel-gaze-preview.html) に統一しています。視線17段階・瞬き33段階・口の開閉33段階を組み合わせられます。[瞬きの比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-comparison.png)、[視線・瞬き・開口の比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-combined-comparison.png) も参照できます。現在は280×195pxの素材とソフトウェア描画の試作です。高解像度原画、現行素材のCubismリグ、Unityでの表示検証は未完了です。
 
-現行素材は `.\scripts\build-ciel-approved-eyes.ps1 -Publish` で生成・検査し、PNGと検査記録をローカルのプレビュー用フォルダへ反映できます。`-Publish` を省略するとGit除外の編集原本フォルダだけを更新します。以前のリメイクv2は `.\scripts\build-ciel-face-study.ps1 -Publish` と [旧v2プレビュー](docs/assets/ciel/production/ciel-gaze-preview-v2.html) で比較できます。
+素材とプレビュー画像は次のコマンドで再生成できます。
 
-旧[表情試作v1](docs/assets/ciel/production/ciel-gaze-preview-legacy.html) は、閉眼時に肌が髪を覆う問題と目の明部のずれがあり、外観は未合格です。[Live2Dの調整方法・公式資料調査](docs/live2d-rigging-best-practices-ja.md) に原因、素材分離・描画順・クリッピングの方針、合格条件を整理しました。
+```powershell
+.\scripts\build-ciel-approved-eyes.ps1 -Publish
+```
+
+`-Publish` は生成・検証した画像と記録を、このリポジトリの資料フォルダへコピーします。省略時はGit除外の `assets/private/ciel/live2d/gimp/` 内だけを更新します。インターネットへの公開は行いません。入力・出力と検証手順は [制作仕様書の現行工程](docs/ciel-live2d-production-spec-ja.md#12-現行の制作工程2026-10-06)、素材分離と品質判断の根拠は [Live2D公式資料調査](docs/live2d-rigging-best-practices-ja.md) にまとめています。
 
 ## Unity開発環境
 

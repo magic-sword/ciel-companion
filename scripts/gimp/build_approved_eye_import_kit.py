@@ -2,9 +2,9 @@
 import os
 from pathlib import Path
 ROOT=Path(os.environ['CIEL_PROJECT_ROOT'])
-exec((ROOT/'scripts/gimp/build_face_remake.py').read_text(encoding='utf-8').split('# Manually traced anatomical boundaries')[0])
+exec((ROOT/'scripts/gimp/eye_material_core.py').read_text(encoding='utf-8'))
 OUT=ROOT/'assets/private/ciel/live2d/gimp/approved-eye-motion-v1'
-paths=[ROOT/'assets/private/ciel/live2d/gimp/cubism-eye-material-v5/semantic-hair-parts.psd',OUT/'closed-materials.psd']
+paths=[ROOT/'assets/private/ciel/live2d/gimp/open-eye-materials/semantic-hair-parts.psd',OUT/'closed-materials.psd']
 sources=[Gimp.file_load(Gimp.RunMode.NONINTERACTIVE,Gio.File.new_for_path(str(p))) for p in paths]
 doc=Gimp.Image.new(W,H,Gimp.ImageBaseType.RGB)
 for item in reversed(sources[0].get_layers()):

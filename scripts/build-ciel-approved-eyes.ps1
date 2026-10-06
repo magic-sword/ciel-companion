@@ -6,7 +6,6 @@ if(-not(Test-Path -LiteralPath $gimp)){throw 'GIMP 3 console executable not foun
 $settings=@{
  CIEL_PROJECT_ROOT=$projectRoot
  CIEL_APPROVED_EYE_ATLAS='1'
- CIEL_CUBISM_SOFT_MASK='0'
  GIMP3_DIRECTORY=Join-Path $projectRoot '.local/gimp-production/profile'
  GIMP3_CACHEDIR=Join-Path $projectRoot '.local/gimp-production/cache'
  GIMP3_TEMPDIR=Join-Path $projectRoot '.local/gimp-production/temp'
@@ -21,9 +20,7 @@ Push-Location $projectRoot
 try {
  $started=Get-Date
  $batchCode="exec(open('scripts/gimp/build_approved_eye_motion.py',encoding='utf-8').read()); exec(open('scripts/gimp/build_approved_eye_import_kit.py',encoding='utf-8').read()); exec(open('scripts/gimp/inspect_approved_eye_continuity.py',encoding='utf-8').read())"
- if(-not(Test-Path -LiteralPath 'assets/private/ciel/live2d/gimp/cubism-eye-material-v5/semantic-hair-parts.psd')){
-  $batchCode="exec(open('scripts/gimp/build_cubism_hair_material.py',encoding='utf-8').read()); "+$batchCode
- }
+ $batchCode="exec(open('scripts/gimp/build_open_eye_materials.py',encoding='utf-8').read()); "+$batchCode
  & $gimp --new-instance --no-data --no-fonts --no-splash --console-messages --batch-interpreter=python-fu-eval --batch $batchCode --quit
  if($LASTEXITCODE -ne 0){throw 'GIMP build failed.'}
  $output=Join-Path $projectRoot 'assets/private/ciel/live2d/gimp/approved-eye-motion-v1'

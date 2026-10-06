@@ -5,8 +5,7 @@ import {createServer} from 'node:http';
 import {createHash} from 'node:crypto';
 const root = process.cwd();
 const assets = path.join(root,'docs/assets/ciel/production');
-const approvedEyes=process.argv.includes('--approved-eyes');
-const pageFile=approvedEyes?'ciel-approved-eye-preview.html':'ciel-gaze-preview.html';
+const pageFile='ciel-gaze-preview.html';
 const previewSource=await fs.readFile(path.join(assets,pageFile),'utf8');
 const artifactPrefix=previewSource.match(/load\('([a-z0-9-]+)-blink-atlas\.png'/)?.[1];
 if(!artifactPrefix)throw Error('Preview does not declare a blink atlas');
@@ -123,7 +122,7 @@ try{
     }
     document.getElementById('reset').click();return count;
   })()`);
-  const out=path.join(root,approvedEyes?'.local/approved-eye-browser-results':'.local/gaze-browser-results');
+  const out=path.join(root,'.local/gaze-browser-results');
   await fs.mkdir(out,{recursive:true});
   const screen=await call('Page.captureScreenshot',{format:'png'});
   await fs.writeFile(path.join(out,'preview.png'),Buffer.from(screen.data,'base64'));

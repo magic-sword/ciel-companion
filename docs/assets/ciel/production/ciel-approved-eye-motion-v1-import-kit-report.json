@@ -40,17 +40,17 @@
     },
     "psd": {
       "file": "open-closed-import-kit.psd",
-      "sha256": "3a4e4d7c0e65e79144a51406019ee0b0fd49fd8702cc896b1b2d90062feeda31"
+      "sha256": "c384c9178d2df59d36747294892a5ab50d95eeab9de6bd001c29260999d02ba5"
     }
   },
   "inputs": [
     {
-      "path": "assets/private/ciel/live2d/gimp/cubism-eye-material-v5/semantic-hair-parts.psd",
-      "sha256": "b7f864475842a7926fdc59b855e54a3e8006b46cb91302f58829c75159bbaa57"
+      "path": "assets/private/ciel/live2d/gimp/open-eye-materials/semantic-hair-parts.psd",
+      "sha256": "37027f3d08173ca4adb61c355d79d0909ae712561f258ff352ef8e975bff4753"
     },
     {
       "path": "assets/private/ciel/live2d/gimp/approved-eye-motion-v1/closed-materials.psd",
-      "sha256": "f8441a85787d7430ac0bf09ea77c4976152b489e9858ce5815f46839190e4833"
+      "sha256": "4e3aba8e4f431d12f8c8e551d07ef56b9faccfb7bf8a637369e3d70a4ba739eb"
     }
   ],
   "limits": [

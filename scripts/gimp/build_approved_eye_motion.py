@@ -5,10 +5,9 @@ This is an appearance/motion prototype. PSD parts are not a Cubism rig.
 import os
 from pathlib import Path
 ROOT=Path(os.environ['CIEL_PROJECT_ROOT'])
-exec((ROOT/'scripts/gimp/build_approved_eye_keys.py').read_text(encoding='utf-8').split('board = Gimp.Image.new')[0])
+exec((ROOT/'scripts/gimp/approved_eye_reference.py').read_text(encoding='utf-8'))
 OUT=ROOT/'assets/private/ciel/live2d/gimp/approved-eye-motion-v1'
 OUT.mkdir(parents=True,exist_ok=True)
-old_render=render
 def ease(v):
     v=max(0,min(1,v)); return v*v*(3-2*v)
 
@@ -63,7 +62,7 @@ for side,item in data.items():
 src.delete()
 
 def render(dx,closure,include_foreground=True):
-    if closure==0:return old_render(dx,0,include_foreground)
+    if closure==0:return render_neutral(dx,include_foreground)
     result=bytearray(reference)
     for side,item in data.items():
         g,b=item['g'],item['buffers']; mat=materials[side]
@@ -147,15 +146,6 @@ board.delete()
 png('closed',closed)
 assert render(0,0)==reference
 assert render(-4,1)==render(4,1)==closed
-if os.environ.get('CIEL_APPROVED_EYE_CENTRE_CHECK')=='1':
-    indices=[4*(y*W+x)+c for y in range(40,111) for x in range(35,246) for c in range(3)]
-    continuity=[]
-    for label,draw in (('previous',old_render),('candidate',render)):
-        frames=[draw(0,n/32) for n in range(33)]
-        changes=[sum(abs(a[i]-b[i]) for i in indices)/len(indices) for a,b in zip(frames,frames[1:])]
-        continuity.append(dict(renderer=label,onset=changes[0],worst=max(changes),steps=changes))
-    (OUT/'centre-check.json').write_text(json.dumps(continuity,indent=2)+'\n',encoding='utf-8')
-    print('CENTRE_CHECK',[(r['renderer'],r['onset'],r['worst']) for r in continuity],flush=True)
 (OUT/'materials-report.json').write_text(json.dumps(dict(
     status='textured_motion_candidate',separation=separation,
     closed_psd_xcf_compositing_verified=True,
@@ -173,5 +163,5 @@ if os.environ.get('CIEL_APPROVED_EYE_ATLAS')=='1':
         generator_sha256=hashlib.sha256((ROOT/'scripts/gimp/build_approved_eye_motion.py').read_bytes()).hexdigest(),
         limitations=['280x195 source-resolution prototype',
                     'Cubism keyforms and Unity rendering not implemented for this new material'])
-    exec((ROOT/'scripts/gimp/build_face_remake_expressions.py').read_text(encoding='utf-8'))
+    exec((ROOT/'scripts/gimp/build_expression_atlases.py').read_text(encoding='utf-8'))
 print('APPROVED_EYE_MOTION_READY',flush=True)

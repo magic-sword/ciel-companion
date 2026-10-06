@@ -7,8 +7,8 @@ OUT=ROOT/'assets/private/ciel/live2d/gimp/approved-eye-motion-v1'
 W,H=280,195
 FMT="R'G'B'A u8"
 results=[]
-board=Gimp.Image.new(W*4,H*2,Gimp.ImageBaseType.RGB)
-for row,path in enumerate((ROOT/'docs/assets/ciel/production/ciel-face-remake-v2-blink-atlas.png',OUT/'blink-atlas.png')):
+board=Gimp.Image.new(W*4,H,Gimp.ImageBaseType.RGB)
+for row,path in enumerate((OUT/'blink-atlas.png',)):
     doc=Gimp.file_load(Gimp.RunMode.NONINTERACTIVE,Gio.File.new_for_path(str(path)))
     src=doc.get_layers()[0].get_buffer()
     frames=[bytes(src.get(Gegl.Rectangle.new(W*8,H*b,W,H),1,FMT,Gegl.AbyssPolicy.NONE)) for b in range(33)]
@@ -31,5 +31,5 @@ assert proc.run(cfg).index(0)==Gimp.PDBStatusType.SUCCESS
 board.delete()
 (OUT/'continuity-report.json').write_text(json.dumps(dict(results=results,
     note='Pixel differences measure change, not aesthetic quality; no automatic visual acceptance.',
-    board_rows=['previous procedural closed lash','approved textured closed lash']),indent=2)+'\n',encoding='utf-8')
+    board_rows=['approved textured closed lash']),indent=2)+'\n',encoding='utf-8')
 print('APPROVED_EYE_CONTINUITY_READY',flush=True)
