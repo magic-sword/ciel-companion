@@ -1,0 +1,39 @@
+{
+  "status": "diagnostic_only_not_accepted_hair_separation",
+  "columns": [
+    "source open",
+    "current closed",
+    "magenta editable / yellow stationary / green registered hair",
+    "existing hair alpha on grey"
+  ],
+  "source_sha256": "f8cb6fa5359ebb834467226b813a8af3e47e18dae89cf8592af97569e6c115ad",
+  "atlas_sha256": "eef2a5eed71ac958d3a2f976bd5d0a92f323da256f5e5cee36692dc7c36587cd",
+  "registered_hair_pixels": 163,
+  "editable_nonhair_pixels": 5749,
+  "stationary_pixels": 520,
+  "neutral_equal": true,
+  "forelock_tracing": {
+    "status": "manual_contour_scaffold_requires_review",
+    "roundtrip": {
+      "xcf": {
+        "neutral_equal": true,
+        "all_parts_equal": true
+      },
+      "psd": {
+        "neutral_equal": true,
+        "all_parts_equal": true
+      }
+    },
+    "layer_count": 4,
+    "foreground_pixels": 17431,
+    "hidden_face_filled": false,
+    "alpha_refined": false,
+    "movement_ready": false,
+    "note": "Exact partition is a file check, not proof of correct hair anatomy. Crop excludes roots."
+  },
+  "limitations": [
+    "Masks describe implementation ownership, not ground-truth anatomy",
+    "Existing foreground is a fragmentary holdout, not a complete movable forelock",
+    "Hair-tip completeness and skin-boundary appearance require visual review"
+  ]
+}

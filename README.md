@@ -6,6 +6,8 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 
 動作確認の入口は [表情プレビュー](docs/assets/ciel/production/ciel-gaze-preview.html) に統一しています。視線17段階・瞬き33段階・口の開閉33段階を組み合わせられます。[瞬きの比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-comparison.png)、[視線・瞬き・開口の比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-combined-comparison.png) も参照できます。現在は280×195pxの素材とソフトウェア描画の試作です。高解像度原画、現行素材のCubismリグ、Unityでの表示検証は未完了です。
 
+現在は [目のない顔下地＋独立した目パーツ](docs/ciel-live2d-production-spec-ja.md#16-目のない顔の下地と独立した目パーツ最新方針再開位置) へ移行中です。下地を仕上げた後、片目のパーツをCubismで変形して検証します。新構成の編集原稿は作成済みですが、外観・リグは未完成で、プレビューへの反映前です。新しいセッションは制作仕様書の第16節から再開してください。
+
 素材とプレビュー画像は次のコマンドで再生成できます。
 
 ```powershell

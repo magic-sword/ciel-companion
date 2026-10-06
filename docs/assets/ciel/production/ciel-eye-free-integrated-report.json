@@ -1,0 +1,34 @@
+﻿{
+    "status":  "integrated_in_cubism_visual_review_failed",
+    "model":  "assets/private/ciel/live2d/gimp/eye-free-closed-details/eye-free-closed-details-rig.cmo3",
+    "model_sha256":  "5479e0d47a7314b163eb3de5aab9af40eff9ffc58def73a8591aec5e0d383551",
+    "existing_model_preserved":  true,
+    "replacement_psd":  "eye-free-face-replacement.psd",
+    "additive_psd":  "closed-eye-details.psd",
+    "observed_eye_open_values":  [
+                                     0,
+                                     0.5,
+                                     1
+                                 ],
+    "skin_cover_added":  false,
+    "reload_verified":  true,
+    "hair_draw_order":  501,
+    "eye_draw_order":  500,
+    "remaining":  [
+                      "Half-open white streaks and possible hair fragments in moving upper lash",
+                      "Half-open outer-corner thickness and lower-rim placement",
+                      "Near-closed opacity transition and all-intermediate visual review",
+                      "Final shared-base and fine hair-boundary appearance review"
+                  ],
+    "contour_refinement":  {
+                               "transferred_pixels":  571,
+                               "fold_alpha_range":  [
+                                                        0,
+                                                        242
+                                                    ],
+                               "left_closed_arc_removed_observed":  true,
+                               "left_closed_color_leak_removed_observed":  true,
+                               "upper_lash_mesh_regenerated":  true,
+                               "visual_quality_complete":  false
+                           }
+}

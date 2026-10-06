@@ -1,0 +1,10 @@
+﻿{
+    "status":  "imported_as_separate_model_not_rigged",
+    "model":  "assets/private/ciel/live2d/gimp/eye-free-closed-details/closed-details-import-check.cmo3",
+    "model_sha256":  "ac2800cf5184e8f651d1176b92d649872ff58c28b9dd17ad0d8e0ffaac1a511c",
+    "source_psd":  "assets/private/ciel/live2d/gimp/eye-free-closed-details/eye-free-face-with-closed-details.psd",
+    "neutral_visual_inspected":  true,
+    "closed_lash_layers_imported_hidden":  true,
+    "existing_rig_overwritten":  false,
+    "blink_keys_verified":  false
+}

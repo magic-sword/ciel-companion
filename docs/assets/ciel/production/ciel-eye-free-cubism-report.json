@@ -1,0 +1,33 @@
+﻿{
+    "status":  "one_eye_motion_observed_visual_refinement_required",
+    "editor":  "Cubism Editor 5.3.04 FREE",
+    "model":  "assets/private/ciel/live2d/gimp/eye-free-face/eye-free-face-rig.cmo3",
+    "model_sha256":  "6550a26fc71da1ad73e71e9ab0b93f362cb120780dcc56153f245bc4080738e4",
+    "psd":  "assets/private/ciel/live2d/gimp/eye-free-face/eye-free-face.psd",
+    "psd_sha256":  "a4044cdd8348caedc91547f01542c4374bbe0f671db83aea2a7aab213acdd633",
+    "screenshot":  "docs/assets/ciel/production/ciel-eye-free-cubism-import.png",
+    "neutral_visual_inspected":  true,
+    "pixel_exact_in_cubism_verified":  false,
+    "blink_keys_verified":  true,
+    "remaining":  [
+                      "Refine angular and thick outer upper-lash contour",
+                      "Resolve residual upper-fold/eye-outline material ownership",
+                      "Align lower rim to closing aperture",
+                      "Review forelock edges and all intermediate key values",
+                      "Reopen saved model and repeat visual verification"
+                  ],
+    "mesh_progress":  "L_UpperLash and L_Sclera meshed and given endpoint keys; L_Iris has a standard mesh; remaining topology requires refinement",
+    "parameter":  "ParamEyeLOpen: 0 closed, 0.5 interpolated half, 1 open",
+    "clipping_observed":  [
+                              "L_Iris -\u003e L_Sclera",
+                              "L_Pupil -\u003e L_Sclera",
+                              "L_Highlight -\u003e L_Sclera"
+                          ],
+    "visual_acceptance_passed":  false,
+    "states_observed":  [
+                            "open",
+                            "half",
+                            "closed"
+                        ],
+    "no_closed_skin_cover_layer":  true
+}
