@@ -523,3 +523,11 @@ Cubismの画面操作は第二スクリーン（`FR2302W`）でも可能。`swit
 ファーを直したPSDは、既存のレイヤーに「差し替え」で反映できた（`ciel-head-body.psd` の差し替え。名前・順序が同じなのでIDはずれず、描画順も保たれた）。顔の4部品（`Hair_Front`・`Face_Skin`・`Ear_L/R`・`Hair_Under_Ear`）を1つのワープデフォーマ `Head_Warp`（5×5分割）に入れ、「角度X」に -30・0・30 の3点キーを付けた。-30 と 30 では、中央の制御点を左右へ動かして、顔の部品が一体で向きを変えることを確認した。**まだ粗い**：制御点の動きが大きく、耳と枠が曲がる。顔の肌・耳・前髪をそれぞれ別の速さで動かす（奥行きの表現）、角度Y・Zのキー、首・体・衣装の追従は未設定。FREE版のデフォーマ数は50個まで（現在1個）。
 
 操作の注意：保存時に「未使用の原画があります。削除しますか？」と出たら、差し替え前の古い原画なので「はい」。パラメーターのキーは「3点追加」で付けた直後の値がずれる（-17など）ので、値欄に数値を入れ直す。キーの上で値を変えてから、デフォーマの制御点を動かす。
+
+### 12.20 Unityでの書き出しの確認（2026-10-08）
+
+PRO版のトライアルで、テクスチャアトラス（4096×4096、1枚）を作り、`unity/Assets/Characters/Ciel/` へ書き出した（`Ciel.moc3`・`Ciel.model3.json`・`Ciel.cdi3.json`・`Ciel.4096/texture_00.png`、合計1.9MB）。Cubism SDKが自動で `Ciel.prefab`・`Ciel.controller`・`Ciel.asset` と `.meta` を作る（これらもGit管理）。テクスチャのインポート設定は最大サイズ 4096（既定の2048だと縮む）。
+
+確認用に `unity/Assets/Editor/CielRenderCheck.cs` を追加した。`Unity.exe -projectPath unity -executeMethod Ciel.EditorTools.CielRenderCheck.Run -logFile <log>`（`-batchmode` は付けない。付けると再生モードへ移れず止まる）で、再生モードに入り、パラメーターを変えて5枚を `.local/render-check/` へ撮影する（`CIEL_RENDER_CHECK_DONE`）。結果：まばたき（半目・閉眼）は設定どおり動く。角度Xは顔・髪・耳が向きを変えるが、旧 `Face_Base`（耳・髪・体を焼き込んだ旧レイヤー）が動かずに残り、耳が二重に見える。次は `Face_Base` の削除。
+
+**アプリからパラメーターを渡す作法**：Cubismは毎フレーム、`CubismParameterStore` が値を保存値へ戻す。外から値を渡すときは `LateUpdate` で設定し、続けて `CubismModel.ForceUpdateNow()` を呼ぶ（設定だけだと描画に反映されない）。エディタの画面で、再生していないときにインスペクタの値を変えても、同じ理由で反映されない（モデルが消えて見えることがある）。
