@@ -2,7 +2,7 @@
 
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。要件は [仕様書](docs/specification-ja.md)、原画・パーツ・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) を参照してください。
 
-制作基準は [シエル外観参考](docs/assets/ciel/ciel-approved-appearance-v1.png) と [承認済みの閉眼デザイン](docs/assets/ciel/production/ciel-eye-appearance-study-v1.png) です。控えめな鼻と、滑らかな白磁の肌を維持します。画像編集はGIMP 3.2.6を使用します。
+制作基準は [シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png) と [承認済みの閉眼デザイン](assets/ciel/reference/ciel-eye-appearance-study-v1.png) です。控えめな鼻と、滑らかな白磁の肌を維持します。画像編集はGIMP 3.2.6を使用します。
 
 動作確認の入口は [表情プレビュー](docs/assets/ciel/production/ciel-gaze-preview.html) に統一しています。視線17段階・瞬き33段階・口の開閉33段階を組み合わせられます。[瞬きの比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-comparison.png)、[視線・瞬き・開口の比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-combined-comparison.png) も参照できます。現在は280×195pxの素材とソフトウェア描画の試作です。高解像度原画、現行素材のCubismリグ、Unityでの表示検証は未完了です。
 
