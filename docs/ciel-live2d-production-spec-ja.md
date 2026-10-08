@@ -513,3 +513,5 @@ Cubismの画面操作は第二スクリーン（`FR2302W`）でも可能。`swit
 `rig/ciel-blink-test.cmo3` が50MBを超え、GitHubの推奨上限に触れたため、**作業モデル（`.cmo3`・`.can3`）は Git LFS で管理する**（`.gitattributes`）。履歴は書き換えない（既存の1回分は通常のGitオブジェクトとして残る）。clone後は `git lfs install` を一度実行する（`git lfs pull` で実体を取得）。GitHub無料枠のLFSは容量1GB・転送1GB/月なので、`.cmo3` のコミットは節目（動作確認が取れたとき）だけにする。
 
 **Unityが読むのは、Cubismから書き出した `.moc3`・テクスチャ・`.model3.json` など。`.cmo3` は不要。** 書き出し物は小さいので、通常のGitで `unity/Assets/Characters/Ciel/` に置く（Live2D SDK本体は従来どおりGit除外）。`.cmo3` は、モデルの編集を引き継ぐ人にだけ必要。書き出し（テクスチャアトラス）はPRO版が必要（第12.7節）。
+
+**描画順の設定（2026-10-08）**：取り込んだ11レイヤーに、インスペクタの「描画順」を設定した。目（開眼・半目・閉眼）は500のまま。`Hair_Front` 700／`Face_Skin` 200／`Ear_R`・`Ear_L` 150／`Hair_Under_Ear` 120／`Neck_Gear` 90／`Chest_Gem` 80／`Waist_Belt` 70／`Outer_R`・`Outer_L` 50／`Body_Base` 10（大きいほど手前）。設定後、顔・耳・前髪・目・衣装・体が元の絵のとおりに重なることを確認した。値を入れるたびに画面が約20秒止まるので、入力後は待ってから次へ進む。次の作業：顔の角度のパラメーターで前髪・耳・顔の肌が別に動くことの確認。
