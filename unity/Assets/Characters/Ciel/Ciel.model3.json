@@ -1,0 +1,10 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "Ciel.moc3",
+		"Textures": [
+			"Ciel.4096/texture_00.png"
+		],
+		"DisplayInfo": "Ciel.cdi3.json"
+	}
+}
