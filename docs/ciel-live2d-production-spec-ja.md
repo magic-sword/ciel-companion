@@ -323,7 +323,6 @@ Cubism Editor 5.3.04 FREE版を使用した目の検証モデルはある。現�
 | `assets/ciel/rig/` | Cubismの作業モデル `ciel-blink-test.cmo3` | 管理する（節目でのみ更新） |
 | `assets/ciel/{master,layers,normalized,psd}/`、`manifest.json` | `scripts/live2d/` が作る中間物 | 管理しない（再生成） |
 | `scripts/live2d/` | 素材v2の再生成スクリプト | 管理する |
-| `assets/private/` | 使わなかった生成画像、旧方式の作業物など。ローカルの保管用 | 管理しない |
 | `.local/` | 作業用の一時物、インストーラ、スクリーンショット | 管理しない |
 
 `.cmo3` やPSDは、保存のたびに数MB〜数十MBの履歴が増える。毎回コミットせず、動作確認が取れた節目だけコミットする。画像・Live2Dファイルは `.gitattributes` で変換されない。
