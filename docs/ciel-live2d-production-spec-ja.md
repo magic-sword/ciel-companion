@@ -672,3 +672,9 @@ Cubismでは17部品の現行 `eye-free-face-replacement.psd` を差し替えた
 ユーザーが同じ切り抜きから瞬きの瞬間を生成した（`generated/edit-c-eyes-closed.png`、元は「シエルの穏やかな瞬き.png」、1672×941）。閉じたまつ毛はゆるく下に凸で、以前承認された閉眼の方向性と一致し、画風・まつ毛の色・二重の線も通常の顔とそろう。**瞬きの閉眼にはこれを採用**し、生成パーツの閉眼まつ毛（上に凸）は笑顔の閉じ目の候補として残す。
 
 位置合わせは横0.6116・縦0.6095・オフセット(598.2, 762.4)。範囲外の差はRMS 3.6〜5.7で、髪の線がわずかにずれるため、閉じたまつ毛と二重の線だけを使う。再生成スクリプトが `master/ciel-upper-body-2x-eyes-closed.png` を出力し、`build-ciel-eye-layers.ps1` が `layers/eyes/{R,L}_{lash,crease}_closed.png` を作る。目のない顔に重ねた結果と瞬きの画像の差は、まつ毛の部分ではほぼ0（全体のRMS 4.1／5.3は髪の線のずれ）。
+
+### 瞬き確認用PSD（2026-10-08）
+
+`scripts/gimp/build_source_v2_blink_psd.py`（第14節のGIMPバッチ方式で実行、完了表示 `SOURCE_V2_BLINK_PSD_READY`）で、`source-v2/psd/ciel-v2-blink-test.psd`／`.xcf` を作った。2172×2896、13レイヤー。下から `Face_Base`（目のない上半身。体・髪・口はまだ分けていない）、左右それぞれ `*_Sclera`・`*_Iris`・`*_Lash`・`*_Crease`・`*_Lash_Closed`・`*_Crease_Closed`。閉眼の2レイヤーは非表示で保存。PSD/XCFを再読み込みしてレイヤー名・順序・表示状態の一致を確認した。表示レイヤーの合成と基準画像の差は全体でRMS 0.56、目の周囲でRMS 2.5。
+
+次はCubism Editorへの取り込みと、左右の目の開閉パラメーター（開眼→半目→閉眼）の設定。半目は開眼のまつ毛を下げる変形と、閉眼レイヤーへの切り替えで作る。
