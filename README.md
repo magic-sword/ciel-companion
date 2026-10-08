@@ -2,19 +2,14 @@
 
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。要件は [仕様書](docs/specification-ja.md)、原画・パーツ・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) を参照してください。
 
-制作基準は [シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png) と [承認済みの閉眼デザイン](assets/ciel/reference/ciel-eye-appearance-study-v1.png) です。控えめな鼻と、滑らかな白磁の肌を維持します。画像編集はGIMP 3.2.6を使用します。
+## キャラクター（シエル）のLive2D制作
 
-動作確認の入口は [表情プレビュー](docs/assets/ciel/production/ciel-gaze-preview.html) に統一しています。視線17段階・瞬き33段階・口の開閉33段階を組み合わせられます。[瞬きの比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-comparison.png)、[視線・瞬き・開口の比較](docs/assets/ciel/production/ciel-approved-eye-motion-v1-combined-comparison.png) も参照できます。現在は280×195pxの素材とソフトウェア描画の試作です。高解像度原画、現行素材のCubismリグ、Unityでの表示検証は未完了です。
+制作の仕様と現在の進捗は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md)（第12節が現行の工程）にまとめています。新しく参加する人・新しいセッションは、まずこの第12節から読んでください。
 
-現在は [目のない顔下地＋独立した目パーツ](docs/ciel-live2d-production-spec-ja.md#16-目のない顔の下地と独立した目パーツ最新方針再開位置) へ移行中です。下地を仕上げた後、片目のパーツをCubismで変形して検証します。新構成の編集原稿は作成済みですが、外観・リグは未完成で、プレビューへの反映前です。2026-10-08に高解像度の基準画像（素材v2）へ切り替えました。新しいセッションは制作仕様書の[第17節](docs/ciel-live2d-production-spec-ja.md#17-高解像度の基準画像と生成パーツ素材v22026-10-08)から再開してください。
-
-素材とプレビュー画像は次のコマンドで再生成できます。
-
-```powershell
-.\scripts\build-ciel-approved-eyes.ps1 -Publish
-```
-
-`-Publish` は生成・検証した画像と記録を、このリポジトリの資料フォルダへコピーします。省略時はGit除外の `assets/private/ciel/live2d/gimp/` 内だけを更新します。インターネットへの公開は行いません。入力・出力と検証手順は [制作仕様書の現行工程](docs/ciel-live2d-production-spec-ja.md#12-現行の制作工程2026-10-06)、素材分離と品質判断の根拠は [Live2D公式資料調査](docs/live2d-rigging-best-practices-ja.md) にまとめています。
+- 外観の参考：[シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png)。控えめな鼻と、滑らかな白磁の肌を維持します。
+- 現在：高解像度の基準画像（2172×2896px）から目のレイヤーを作り、Cubism Editor 5.3.04で開眼・半目・閉眼の開閉キーを設定したところです（`assets/ciel/rig/ciel-blink-test.cmo3`）。次は体・髪・口のパーツ分けと、PRO版での書き出しです。Unityでの表示検証は未完了です。
+- 元画像・作業モデルはGitで管理し、再生成できる中間物は管理しません。素材は `scripts/live2d/` で再生成できます（手順は仕様書の第12.3節）。画像編集はGIMP 3.2.6を使います。
+- 過去の方式（280×195px素材など）は削除しました。Gitのタグ `archive/pre-v2-cleanup` で参照できます。
 
 ## Unity開発環境
 
