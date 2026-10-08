@@ -7,10 +7,10 @@
     透明度は等倍画像のアルファを2倍に補間し、色は黒背景との合成を逆算して求める。
   - normalized: 生成パーツをキャラから見た左右(L/R)の英数字名へ統一し、ほぼ不透明(>=248)の画素を255にする。
   - manifest.json: 元ファイル名・キャンバスサイズ・描画範囲・用途を記録する。
-  入出力は Git 除外の assets/private/ciel/live2d/source-v2/ 内だけ。
+  入力は assets/ciel/generated/（Git管理）、出力の master/ normalized/ manifest.json は assets/ciel/ 内の Git 除外フォルダ（再生成できる）。
 #>
 param(
-  [string]$SourceRoot = (Join-Path $PSScriptRoot '..\assets\private\ciel\live2d\source-v2')
+  [string]$SourceRoot = (Join-Path $PSScriptRoot '..\..\assets\ciel')
 )
 $ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path $SourceRoot).Path
@@ -164,20 +164,15 @@ $parts = [ordered]@{
   'normal\mouth_closed.png'            = '閉じた口'
   'normal\R_sclera.png'                = '右目 白目'
   'normal\L_sclera.png'                = '左目 白目'
-  'normal\L_sclera_alt.png'            = '左目 白目（別案・別キャンバス）'
   'normal\R_iris.png'                  = '右目 虹彩'
   'normal\L_iris.png'                  = '左目 虹彩'
-  'normal\L_iris_alt.png'              = '左目 虹彩（別案・大きめ）'
   'normal\R_lashes_open.png'           = '右目 上まつ毛・下まぶた線'
   'normal\L_lashes_open.png'           = '左目 上まつ毛・下まぶた線'
   'normal\R_brow.png'                  = '右眉'
   'normal\L_brow.png'                  = '左眉（別キャンバス）'
-  'normal\hair_front_unused.png'       = '不使用：髪型が基準画像と異なる'
   'expression\mouth_open.png'          = '開いた口（口パク）'
   'expression\R_lashes_closed.png'     = '右目 閉眼まつ毛'
   'expression\L_lashes_closed.png'     = '左目 閉眼まつ毛'
-  'expression\R_lid_patch_unused.png'  = '不使用：肌パッチ方式は廃止'
-  'expression\L_lid_patch_unused.png'  = '不使用：肌パッチ方式は廃止'
 }
 
 $records = @()
@@ -194,7 +189,7 @@ foreach ($name in $parts.Keys) {
 }
 
 $manifest = [ordered]@{
-  generatedBy = 'scripts/prepare-ciel-source-v2.ps1'
+  generatedBy = 'scripts/live2d/prepare-source.ps1'
   convention = 'L/R はキャラクターから見た左右。キャラの右目は画面の左側。'
   note = '生成パーツは基準画像と同じ絵ではない。基準画像の位置・大きさへ合わせてから、隠れる部分と差分にだけ使う。'
   master = [ordered]@{

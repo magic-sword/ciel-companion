@@ -1,0 +1,11 @@
+# 改行は自動。画像・Live2D・編集原本は変換しない。
+* text=auto
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.psd binary
+*.xcf binary
+*.cmo3 binary
+*.can3 binary
+*.moc3 binary
+*.exe binary

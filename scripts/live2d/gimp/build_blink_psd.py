@@ -1,9 +1,9 @@
-"""Assemble the source-v2 blink test PSD for Cubism from the layer PNGs.
+"""Assemble the blink test PSD for Cubism from the layer PNGs.
 
 GIMP 3 batch script (run with python-fu-eval; see the production spec, section 14).
-Input:  assets/private/ciel/live2d/source-v2/master/ciel-upper-body-2x-eyeless.png
-        assets/private/ciel/live2d/source-v2/layers/eyes/{R,L}_*.png   (scripts/build-ciel-eye-layers.ps1)
-Output: assets/private/ciel/live2d/source-v2/psd/ciel-v2-blink-test.{psd,xcf}, report.json
+Input:  assets/ciel/master/ciel-upper-body-2x-eyeless.png
+        assets/ciel/layers/eyes/{R,L}_*.png   (scripts/live2d/build-eye-layers.ps1)
+Output: assets/ciel/psd/ciel-blink-test.{psd,xcf}, report.json
 Layer names use the character's own left/right (R = viewer's left). Closed-eye layers are saved hidden,
 so the visible composite is the neutral face.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 from gi.repository import Gimp, Gio
 
 ROOT = Path(os.environ['CIEL_PROJECT_ROOT'])
-SRC = ROOT / 'assets/private/ciel/live2d/source-v2'
+SRC = ROOT / 'assets/ciel'
 OUT = SRC / 'psd'
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -49,7 +49,7 @@ assert [l.get_name() for l in doc.get_layers()] == [n for n, _, _ in reversed(st
 
 checks = {}
 for suffix, proc in [('xcf', 'gimp-xcf-save'), ('psd', 'file-psd-export')]:
-    target = OUT / f'ciel-v2-blink-test.{suffix}'
+    target = OUT / f'ciel-blink-test.{suffix}'
     run_proc(proc, image=doc, file=Gio.File.new_for_path(str(target)))
     loaded = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(str(target)))
     names = [l.get_name() for l in loaded.get_layers()]
@@ -67,7 +67,7 @@ flat.delete()
 doc.delete()
 
 report = dict(
-    generatedBy='scripts/gimp/build_source_v2_blink_psd.py',
+    generatedBy='scripts/live2d/gimp/build_blink_psd.py',
     canvas=[W, H], order_bottom_to_top=[n for n, _, _ in stack],
     hidden=[n for n, _, v in stack if not v], roundtrip=checks,
     inputs={n: hashlib.sha256(p.read_bytes()).hexdigest() for n, p, _ in stack},

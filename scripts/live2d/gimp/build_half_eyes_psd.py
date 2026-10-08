@@ -1,10 +1,10 @@
-"""Assemble the half-open eye layers of source-v2 into a small PSD for Cubism.
+"""Assemble the half-open eye layers into a small PSD for Cubism.
 
 GIMP 3 batch script (run with python-fu-eval; see the production spec, section 14).
-Input:  assets/private/ciel/live2d/source-v2/layers/eyes/{R,L}_{sclera,iris,lash,crease}_half.png
-        (scripts/build-ciel-eye-layers.ps1, then scripts/trim-half-eye-layers.py)
-Output: assets/private/ciel/live2d/source-v2/psd/ciel-v2-half-eyes.{psd,xcf}, half-eyes-report.json
-This PSD is NOT a replacement for ciel-v2-blink-test.psd: open it on the same model in Cubism and add all layers
+Input:  assets/ciel/layers/eyes/{R,L}_{sclera,iris,lash,crease}_half.png
+        (scripts/live2d/build-eye-layers.ps1, then scripts/live2d/trim-half-eye-layers.py)
+Output: assets/ciel/psd/ciel-half-eyes.{psd,xcf}, half-eyes-report.json
+This PSD is NOT a replacement for ciel-blink-test.psd: open it on the same model in Cubism and add all layers
 as new art meshes (replacing the 13-layer PSD shifts the layer ids and mixes up the textures; see spec section 16).
 Layer names use the character's own left/right (R = viewer's left). All layers are saved visible.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 from gi.repository import Gimp, Gio
 
 ROOT = Path(os.environ['CIEL_PROJECT_ROOT'])
-SRC = ROOT / 'assets/private/ciel/live2d/source-v2'
+SRC = ROOT / 'assets/ciel'
 OUT = SRC / 'psd'
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -31,7 +31,7 @@ stack = []
 for side in ('R', 'L'):
     for part in ('sclera', 'iris', 'lash', 'crease'):
         stack.append((f'{side}_{part.capitalize()}_Half', eyes / f'{side}_{part}_half.png', True))
-for _, path, _ in stack: assert path.exists(), f'missing {path}; run build-ciel-eye-layers.ps1 first'
+for _, path, _ in stack: assert path.exists(), f'missing {path}; run scripts/live2d/build-eye-layers.ps1 first'
 
 W, H = 2172, 2896
 doc = Gimp.Image.new(W, H, Gimp.ImageBaseType.RGB)
@@ -44,7 +44,7 @@ assert [l.get_name() for l in doc.get_layers()] == [n for n, _, _ in reversed(st
 
 checks = {}
 for suffix, proc in [('xcf', 'gimp-xcf-save'), ('psd', 'file-psd-export')]:
-    target = OUT / f'ciel-v2-half-eyes.{suffix}'
+    target = OUT / f'ciel-half-eyes.{suffix}'
     run_proc(proc, image=doc, file=Gio.File.new_for_path(str(target)))
     loaded = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(str(target)))
     names = [l.get_name() for l in loaded.get_layers()]
@@ -56,7 +56,7 @@ for suffix, proc in [('xcf', 'gimp-xcf-save'), ('psd', 'file-psd-export')]:
 doc.delete()
 
 report = dict(
-    generatedBy='scripts/gimp/build_source_v2_half_eyes_psd.py',
+    generatedBy='scripts/live2d/gimp/build_half_eyes_psd.py',
     canvas=[W, H], order_bottom_to_top=[n for n, _, _ in stack], roundtrip=checks,
     inputs={n: hashlib.sha256(p.read_bytes()).hexdigest() for n, p, _ in stack})
 (OUT / 'half-eyes-report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')

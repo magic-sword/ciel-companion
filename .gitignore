@@ -35,3 +35,14 @@
 /unity/Assets/Scenes/SdkCheck.unity.meta
 /unity/Assets/Settings/LiveKitTokenSource.asset
 /unity/Assets/Settings/LiveKitTokenSource.asset.meta
+
+# Live2D素材: 入力(generated, requests)と手作業の成果物(rig, reference)はGit管理。
+# 次の中間物はスクリプトで再生成できるので管理しない（手順は docs/ciel-live2d-production-spec-ja.md）。
+/assets/ciel/master/
+/assets/ciel/layers/
+/assets/ciel/normalized/
+/assets/ciel/psd/
+/assets/ciel/manifest.json
+# Cubism Editorが作る一時・自動バックアップ
+*.cmo3.bak
+*.can3.bak

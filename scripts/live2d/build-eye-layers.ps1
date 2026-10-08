@@ -3,7 +3,7 @@
   素材v2の基準画像から、目のレイヤー（白目・虹彩・まつ毛・二重の線）を作る。
 
 .DESCRIPTION
-  入力（prepare-ciel-source-v2.ps1 の出力）:
+  入力（prepare-source.ps1 の出力）:
     master/ciel-upper-body-2x.png          通常の顔
     master/ciel-upper-body-2x-eyeless.png  同じ画像から両目を消したもの（依頼B）。目のない顔の肌として使う
     master/ciel-upper-body-2x-eyes-closed.png  瞬きの瞬間（依頼C）。閉じたまつ毛と二重の線を取り出す
@@ -16,7 +16,7 @@
   重ね順は 目のない顔 < 白目 < 虹彩 < まつ毛 < 二重の線。L/R はキャラクターから見た左右（R＝画面左）。
 #>
 param(
-  [string]$SourceRoot = (Join-Path $PSScriptRoot '..\assets\private\ciel\live2d\source-v2')
+  [string]$SourceRoot = (Join-Path $PSScriptRoot '..\..\assets\ciel')
 )
 $ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path $SourceRoot).Path
@@ -34,7 +34,7 @@ $eyes = @(
 $m = [Layer]::Load((Join-Path $SourceRoot 'master\ciel-upper-body-2x.png'))
 $b = [Layer]::Load((Join-Path $SourceRoot 'master\ciel-upper-body-2x-eyeless.png'))
 $names = 'sclera','iris','lash','crease'
-$report = [ordered]@{ generatedBy = 'scripts/build-ciel-eye-layers.ps1'; order = 'eyeless < sclera < iris < lash < crease'; eyes = @() }
+$report = [ordered]@{ generatedBy = 'scripts/live2d/build-eye-layers.ps1'; order = 'eyeless < sclera < iris < lash < crease'; eyes = @() }
 foreach ($e in $eyes) {
   $mc = $m.Crop($e.x, $e.y, $e.w, $e.h); $bc = $b.Crop($e.x, $e.y, $e.w, $e.h)
   $r = [EyeSep]::Run($mc, $bc, $e.icx - $e.x, $e.icy - $e.y, $e.rx, $e.ry)

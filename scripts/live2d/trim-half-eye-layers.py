@@ -1,9 +1,9 @@
 """半目レイヤーの後処理。
 
-build-ciel-eye-layers.ps1 が作る {R,L}_iris_half.png は、まつ毛に隠れる虹彩の上部を楕円で補完するため、
+build-eye-layers.ps1 が作る {R,L}_iris_half.png は、まつ毛に隠れる虹彩の上部を楕円で補完するため、
 半目ではまつ毛の上端より上に虹彩の青い線がはみ出す。各列でまつ毛の上端を求め、それより上の虹彩を消す。
-実行: python -I scripts/trim-half-eye-layers.py   完了表示 HALF_EYE_TRIMMED
-入出力: assets/private/ciel/live2d/source-v2/layers/eyes/
+実行: python -I scripts/live2d/trim-half-eye-layers.py   完了表示 HALF_EYE_TRIMMED
+入出力: assets/ciel/layers/eyes/
 """
 import os
 import sys
@@ -11,8 +11,8 @@ import sys
 import numpy as np
 from PIL import Image
 
-root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
-                    'assets', 'private', 'ciel', 'live2d', 'source-v2', 'layers', 'eyes')
+root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                    'assets', 'ciel', 'layers', 'eyes')
 LASH_ALPHA = 100
 IRIS = {'R': (921, 1057), 'L': (1288, 1044)}   # iris centre (x, y) in the 2172x2896 canvas
 result = []
@@ -39,7 +39,7 @@ for side in ('R', 'L'):
         col = iris[:int(top[x]), x, 3]
         erased += int((col > 0).sum())
         iris[:int(top[x]), x, 3] = 0
-    # Anything outside the iris ellipse (same centre/radii as build-ciel-eye-layers.ps1, 8% margin) is not iris.
+    # Anything outside the iris ellipse (same centre/radii as build-eye-layers.ps1, 8% margin) is not iris.
     icx, icy = IRIS[side]
     yy, xx = np.mgrid[0:iris.shape[0], 0:iris.shape[1]]
     outside = ((xx - icx) / (67.5 * 1.08)) ** 2 + ((yy - icy) / (69.5 * 1.08)) ** 2 > 1.0
