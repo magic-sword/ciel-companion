@@ -24,6 +24,7 @@ NECK_GEAR = (860, 60, 1340, 440)     # 首輪と飾り
 CHEST_GEM = (990, 440, 1250, 680)    # 胸の宝石
 WAIST_BELT = (820, 1100, 1420, 1220) # 腰のベルト
 MID_X = 1086                         # Outer の左右の境（画面の左が R）
+FUR_ZONES = [(120, 120, 800, 800), (1370, 120, 2050, 800)]   # 左右の肩のファー（切り抜き内）。ここだけ大きく閉じる
 
 
 def morph(m, size, grow):
@@ -72,7 +73,22 @@ diff = np.abs(F - B).sum(2)
 diff = np.asarray(Image.fromarray(np.clip(diff, 0, 255).astype('uint8')).filter(ImageFilter.GaussianBlur(2))).astype(float)
 cloth = diff > THRESHOLD
 cloth = morph(morph(cloth, 9, False), 9, True)     # 開く：細い線のずれを除く
-cloth = morph(morph(cloth, 61, True), 61, False)   # 閉じる：ファーの内側など、差が出ない所をつなぐ
+
+
+def big_close(mask, radius):
+    # 1/4の大きさで閉じる処理（ファーの内側は髪と同じ白で差が出ず、大きな穴になる）。元の範囲の外へ radius px を超えて広げない
+    small = Image.fromarray((mask * 255).astype('uint8')).resize((CW // 4, CH // 4), Image.BILINEAR)
+    k = radius // 4 * 2 + 1
+    closed = small.filter(ImageFilter.MaxFilter(k)).filter(ImageFilter.MinFilter(k))
+    up = np.asarray(closed.resize((CW, CH), Image.BILINEAR)) > 127
+    zone = np.zeros(mask.shape, bool)
+    for x0, y0, x1, y1 in FUR_ZONES:
+        zone[y0:y1, x0:x1] = True
+    return (up & zone) | mask
+
+
+cloth = morph(morph(cloth, 61, True), 61, False)   # 閉じる：細かい隙間をつなぐ
+cloth = big_close(cloth, 200)                      # 閉じる：ファーの内側の大きな穴をつなぐ
 cloth = drop_small(cloth, 3000)
 
 
