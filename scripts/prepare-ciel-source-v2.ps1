@@ -145,6 +145,7 @@ Save $master (Join-Path $masterDir 'ciel-upper-body-2x.png')
 $stages = @(
   [ordered]@{ file = 'edit-b-eyes-removed.png'; out = 'ciel-upper-body-2x-eyeless.png'; what = '両目（まつ毛・二重の線を含む）を消して肌にした（Aの編集結果を元に作成）'; scale = 0.7030; ox = 597.9; oy = 762.0; feather = 16 }
   [ordered]@{ file = 'edit-c-eyes-closed.png'; out = 'ciel-upper-body-2x-eyes-closed.png'; what = '両目を閉じた瞬きの瞬間。閉じたまつ毛と二重の線だけを使う（範囲外の差 RMS 3.6〜5.7、縦横の倍率がわずかに異なる）'; scale = 0.6116; scaleY = 0.6095; ox = 598.2; oy = 762.4; feather = 16 }
+  [ordered]@{ file = 'ciel-face-half-blink-1024x576.png'; out = 'ciel-upper-body-2x-eyes-half.png'; what = '半目（上まぶたが降りたジト目）。切り抜き 1024x576 と同じ大きさ・位置（倍率1.0、オフセット(598,762)）。目の4レイヤーを取り出す'; scale = 1.0; ox = 598.0; oy = 762.0; feather = 16 }
 )
 foreach ($st in $stages) {
   $path = Join-Path $gen $st.file

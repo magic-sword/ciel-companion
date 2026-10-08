@@ -58,5 +58,20 @@ foreach ($e in $eyes) {
   ($report.eyes | Where-Object { $_.side -eq $e.side }).closedRecompositeRms = [math]::Round($rms, 2)
   [Layer]::HCat($kc, $comp, [Layer]::Diff($comp, $kc, 3)).Scale(2).Save((Join-Path $outDir "check-$($e.side)-closed.png"))
 }
+# Half-open eyes (the half-blink illustration): all four layers are separated the same way as the open eyes,
+# so the half-open pose keeps the iris shape and only the lid covers it. Output: {R,L}_{sclera,iris,lash,crease}_half.png
+$h = [Layer]::Load((Join-Path $SourceRoot 'master\ciel-upper-body-2x-eyes-half.png'))
+foreach ($e in $eyes) {
+  $hc = $h.Crop($e.x, $e.y, $e.w, $e.h); $bc = $b.Crop($e.x, $e.y, $e.w, $e.h)
+  $r = [EyeSep]::Run($hc, $bc, $e.icx - $e.x, $e.icy - $e.y, $e.rx, $e.ry)
+  for ($i = 0; $i -lt 4; $i++) {
+    [Layer]::Paste($r[$i], $m.W, $m.H, $e.x, $e.y).Save((Join-Path $outDir ('{0}_{1}_half.png' -f $e.side, $names[$i])))
+  }
+  $comp = $bc.Clone(); foreach ($i in 0..3) { $comp.Over($r[$i]) }
+  $rms = [Layer]::Rms($comp, $hc)
+  $item = $report.eyes | Where-Object { $_.side -eq $e.side }
+  $item['halfRecompositeRms'] = [math]::Round($rms, 2)
+  [Layer]::HCat($hc, $comp, [Layer]::Diff($comp, $hc, 3)).Scale(2).Save((Join-Path $outDir "check-$($e.side)-half.png"))
+}
 $report | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8 (Join-Path $outDir 'report.json')
 Write-Output ('EYE_LAYERS_READY ' + (($report.eyes | ForEach-Object { "$($_.side) rms=$($_.recompositeRms) closed=$($_.closedRecompositeRms)" }) -join ' '))
