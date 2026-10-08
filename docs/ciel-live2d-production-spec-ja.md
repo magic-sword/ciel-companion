@@ -508,3 +508,9 @@ FREE版でも、取り込み・メッシュ・パラメーター・保存はで�
 `scripts/live2d/gimp/build_head_body_psd.py`（`HEAD_BODY_PSD_READY`）が、`psd/ciel-head-body.psd`（11レイヤー、約89MB。下から Body_Base・Outer_R・Outer_L・Waist_Belt・Chest_Gem・Neck_Gear・Hair_Under_Ear・Ear_R・Ear_L・Face_Skin・Hair_Front）を出力する。作業モデル `rig/ciel-blink-test.cmo3` へ「全てのレイヤーを新規アートメッシュとして追加」で取り込んだ（読み込みに1分以上かかり、その間は画面が黒くなる）。取り込んだレイヤーは既存の目より上に重なり、目が前髪で隠れる。**描画順の設定が必要**：下から 体 < 衣装 < 耳下の髪 < 耳 < 顔の肌 < 目（Sclera < Iris < Lash < Crease、半目・閉眼）< 前髪。メッシュ・パラメーター・顔の角度の動作確認は未実施。
 
 Cubismの画面操作は第二スクリーン（`FR2302W`）でも可能。`switch_display` でスクリーンを切り替え、ダイアログが出る間は画面が黒くなるので数秒〜数十秒待つ。`open_application` を呼ぶと2つ目のCubismが起動することがあるので、起動済みのときは呼ばない。
+
+### 12.18 Gitの容量とUnityへの組み込み（2026-10-08）
+
+`rig/ciel-blink-test.cmo3` が50MBを超え、GitHubの推奨上限に触れたため、**作業モデル（`.cmo3`・`.can3`）は Git LFS で管理する**（`.gitattributes`）。履歴は書き換えない（既存の1回分は通常のGitオブジェクトとして残る）。clone後は `git lfs install` を一度実行する（`git lfs pull` で実体を取得）。GitHub無料枠のLFSは容量1GB・転送1GB/月なので、`.cmo3` のコミットは節目（動作確認が取れたとき）だけにする。
+
+**Unityが読むのは、Cubismから書き出した `.moc3`・テクスチャ・`.model3.json` など。`.cmo3` は不要。** 書き出し物は小さいので、通常のGitで `unity/Assets/Characters/Ciel/` に置く（Live2D SDK本体は従来どおりGit除外）。`.cmo3` は、モデルの編集を引き継ぐ人にだけ必要。書き出し（テクスチャアトラス）はPRO版が必要（第12.7節）。
