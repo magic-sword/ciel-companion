@@ -35,9 +35,24 @@ TOP_Y = 500.0        # ここより上は、頭頂へ丸く奥へ消える
 TOP_R = 650.0
 NECK_FADE = 200.0
 EAR_Y = 800.0        # これより上の、板の外側（耳・頭の上の横の髪）は、奥へ回らず、板に近い深さに置く
+PROFILE_K = 0.92     # 横断面の丸さ（大きいほど丸い。小さいほど平ら）
 EAR_BLEND_Y = 600.0
 EAR_Z = 290.0        # 耳は、板と同じ向きの平らなカード（回しても、細くつぶれない）
 EAR_W = 700.0
+# 顔の凹凸（板の上に足す）。鼻筋の山折り、鼻頭、ふっくらした頬、口もと。板の縁では 0 になる。
+NOSE_X = 0.0         # 鼻筋の x（CX からの差）
+NOSE_H = 90.0        # 鼻頭の高さ
+NOSE_W = 150.0       # 鼻筋の半幅（山折りの幅）
+NOSE_TOP_Y = 960.0   # 鼻筋が立ち上がり始める y（目の間）
+NOSE_TIP_Y = 1150.0  # 鼻頭の y
+NOSE_END_Y = 1250.0  # 鼻の下で、平らに戻る y
+CHEEK_DX = 215.0
+CHEEK_Y = 1175.0
+CHEEK_R = 165.0
+CHEEK_H = 60.0       # ふっくらした頬の高さ
+MOUTH_Y = 1250.0
+MOUTH_RX, MOUTH_RY, MOUTH_H = 120.0, 70.0, 25.0
+EDGE_FADE = 90.0
 KEYS = [-30.0, -15.0, 0.0, 15.0, 30.0]
 # 角度X（＋が画面の右を向く）→ yaw（度）。目の間隔の縮み（0.876・0.986・0.951・0.795）と、目の中心の動きから。
 YAW = {-30.0: -26.5, -15.0: -10.5, 0.0: 0.0, 15.0: 13.0, 30.0: 36.0}
@@ -62,14 +77,41 @@ def plate_half_width(y):
     return PLATE_W + (CHIN_W - PLATE_W) * (y - CHEEK_Y) / (CHIN_Y - CHEEK_Y)
 
 
+def smoothstep(t):
+    t = min(1.0, max(0.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def relief(x, y):
+    """顔の凹凸：鼻筋（山折り）と鼻頭、ふっくらした頬、口もと。"""
+    dx = x - CX - NOSE_X
+    r = 0.0
+    # 鼻筋：横は三角形（山折り）、縦は、目の間から鼻頭へ立ち上がり、鼻の下で戻る
+    lat = max(0.0, 1.0 - abs(dx) / NOSE_W)
+    if y <= NOSE_TIP_Y:
+        g = smoothstep((y - NOSE_TOP_Y) / (NOSE_TIP_Y - NOSE_TOP_Y))
+    else:
+        g = 1.0 - smoothstep((y - NOSE_TIP_Y) / (NOSE_END_Y - NOSE_TIP_Y))
+    r += NOSE_H * lat * g
+    # 頬（左右）
+    for sx in (-1.0, 1.0):
+        d2 = ((x - CX - sx * CHEEK_DX) ** 2 + (y - CHEEK_Y) ** 2) / (CHEEK_R * CHEEK_R)
+        if d2 < 1.0:
+            r += CHEEK_H * (1.0 - d2) ** 1.5
+    # 口もと
+    d2 = ((x - CX) / MOUTH_RX) ** 2 + ((y - MOUTH_Y) / MOUTH_RY) ** 2
+    if d2 < 1.0:
+        r += MOUTH_H * (1.0 - d2) ** 1.5
+    return r
+
+
 def depth(x, y):
     w = plate_half_width(y)
     ax = abs(x - CX)
-    if ax <= w:
-        z = PLATE_Z
-    else:
-        r2 = w * w + PLATE_Z * PLATE_Z          # 円柱の半径の二乗
-        z = math.sqrt(max(0.0, r2 - ax * ax))
+    # 顔の横断面は、丸い（楕円）：中央（鼻筋）が手前で、左右へ向かって奥へ回る。逆さのホームベース形の輪郭は、
+    # その高さでの顔の半幅 w に比例した半径 w / PROFILE_K で表す（顎に向かって細くなる）。
+    rf = w / PROFILE_K
+    z = PLATE_Z * math.sqrt(max(0.0, 1.0 - (ax / rf) ** 2))
     if y < EAR_Y and ax <= EAR_W:
         # 頭の上（耳・頭頂の髪）は、高さによらず、ほぼ同じ深さ EAR_Z に置く（耳が、斜めにゆがまない）。
         # 額に近づくにつれて、板の深さへつなぐ（EAR_BLEND_Y から EAR_Y まで）。
@@ -79,6 +121,10 @@ def depth(x, y):
         z *= math.sqrt(max(0.0, 1.0 - ((TOP_Y - y) / TOP_R) ** 2))
     if y > CHIN_Y:
         z *= max(0.0, 1.0 - ((y - CHIN_Y) / NECK_FADE) ** 2)
+    # 顔の凹凸は、板の内側だけ。縁（板の半幅）に近づくと 0 になる
+    env = min(1.0, max(0.0, (w - ax) / EDGE_FADE))
+    if env > 0.0 and y < CHIN_Y:
+        z += relief(x, y) * env
     return z
 
 
