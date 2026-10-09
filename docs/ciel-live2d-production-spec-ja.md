@@ -557,3 +557,12 @@ PRO版のトライアルで、テクスチャアトラス（4096×4096、1枚）
 - `scripts/live2d/gimp/build_head_body_psd.py` が、後ろ髪・口3種を足した15レイヤーのPSD `psd/ciel-head-body.psd`（約108MB）を出力する（`HEAD_BODY_PSD_READY`）。
 
 次：Cubismへ、既存の `ciel-head-body.psd` を「差し替え」で反映し、`Hair_Back` と口3種を取り込む。口は `ParamMouthOpenY` の 0・0.5・1 に 閉じ・小・大 を割り当てる。後ろ髪が入ったら、旧 `Face_Base` を外す。
+
+### 12.23 .cmo3 の直接操作（調査、2026-10-09）
+
+Cubismの画面操作が不安定（フォーカスが外れる、数値入力が反映されない、画面が止まる）で、キーフレームを大量に作るのが難しいため、`.cmo3` をスクリプトで書き換える方法を調べた。
+
+- `.cmo3` は **CAFF**（Live2Dの非公開コンテナ）。オープンソースの `caff-archive`（https://github.com/vtubing/caff-archive、MIT）の仕様を参照し、`scripts/live2d/caff.py` に読み書きを実装した。ヘッダは54バイト（'CAFF'、版、形式ID、鍵 u32 ほか）、本体は 鍵のXORで難読化されたメタデータ（229エントリ）と、各ファイル。
+- **読み書きの往復は、バイト単位で一致する**（`assets/ciel/rig/ciel-blink-test.cmo3`、54MB、229エントリ。`imageFileBuf*.png` ＝ テクスチャ画像、`main.xml` ＝ モデル本体）。
+- `main.xml` は、データ記述子つきのストリームZIP（ローカルヘッダの `PK\3\4`、名前 `contents`、deflate、末尾の中央ディレクトリは無い）。中身は約628KBのXML（`CModelSource:15` など）。
+- 書き換えたファイルがCubism Editorで開けるかは、実機で確かめる。元のファイルはGitの履歴（LFS）から復元できる。
