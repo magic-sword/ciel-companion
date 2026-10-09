@@ -214,6 +214,47 @@ class Cmo3:
         blk2 = re.sub(r'(<float-array xs\.n="uvs" count="8">)[^<]*(</float-array>)', lambda m: m.group(1) + uvtxt + m.group(2), blk2)
         self.xml = self.xml[:a] + blk2 + self.xml[b:]
 
+    def warp_info(self, name):
+        """ワープデフォーマの、xs.id・guid（CDeformerGuid の ref）・CoordType（デフォーマ座標）・元の格子の範囲を返す。"""
+        x = self.xml
+        i = x.index('<s xs.n="localName">%s</s>' % name)
+        st = x.rfind('<CWarpDeformerSource', 0, i)
+        en = x.index('</CWarpDeformerSource>', i)
+        seg = x[st:en]
+        wid = re.match(r'<CWarpDeformerSource xs\.id="(#\d+)"', seg).group(1)
+        guid = re.search(r'<CDeformerGuid xs\.n="guid" xs\.ref="(#\d+)"', seg).group(1)
+        coord = re.search(r'<CoordType xs\.n="coordType" xs\.ref="(#\d+)"', seg).group(1)
+        orig = re.search(r'<float-array xs\.n="positions" xs\.ref="(#\d+)"', seg).group(1)
+        m = re.search(r'<float-array count="\d+" xs\.id="%s"[^>]*>([^<]*)' % re.escape(orig), x)
+        v = [float(q) for q in m.group(1).split()]
+        xs, ys = v[0::2], v[1::2]
+        return dict(id=wid, guid=guid, coord=coord, x0=min(xs), x1=max(xs), y0=min(ys), y1=max(ys))
+
+    def move_mesh_into_warp(self, mesh, warp_name):
+        """メッシュを、ワープデフォーマの子にする。targetDeformerGuid と、全キーフォームの CoordType・positions を、
+        デフォーマの正規化座標（元の格子の範囲を 0〜1）へ変換する。point（元の画像座標）と uvs は、変えない。"""
+        w = self.warp_info(warp_name)
+        a, b = self.mesh_block(mesh)
+        blk = self.xml[a:b]
+        blk = re.sub(r'(<CDeformerGuid xs\.n="targetDeformerGuid" xs\.ref=")#\d+(")', lambda m: m.group(1) + w['guid'] + m.group(2), blk)
+        W = w['x1'] - w['x0']
+        H = w['y1'] - w['y0']
+
+        def conv(m):
+            vals = [float(q) for q in m.group(2).split()]
+            out = []
+            for i in range(0, len(vals), 2):
+                out += [(vals[i] - w['x0']) / W, (vals[i + 1] - w['y0']) / H]
+            return m.group(1) + ' '.join(_fmt(v) for v in out) + m.group(3)
+        # keyforms の中の positions だけを変換する（メッシュ直下の positions は、元のまま）
+        k = blk.index('<carray_list xs.n="keyforms"')
+        k2 = blk.index('</carray_list>', k) + len('</carray_list>')
+        kf = blk[k:k2]
+        kf = re.sub(r'(<float-array xs\.n="positions" count="\d+">)([^<]*)(</float-array>)', conv, kf)
+        kf = re.sub(r'(<CoordType xs\.n="coordType" xs\.ref=")#\d+(")', lambda m: m.group(1) + w['coord'] + m.group(2), kf)
+        blk = blk[:k] + kf + blk[k2:]
+        self.xml = self.xml[:a] + blk + self.xml[b:]
+
     # ---- 保存 ----
     def save(self, path):
         data = self.xml.encode('utf-8')
