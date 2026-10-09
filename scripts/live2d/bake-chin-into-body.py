@@ -19,6 +19,7 @@ BODY = os.path.join(ROOT, 'layers', 'body', 'Body_Base.png')
 UNDER = os.path.join(ROOT, 'generated', 'parts', 'underlayers')
 CROP = (318, 236)
 TARGET = np.array([246.0, 245.0, 248.0])
+SIDE_FULL, SIDE_ZERO = 200, 290   # 顔の中心（キャンバス x=1104）から、この距離まで残し、この距離で 0 にする。顎の両端の張り出しが、横向きで顔の脇にはみ出さないように
 EXTRUDE = 230   # 上端の列を、上へ延ばす量（px）。顎が上がったとき、顎と首の間に隙間ができないように
 
 
@@ -53,6 +54,9 @@ def main():
         p90 = np.percentile(k[solid][:, :3], 90, axis=0)
         k[..., :3] = np.clip(k[..., :3] * (TARGET / p90), 0, 255)
         k = extrude_up(k)
+        xs = np.arange(k.shape[1]) - (1104 - CROP[0])
+        fall = np.clip((SIDE_ZERO - np.abs(xs)) / (SIDE_ZERO - SIDE_FULL), 0, 1)
+        k[..., 3] *= fall[None, :]
         a = Image.fromarray(k[..., 3].astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))
         k[..., 3] = np.asarray(a)
         layer = Image.new('RGBA', body.size, (0, 0, 0, 0))

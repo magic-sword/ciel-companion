@@ -50,23 +50,37 @@ def bilinear(grid, u):
 
 
 def invert(grid, target, u0):
-    """grid（(S+1)×(S+1)×2、キャンバス座標）の双線形曲面で、target に写る正規化座標 u を求める（ニュートン法）。"""
-    u = np.array(u0, float)
-    for _ in range(40):
-        f = bilinear(grid, u) - target
-        if np.hypot(*f) < 0.05:
+    """grid の双線形曲面（外側は端のセルの延長）で、target に写る正規化座標 u を求める。減衰付きニュートン法を、複数の初期値から試す。"""
+    best, best_e = None, 1e18
+    for start in (u0, (0.5, 0.5), (0.3, 0.5), (0.7, 0.5), (0.5, 0.3), (0.5, 0.7)):
+        u = np.array(start, float)
+        for _ in range(80):
+            f = bilinear(grid, u) - target
+            e = np.hypot(*f)
+            if e < 0.05:
+                break
+            h = 1e-4
+            J = np.zeros((2, 2))
+            for k in range(2):
+                d = np.zeros(2); d[k] = h
+                J[:, k] = (bilinear(grid, u + d) - bilinear(grid, u - d)) / (2 * h)
+            try:
+                step = np.linalg.solve(J, f)
+            except np.linalg.LinAlgError:
+                break
+            lam = 1.0
+            while lam > 1e-3:
+                un = np.clip(u - lam * step, -1.5, 2.5)
+                if np.hypot(*(bilinear(grid, un) - target)) < e:
+                    break
+                lam *= 0.5
+            u = un
+        e = np.hypot(*(bilinear(grid, u) - target))
+        if e < best_e:
+            best, best_e = u, e
+        if best_e < 0.5:
             break
-        e = 1e-4
-        J = np.zeros((2, 2))
-        for k in range(2):
-            d = np.zeros(2); d[k] = e
-            J[:, k] = (bilinear(grid, u + d) - bilinear(grid, u - d)) / (2 * e)
-        try:
-            step = np.linalg.solve(J, f)
-        except np.linalg.LinAlgError:
-            break
-        u = np.clip(u - step, -0.2, 1.2)
-    return u
+    return best
 
 
 def clean_edge(im):
