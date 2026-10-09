@@ -35,6 +35,9 @@ TOP_Y = 500.0        # ここより上は、頭頂へ丸く奥へ消える
 TOP_R = 650.0
 NECK_FADE = 200.0
 EAR_Y = 800.0        # これより上の、板の外側（耳・頭の上の横の髪）は、奥へ回らず、板に近い深さに置く
+CHEEK_BULGE = 0.0      # 頬の高さで、横断面を広げる量（px）。頬の輪郭がふくらむ
+CHEEK_BULGE_Y = 1150.0
+CHEEK_BULGE_SIG = 130.0
 PROFILE_K = 0.92     # 横断面の丸さ（大きいほど丸い。小さいほど平ら）
 EAR_BLEND_Y = 600.0
 EAR_Z = 290.0        # 耳は、板と同じ向きの平らなカード（回しても、細くつぶれない）
@@ -110,7 +113,8 @@ def depth(x, y):
     ax = abs(x - CX)
     # 顔の横断面は、丸い（楕円）：中央（鼻筋）が手前で、左右へ向かって奥へ回る。逆さのホームベース形の輪郭は、
     # その高さでの顔の半幅 w に比例した半径 w / PROFILE_K で表す（顎に向かって細くなる）。
-    rf = w / PROFILE_K
+    bump = CHEEK_BULGE * math.exp(-((y - CHEEK_BULGE_Y) / CHEEK_BULGE_SIG) ** 2)
+    rf = (w + bump) / PROFILE_K
     z = PLATE_Z * math.sqrt(max(0.0, 1.0 - (ax / rf) ** 2))
     if y < EAR_Y and ax <= EAR_W:
         # 頭の上（耳・頭頂の髪）は、高さによらず、ほぼ同じ深さ EAR_Z に置く（耳が、斜めにゆがまない）。
