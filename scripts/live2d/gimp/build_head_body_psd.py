@@ -1,8 +1,8 @@
 """Assemble the head and body layers into a PSD for Cubism.
 
 GIMP 3 batch script (run with python-fu-eval; see the production spec, section 12.3).
-Input:  assets/ciel/layers/head/{Hair_Under_Ear,Ear_R,Ear_L,Face_Skin,Hair_Front}.png
-        (scripts/live2d/build-head-layers.py, build-ear-layers.py)
+Input:  assets/ciel/layers/head/{Hair_Back,Hair_Under_Ear,Ear_R,Ear_L,Face_Skin,Mouth_Closed,Mouth_Small,Mouth_Large,Hair_Front}.png
+        (scripts/live2d/build-head-layers.py, build-ear-layers.py, build-mouth-and-hair-layers.py)
         assets/ciel/layers/body/{Body_Base,Outer_R,Outer_L,Waist_Belt,Chest_Gem,Neck_Gear}.png
         (scripts/live2d/build-body-layers.py)
 Output: assets/ciel/psd/ciel-head-body.{psd,xcf}, head-body-report.json
@@ -28,9 +28,10 @@ def run_proc(name, **values):
     if result.index(0) != Gimp.PDBStatusType.SUCCESS: raise RuntimeError(name)
 
 # bottom -> top
-names = [('body', 'Body_Base'), ('body', 'Outer_R'), ('body', 'Outer_L'), ('body', 'Waist_Belt'),
+names = [('head', 'Hair_Back'), ('body', 'Body_Base'), ('body', 'Outer_R'), ('body', 'Outer_L'), ('body', 'Waist_Belt'),
          ('body', 'Chest_Gem'), ('body', 'Neck_Gear'), ('head', 'Hair_Under_Ear'), ('head', 'Ear_R'),
-         ('head', 'Ear_L'), ('head', 'Face_Skin'), ('head', 'Hair_Front')]
+         ('head', 'Ear_L'), ('head', 'Face_Skin'), ('head', 'Mouth_Closed'), ('head', 'Mouth_Small'),
+         ('head', 'Mouth_Large'), ('head', 'Hair_Front')]
 stack = [(n, SRC / 'layers' / d / f'{n}.png', True) for d, n in names]
 for _, path, _ in stack: assert path.exists(), f'missing {path}; run the layer scripts first'
 
