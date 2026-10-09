@@ -133,7 +133,8 @@ def draw_mesh(canvas, tex, src, dst, idx, opacity):
         reg[..., 3] = reg[..., 3] + a * (1 - reg[..., 3])
 
 
-def render(doc, x, y):
+def render(doc, x, y, skin=None):
+    """skin：(PNG のパス, キャンバス上の x, y) を渡すと、Face_Skin の代わりに、その画像を、動かさずに置く（実験用）。"""
     canvas = np.zeros((int(H * SCALE), int(W * SCALE), 4), np.float32)
     canvas[..., :3] = (60 / 255, 60 / 255, 100 / 255)
     canvas[..., 3] = 1.0
@@ -150,6 +151,15 @@ def render(doc, x, y):
     for m, n, _ in items:
         if m['opacity'] <= 0.001:
             continue
+        if skin and n == 'Face_Skin':
+            im = np.asarray(Image.open(skin[0]).convert('RGBA')).astype(np.float32) / 255.0
+            q = int(round(SCALE * 1536))
+            im = np.asarray(Image.fromarray((im * 255).astype(np.uint8)).resize((q, q), Image.LANCZOS)).astype(np.float32) / 255.0
+            ox, oy = int(skin[1] * SCALE), int(skin[2] * SCALE)
+            reg = canvas[oy:oy + q, ox:ox + q]
+            a = im[..., 3:4]
+            reg[..., :3] = reg[..., :3] * (1 - a) + im[..., :3] * a
+            continue
         tex = load_png(n)
         if m['target'] == info['guid']:
             norm = m['pos']
@@ -160,11 +170,11 @@ def render(doc, x, y):
     return canvas
 
 
-def main(src, out, pairs):
+def main(src, out, pairs, skins=None):
     doc = t.Cmo3(src)
     tiles = []
-    for x, y in pairs:
-        c = render(doc, x, y)
+    for k, (x, y) in enumerate(pairs):
+        c = render(doc, x, y, skins[k] if skins else None)
         im = Image.fromarray((np.clip(c[..., :3], 0, 1) * 255).astype(np.uint8))
         s = SCALE
         tiles.append(im.crop((int(318 * s), int(236 * s), int((318 + 1536) * s), int((236 + 1536) * s))))

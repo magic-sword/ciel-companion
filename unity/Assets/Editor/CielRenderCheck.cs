@@ -180,6 +180,14 @@ namespace Ciel.EditorTools
                     foreach (var uv in uvs) { u0 = Mathf.Min(u0, uv.x); u1 = Mathf.Max(u1, uv.x); v0 = Mathf.Min(v0, uv.y); v1 = Mathf.Max(v1, uv.y); }
                     Debug.Log("CielRenderCheck: UVRECT " + dd.name + " " + u0 + " " + u1 + " " + v0 + " " + v1);
                 }
+            if (c.name.StartsWith("only_Face_Base"))
+                foreach (var dd in _model.Drawables)
+                    if (dd.name == "Face_Base")
+                    {
+                        var mf = dd.GetComponent<MeshFilter>().sharedMesh;
+                        var rr = dd.GetComponent<Live2D.Cubism.Rendering.CubismRenderer>();
+                        Debug.Log("CielRenderCheck: FB " + c.name + " bounds=" + mf.bounds + " verts=" + mf.vertexCount + " tris=" + (mf.triangles.Length / 3) + " color=" + rr.Color + " enabled=" + dd.GetComponent<MeshRenderer>().enabled + " mat=" + dd.GetComponent<MeshRenderer>().sharedMaterial);
+                    }
             if (c.name == "scan_all")
             {
                 foreach (var d0 in _model.Drawables)
@@ -199,7 +207,7 @@ namespace Ciel.EditorTools
             if (c.name.StartsWith("only_"))
             {
                 foreach (var d in _model.Drawables)
-                    if (d.name != c.name.Substring(5)) d.GetComponent<MeshRenderer>().enabled = false;
+                    if (d.name != c.name.Substring(5).Replace("_L", "").Replace("_R", "")) d.GetComponent<MeshRenderer>().enabled = false;
             }
             _cam.Render();
             var tex = new Texture2D(Width, Height, TextureFormat.RGBA32, false);
