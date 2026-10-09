@@ -566,3 +566,21 @@ Cubismの画面操作が不安定（フォーカスが外れる、数値入力�
 - **読み書きの往復は、バイト単位で一致する**（`assets/ciel/rig/ciel-blink-test.cmo3`、54MB、229エントリ。`imageFileBuf*.png` ＝ テクスチャ画像、`main.xml` ＝ モデル本体）。
 - `main.xml` は、データ記述子つきのストリームZIP（ローカルヘッダの `PK\3\4`、名前 `contents`、deflate、末尾の中央ディレクトリは無い）。中身は約628KBのXML（`CModelSource:15` など）。
 - 書き換えたファイルがCubism Editorで開けるかは、実機で確かめる。元のファイルはGitの履歴（LFS）から復元できる。
+
+### 12.24 .cmo3 編集ツール（`scripts/live2d/cmo3_tool.py`、2026-10-09）
+
+Cubismの画面操作は、フォーカスが外れる、数値入力が反映されない、画面が止まる、などで不安定だった。そこで `.cmo3` を直接書き換える最小のツールを作り、**実機（Cubism Editor 5.3.04）で動くことを確認した**。
+
+**仕組み**：`caff.py`（CAFFコンテナ）→ `main.xml`（ストリームZIP）→ `contents`（XML、約730KB）→ 文字列の置換だけで編集（XMLは再整形しない）→ 圧縮・ZIP・CAFFを組み直して保存。何も変えずに保存し直すと、XMLが完全に一致する。
+
+**キーフォームの構造**（目の開閉や口の開閉と同じ）：
+- `CArtMeshSource` の `keyforms`（`CArtMeshForm` を、キーの数だけ。`drawOrder`・`opacity`・`positions`・`CFormGuid` の参照）
+- `KeyformGridSource` の `keyformsOnGrid`（`KeyformOnGrid` ＝ `keyIndex` ＋ `CFormGuid` の参照）と `keyformBindings`
+- `KeyformBindingSource`（`CParameterGuid` ＋ `keys`＝キーの値の配列）
+- `CFormGuid` の定義は、メッシュの近くに `<CFormGuid uuid=… xs.id="#N" xs.idx="M" />` で並ぶ。`xs.id` は文書内で一意、`xs.idx` は通し番号。
+
+**機能**：`set_keyform_opacity`・`set_draw_order`・`insert_keyform`（キーの挿入。直前のキーを複製し、`xs.id`・`xs.idx`・UUID を新しく振る）。
+
+**確認**：口3種（`Mouth_Closed/Small/Large`）のキーを、`ParamMouthOpenY` の 0・0.5・1 の3点にし、不透明度を 閉じ＝1/0/0、小＝0/1/0、大＝0/0/1 にしたファイルを、Cubismで開けた。値 0 で閉じた口、0.5 で小さく開いた口（八重歯つき）、1 で大きく開いた口が出る。参照の欠け・ID の重複はない。
+
+**使い方の注意**：書き換える前に、Cubismで保存してGitにコミットしておく。Cubismで開いているファイルを、別のプロセスで上書きしない（`.local/cmo3-test/` に別名で出力し、開いて確かめてから、作業ファイルへ置く）。テストの出力はGit管理しない。

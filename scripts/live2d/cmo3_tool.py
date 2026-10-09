@@ -14,6 +14,7 @@ XMLは再整形せず、文字列の置換だけで編集する（元の記述�
 import io
 import re
 import struct
+import uuid
 import zlib
 
 import caff
@@ -72,6 +73,88 @@ class Cmo3:
         blk = self.xml[a:b]
         new = re.sub(r'<i xs\.n="drawOrder">-?\d+</i>', '<i xs.n="drawOrder">%d</i>' % value, blk)
         self.xml = self.xml[:a] + new + self.xml[b:]
+
+
+    def _next_ids(self):
+        ids = [int(x) for x in re.findall(r'xs\.id="#(\d+)"', self.xml)]
+        idxs = [int(x) for x in re.findall(r'xs\.idx="(\d+)"', self.xml)]
+        return max(ids) + 1, max(idxs) + 1
+
+    def mesh_id(self, name):
+        a, b = self.mesh_block(name)
+        return re.match(r'<CArtMeshSource xs\.id="(#\d+)"', self.xml[a:b]).group(1)
+
+    def mesh_grid_and_binding(self, mesh):
+        """メッシュの KeyformGridSource の xs.id と、その唯一の KeyformBindingSource の xs.id を返す。"""
+        a, b = self.mesh_block(mesh)
+        grid = re.search(r'<KeyformGridSource xs\.n="keyformGridSource" xs\.ref="(#\d+)"', self.xml[a:b]).group(1)
+        ga = self.xml.index('<KeyformGridSource xs.id="%s"' % grid)
+        gb = self.xml.index('</KeyformGridSource>', ga)
+        binds = set(re.findall(r'KeyformBindingSource xs\.ref="(#\d+)"', self.xml[ga:gb]))
+        if len(binds) != 1:
+            raise ValueError('%s: expected one binding, found %s' % (mesh, binds))
+        return grid, binds.pop()
+
+    def insert_keyform(self, mesh, key_index, key_value, opacity):
+        """メッシュに、キーを 1 つ挿入する。key_index は、挿入後の、キーの位置（0 始まり）。
+        既存のキーフォーム（直前のキー）を複製し、不透明度だけ変える。パラメーターのキーの値（key_value）も挿入する。"""
+        NL = chr(10)
+        grid, bind = self.mesh_grid_and_binding(mesh)
+        new_id, new_idx = self._next_ids()
+        new_ref = '#%d' % new_id
+
+        # 1) 形のコピー元：直前のキー（なければ先頭）の CArtMeshForm
+        a, b = self.mesh_keyforms(mesh)
+        blk = self.xml[a:b]
+        forms = [m for m in re.finditer(r'<CArtMeshForm>.*?</CArtMeshForm>', blk, flags=re.S)]
+        src = forms[key_index - 1] if key_index > 0 else forms[0]
+        form = src.group(0)
+        form = re.sub(r'<CFormGuid xs\.n="guid" xs\.ref="#\d+" />', '<CFormGuid xs.n="guid" xs.ref="%s" />' % new_ref, form)
+        form = re.sub(r'<f xs\.n="opacity">[\d\.\-eE]+</f>', '<f xs.n="opacity">%s</f>' % _fmt(opacity), form)
+        if key_index < len(forms):
+            ins = forms[key_index].start()
+            blk2 = blk[:ins] + form + NL + NL + blk[ins:]
+        else:
+            ins = forms[-1].end()
+            blk2 = blk[:ins] + NL + NL + form + blk[ins:]
+        blk2 = re.sub(r'(<carray_list xs\.n="keyforms" count=")\d+(")', lambda m: m.group(1) + str(len(forms) + 1) + m.group(2), blk2, count=1)
+        self.xml = self.xml[:a] + blk2 + self.xml[b:]
+
+        # 2) CFormGuid の定義を、コピー元のキーの定義の後ろに足す
+        prev_ref = re.search(r'<CFormGuid xs\.n="guid" xs\.ref="(#\d+)" />', src.group(0)).group(1)
+        dm = re.search(r'<CFormGuid uuid="[^"]*"[^>]*xs\.id="%s"[^>]*/>' % re.escape(prev_ref), self.xml)
+        define = '<CFormGuid uuid="%s" note="Key [  ]" xs.id="%s" xs.idx="%d" />' % (uuid.uuid4(), new_ref, new_idx)
+        self.xml = self.xml[:dm.end()] + NL + NL + define + self.xml[dm.end():]
+
+        # 3) KeyformGridSource：KeyformOnGrid を足し、後ろの keyIndex をずらす
+        ga = self.xml.index('<KeyformGridSource xs.id="%s"' % grid)
+        gb = self.xml.index('</KeyformGridSource>', ga)
+        gblk = self.xml[ga:gb]
+        items = list(re.finditer(r'<KeyformOnGrid>.*?</KeyformOnGrid>', gblk, flags=re.S))
+        new_item = items[min(key_index, len(items) - 1)].group(0)
+        new_item = re.sub(r'<i xs\.n="keyIndex">\d+</i>', '<i xs.n="keyIndex">%d</i>' % key_index, new_item)
+        new_item = re.sub(r'<CFormGuid xs\.n="keyformGuid" xs\.ref="#\d+" />', '<CFormGuid xs.n="keyformGuid" xs.ref="%s" />' % new_ref, new_item)
+
+        def shift(m):
+            i = int(m.group(1))
+            return '<i xs.n="keyIndex">%d</i>' % (i + 1 if i >= key_index else i)
+        shifted = [re.sub(r'<i xs\.n="keyIndex">(\d+)</i>', shift, it.group(0)) for it in items]
+        new_items = shifted[:key_index] + [new_item] + shifted[key_index:]
+        first, last = items[0].start(), items[-1].end()
+        gblk2 = gblk[:first] + (NL + NL).join(new_items) + gblk[last:]
+        gblk2 = re.sub(r'(<array_list xs\.n="keyformsOnGrid" count=")\d+(")', lambda m: m.group(1) + str(len(items) + 1) + m.group(2), gblk2, count=1)
+        self.xml = self.xml[:ga] + gblk2 + self.xml[gb:]
+
+        # 4) KeyformBindingSource：keys に値を挿入
+        ba = self.xml.index('<KeyformBindingSource xs.id="%s"' % bind)
+        bb = self.xml.index('</KeyformBindingSource>', ba)
+        bblk = self.xml[ba:bb]
+        km = re.search(r'<array_list xs\.n="keys" count="(\d+)">(.*?)</array_list>', bblk, flags=re.S)
+        vals = re.findall(r'<f>([\d\.\-eE]+)</f>', km.group(2))
+        vals.insert(key_index, _fmt(key_value))
+        keys_xml = '<array_list xs.n="keys" count="%d">' % len(vals) + NL + NL + (NL + NL).join('<f>%s</f>' % v for v in vals) + NL + NL + '</array_list>'
+        bblk2 = bblk[:km.start()] + keys_xml + bblk[km.end():]
+        self.xml = self.xml[:ba] + bblk2 + self.xml[bb:]
 
     # ---- 保存 ----
     def save(self, path):
