@@ -21,7 +21,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'ass
 IMAGE = re.compile(r'<CModelImage [^>]*>\s*<CModelImageGuid xs.n="guid" xs.ref="#\d+" />\s*<s xs.n="name">([^<]*)</s>.*?</CModelImage>', re.S)
 
 
-def fit(im, size):
+def fit(im, size, allow_quantize=False):
     best = None
     for level in (9, 6, 3, 1):
         b = io.BytesIO()
@@ -30,6 +30,14 @@ def fit(im, size):
         if len(data) <= size:
             return data + b'\x00' * (size - len(data))
         best = data
+    if allow_quantize:
+        # 色数を 256 に減らした PNG（キャッシュ用の縮小画像だけに使う）
+        q = im.quantize(colors=256, method=Image.FASTOCTREE, dither=Image.NONE)
+        b = io.BytesIO()
+        q.save(b, 'PNG', optimize=True)
+        data = b.getvalue()
+        if len(data) <= size:
+            return data + b'\x00' * (size - len(data))
     raise ValueError('PNG が元より大きい: %d > %d' % (len(best), size))
 
 
@@ -55,7 +63,7 @@ def main(src, dst, names):
         half = full.resize((full.width // 2, full.height // 2), Image.LANCZOS)
         pad = Image.new('RGBA', (ow, oh), (0, 0, 0, 0))
         pad.paste(half, (0, 0))
-        set_entry(c, cache, fit(pad, len(old_cache.data)))
+        set_entry(c, cache, fit(pad, len(old_cache.data), allow_quantize=True))
         print('replaced', name, raw, cache)
     c.save(dst)
     print('IMAGES_REPLACED_SAME_SIZE')
