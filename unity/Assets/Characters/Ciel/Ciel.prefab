@@ -3636,7 +3636,7 @@ MonoBehaviour:
   _sortingOrder: 0
   _renderOrder: 6
   _depthOffset: 0.00001
-  _opacity: 1
+  _opacity: 0
   _masks: []
   ColorBlendType: 0
   AlphaBlendType: 0
@@ -3774,7 +3774,7 @@ MonoBehaviour:
   _sortingOrder: 0
   _renderOrder: 5
   _depthOffset: 0.00001
-  _opacity: 1
+  _opacity: 0
   _masks: []
   ColorBlendType: 0
   AlphaBlendType: 0
@@ -5130,7 +5130,7 @@ MonoBehaviour:
   _sortingOrder: 0
   _renderOrder: 4
   _depthOffset: 0.00001
-  _opacity: 1
+  _opacity: 0
   _masks: []
   ColorBlendType: 0
   AlphaBlendType: 0

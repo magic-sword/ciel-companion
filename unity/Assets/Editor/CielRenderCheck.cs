@@ -30,6 +30,8 @@ namespace Ciel.EditorTools
             ("neutral", 0f, 0f, 1f, 1f, 0f),
             ("angleX_minus30", -30f, 0f, 1f, 1f, 0f),
             ("angleX_plus30", 30f, 0f, 1f, 1f, 0f),
+            ("angleX_minus15", -15f, 0f, 1f, 1f, 0f),
+            ("angleX_plus15", 15f, 0f, 1f, 1f, 0f),
             ("eyes_half", 0f, 0f, 0.5f, 0.5f, 0f),
             ("eyes_closed", 0f, 0f, 0f, 0f, 0f),
             ("mouth_small", 0f, 0f, 1f, 1f, 0.5f),
@@ -132,6 +134,49 @@ namespace Ciel.EditorTools
             _ticks++;
             if (_ticks < WaitTicks) return;
 
+            if (c.name.StartsWith("hide_"))
+            {
+                var hide = c.name.Substring(5).Split('+');
+                foreach (var d in _model.Drawables)
+                    foreach (var h in hide)
+                        if (d.name == h) d.GetComponent<MeshRenderer>().enabled = false;
+            }
+            if (c.name == "only_Face_Skin")
+                foreach (var dd in _model.Drawables)
+                    if (dd.name == "Face_Skin" || dd.name.StartsWith("Mouth"))
+                    {
+                        var mf = dd.GetComponent<MeshFilter>().sharedMesh;
+                        Debug.Log("CielRenderCheck: DIAG " + dd.name + " bounds=" + mf.bounds + " verts=" + mf.vertexCount + " uv0=" + mf.uv[0] + " idx=" + dd.GetComponent<MeshRenderer>().enabled + " sorting=" + dd.GetComponent<MeshRenderer>().sortingOrder);
+                    }
+            if (c.name == "neutral")
+                foreach (var dd in _model.Drawables)
+                {
+                    var uvs = dd.GetComponent<MeshFilter>().sharedMesh.uv;
+                    float u0 = 9, u1 = -9, v0 = 9, v1 = -9;
+                    foreach (var uv in uvs) { u0 = Mathf.Min(u0, uv.x); u1 = Mathf.Max(u1, uv.x); v0 = Mathf.Min(v0, uv.y); v1 = Mathf.Max(v1, uv.y); }
+                    Debug.Log("CielRenderCheck: UVRECT " + dd.name + " " + u0 + " " + u1 + " " + v0 + " " + v1);
+                }
+            if (c.name == "scan_all")
+            {
+                foreach (var d0 in _model.Drawables)
+                {
+                    foreach (var d in _model.Drawables) d.GetComponent<MeshRenderer>().enabled = (d == d0);
+                    _cam.Render();
+                    var t0 = new Texture2D(Width, Height, TextureFormat.RGBA32, false);
+                    RenderTexture.active = _rt;
+                    t0.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+                    RenderTexture.active = null;
+                    int red = 0;
+                    foreach (var px in t0.GetPixels32()) if (px.r - px.g > 45 && px.r > 180) red++;
+                    Object.DestroyImmediate(t0);
+                    if (red > 20) Debug.Log("CielRenderCheck: SCAN red " + d0.name + " " + red);
+                }
+            }
+            if (c.name.StartsWith("only_"))
+            {
+                foreach (var d in _model.Drawables)
+                    if (d.name != c.name.Substring(5)) d.GetComponent<MeshRenderer>().enabled = false;
+            }
             _cam.Render();
             var tex = new Texture2D(Width, Height, TextureFormat.RGBA32, false);
             RenderTexture.active = _rt;
@@ -142,6 +187,9 @@ namespace Ciel.EditorTools
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
             Debug.Log("CielRenderCheck: wrote " + path);
+            if (c.name == "angleX_minus30")
+                foreach (var d in _model.Drawables)
+                    if (d.name.StartsWith("Mouth")) Debug.Log("CielRenderCheck: drawable " + d.name + " color=" + d.GetComponent<Live2D.Cubism.Rendering.CubismRenderer>().Color + " bounds=" + d.GetComponent<MeshFilter>().sharedMesh.bounds.center);
 
             _caseIndex++;
             _ticks = 0;

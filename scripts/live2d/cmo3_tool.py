@@ -255,6 +255,90 @@ class Cmo3:
         blk = blk[:k] + kf + blk[k2:]
         self.xml = self.xml[:a] + blk + self.xml[b:]
 
+    def warp_block(self, name):
+        x = self.xml
+        i = x.index('<s xs.n="localName">%s</s>' % name)
+        st = x.rfind('<CWarpDeformerSource', 0, i)
+        en = x.index('</CWarpDeformerSource>', i) + len('</CWarpDeformerSource>')
+        return st, en
+
+    def warp_keyform_positions(self, name):
+        """ワープデフォーマの、キーフォームごとの、格子頂点の位置（(x, y) のリスト）を返す。"""
+        a, b = self.warp_block(name)
+        blk = self.xml[a:b]
+        return [[(float(v[i]), float(v[i + 1])) for i in range(0, len(v), 2)]
+                for v in (q.split() for q in re.findall(r'<float-array xs\.n="positions" count="\d+">([^<]*)', blk))]
+
+    def insert_warp_keyform(self, name, key_index, key_value, positions):
+        """ワープデフォーマに、キーを 1 つ挿入する。positions は、格子頂点 (x, y) のリスト。
+        バインディング（KeyformBindingSource）は、デフォーマの KeyformGridSource から、唯一のものを使う。"""
+        NL = chr(10)
+        a, b = self.warp_block(name)
+        blk = self.xml[a:b]
+        grid = re.search(r'<KeyformGridSource xs\.n="keyformGridSource" xs\.ref="(#\d+)"', blk).group(1)
+        new_id, new_idx = self._next_ids()
+        new_ref = '#%d' % new_id
+        forms = list(re.finditer(r'<CWarpDeformerForm>.*?</CWarpDeformerForm>', blk, flags=re.S))
+        src = forms[key_index - 1] if key_index > 0 else forms[0]
+        form = src.group(0)
+        form = re.sub(r'<CFormGuid xs\.n="guid" xs\.ref="#\d+" />', '<CFormGuid xs.n="guid" xs.ref="%s" />' % new_ref, form)
+        pos = ' '.join('%s %s' % (_fmt(px), _fmt(py)) for px, py in positions)
+        form = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                      lambda m: m.group(1) + str(len(positions) * 2) + m.group(2) + pos + m.group(3), form)
+        if key_index < len(forms):
+            ins = forms[key_index].start()
+            blk2 = blk[:ins] + form + NL + NL + blk[ins:]
+        else:
+            ins = forms[-1].end()
+            blk2 = blk[:ins] + NL + NL + form + blk[ins:]
+        blk2 = re.sub(r'(<carray_list xs\.n="keyforms" count=")\d+(")', lambda m: m.group(1) + str(len(forms) + 1) + m.group(2), blk2, count=1)
+        self.xml = self.xml[:a] + blk2 + self.xml[b:]
+
+        prev_ref = re.search(r'<CFormGuid xs\.n="guid" xs\.ref="(#\d+)" />', src.group(0)).group(1)
+        dm = re.search(r'<CFormGuid uuid="[^"]*"[^>]*xs\.id="%s"[^>]*/>' % re.escape(prev_ref), self.xml)
+        define = '<CFormGuid uuid="%s" note="Key [  ]" xs.id="%s" xs.idx="%d" />' % (uuid.uuid4(), new_ref, new_idx)
+        self.xml = self.xml[:dm.end()] + NL + NL + define + self.xml[dm.end():]
+
+        ga = self.xml.index('<KeyformGridSource xs.id="%s"' % grid)
+        gb = self.xml.index('</KeyformGridSource>', ga)
+        gblk = self.xml[ga:gb]
+        items = list(re.finditer(r'<KeyformOnGrid>.*?</KeyformOnGrid>', gblk, flags=re.S))
+        new_item = items[min(key_index, len(items) - 1)].group(0)
+        new_item = re.sub(r'<i xs\.n="keyIndex">\d+</i>', '<i xs.n="keyIndex">%d</i>' % key_index, new_item)
+        new_item = re.sub(r'<CFormGuid xs\.n="keyformGuid" xs\.ref="#\d+" />', '<CFormGuid xs.n="keyformGuid" xs.ref="%s" />' % new_ref, new_item)
+
+        def shift(m):
+            i = int(m.group(1))
+            return '<i xs.n="keyIndex">%d</i>' % (i + 1 if i >= key_index else i)
+        shifted = [re.sub(r'<i xs\.n="keyIndex">(\d+)</i>', shift, it.group(0)) for it in items]
+        new_items = shifted[:key_index] + [new_item] + shifted[key_index:]
+        gblk2 = gblk[:items[0].start()] + (NL + NL).join(new_items) + gblk[items[-1].end():]
+        gblk2 = re.sub(r'(<array_list xs\.n="keyformsOnGrid" count=")\d+(")', lambda m: m.group(1) + str(len(items) + 1) + m.group(2), gblk2, count=1)
+        self.xml = self.xml[:ga] + gblk2 + self.xml[gb:]
+
+        binds = set(re.findall(r'KeyformBindingSource xs\.ref="(#\d+)"', gblk))
+        if len(binds) != 1:
+            raise ValueError('expected one binding, found %s' % binds)
+        bind = binds.pop()
+        ba = self.xml.index('<KeyformBindingSource xs.id="%s"' % bind)
+        bb = self.xml.index('</KeyformBindingSource>', ba)
+        bblk = self.xml[ba:bb]
+        km = re.search(r'<array_list xs\.n="keys" count="(\d+)">(.*?)</array_list>', bblk, flags=re.S)
+        vals = re.findall(r'<f>([\d\.\-eE]+)</f>', km.group(2))
+        vals.insert(key_index, _fmt(key_value))
+        keys_xml = '<array_list xs.n="keys" count="%d">' % len(vals) + NL + NL + (NL + NL).join('<f>%s</f>' % v for v in vals) + NL + NL + '</array_list>'
+        self.xml = self.xml[:ba] + bblk[:km.start()] + keys_xml + bblk[km.end():] + self.xml[bb:]
+
+    def set_warp_keyform_positions(self, name, key_index, positions):
+        a, b = self.warp_block(name)
+        blk = self.xml[a:b]
+        forms = list(re.finditer(r'<CWarpDeformerForm>.*?</CWarpDeformerForm>', blk, flags=re.S))
+        f = forms[key_index]
+        pos = ' '.join('%s %s' % (_fmt(px), _fmt(py)) for px, py in positions)
+        f2 = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                    lambda m: m.group(1) + str(len(positions) * 2) + m.group(2) + pos + m.group(3), f.group(0))
+        self.xml = self.xml[:a] + blk[:f.start()] + f2 + blk[f.end():] + self.xml[b:]
+
     # ---- 保存 ----
     def save(self, path):
         data = self.xml.encode('utf-8')
