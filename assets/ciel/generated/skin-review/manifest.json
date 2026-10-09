@@ -1,0 +1,450 @@
+﻿{
+    "reference":  "upper-body-1x.png",
+    "light_sample":  {
+                         "rgb":  [
+                                     251.6635,
+                                     249.491,
+                                     249.675
+                                 ],
+                         "rect":  [
+                                      500,
+                                      590,
+                                      80,
+                                      25
+                                  ]
+                     },
+    "shadow_sample":  {
+                          "rgb":  [
+                                      220.08571428571429,
+                                      207.19142857142856,
+                                      219.76
+                                  ],
+                          "rect":  [
+                                       520,
+                                       695,
+                                       70,
+                                       10
+                                   ]
+                      },
+    "method":  "Image-generation color study followed by selective reference-palette transfer; original geometry and alpha retained. RGB samples are sRGB image values, not calibrated physical material measurements.",
+    "images":  [
+                   {
+                       "source":  "pose-ref/pose_x0_yD15.png",
+                       "file":  "pose-ref/pose_x0_yD15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  226556,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_x0_yD30.png",
+                       "file":  "pose-ref/pose_x0_yD30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  239797,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_x0_yU15.png",
+                       "file":  "pose-ref/pose_x0_yU15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  290812,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_x0_yU30.png",
+                       "file":  "pose-ref/pose_x0_yU30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  404451,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL15_y0.png",
+                       "file":  "pose-ref/pose_xL15_y0_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  266588,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL15_yD15.png",
+                       "file":  "pose-ref/pose_xL15_yD15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  228837,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL15_yD30.png",
+                       "file":  "pose-ref/pose_xL15_yD30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  216389,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL15_yU15.png",
+                       "file":  "pose-ref/pose_xL15_yU15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  298726,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL15_yU30.png",
+                       "file":  "pose-ref/pose_xL15_yU30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  433843,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL30_y0.png",
+                       "file":  "pose-ref/pose_xL30_y0_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  286448,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL30_yD15.png",
+                       "file":  "pose-ref/pose_xL30_yD15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  243366,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL30_yD30.png",
+                       "file":  "pose-ref/pose_xL30_yD30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  223448,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL30_yU15.png",
+                       "file":  "pose-ref/pose_xL30_yU15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  326091,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xL30_yU30.png",
+                       "file":  "pose-ref/pose_xL30_yU30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  369694,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR15_y0.png",
+                       "file":  "pose-ref/pose_xR15_y0_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  232660,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR15_yD15.png",
+                       "file":  "pose-ref/pose_xR15_yD15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  201786,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR15_yD30.png",
+                       "file":  "pose-ref/pose_xR15_yD30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  217181,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR15_yU15.png",
+                       "file":  "pose-ref/pose_xR15_yU15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  323496,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR15_yU30.png",
+                       "file":  "pose-ref/pose_xR15_yU30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  406243,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR30_y0.png",
+                       "file":  "pose-ref/pose_xR30_y0_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  259827,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR30_yD15.png",
+                       "file":  "pose-ref/pose_xR30_yD15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  228866,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR30_yD30.png",
+                       "file":  "pose-ref/pose_xR30_yD30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  198438,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR30_yU15.png",
+                       "file":  "pose-ref/pose_xR30_yU15_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  353047,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "pose-ref/pose_xR30_yU30.png",
+                       "file":  "pose-ref/pose_xR30_yU30_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  2359296,
+                       "changed_pixels":  376735,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/ciel-face-half-blink-1024x576.png",
+                       "file":  "edits/ciel-face-half-blink-1024x576_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1024,
+                       "height":  576,
+                       "visible_pixels":  589824,
+                       "changed_pixels":  121104,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-a-eye-strands-removed.png",
+                       "file":  "edits/edit-a-eye-strands-removed_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1456,
+                       "height":  816,
+                       "visible_pixels":  1188096,
+                       "changed_pixels":  153514,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-b-eyes-removed.png",
+                       "file":  "edits/edit-b-eyes-removed_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1456,
+                       "height":  816,
+                       "visible_pixels":  1188096,
+                       "changed_pixels":  174399,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-c-eyes-closed.png",
+                       "file":  "edits/edit-c-eyes-closed_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1672,
+                       "height":  941,
+                       "visible_pixels":  1573352,
+                       "changed_pixels":  414089,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-d-hair-removed.png",
+                       "file":  "edits/edit-d-hair-removed_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1254,
+                       "height":  1254,
+                       "visible_pixels":  1572516,
+                       "changed_pixels":  178173,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-e-ears-removed.png",
+                       "file":  "edits/edit-e-ears-removed_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1024,
+                       "height":  1024,
+                       "visible_pixels":  1048576,
+                       "changed_pixels":  54541,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "edits/edit-f-body-bare.png",
+                       "file":  "edits/edit-f-body-bare_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1448,
+                       "height":  1086,
+                       "visible_pixels":  1572528,
+                       "changed_pixels":  52337,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "normal/face_base_neck.png",
+                       "file":  "normal/face_base_neck_porcelain.png",
+                       "mode":  "selective",
+                       "width":  1374,
+                       "height":  1145,
+                       "visible_pixels":  821251,
+                       "changed_pixels":  627914,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "parts/underlayers/C-0_face-rounded_x0_y0_v2.png",
+                       "file":  "parts/underlayers/C-0_face-rounded_x0_y0_v3.png",
+                       "mode":  "skin",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  428742,
+                       "changed_pixels":  428303,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  30
+                   },
+                   {
+                       "source":  "parts/underlayers/C-L30_face-rounded_xL30_y0_v2.png",
+                       "file":  "parts/underlayers/C-L30_face-rounded_xL30_y0_v3.png",
+                       "mode":  "skin",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  362105,
+                       "changed_pixels":  362062,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  30
+                   },
+                   {
+                       "source":  "parts/underlayers/C-R30_face-rounded_xR30_y0_v2.png",
+                       "file":  "parts/underlayers/C-R30_face-rounded_xR30_y0_v3.png",
+                       "mode":  "skin",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  348596,
+                       "changed_pixels":  344848,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  13
+                   },
+                   {
+                       "source":  "parts/underlayers/K-2_chin-throat_x0_yU15_v2.png",
+                       "file":  "parts/underlayers/K-2_chin-throat_x0_yU15_v3.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  83450,
+                       "changed_pixels":  81846,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "parts/underlayers/K-3_chin-throat_x0_yU30_v2.png",
+                       "file":  "parts/underlayers/K-3_chin-throat_x0_yU30_v3.png",
+                       "mode":  "selective",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  86717,
+                       "changed_pixels":  83851,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  0
+                   },
+                   {
+                       "source":  "parts/underlayers/N-1_blush-shading_x0_y0_v2.png",
+                       "file":  "parts/underlayers/N-1_blush-shading_x0_y0_v3.png",
+                       "mode":  "overlay",
+                       "width":  1536,
+                       "height":  1536,
+                       "visible_pixels":  27127,
+                       "changed_pixels":  21626,
+                       "alpha_differences":  0,
+                       "protected_color_differences":  869
+                   }
+               ]
+}

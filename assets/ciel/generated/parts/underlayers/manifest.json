@@ -1,0 +1,119 @@
+{
+  "description": "回転時の補完用下レイヤー生成素材",
+  "notes": [
+    "各ポーズの見本を参照して画像生成。1536×1536。",
+    "位置・大きさは見本の目印に合わせて補正済みだが、輪郭の画素単位の一致は保証しない。組み込み時に調整する。",
+    "C・K・N は、陶器のような白い肌の色に補正した版（v3）。E・H は髪と猫耳だけなので v2。",
+    "旧版（v1・v2）と S（C に統合）は削除した（履歴は Git にある場合のみ。未コミットだったものは復元できない）。"
+  ],
+  "images": [
+    {
+      "file": "C-0_face-rounded_x0_y0.png",
+      "reference": "../../../requests/face-hair-crop-1536x1536_x318_y236.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    },
+    {
+      "file": "C-L30_face-rounded_xL30_y0.png",
+      "reference": "../../pose-ref/pose_xL30_y0.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    },
+    {
+      "file": "C-R30_face-rounded_xR30_y0.png",
+      "reference": "../../pose-ref/pose_xR30_y0.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    },
+    {
+      "file": "E-1_ear-backs_xR30_y0.png",
+      "reference": "../../pose-ref/pose_xR30_y0.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v2_generated_aligned_to_visual_landmarks",
+      "notes": "見本の基準点に対し位置・寸法補正済み。輪郭全周のピクセル一致ではない。Cは顔パーツと赤みなし。微小孤立アルファを除去。",
+      "version_used": "v2"
+    },
+    {
+      "file": "H-2_hair-ears_x0_yD15.png",
+      "reference": "../../pose-ref/pose_x0_yD15.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v2_generated_aligned_to_visual_landmarks",
+      "notes": "見本の基準点に対し位置・寸法補正済み。輪郭全周のピクセル一致ではない。Cは顔パーツと赤みなし。微小孤立アルファを除去。",
+      "version_used": "v2"
+    },
+    {
+      "file": "H-3_hair-ears_x0_yD30.png",
+      "reference": "../../pose-ref/pose_x0_yD30.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v2_generated_aligned_to_visual_landmarks",
+      "notes": "見本の基準点に対し位置・寸法補正済み。輪郭全周のピクセル一致ではない。Cは顔パーツと赤みなし。微小孤立アルファを除去。",
+      "version_used": "v2"
+    },
+    {
+      "file": "K-2_chin-throat_x0_yU15.png",
+      "reference": "../../pose-ref/pose_x0_yU15.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    },
+    {
+      "file": "K-3_chin-throat_x0_yU30.png",
+      "reference": "../../pose-ref/pose_x0_yU30.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    },
+    {
+      "file": "N-1_blush-shading_x0_y0.png",
+      "reference": "../../../requests/face-hair-crop-1536x1536_x318_y236.png",
+      "color_reference": "../../upper-body-1x.png",
+      "width": 1536,
+      "height": 1536,
+      "background": "transparent",
+      "status": "v3_porcelain_palette_corrected",
+      "notes": "原画の陶器のような白い肌に色補正。v2の寸法・位置・アルファを保持。Cは顔パーツなし、Nは低彩度化。",
+      "alpha_differences": 0,
+      "version_used": "v3"
+    }
+  ],
+  "deferred": [
+    {
+      "id": "P",
+      "reason": "第5章の「必要になったら」に従い未生成"
+    }
+  ]
+}
