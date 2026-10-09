@@ -46,3 +46,4 @@
 # Cubism Editorが作る一時・自動バックアップ
 *.cmo3.bak
 *.can3.bak
+__pycache__/

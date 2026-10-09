@@ -156,6 +156,64 @@ class Cmo3:
         bblk2 = bblk[:km.start()] + keys_xml + bblk[km.end():]
         self.xml = self.xml[:ba] + bblk2 + self.xml[bb:]
 
+    def crop_quad_mesh(self, mesh, bbox, canvas=(2172, 2896), margin=2):
+        """4頂点（キャンバス全体を覆う四角形）のメッシュを、絵の範囲（bbox=(x0, y0, x1, y1)、画素・両端を含む）に切り詰める。
+        頂点の位置（point と、全キーフォームの positions）と、UV を書き換える。頂点の並び順・三角形・キーの構造は変えない。"""
+        W, H = canvas
+        x0, y0, x1, y1 = bbox
+        x0 = max(0, x0 - margin); y0 = max(0, y0 - margin)
+        x1 = min(W - 1, x1 + margin); y1 = min(H - 1, y1 + margin)
+        a, b = self.mesh_block(mesh)
+        blk = self.xml[a:b]
+        pt = re.search(r'<float-array xs\.n="point" count="8">([^<]*)</float-array>', blk)
+        if not pt:
+            raise ValueError('%s: not a 4-vertex mesh' % mesh)
+        old = [float(v) for v in pt.group(1).split()]
+        # 元の四角形（point）は、(W+1, -1)・(-1, -1)・(W+1, H+1)・(-1, H+1) の順（実ファイルで確認）。
+        # 頂点ごとに、x と y のどちら側（小さい側 / 大きい側）かを見て、同じ側へ、新しい矩形の端を割り当てる。
+        xs_new = {False: float(x0), True: float(x1 + 1)}
+        ys_new = {False: float(y0), True: float(y1 + 1)}
+        cx = (min(old[0::2]) + max(old[0::2])) / 2
+        cy = (min(old[1::2]) + max(old[1::2])) / 2
+        new = []
+        for i in range(4):
+            new.append(xs_new[old[2 * i] > cx])
+            new.append(ys_new[old[2 * i + 1] > cy])
+        txt = ' '.join(_fmt(v) for v in new)
+        blk2 = re.sub(r'(<float-array xs\.n="(?:point|positions)" count="8">)[^<]*(</float-array>)',
+                      lambda m: m.group(1) + txt + m.group(2), blk)
+        # UV：テクスチャ（アトラス）内の位置。元の uvs は、元の四角形（全体）の、アトラス上の矩形。
+        uv = re.search(r'<float-array xs\.n="uvs" count="8">([^<]*)</float-array>', blk2)
+        u = [float(v) for v in uv.group(1).split()]
+        uxs = sorted(set(u[0::2])); uys = sorted(set(u[1::2]))
+        if len(uxs) != 2 or len(uys) != 2:
+            raise ValueError('%s: unexpected uvs %s' % (mesh, u))
+        # 元の頂点 i が、元の四角形のどの隅か（x 側 / y 側）が、そのまま、UV にも、対応している。
+        W2 = (max(old[0::2]) - min(old[0::2]))
+        H2 = (max(old[1::2]) - min(old[1::2]))
+        ox, oy = min(old[0::2]), min(old[1::2])
+        du = uxs[1] - uxs[0]; dv = uys[1] - uys[0]
+        newuv = []
+        for i in range(4):
+            # 元の頂点 i の、元の四角形内での、正規化位置 → 新しい頂点の、正規化位置
+            nx = (new[2 * i] - ox) / W2
+            ny = (new[2 * i + 1] - oy) / H2
+            # 元の UV は、(隅 → uv) の対応。新しい位置の UV は、同じ、隅の対応を、線形補間する
+            bu = u[0::2]; bv = u[1::2]
+            # 元の四角形の隅 j の UV を、(sx, sy) 側で区別して、補間する
+            def corner(sx, sy):
+                for j in range(4):
+                    if (old[2 * j] > cx) == sx and (old[2 * j + 1] > cy) == sy:
+                        return bu[j], bv[j]
+            u00, v00 = corner(False, False); u10, v10 = corner(True, False)
+            u01, v01 = corner(False, True); u11, v11 = corner(True, True)
+            uu = (u00 * (1 - nx) * (1 - ny) + u10 * nx * (1 - ny) + u01 * (1 - nx) * ny + u11 * nx * ny)
+            vv = (v00 * (1 - nx) * (1 - ny) + v10 * nx * (1 - ny) + v01 * (1 - nx) * ny + v11 * nx * ny)
+            newuv += [uu, vv]
+        uvtxt = ' '.join(_fmt(v) for v in newuv)
+        blk2 = re.sub(r'(<float-array xs\.n="uvs" count="8">)[^<]*(</float-array>)', lambda m: m.group(1) + uvtxt + m.group(2), blk2)
+        self.xml = self.xml[:a] + blk2 + self.xml[b:]
+
     # ---- 保存 ----
     def save(self, path):
         data = self.xml.encode('utf-8')

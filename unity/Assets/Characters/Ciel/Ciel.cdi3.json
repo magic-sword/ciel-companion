@@ -140,6 +140,14 @@
 	"ParameterGroups": [],
 	"Parts": [
 		{
+			"Id": "Part4",
+			"Name": "ciel-mouth.psd"
+		},
+		{
+			"Id": "Part3",
+			"Name": "ciel-head-body.psd（対応無し）"
+		},
+		{
 			"Id": "Part2",
 			"Name": "ciel-head-body.psd"
 		},

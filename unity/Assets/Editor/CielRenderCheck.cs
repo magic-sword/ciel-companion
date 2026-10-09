@@ -1,5 +1,6 @@
 using System.IO;
 using Live2D.Cubism.Core;
+using Live2D.Cubism.Editor.Importers;
 using UnityEditor;
 using UnityEngine;
 
@@ -7,149 +8,167 @@ namespace Ciel.EditorTools
 {
     /// <summary>
     /// 書き出したシエルのモデルを、パラメーターを変えながら画像に描画して確認する。
-    /// 再生モードに入り、1ケースごとに数フレーム進めてから撮影する（Cubismの描画はフレームごとにメッシュを切り替えるため）。
-    /// 実行: Unity -batchmode -executeMethod Ciel.EditorTools.CielRenderCheck.Run -logFile &lt;path&gt;
+    /// 再生モードには入らず、エディタの更新ループ（EditorApplication.update）でモデルを更新して撮影する。
+    ///
+    /// 使い方（どちらか）：
+    ///  1. メニュー CIEL ＞ Render Check（エディタで開いている状態から1クリック）
+    ///  2. プロジェクトの .local/render-check/request ファイルを置いてからエディタを起動する
+    ///     （起動が落ち着いてから自動で撮影し、終わるとファイルを消して、エディタを終了する）。
+    ///     -executeMethod は起動の途中で実行され、その後の更新ループが回らないことがあるため使わない。
     /// 出力: .local/render-check/*.png（Git対象外）
     /// </summary>
     public static class CielRenderCheck
     {
         const string PrefabPath = "Assets/Characters/Ciel/Ciel.prefab";
-        const string StateKey = "CielRenderCheck.Pending";
+        const string ModelJsonPath = "Assets/Characters/Ciel/Ciel.model3.json";
+        const int Width = 768, Height = 1024;
+        const int WaitTicks = 8;   // 値を設定してから撮影するまでの更新回数
 
         // 名前, ParamAngleX, ParamAngleY, ParamEyeLOpen, ParamEyeROpen
-        static readonly (string name, float angleX, float angleY, float eyeL, float eyeR)[] Cases =
+        static readonly (string name, float angleX, float angleY, float eyeL, float eyeR, float mouth)[] Cases =
         {
-            ("neutral", 0f, 0f, 1f, 1f),
-            ("angleX_minus30", -30f, 0f, 1f, 1f),
-            ("angleX_plus30", 30f, 0f, 1f, 1f),
-            ("eyes_half", 0f, 0f, 0.5f, 0.5f),
-            ("eyes_closed", 0f, 0f, 0f, 0f),
+            ("neutral", 0f, 0f, 1f, 1f, 0f),
+            ("angleX_minus30", -30f, 0f, 1f, 1f, 0f),
+            ("angleX_plus30", 30f, 0f, 1f, 1f, 0f),
+            ("eyes_half", 0f, 0f, 0.5f, 0.5f, 0f),
+            ("eyes_closed", 0f, 0f, 0f, 0f, 0f),
+            ("mouth_small", 0f, 0f, 1f, 1f, 0.5f),
+            ("mouth_large", 0f, 0f, 1f, 1f, 1f),
         };
 
-        public static void Run()
-        {
-            // 再生モードへ入る。ドメインが再読込されるので、状態は SessionState に置く。
-            SessionState.SetBool(StateKey, true);
-            EditorApplication.EnterPlaymode();
-        }
+        static string OutDir => Path.GetFullPath(Path.Combine(Application.dataPath, "../../.local/render-check"));
+        static string RequestPath => Path.Combine(OutDir, "request");
+
+        static GameObject _instance;
+        static CubismModel _model;
+        static Camera _cam;
+        static RenderTexture _rt;
+        static int _caseIndex;
+        static int _ticks;
+        static bool _exitWhenDone;
 
         [InitializeOnLoadMethod]
-        static void OnLoad()
+        static void AutoStart()
         {
-            EditorApplication.playModeStateChanged += state =>
+            if (!File.Exists(RequestPath)) return;
+            // 起動が落ち着くまで待ってから始める（delayCall → 更新ループを数十回回す）。
+            int waited = 0;
+            EditorApplication.CallbackFunction wait = null;
+            wait = () =>
             {
-                if (state == PlayModeStateChange.EnteredPlayMode && SessionState.GetBool(StateKey, false))
-                {
-                    SessionState.SetBool(StateKey, false);
-                    var go = new GameObject("CielRenderCheckRunner");
-                    go.AddComponent<Runner>();
-                }
+                if (++waited < 60) return;
+                EditorApplication.update -= wait;
+                _exitWhenDone = true;
+                File.Delete(RequestPath);
+                Begin();
             };
+            EditorApplication.update += wait;
         }
 
-        sealed class Runner : MonoBehaviour
+        [MenuItem("CIEL/Render Check")]
+        static void MenuRun()
         {
-            CubismModel _model;
-            (string name, float angleX, float angleY, float eyeL, float eyeR) _current;
+            _exitWhenDone = false;
+            Begin();
+        }
 
-            // Cubismはパラメーターを毎フレーム保存値へ戻すので、値はLateUpdateで設定する。
-            void LateUpdate()
+        // moc3 / model3.json を書き出し直しても、起動時にプレハブが再生成されないことがあるので、撮影の前に取り込み直す。
+        static void ReimportModel()
+        {
+            AssetDatabase.ImportAsset(ModelJsonPath, ImportAssetOptions.ForceUpdate);
+            var importer = CubismImporter.GetImporterAtPath(ModelJsonPath);
+            if (importer == null)
             {
-                if (_model == null) return;
-                Set(_model, "ParamAngleX", _current.angleX);
-                Set(_model, "ParamAngleY", _current.angleY);
-                Set(_model, "ParamEyeLOpen", _current.eyeL);
-                Set(_model, "ParamEyeROpen", _current.eyeR);
-                _model.ForceUpdateNow();
+                Debug.LogWarning("CielRenderCheck: no Cubism importer for " + ModelJsonPath);
+                return;
+            }
+            importer.Import();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CielRenderCheck: reimported " + ModelJsonPath);
+        }
+
+        static void Begin()
+        {
+            ReimportModel();
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError("CielRenderCheck: prefab not found: " + PrefabPath);
+                Finish(2);
+                return;
             }
 
-            System.Collections.IEnumerator Start()
+            Directory.CreateDirectory(OutDir);
+
+            _instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            _model = _instance.GetComponent<CubismModel>();
+            Debug.Log("CielRenderCheck: drawables=" + _model.Drawables.Length + " parameters=" + _model.Parameters.Length);
+
+            var camGo = new GameObject("CielRenderCheckCamera");
+            _cam = camGo.AddComponent<Camera>();
+            _cam.orthographic = true;
+            _cam.orthographicSize = 0.75f;
+            _cam.transform.position = new Vector3(0f, 0f, -10f);
+            _cam.clearFlags = CameraClearFlags.SolidColor;
+            _cam.backgroundColor = new Color(0.25f, 0.3f, 0.45f, 1f);
+            _rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32);
+            _cam.targetTexture = _rt;
+
+            _caseIndex = 0;
+            _ticks = 0;
+            EditorApplication.update += Tick;
+        }
+
+        static void Tick()
+        {
+            var c = Cases[_caseIndex];
+            Set("ParamAngleX", c.angleX);
+            Set("ParamAngleY", c.angleY);
+            Set("ParamEyeLOpen", c.eyeL);
+            Set("ParamEyeROpen", c.eyeR);
+            Set("ParamMouthOpenY", c.mouth);
+            _model.ForceUpdateNow();
+            _ticks++;
+            if (_ticks < WaitTicks) return;
+
+            _cam.Render();
+            var tex = new Texture2D(Width, Height, TextureFormat.RGBA32, false);
+            RenderTexture.active = _rt;
+            tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+            tex.Apply();
+            RenderTexture.active = null;
+            var path = Path.Combine(OutDir, c.name + ".png");
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            Debug.Log("CielRenderCheck: wrote " + path);
+
+            _caseIndex++;
+            _ticks = 0;
+            if (_caseIndex >= Cases.Length)
             {
-                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-                if (prefab == null)
-                {
-                    Debug.LogError("CielRenderCheck: prefab not found: " + PrefabPath);
-                    EditorApplication.Exit(2);
-                    yield break;
-                }
-
-                var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.local/render-check"));
-                Directory.CreateDirectory(outDir);
-
-                var instance = Instantiate(prefab);
-                var model = instance.GetComponent<CubismModel>();
-                _model = model;
-                _current = Cases[0];
-                Debug.Log("CielRenderCheck: drawables=" + model.Drawables.Length + " parameters=" + model.Parameters.Length);
-
-                var camGo = new GameObject("CielRenderCheckCamera");
-                var cam = camGo.AddComponent<Camera>();
-                cam.orthographic = true;
-                cam.orthographicSize = 0.75f;
-                cam.transform.position = new Vector3(0f, 0f, -10f);
-                cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.backgroundColor = new Color(0.25f, 0.3f, 0.45f, 1f);
-                const int width = 768, height = 1024;
-                var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
-                cam.targetTexture = rt;
-
-                for (int i = 0; i < 5; i++) yield return null;   // 初回の更新を待つ
-
-                foreach (var c in Cases)
-                {
-                    _current = c;
-                    for (int i = 0; i < 5; i++) yield return null;
-                    yield return new WaitForEndOfFrame();
-
-                    LogState(model, c.name);
-                    cam.Render();
-                    var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    RenderTexture.active = rt;
-                    tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                    tex.Apply();
-                    RenderTexture.active = null;
-                    var path = Path.Combine(outDir, c.name + ".png");
-                    File.WriteAllBytes(path, tex.EncodeToPNG());
-                    Destroy(tex);
-                    Debug.Log("CielRenderCheck: wrote " + path);
-                }
-
+                EditorApplication.update -= Tick;
                 Debug.Log("CIEL_RENDER_CHECK_DONE");
-                EditorApplication.Exit(0);
+                Finish(0);
             }
+        }
 
-            static void LogState(CubismModel model, string label)
-            {
-                float ax = float.NaN, el = float.NaN;
-                foreach (var p in model.Parameters)
-                {
-                    if (p.Id == "ParamAngleX") ax = p.Value;
-                    if (p.Id == "ParamEyeLOpen") el = p.Value;
-                }
-                string v = "n/a";
-                foreach (var d in model.Drawables)
-                {
-                    if (d.name == "Face_Skin")
-                    {
-                        var vp = d.VertexPositions;
-                        v = vp.Length > 0 ? vp[vp.Length / 2].ToString("F4") : "empty";
-                        var mr = d.GetComponent<MeshRenderer>();
-                        var mf = d.GetComponent<MeshFilter>();
-                        Debug.Log("CielState[" + label + "] Face_Skin renderer.enabled=" + mr.enabled + " meshVerts=" + (mf.sharedMesh != null ? mf.sharedMesh.vertexCount : -1) + " meshMid=" + (mf.sharedMesh != null && mf.sharedMesh.vertexCount > 0 ? mf.sharedMesh.vertices[mf.sharedMesh.vertexCount / 2].ToString("F4") : "n/a"));
-                    }
-                }
-                Debug.Log("CielState[" + label + "] ParamAngleX=" + ax + " ParamEyeLOpen=" + el + " FaceSkinMidVertex=" + v + " frame=" + Time.frameCount);
-            }
+        static void Finish(int code)
+        {
+            if (_instance != null) Object.DestroyImmediate(_instance);
+            if (_cam != null) Object.DestroyImmediate(_cam.gameObject);
+            if (_rt != null) _rt.Release();
+            if (_exitWhenDone) EditorApplication.Exit(code);
+        }
 
-            static void Set(CubismModel model, string id, float value)
+        static void Set(string id, float value)
+        {
+            foreach (var p in _model.Parameters)
             {
-                foreach (var p in model.Parameters)
+                if (p.Id == id)
                 {
-                    if (p.Id == id)
-                    {
-                        p.Value = Mathf.Clamp(value, p.MinimumValue, p.MaximumValue);
-                        return;
-                    }
+                    p.Value = Mathf.Clamp(value, p.MinimumValue, p.MaximumValue);
+                    return;
                 }
             }
         }
