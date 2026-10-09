@@ -1,7 +1,7 @@
 """体の下地と、衣装のレイヤーを作る。
 
 入力  assets/ciel/master/ciel-upper-body-2x.png    基準画像
-      assets/ciel/generated/edit-f-body-bare.png   依頼F（衣装を消した体。切り抜き body-crop の部分編集）
+      assets/ciel/generated/edits/edit-f-body-bare.png   依頼F（衣装を消した体。切り抜き body-crop の部分編集）
 出力  assets/ciel/layers/body/Body_Base.png（Fの画像を基準画像の大きさへ拡大した下地：素の体・後ろ髪・トップス・スカート）
       assets/ciel/layers/body/{Neck_Gear,Chest_Gem,Waist_Belt,Outer_R,Outer_L}.png
       （基準画像の画素のうち、Fで消えた所＝首輪と飾り・胸の宝石・腰のベルト・ファーとジャケットと袖）、check-body.png
@@ -66,7 +66,7 @@ crop = master.crop((X, Y, X + CW, Y + CH))
 bg = Image.new('RGBA', crop.size, (255, 255, 255, 255))
 bg.alpha_composite(crop)
 B = np.asarray(bg.convert('RGB')).astype(float)
-F = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edit-f-body-bare.png')).convert('RGB')
+F = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edits', 'edit-f-body-bare.png')).convert('RGB')
                .resize((CW, CH), Image.LANCZOS)).astype(float)
 
 diff = np.abs(F - B).sum(2)

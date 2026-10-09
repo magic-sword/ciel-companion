@@ -1,9 +1,9 @@
 """口（閉じ・小・大）と後ろ髪のレイヤーを作る。
 
 入力  assets/ciel/requests/face-hair-crop-1536x1536_x318_y236.png  切り抜き（基準画像の x318・y236）
-      assets/ciel/generated/G1_Closed.png / G2_Small_Open.png / G3_Large_Open.png
+      assets/ciel/generated/parts/mouth-closed.png / mouth-small-open.png / mouth-large-open.png
           依頼G。切り抜きの口だけを描き直した部分編集（口以外の差は 0）
-      assets/ciel/generated/ciel-rear-hair-layer-1536.png  後ろ髪だけの透明PNG（切り抜きと同じ大きさ・位置）
+      assets/ciel/generated/parts/rear-hair-layer-1536.png  後ろ髪だけの透明PNG（切り抜きと同じ大きさ・位置）
 出力  assets/ciel/layers/head/{Mouth_Closed,Mouth_Small,Mouth_Large,Hair_Back}.png（基準画像と同じキャンバス）
       assets/ciel/layers/head/check-mouth-hair.png
 実行  python -I scripts/live2d/build-mouth-and-hair-layers.py   完了表示 MOUTH_HAIR_LAYERS_READY
@@ -43,9 +43,9 @@ master = Image.open(os.path.join(ROOT, 'master', 'ciel-upper-body-2x.png'))
 MW, MH = master.size
 base = load_rgb('requests/face-hair-crop-1536x1536_x318_y236.png')
 samples = {
-    'Mouth_Closed': load_rgb('generated/G1_Closed.png'),
-    'Mouth_Small': load_rgb('generated/G2_Small_Open.png'),
-    'Mouth_Large': load_rgb('generated/G3_Large_Open.png'),
+    'Mouth_Closed': load_rgb('generated/parts/mouth-closed.png'),
+    'Mouth_Small': load_rgb('generated/parts/mouth-small-open.png'),
+    'Mouth_Large': load_rgb('generated/parts/mouth-large-open.png'),
 }
 
 # 口の範囲：G2・G3 のどちらかで切り抜きと差が出る所（G1 は切り抜きと同一）。
@@ -74,7 +74,7 @@ for key, img in samples.items():
     put(img, alpha, key + '.png')
 
 # 後ろ髪（透明PNG）
-rear = Image.open(os.path.join(ROOT, 'generated', 'ciel-rear-hair-layer-1536.png')).convert('RGBA')
+rear = Image.open(os.path.join(ROOT, 'generated', 'parts', 'rear-hair-layer-1536.png')).convert('RGBA')
 assert rear.size == (W, W), rear.size
 layer = Image.new('RGBA', (MW, MH), (0, 0, 0, 0))
 layer.paste(rear, (X, Y))

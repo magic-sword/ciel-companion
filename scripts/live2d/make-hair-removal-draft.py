@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image, ImageFilter
 r = 'D:/CIEL/apps/ciel-companion/assets/ciel/'
-a = Image.open(r + 'generated/edit-d-hair-removed.png').convert('RGB').resize((1536, 1536), Image.LANCZOS)
+a = Image.open(r + 'generated/edits/edit-d-hair-removed.png').convert('RGB').resize((1536, 1536), Image.LANCZOS)
 m = Image.open(r + 'requests/face-hair-crop-1536x1536_x318_y236.png').convert('RGB')
 A = np.asarray(a).astype(int)
 M = np.asarray(m).astype(float)

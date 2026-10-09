@@ -2,7 +2,7 @@
 
 入力  assets/ciel/master/ciel-upper-body-2x.png       基準画像
       assets/ciel/master/ciel-upper-body-2x-eyeless.png 目のない顔
-      assets/ciel/generated/edit-d-hair-removed.png     依頼D（前髪を消した顔。画像全体が描き直されているので、顔の肌の領域だけを使う）
+      assets/ciel/generated/edits/edit-d-hair-removed.png     依頼D（前髪を消した顔。画像全体が描き直されているので、顔の肌の領域だけを使う）
 出力  assets/ciel/layers/head/{Face_Skin,Hair_Front}.png（基準画像と同じキャンバス）、check-head.png
 実行  python -I scripts/live2d/build-head-layers.py   完了表示 HEAD_LAYERS_READY
 重ね順 目のない顔 < Face_Skin < 目 < Hair_Front
@@ -66,7 +66,7 @@ eyeless = Image.open(os.path.join(ROOT, 'master', 'ciel-upper-body-2x-eyeless.pn
 crop = (X, Y, X + W, Y + W)
 M = flat(master.crop(crop))
 E = flat(eyeless.crop(crop))
-D = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edit-d-hair-removed.png')).convert('RGB')
+D = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edits', 'edit-d-hair-removed.png')).convert('RGB')
                .resize((W, W), Image.LANCZOS)).astype(float)
 
 # F：依頼Dの顔の肌の領域

@@ -26,7 +26,7 @@
 ### ChatGPT に渡すもの
 
 - 元画像：`assets/ciel/requests/face-hair-crop-1536x1536_x318_y236.png`（顔と髪の切り抜き。1536×1536）
-- 参考（前回の左右向き。出来の目安）：`assets/ciel/generated/J1`〜`J4`
+- 参考（前回の左右向き。出来の目安）：`assets/ciel/generated/pose-ref/`（`pose_xL15_y0.png` など）
 
 ### ChatGPT への文面のひな形
 

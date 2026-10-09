@@ -1,7 +1,7 @@
 """耳のレイヤーと、耳の下の髪を作る。
 
 入力  assets/ciel/master/ciel-upper-body-2x.png     基準画像
-      assets/ciel/generated/edit-e-ears-removed.png 依頼E（耳を消した顔。切り抜き face-hair-crop の部分編集）
+      assets/ciel/generated/edits/edit-e-ears-removed.png 依頼E（耳を消した顔。切り抜き face-hair-crop の部分編集）
 出力  assets/ciel/layers/head/{Ear_R,Ear_L,Hair_Under_Ear}.png（基準画像と同じキャンバス）、check-ears.png
 実行  python -I scripts/live2d/build-ear-layers.py   完了表示 EAR_LAYERS_READY
 L/R はキャラクターから見た左右（Ear_R は画面の左）。
@@ -38,7 +38,7 @@ M = np.asarray(master).astype(float)
 crop_bg = Image.new('RGBA', (W, W), (255, 255, 255, 255))
 crop_bg.alpha_composite(master.crop((X, Y, X + W, Y + W)))
 B = np.asarray(crop_bg.convert('RGB')).astype(float)
-E = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edit-e-ears-removed.png')).convert('RGB')
+E = np.asarray(Image.open(os.path.join(ROOT, 'generated', 'edits', 'edit-e-ears-removed.png')).convert('RGB')
                .resize((W, W), Image.LANCZOS)).astype(float)
 
 diff = np.abs(E - B).sum(2)

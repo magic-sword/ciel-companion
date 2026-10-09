@@ -1,7 +1,7 @@
 """顔の向きの見本（正面・左右15度・左右30度）から、顔の特徴の位置を測る。
 
 入力  assets/ciel/requests/face-hair-crop-1536x1536_x318_y236.png（正面）
-      assets/ciel/generated/J{1..4}_*.png（1536x1536。J1=左15度、J2=右15度、J3=左30度、J4=右30度。画面の左右）
+      assets/ciel/generated/pose-ref/pose_x{L30,L15,R15,R30}_y0.png（1536x1536。L=画面の左を向く、R=右を向く）
 出力  標準出力に、各画像の特徴量を表で出す（assets/ciel/head-turn-measure.json にも保存）
 実行  python -I scripts/live2d/measure-head-turn.py
 
@@ -17,11 +17,11 @@ from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets', 'ciel')
 SAMPLES = [
-    ('left30', 'generated/J3_Viewer_Left_Approx30.png', -30),
-    ('left15', 'generated/J1_Viewer_Left_Approx15.png', -15),
+    ('left30', 'generated/pose-ref/pose_xL30_y0.png', -30),
+    ('left15', 'generated/pose-ref/pose_xL15_y0.png', -15),
     ('front', 'requests/face-hair-crop-1536x1536_x318_y236.png', 0),
-    ('right15', 'generated/J2_Viewer_Right_Approx15.png', 15),
-    ('right30', 'generated/J4_Viewer_Right_Approx30.png', 30),
+    ('right15', 'generated/pose-ref/pose_xR15_y0.png', 15),
+    ('right30', 'generated/pose-ref/pose_xR30_y0.png', 30),
 ]
 
 
