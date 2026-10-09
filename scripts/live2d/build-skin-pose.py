@@ -81,6 +81,7 @@ def clean_edge(im):
     arr[band, :3] = mean.astype(np.uint8)
     soft = Image.fromarray(eroded).filter(ImageFilter.GaussianBlur(1.5))
     arr[..., 3] = np.asarray(soft)
+    arr[arr[..., 3] < 255, :3] = mean.astype(np.uint8)   # 半透明の画素も、肌色にそろえる（灰色の縁を防ぐ）
     return Image.fromarray(arr, 'RGBA')
 
 

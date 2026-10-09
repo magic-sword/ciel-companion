@@ -149,7 +149,7 @@ def render(doc, x, y, skin=None):
     items = [(m, n, i) for i, (m, n) in enumerate(items)]
     items.sort(key=lambda it: (it[0]['order'], -it[2]))     # 同じ描画順では、リストの上（先）が前
     for m, n, _ in items:
-        if m['opacity'] <= 0.001:
+        if m['opacity'] <= 0.001 or n in os.environ.get('HIDE', '').split(','):
             continue
         if skin and n == 'Face_Skin':
             im = np.asarray(Image.open(skin[0]).convert('RGBA')).astype(np.float32) / 255.0
