@@ -237,6 +237,11 @@ class Cmo3:
         a, b = self.mesh_block(mesh)
         blk = self.xml[a:b]
         blk = re.sub(r'(<CDeformerGuid xs\.n="targetDeformerGuid" xs\.ref=")#\d+(")', lambda m: m.group(1) + w['guid'] + m.group(2), blk)
+        # PSD から取り込んだ直後のメッシュは、親が ROOT の直接定義（uuid と note="ROOT"）になっている
+        blk = re.sub(r'<CDeformerGuid xs\.n="targetDeformerGuid" uuid="[^"]*" note="ROOT" />',
+                     '<CDeformerGuid xs.n="targetDeformerGuid" xs.ref="%s" />' % w['guid'], blk)
+        if 'targetDeformerGuid" xs.ref="%s"' % w['guid'] not in blk:
+            raise ValueError('%s: targetDeformerGuid を %s にできなかった' % (mesh, warp_name))
         W = w['x1'] - w['x0']
         H = w['y1'] - w['y0']
 
@@ -252,6 +257,9 @@ class Cmo3:
         kf = blk[k:k2]
         kf = re.sub(r'(<float-array xs\.n="positions" count="\d+">)([^<]*)(</float-array>)', conv, kf)
         kf = re.sub(r'(<CoordType xs\.n="coordType" xs\.ref=")#\d+(")', lambda m: m.group(1) + w['coord'] + m.group(2), kf)
+        # 取り込み直後のメッシュは、キーフォームの座標系が直接定義（<CoordType xs.n="coordType"><s ...>Canvas</s></CoordType>）
+        kf = re.sub(r'<CoordType xs\.n="coordType">\s*<s xs\.n="coordName">Canvas</s>\s*</CoordType>',
+                    '<CoordType xs.n="coordType" xs.ref="%s" />' % w['coord'], kf)
         blk = blk[:k] + kf + blk[k2:]
         self.xml = self.xml[:a] + blk + self.xml[b:]
 

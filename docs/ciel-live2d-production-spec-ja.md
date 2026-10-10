@@ -717,4 +717,14 @@ Cubismの画面操作は、フォーカスが外れる、数値入力が反映�
 - 組み込み：`install-v5-parts.ps1` → `gimp/build_v5_psd.py` → Cubism で古いメッシュ 11 個（Hair_Back・Body_Base・Outer_L/R・Waist_Belt・Chest_Gem・Neck_Gear・Hair_Under_Ear・Face_Skin・Hair_Front・Face_Base）を削除し、PSD を新規アートメッシュとして追加 → `integrate-v5.py` → アトラス（古い画像の削除に「はい」、未配置を全部配置、自動レイアウト）→ 書き出し。
 - 犬耳の描画順は、頭頂の髪より上、横髪・前髪より下（620）。上に置くと、横を向いたとき耳が顔や横髪に重なった。
 - 結果（Unity、33 枚、UV はすべて範囲内）：正面は元画像とほぼ同じ見た目。左右・上下の全ての向きで、継ぎ目・下のレイヤーの剥き出しが見えない。下を向くと頭頂の髪が自然に見える。残る課題は引き継ぎ資料の 4 章。
-- 整理：v5 に置き換わった古い素材（`generated/v4`、`generated/parts/underlayers`、古い PSD）、古いレイヤーを作るスクリプト（`build-head-layers.py`・`build-body-layers.py`・`soften-body-top.py`・`trim-hair-under-ear.py` など）、古い依頼資料を削除した。`build-mouth-and-hair-layers.py` は口だけを作る `build-mouth-layers.py` にした。
+- 整理（12.41 の続き）：v5 に置き換わった古い素材（`generated/v4`、`generated/parts/underlayers`、古い PSD）、古いレイヤーを作るスクリプト（`build-head-layers.py`・`build-body-layers.py`・`soften-body-top.py`・`trim-hair-under-ear.py` など）、古い依頼資料を削除した。`build-mouth-and-hair-layers.py` は口だけを作る `build-mouth-layers.py` にした。
+
+### 12.42 上向きの顎と首、頬の赤み（2026-10-10）
+- 顎の線を別のレイヤーにした：`split-jaw-line.py` が Face_Skin の顎・頬の下側の輪郭線（y 1150〜1230 から下）を `Face_JawLine.png` に分け、Face_Skin の側は肌の色に塗る。`gimp/build_jawline_psd.py` → Cubism で「新規アートメッシュとして追加」→ `add-jaw-line-keys.py`（Head_Warp の子、描画順 205、角度Y の 5 キーで不透明度 −30〜0:1、15:0.35、30:0）。
+- 首の上側を明るくした：`lighten-neck.py`（Body_Base の首、y 1160〜1420 を上ほど明るい白磁へ）。
+- Head_Warp の格子を 16×16 → 24×24 に細かくした（`refine-head-warp.py` → `head3d-keys.py` で 25 キーを作り直す）。
+- 頬の赤み（Face_Blush）の不透明度を 0.7 にした。
+- `replace-image-same-size.py` は、v5 の画像（Cubism が保存した元の PNG より大きい）を差し替えられない。画像を変えたら、Cubism で PSD を「差し替え」で取り込む（ciel-v5.psd を作り直して「[ciel-v5.psd] を差し替え」）。
+- `cmo3_tool.move_mesh_into_warp` は、PSD から取り込んだ直後のメッシュ（親が ROOT の直接定義、座標系が直接定義）にも対応した。
+- Cubism は、2 台目のモニターが消えていると画面が黒くしか写らない。`move-cubism-to-primary.ps1` で主モニターへ移す。起動時の確認は `focus-cubism-dialog.ps1` で前に出す（PowerShell 5.1 用に BOM 付き UTF-8）。
+- 結果（Unity）：上を向くと、顎の線が消え、顎の下が明るい首へなめらかにつながる（お手本に近い）。顎の下端の小さな波は残る（頭の凹凸を顎の縁で消す試しは、効果がなかったので戻した）。下向きは、両目の位置の差が x0 で 10〜31px と小さく、見た目もお手本に近いので、今回は変えていない。

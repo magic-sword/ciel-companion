@@ -17,4 +17,8 @@ foreach ($n in $body) { Copy-Item (Join-Path $src "$n.png") (Join-Path $layers "
 $obsolete = 'head/Hair_Under_Ear.png', 'head/Face_Base.png'
 foreach ($o in $obsolete) { $p = Join-Path $layers $o; if (Test-Path $p) { Remove-Item $p } }
 Get-ChildItem $layers -Recurse -File | Where-Object { $_.Name -match '\.(orig|prechin|pre-a2|chin-k)\.png$' } | Remove-Item
+# v5 のパーツの後処理（顎の線を別レイヤーへ、首の上側を明るく）
+$py = 'C:\Users\prog\anaconda3\python.exe'
+& $py -I (Join-Path $PSScriptRoot 'split-jaw-line.py')
+& $py -I (Join-Path $PSScriptRoot 'lighten-neck.py')
 Write-Output 'V5_PARTS_INSTALLED'

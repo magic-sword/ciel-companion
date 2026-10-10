@@ -12,6 +12,7 @@ import re
 import struct
 import sys
 
+import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +23,10 @@ IMAGE = re.compile(r'<CModelImage [^>]*>\s*<CModelImageGuid xs.n="guid" xs.ref="
 
 
 def fit(im, size, allow_quantize=False):
+    # 完全に透明な画素の色を 0 にそろえる（見た目は同じ。圧縮が効き、Cubism が保存した元の PNG に収まりやすい）
+    arr = np.asarray(im.convert('RGBA')).copy()
+    arr[arr[..., 3] == 0] = 0
+    im = Image.fromarray(arr, 'RGBA')
     best = None
     for level in (9, 6, 3, 1):
         b = io.BytesIO()
@@ -30,6 +35,16 @@ def fit(im, size, allow_quantize=False):
         if len(data) <= size:
             return data + b'\x00' * (size - len(data))
         best = data
+    # 少しだけ届かないときは、色の最下位ビットを落として（見た目は変わらない）圧縮を効かせる
+    for bits in (1, 2):
+        arr2 = arr.copy()
+        arr2[..., :3] = (arr2[..., :3] >> bits) << bits
+        b = io.BytesIO()
+        Image.fromarray(arr2, 'RGBA').save(b, 'PNG', compress_level=9, optimize=True)
+        data = b.getvalue()
+        if len(data) <= size:
+            print('  posterized %d bit(s): %d <= %d' % (bits, len(data), size))
+            return data + b'\x00' * (size - len(data))
     if allow_quantize:
         # 色数を 256 に減らした PNG（キャッシュ用の縮小画像だけに使う）
         q = im.quantize(colors=256, method=Image.FASTOCTREE, dither=Image.NONE)
@@ -63,7 +78,16 @@ def main(src, dst, names):
         half = full.resize((full.width // 2, full.height // 2), Image.LANCZOS)
         pad = Image.new('RGBA', (ow, oh), (0, 0, 0, 0))
         pad.paste(half, (0, 0))
-        set_entry(c, cache, fit(pad, len(old_cache.data), allow_quantize=True))
+        try:
+            data = fit(pad, len(old_cache.data), allow_quantize=True)
+        except ValueError:
+            # キャッシュ（表示用の縮小画像）が収まらないときは、さらに半分に縮めて入れる（Cubism はアトラス編集の OK で作り直す）
+            small = half.resize((half.width // 2, half.height // 2), Image.LANCZOS)
+            pad = Image.new('RGBA', (ow, oh), (0, 0, 0, 0))
+            pad.paste(small.resize(half.size, Image.NEAREST), (0, 0))
+            data = fit(pad, len(old_cache.data), allow_quantize=True)
+            print('  cache: reduced detail for', name)
+        set_entry(c, cache, data)
         print('replaced', name, raw, cache)
     c.save(dst)
     print('IMAGES_REPLACED_SAME_SIZE')
