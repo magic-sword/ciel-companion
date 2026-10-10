@@ -708,3 +708,13 @@ Cubismの画面操作は、フォーカスが外れる、数値入力が反映�
 - 直し方：(1) `scripts/live2d/face-skin-from-a2.py`：Face_Skin の土台を A2 の顔（顎・頬の線つき）にし、元の Face_Skin（`Face_Skin.pre-a2.png`）の内側を重ねる。メッシュの範囲（720, 484, 1474, 1390）に切り詰める。(2) `bake-neck-from-a2.py`：A2 の顔の範囲（広げたもの）にある元絵を、Body_Base と Neck_Gear（元は `Neck_Gear.pre-a2.png`）から消す。(3) `head3d-keys.py`：y 1100〜1300 で、縁へなだらかに落ちる放物線の横断面（半径 1.6 倍、`JAW_SOFT`）へ移す。
 - 手順：`face-skin-from-a2.py`・`bake-neck-from-a2.py` → `head3d-keys.py` → `replace-image-same-size.py`（Face_Skin・Body_Base・Neck_Gear）→ Cubism でアトラス OK・書き出し。
 - 結果（Unity）：上向きで、顎の線が顔と一緒に動き、体側に線が残らない。顎の下端に、小さな波が少し残る。
+- （12.41 で、Face_Skin・Body_Base・Neck_Gear は v5 のパーツに置き換えた。`face-skin-from-a2.py`・`bake-neck-from-a2.py` は削除。`head3d-keys.py` の `JAW_SOFT` は残す。）
+
+### 12.41 髪・顔・体を v5 のパーツに作り直して組み込む（2026-10-10）
+- 理由：前髪と横髪が 1 枚、横髪の長い毛束は後ろ髪や体に焼き込み、顔の肌に前髪の毛先の線、頭頂の髪が無い、という粗い分け方で、編集では限界があった。
+- 方針：ピクセル単位の一致はやめ、継ぎ目を上のパーツの下に隠す分け方にし、下のパーツは隠れる側まで描く。Codex（`codex exec`、`scripts/codex/run-codex.ps1`）に生成させ、Claude Code が重ねた図で確認した。詳細は `docs/ciel-codex-brief-v5-hair-parts-ja.md`。
+- パーツ（18）：後ろ髪・頭頂の髪・横髪 L/R・前髪・アホ毛・顔の肌・頬の赤み・鼻・眉 L/R・体・毛皮の襟・腕の服 L/R・ベルト・宝石・首輪。目・口・犬耳は既存。頬は、元画像からなぞった輪郭に合わせ直した（正面で角張って見えたため）。
+- 組み込み：`install-v5-parts.ps1` → `gimp/build_v5_psd.py` → Cubism で古いメッシュ 11 個（Hair_Back・Body_Base・Outer_L/R・Waist_Belt・Chest_Gem・Neck_Gear・Hair_Under_Ear・Face_Skin・Hair_Front・Face_Base）を削除し、PSD を新規アートメッシュとして追加 → `integrate-v5.py` → アトラス（古い画像の削除に「はい」、未配置を全部配置、自動レイアウト）→ 書き出し。
+- 犬耳の描画順は、頭頂の髪より上、横髪・前髪より下（620）。上に置くと、横を向いたとき耳が顔や横髪に重なった。
+- 結果（Unity、33 枚、UV はすべて範囲内）：正面は元画像とほぼ同じ見た目。左右・上下の全ての向きで、継ぎ目・下のレイヤーの剥き出しが見えない。下を向くと頭頂の髪が自然に見える。残る課題は引き継ぎ資料の 4 章。
+- 整理：v5 に置き換わった古い素材（`generated/v4`、`generated/parts/underlayers`、古い PSD）、古いレイヤーを作るスクリプト（`build-head-layers.py`・`build-body-layers.py`・`soften-body-top.py`・`trim-hair-under-ear.py` など）、古い依頼資料を削除した。`build-mouth-and-hair-layers.py` は口だけを作る `build-mouth-layers.py` にした。

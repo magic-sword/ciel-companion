@@ -1,18 +1,16 @@
-"""口（閉じ・小・大）と後ろ髪のレイヤーを作る。
+"""口（閉じ・小・大）のレイヤーを作る。（後ろ髪は v5 のパーツ。install-v5-parts.ps1）
 
 入力  assets/ciel/requests/face-hair-crop-1536x1536_x318_y236.png  切り抜き（基準画像の x318・y236）
       assets/ciel/generated/parts/mouth-closed.png / mouth-small-open.png / mouth-large-open.png
           依頼G。切り抜きの口だけを描き直した部分編集（口以外の差は 0）
-      assets/ciel/generated/parts/rear-hair-layer-1536.png  後ろ髪だけの透明PNG（切り抜きと同じ大きさ・位置）
-出力  assets/ciel/layers/head/{Mouth_Closed,Mouth_Small,Mouth_Large,Hair_Back}.png（基準画像と同じキャンバス）
-      assets/ciel/layers/head/check-mouth-hair.png
-実行  python -I scripts/live2d/build-mouth-and-hair-layers.py   完了表示 MOUTH_HAIR_LAYERS_READY
+出力  assets/ciel/layers/head/{Mouth_Closed,Mouth_Small,Mouth_Large}.png（基準画像と同じキャンバス）
+      assets/ciel/layers/head/check-mouth.png
+実行  python -I scripts/live2d/build-mouth-and-hair-layers.py   完了表示 MOUTH_LAYERS_READY
 
 考え方
 - 口：G1〜G3 と切り抜きの差が出る範囲が口。差の範囲に少し余白を足し、G の画素をそのまま使う（口の周りの肌は
   切り抜きと同じなので、重ねても継ぎ目が出ない）。G1 は切り抜きと同一（口が閉じた笑顔）なので、閉じた口の線は
   切り抜きから切り出す。切り出す範囲は G2・G3 の口が開く範囲を含める。
-- 後ろ髪：透明PNGをそのまま、基準画像の座標へ置く。
 """
 import os
 
@@ -73,23 +71,13 @@ alpha = blur(box, 3)
 for key, img in samples.items():
     put(img, alpha, key + '.png')
 
-# 後ろ髪（透明PNG）
-rear = Image.open(os.path.join(ROOT, 'generated', 'parts', 'rear-hair-layer-1536.png')).convert('RGBA')
-assert rear.size == (W, W), rear.size
-layer = Image.new('RGBA', (MW, MH), (0, 0, 0, 0))
-layer.paste(rear, (X, Y))
-layer.save(os.path.join(out_dir, 'Hair_Back.png'))
-
-# 確認：口3種を、切り抜きの上に重ねた結果と、後ろ髪
+# 確認：口3種を、切り抜きの上に重ねた結果
 tiles = []
 for key, img in samples.items():
     comp = base * (1 - alpha[..., None]) + img * alpha[..., None]
     tiles.append(Image.fromarray(np.clip(comp, 0, 255).astype('uint8')).crop((520, 880, 1100, 1200)))
-rear_bg = Image.new('RGBA', rear.size, (70, 70, 100, 255))
-rear_bg.alpha_composite(rear)
-o = Image.new('RGB', (580 * 3, 320 + 400), (255, 255, 255))
+o = Image.new('RGB', (580 * 3, 320), (255, 255, 255))
 for i, t in enumerate(tiles):
     o.paste(t, (i * 580, 0))
-o.paste(rear_bg.convert('RGB').resize((400, 400)), (0, 320))
-o.save(os.path.join(out_dir, 'check-mouth-hair.png'))
-print('MOUTH_HAIR_LAYERS_READY')
+o.save(os.path.join(out_dir, 'check-mouth.png'))
+print('MOUTH_LAYERS_READY')
