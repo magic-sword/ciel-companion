@@ -3,8 +3,8 @@
 
 顎の裏は、顔の下（首より上・顔より下）にある面で、上を向いて顔が上へずれたとき、空いた所から見える。
 - 動かない体と同じく ROOT の直下のまま、約 50px の格子に分け、角度X×角度Y の 25 キーを付ける。
-- 位置：頭と同じ回転を、顎の裏の深さ（DEPTH）の面として計算する。横（角度X）は顔の下側と一緒に動き、
-  縦（角度Y）は動きを Y_RATE に抑える（顔が上へずれた分だけ、下に残って見えるように）。
+- 位置（グルーと同じ考え方）：上の縁（GLUE_TOP より上）は顔の顎と同じに動き、下の縁（GLUE_BOTTOM より下）は首に
+  残る。間は、なだらかに伸び縮みする。上を向くと顎が上がり、顎の裏が広がって見える。
 - 不透明度：角度Y が 0 以下で 0、上向き 15・30 で 1（正面・横向き・下向きで、顔の脇から見えないように）。
 - 描画順 DRAW_ORDER（首 10 より上、首輪 90 より下、顔 200 より下）。
 実行  python -I scripts/live2d/chin-under-keys.py 入力.cmo3 出力.cmo3   完了表示 CHIN_UNDER_KEYS_ADDED
@@ -33,22 +33,20 @@ MESH = 'Chin_Under'
 LAYER = os.path.join(HERE, '..', '..', 'assets', 'ciel', 'layers', 'head', MESH + '.png')
 CELL = 50.0
 MARGIN = 8
-DEPTH = 220.0        # 顎の裏の面の奥行き（顔の板 410 より奥）
-Y_RATE = 0.3         # 縦の動きの割合
+GLUE_TOP = 1340.0    # これより上の点は、顔の顎と同じに動く（顎の輪郭の高さ）
+GLUE_BOTTOM = 1530.0 # これより下の点は、首と同じ（動かない）
 OPACITY_Y = {-30.0: 0.0, -15.0: 0.0, 0.0: 0.0, 15.0: 1.0, 30.0: 1.0}
 DRAW_ORDER = 85
 KEYS = h3d.KEYS
 
 
 def moved(points, yaw_deg, pitch_deg):
-    p, q = math.radians(yaw_deg), math.radians(pitch_deg)
+    """上の縁は顔の顎（head3d-keys.py の顔の表面と同じ動き）に、下の縁は首（動かない）に付けて、間を伸び縮みさせる。"""
+    face = h3d.rotated(points, yaw_deg, pitch_deg)
     out = []
-    for x, y in points:
-        X, Y, Z = x - h3d.CX, y - h3d.PIVOT_Y, DEPTH
-        X1 = X * math.cos(p) + Z * math.sin(p)
-        Z1 = -X * math.sin(p) + Z * math.cos(p)
-        Y1 = Y * math.cos(q) - Z1 * math.sin(q)
-        out.append((x + (X1 - X), y + Y_RATE * (Y1 - Y)))
+    for (x, y), (fx, fy) in zip(points, face):
+        w = 1.0 - h3d.smoothstep((y - GLUE_TOP) / (GLUE_BOTTOM - GLUE_TOP))   # 上の縁で 1（顔）、下の縁で 0（首）
+        out.append((x + w * (fx - x), y + w * (fy - y)))
     return out
 
 

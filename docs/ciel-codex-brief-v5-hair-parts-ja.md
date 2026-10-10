@@ -86,7 +86,7 @@
 | 横髪L（画面右） | 頬まわり修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Hair_Side_L.png`。頬の毛束を局所的に内側・下側へ調整。±20px各9位置で隠れる頬の輪郭線の露出なし。報告：`v5/_work/cheek-fix/report-ja.md` |
 | 横髪R（画面左） | 頬まわり修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Hair_Side_R.png`。頬の毛先の高さと下側の内縁を調整。±20px各9位置で隠れる頬の輪郭線の露出なし。報告：`v5/_work/cheek-fix/report-ja.md` |
 | 後ろ髪 | 採用済み（今回変更なし／生成2回） | `v5/parts/Hair_Back.png`。自然な毛先・隠れる髪の描き足しを採用。前回報告：`v5/_work/back-body/report-ja.md` |
-| 体 | 顎裏の影は採用済み、濃さの微調整後・確認待ち（今回生成0回／既往体1回・首1回） | `v5/parts/Body_Base.png`。採用済みV字影だけ少し濃くした。透明度・左右輪郭保持、輪郭線の追加なし。報告：`v5/_work/closed-collar-fix/report-ja.md` |
+| 体 | 首全体の陰色へ修正済み・確認待ち（今回生成0回／既往体1回・首1回） | `v5/parts/Body_Base.png`。上向き30°の首から採色、上(226,215,225)→下(231,222,230)。V字影を除去し、肩側へ元の明色に戻す。透明度・左右外縁保持。報告：`v5/_work/chin-neck-match/report-ja.md` |
 | 目R（画面左） | 開き・半目は採用済み、閉じまつ毛修正後・確認待ち（今回生成0回／上限4回、既往1回） | `v5/parts/eyes/R_*.png` 10枚。閉じまつ毛を細くし、短い下まつ毛を補修。配置と開いた目の採取色を維持。旧layersではなくこの出力を使用。報告：`v5/_work/closed-collar-fix/report-ja.md` |
 | 目L（画面右） | 開き・半目は採用済み、閉じまつ毛修正後・確認待ち（今回生成0回／上限4回、既往1回） | `v5/parts/eyes/L_*.png` 10枚。閉じまつ毛を細くし、短い下まつ毛を補修。配置と開いた目の採取色を維持。旧layersではなくこの出力を使用。報告：`v5/_work/closed-collar-fix/report-ja.md` |
 | 首輪 | 後ろ側の輪を修正済み・確認待ち（今回生成0回） | `v5/parts/Neck_Gear.png`。首幅内の後ろの弧を除去し、外側だけ保持。前の帯・バックル・チャームは同一。顔を上120pxの図で首前への露出なし。報告：`v5/_work/closed-collar-fix/report-ja.md` |
@@ -95,7 +95,7 @@
 | 胸の宝石 | 採用済み（今回変更なし／生成0回） | `v5/parts/Chest_Gem.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | ベルト | 採用済み（今回変更なし／生成0回） | `v5/parts/Waist_Belt.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | 顔の肌 | 頬・顎修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Face_Skin.png`。下側をA2輪郭へ変更（y=1225幅554px、y=1250幅507px）。額・こめかみ保持。顎の線だけ残し横髪の下はフェード。首の重なり最小157px。報告：`v5/_work/cheek-fix/report-ja.md` |
-| 顎の裏 | 独立パーツ作成済み・確認待ち（今回生成1回／上限6回） | `v5/parts/Chin_Under.png`。首より上・顔より下。頬間の幅530px、顔輪郭より最小14px内側、顎先より344px上まで補完、首中央の重なり最小137px。正面露出なし。上60/120px確認図・口の既存肌片の注意：`v5/_work/chin-under/report-ja.md` |
+| 顎の裏 | 首と同色・伸縮用の形へ修正済み・確認待ち（今回生成0回／既往1回） | `v5/parts/Chin_Under.png`。上端は顎曲線の12px内側、左右は首との交点付近。首内へ151px補完・下端フェード。上端−60/−120px、下端y1520固定で確認。正面は首に同化し露出なし。確認図は体→顎裏→首輪→顔。報告：`v5/_work/chin-neck-match/report-ja.md` |
 | 毛皮の襟 | 作成済み・確認待ち（生成0回） | `v5/parts/Body_Fur.png`。採用済みの体から切り出し、下端の毛先を曲線で保持。腕の服より手前。体側の削りなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉L（画面右） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_L.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉R（画面左） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_R.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
