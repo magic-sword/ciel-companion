@@ -95,6 +95,7 @@
 | 胸の宝石 | 採用済み（今回変更なし／生成0回） | `v5/parts/Chest_Gem.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | ベルト | 採用済み（今回変更なし／生成0回） | `v5/parts/Waist_Belt.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | 顔の肌 | 頬・顎修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Face_Skin.png`。下側をA2輪郭へ変更（y=1225幅554px、y=1250幅507px）。額・こめかみ保持。顎の線だけ残し横髪の下はフェード。首の重なり最小157px。報告：`v5/_work/cheek-fix/report-ja.md` |
+| 顎の裏 | 独立パーツ作成済み・確認待ち（今回生成1回／上限6回） | `v5/parts/Chin_Under.png`。首より上・顔より下。頬間の幅530px、顔輪郭より最小14px内側、顎先より344px上まで補完、首中央の重なり最小137px。正面露出なし。上60/120px確認図・口の既存肌片の注意：`v5/_work/chin-under/report-ja.md` |
 | 毛皮の襟 | 作成済み・確認待ち（生成0回） | `v5/parts/Body_Fur.png`。採用済みの体から切り出し、下端の毛先を曲線で保持。腕の服より手前。体側の削りなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉L（画面右） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_L.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉R（画面左） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_R.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |

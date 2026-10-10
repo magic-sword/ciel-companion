@@ -23,7 +23,7 @@
 - `eyes/`：左右の目 4 層×（開き・半開き・閉じ）（`build-eye-layers.ps1`、`trim-half-eye-layers.py`）。
 
 ### 2.3 重なり順（下から。描画順の値は `integrate-v5.py`）
-後ろ髪 → 体 → 腕の服 → 毛皮の襟 → ベルト → 宝石 → 首輪 → 顔の肌 → 頬の赤み → 鼻 → 口 → 目 → 頭頂の髪 → 犬耳 → 横髪 → 前髪 → 眉 → アホ毛
+後ろ髪 → 体 → 腕の服 → 毛皮の襟 → ベルト → 宝石 → 顎の裏（上向きでだけ見える）→ 首輪 → 顔の肌 → 頬の赤み → 鼻 → 口 → 目 → 頭頂の髪 → 犬耳 → 横髪 → 前髪 → 眉 → アホ毛
 
 ## 3. 作業の流れ
 1. パーツ：`powershell -File scripts/live2d/install-v5-parts.ps1` → GIMP で `scripts/live2d/gimp/build_v5_psd.py`（`assets/ciel/psd/ciel-v5.psd`）。
