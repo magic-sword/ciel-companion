@@ -47,3 +47,7 @@
 *.cmo3.bak
 *.can3.bak
 __pycache__/
+
+# Codex の作業用・不採用（大きい。完成は v5/parts）
+/assets/ciel/generated/v5/_work/
+/assets/ciel/generated/v5/_rejected/
