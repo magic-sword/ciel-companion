@@ -95,7 +95,9 @@
 | 胸の宝石 | 採用済み（今回変更なし／生成0回） | `v5/parts/Chest_Gem.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | ベルト | 採用済み（今回変更なし／生成0回） | `v5/parts/Waist_Belt.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
 | 顔の肌 | 頬・顎修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Face_Skin.png`。下側をA2輪郭へ変更（y=1225幅554px、y=1250幅507px）。額・こめかみ保持。顎の線だけ残し横髪の下はフェード。首の重なり最小157px。報告：`v5/_work/cheek-fix/report-ja.md` |
-| 顎の裏 | 首と同色・伸縮用の形へ修正済み・確認待ち（今回生成0回／既往1回） | `v5/parts/Chin_Under.png`。上端は顎曲線の12px内側、左右は首との交点付近。首内へ151px補完・下端フェード。上端−60/−120px、下端y1520固定で確認。正面は首に同化し露出なし。確認図は体→顎裏→首輪→顔。報告：`v5/_work/chin-neck-match/report-ja.md` |
+| 顎の裏 | 首の広がりを修正・プレビュー確認待ち（塗り追加生成0回／今回全体1回・上限6回） | `v5/parts/Chin_Under.png`。参照4枚を渡した生成曲線に合わせ、首の両側を拡張・整形。頬とドームの塗りは保持（y<1285同一）。単独・正面のはみ出しを確認。報告：`v5/_work/chin-flare/report-ja.md` |
+| 顎裏の食い込み線 | 接続位置を修正・プレビュー確認待ち（線素材生成1回を首の線と共有） | `v5/parts/Chin_Under_Line.png`。首の線の上端と同じ位置・線幅でつながる左右2本。先端を細くし、塗りの背面へ配置。正面の露出なし。報告：`v5/_work/chin-flare/report-ja.md` |
+| 首の輪郭線 | 上へ広がる曲線へ修正・プレビュー確認待ち（線素材生成1回を食い込み線と共有） | `v5/parts/Neck_Line.png`。上向き・斜め上4枚を参照として生成。首輪寄り約208px→上部約398pxの幅へ広がる形。Body_Baseは変更なし。単独・正面のみ確認、頭の変形と連動した動作はユーザー側で確認。報告：`v5/_work/chin-flare/report-ja.md` |
 | 毛皮の襟 | 作成済み・確認待ち（生成0回） | `v5/parts/Body_Fur.png`。採用済みの体から切り出し、下端の毛先を曲線で保持。腕の服より手前。体側の削りなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉L（画面右） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_L.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |
 | 眉R（画面左） | 作成済み・確認待ち（生成0回） | `v5/parts/Brow_R.png`。薄い灰紫の弧。前髪より上。±20pxで下地の欠けなし。確認図・報告：`v5/_work/finishing/report-ja.md` |

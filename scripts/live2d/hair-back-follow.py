@@ -42,7 +42,7 @@ def moved(points, yaw_deg, pitch_deg):
         X, Y, Z = x - h3d.CX, y - h3d.PIVOT_Y, -BACK_Z
         X1 = X * math.cos(p) + Z * math.sin(p)
         Z1 = -X * math.sin(p) + Z * math.cos(p)
-        Y1 = Y * math.cos(q) - Z1 * math.sin(q)
+        Y1 = Y * math.cos(q) - Z1 * math.sin(q) - h3d.head_lift(pitch_deg)   # 頭と一緒に持ち上げる
         # 回したときの位置と、回さないときの位置（= 元の位置）の差を、高さに応じた強さで足す
         w = follow(y)
         out.append((x + w * (X1 - X), y + w * (Y1 - Y)))

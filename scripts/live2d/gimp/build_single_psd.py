@@ -9,13 +9,14 @@ from pathlib import Path
 from gi.repository import Gimp, Gio
 
 ROOT = Path(os.environ['CIEL_PROJECT_ROOT'])
-name = os.environ['CIEL_LAYER']
-src = next(p for p in (ROOT / 'assets/ciel/layers' / d / f'{name}.png' for d in ('head', 'body')) if p.exists())
-out = ROOT / 'assets/ciel/psd' / f'ciel-{name.lower()}.psd'
+names = os.environ['CIEL_LAYER'].split(',')     # カンマ区切りで複数（先頭が一番下。PSD の名前は先頭から）
+out = ROOT / 'assets/ciel/psd' / f'ciel-{names[0].lower()}.psd'
 doc = Gimp.Image.new(2172, 2896, Gimp.ImageBaseType.RGB)
-item = Gimp.file_load_layer(Gimp.RunMode.NONINTERACTIVE, doc, Gio.File.new_for_path(str(src)))
-item.set_name(name)
-doc.insert_layer(item, None, 0)
+for name in names:
+    src = next(p for p in (ROOT / 'assets/ciel/layers' / d / f'{name}.png' for d in ('head', 'body')) if p.exists())
+    item = Gimp.file_load_layer(Gimp.RunMode.NONINTERACTIVE, doc, Gio.File.new_for_path(str(src)))
+    item.set_name(name)
+    doc.insert_layer(item, None, 0)
 proc = Gimp.get_pdb().lookup_procedure('file-psd-export')
 config = proc.create_config()
 config.set_property('run-mode', Gimp.RunMode.NONINTERACTIVE)

@@ -140,6 +140,10 @@
 	"ParameterGroups": [],
 	"Parts": [
 		{
+			"Id": "Part9",
+			"Name": "ciel-chin_under.psd"
+		},
+		{
 			"Id": "Part8",
 			"Name": "ciel-chin_under.psd"
 		},

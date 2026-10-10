@@ -1,4 +1,4 @@
-﻿"""頭を立体（楕円体）として回し、Head_Warp の格子（X×Y の 25 キー）の位置を計算して設定する。
+"""頭を立体（楕円体）として回し、Head_Warp の格子（X×Y の 25 キー）の位置を計算して設定する。
 
 入力  Head_Warp が、角度X（5キー）と角度Y（5キー）の格子を持つ .cmo3（build-head3d-base.py のあと、Cubism で角度Yにキーを付け、
       mesh_ops.insert_second_key で ±15 のキーを足したもの）
@@ -58,6 +58,14 @@ CHEEK_H = 60.0       # ふっくらした頬の高さ
 MOUTH_Y = 1250.0
 MOUTH_RX, MOUTH_RY, MOUTH_H = 120.0, 70.0, 25.0
 EDGE_FADE = 90.0
+CHIN_FWD = 0.0       # 顎の先の突き出し（px）
+CHIN_FWD_Y, CHIN_FWD_SX, CHIN_FWD_SY = 1420.0, 140.0, 140.0
+JAW_RECEDE = 150.0     # エラ（顎の角）が奥へ下がる量（px）
+JAW_KEY_RECEDE = 550.0 # 上向き 30° だけで、エラを奥へ下げる量（px）
+JAW_KEY_Y0, JAW_KEY_Y1 = 1000.0, 1420.0
+JAW_KEY_P0 = 22.0   # この pitch（上向き 15° のキー）までは 0
+LIFT_POW = 5.0      # 持ち上げの、角度に対する曲がり（大きいほど、上向き 15° では少なく、30° で効く）
+LIFT_AT_30 = 70.0  # 上向き 30° で、頭全体を上へ持ち上げる量（px）
 # 目のある所は平らにする（目の中心、楕円の半径、この割合より内側は完全に平ら）
 EYES = [(891.0, 1046.0), (1316.0, 1033.0)]
 EYE_RX, EYE_RY = 200.0, 150.0
@@ -153,11 +161,34 @@ def depth_curved(x, y):
         z *= math.sqrt(max(0.0, 1.0 - ((TOP_Y - y) / TOP_R) ** 2))
     if y > CHIN_Y:
         z *= max(0.0, 1.0 - ((y - CHIN_Y) / NECK_FADE) ** 2)
+    # 顎の先は手前へ突き出し、エラ（顎の角）は奥へ下がる。上を向くと、手前の顎の先ほど大きく上がり、
+    # 顔の下の輪郭が V から凹（⌒）へ反転する（お手本の上向き 30°）。
+    if CHIN_FWD or JAW_RECEDE:
+        gy = math.exp(-((y - CHIN_FWD_Y) / CHIN_FWD_SY) ** 2)
+        z += CHIN_FWD * math.exp(-((x - CX) / CHIN_FWD_SX) ** 2) * gy
+        jaw2 = smoothstep((y - JAW_BLEND_Y0) / (JAW_BLEND_Y1 - JAW_BLEND_Y0))
+        z -= JAW_RECEDE * jaw2 * min(1.0, ax / PLATE_W) ** 2
     # 顔の凹凸は、板の内側だけ。縁（板の半幅）に近づくと 0 になる
     env = min(1.0, max(0.0, (w - ax) / EDGE_FADE))
     if env > 0.0 and y < CHIN_Y:
         z += relief(x, y) * env
     return z
+
+
+def head_lift(pitch_deg):
+    """上を向くほど、頭全体を上へ持ち上げる量（px）。お手本の上向き 30° では、目・顎が回転だけの場合より約 70px 上がる。"""
+    return LIFT_AT_30 * (max(0.0, pitch_deg) / 29.0) ** LIFT_POW
+
+
+def jaw_key_recede(x, y, pitch_deg):
+    """上向き 30° のキーだけで、エラを奥へ下げる量。お手本では、15° の顎はまだ V（下へ凸）で、30° で凹（⌒）へ反転する。
+    一つの立体の形では、この反転を 30° だけに起こせないので、輪郭用の形を、上向きの角度に応じて足す（キーごとの輪郭の変形）。"""
+    k = smoothstep((pitch_deg - JAW_KEY_P0) / (PITCH[30.0] - JAW_KEY_P0))
+    if k <= 0.0:
+        return 0.0
+    # 縦の範囲を広く取る（狭いと、下げる量の差で格子が上下に折り返し、頬の横の髪がちぎれる）
+    jaw = smoothstep((y - JAW_KEY_Y0) / (JAW_KEY_Y1 - JAW_KEY_Y0))
+    return JAW_KEY_RECEDE * k * jaw * min(1.0, abs(x - CX) / PLATE_W) ** 2
 
 
 def rotated(rest, yaw_deg, pitch_deg):
@@ -166,8 +197,9 @@ def rotated(rest, yaw_deg, pitch_deg):
     for x, y in rest:
         X, Y, Z = x - CX, y - PIVOT_Y, depth(x, y)
         X1 = X * math.cos(p) + Z * math.sin(p)
-        Z1 = -X * math.sin(p) + Z * math.cos(p)
-        Y1 = Y * math.cos(q) - Z1 * math.sin(q)
+        # 上向きのキーだけの輪郭の形は、縦の動きにだけ効かせる（横を向いたときに、頬の横の髪を横へ押し出さない）
+        Z1 = -X * math.sin(p) + (Z - jaw_key_recede(x, y, pitch_deg)) * math.cos(p)
+        Y1 = Y * math.cos(q) - Z1 * math.sin(q) - head_lift(pitch_deg)
         out.append((CX + X1, PIVOT_Y + Y1))
     return out
 

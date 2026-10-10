@@ -7,7 +7,8 @@
   残る。間は、なだらかに伸び縮みする。上を向くと顎が上がり、顎の裏が広がって見える。
 - 不透明度：角度Y が 0 以下で 0、上向き 15・30 で 1（正面・横向き・下向きで、顔の脇から見えないように）。
 - 描画順 DRAW_ORDER（首 10 より上、首輪 90 より下、顔 200 より下）。
-実行  python -I scripts/live2d/chin-under-keys.py 入力.cmo3 出力.cmo3   完了表示 CHIN_UNDER_KEYS_ADDED
+顎の裏の線（Chin_Under_Line）と首の線（Neck_Line）にも、同じ動きで使う（線が顎の裏と離れない）。
+実行  python -I scripts/live2d/chin-under-keys.py 入力.cmo3 出力.cmo3 [メッシュ名 ...]   完了表示 CHIN_UNDER_KEYS_ADDED（既定は Chin_Under）
 """
 import importlib.util
 import math
@@ -29,14 +30,13 @@ spec = importlib.util.spec_from_file_location('h3d', os.path.join(HERE, 'head3d-
 h3d = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(h3d)
 
-MESH = 'Chin_Under'
-LAYER = os.path.join(HERE, '..', '..', 'assets', 'ciel', 'layers', 'head', MESH + '.png')
+LAYERS = os.path.join(HERE, '..', '..', 'assets', 'ciel', 'layers', 'head')
 CELL = 50.0
 MARGIN = 8
 GLUE_TOP = 1340.0    # これより上の点は、顔の顎と同じに動く（顎の輪郭の高さ）
 GLUE_BOTTOM = 1530.0 # これより下の点は、首と同じ（動かない）
 OPACITY_Y = {-30.0: 0.0, -15.0: 0.0, 0.0: 0.0, 15.0: 1.0, 30.0: 1.0}
-DRAW_ORDER = 85
+DRAW_ORDER = {'Chin_Under': 85, 'Chin_Under_Line': 86, 'Neck_Line': 86}
 KEYS = h3d.KEYS
 
 
@@ -54,9 +54,8 @@ def param_ref(d, pid):
     return re.search(r'<CParameterGuid uuid="[^"]*" note="%s" xs\.id="(#\d+)"' % pid, d.xml).group(1)
 
 
-def main(src, dst):
-    d = t.Cmo3(src)
-    a = np.asarray(Image.open(LAYER).convert('RGBA'))[..., 3]
+def add_keys(d, MESH):
+    a = np.asarray(Image.open(os.path.join(LAYERS, MESH + '.png')).convert('RGBA'))[..., 3]
     ys, xs = np.nonzero(a > 4)
     bb = (xs.min() - MARGIN, ys.min() - MARGIN, xs.max() + 1 + MARGIN, ys.max() + 1 + MARGIN)
     m.remesh_quad(d, MESH, bb, max(2, int(round((bb[2] - bb[0]) / CELL))), max(2, int(round((bb[3] - bb[1]) / CELL))))
@@ -82,7 +81,7 @@ def main(src, dst):
             f = re.sub(r'<CFormGuid xs\.n="guid" xs\.ref="#\d+" />', '<CFormGuid xs.n="guid" xs.ref="%s" />' % form_ids[yi * len(KEYS) + xi][0], form)
             f = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)', lambda mm: mm.group(1) + str(2 * len(pts)) + mm.group(2) + txt + mm.group(3), f)
             f = re.sub(r'<f xs\.n="opacity">[^<]*</f>', '<f xs.n="opacity">%s</f>' % _fmt(OPACITY_Y[ky]), f)
-            f = re.sub(r'<i xs\.n="drawOrder">-?\d+</i>', '<i xs.n="drawOrder">%d</i>' % DRAW_ORDER, f)
+            f = re.sub(r'<i xs\.n="drawOrder">-?\d+</i>', '<i xs.n="drawOrder">%d</i>' % DRAW_ORDER[MESH], f)
             forms.append(f)
     kf_new = '<carray_list xs.n="keyforms" count="%d">' % n + nl + (nl + nl).join(forms) + nl + '</carray_list>'
 
@@ -120,9 +119,16 @@ def main(src, dst):
     defs = nl.join('<CFormGuid uuid="%s" note="Key [  ]" xs.id="%s" xs.idx="%d" />' % (uuid.uuid4(), fid, fidx) for fid, fidx in form_ids)
     d.xml = (d.xml[:anchor.end()] + nl + defs + nl + grid_xml + nl + binding(bx, bxi, param_ref(d, 'ParamAngleX')) + nl
              + binding(by, byi, param_ref(d, 'ParamAngleY')) + d.xml[anchor.end():])
+    print(MESH, 'bbox', bb, 'vertices', len(rest))
+
+
+def main(src, dst, meshes):
+    d = t.Cmo3(src)
+    for mesh in meshes or ['Chin_Under']:
+        add_keys(d, mesh)
     d.save(dst)
-    print('CHIN_UNDER_KEYS_ADDED', dst, 'bbox', bb, 'vertices', len(rest))
+    print('CHIN_UNDER_KEYS_ADDED', dst)
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3:])
