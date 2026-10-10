@@ -121,6 +121,79 @@ def remesh_quad(doc, mesh, bbox, nx, ny):
     doc.xml = doc.xml[:a] + blk + doc.xml[b:]
 
 
+def remesh_rect(doc, mesh, bbox, nx, ny):
+    """任意の形のメッシュ（全キーフォームの形が同じもの）を、画像座標の矩形 bbox の nx×ny の格子に作り直す。
+    UV は、元の point → uv の対応（アフィン）から求める。キーフォームの positions は、親がワープデフォーマなら
+    その正規化座標、そうでなければ画像座標で書く。不透明度・描画順などキーフォームの他の値は、そのまま。"""
+    import numpy as np
+    a, b = doc.mesh_block(mesh)
+    blk = doc.xml[a:b]
+    P = np.array(_arr(blk, 'point')).reshape(-1, 2)
+    k = blk.index('<carray_list xs.n="keyforms"')
+    k2 = blk.index('</carray_list>', k) + len('</carray_list>')
+    rest = blk[k2:]
+    UV = np.array(_arr(rest, 'uvs')).reshape(-1, 2)
+    coef, *_ = np.linalg.lstsq(np.c_[P, np.ones(len(P))], UV, rcond=None)
+    bx0, by0, bx1, by1 = bbox
+    xs = [bx0 + (bx1 - bx0) * i / nx for i in range(nx + 1)]
+    ys = [by0 + (by1 - by0) * j / ny for j in range(ny + 1)]
+    pts = [(x, y) for y in ys for x in xs]
+    n = len(pts)
+    newuv = np.c_[np.array(pts), np.ones(n)] @ coef
+    # 親がワープなら、正規化座標へ
+    tg = re.search(r'<CDeformerGuid xs\.n="targetDeformerGuid" xs\.ref="(#\d+)"', blk)
+    norm = None
+    if tg:
+        for wm in re.finditer(r'<CWarpDeformerSource xs\.id="#\d+"[^>]*>.*?<s xs\.n="localName">([^<]*)</s>', doc.xml, flags=re.S):
+            info = doc.warp_info(wm.group(1))
+            if info['guid'] == tg.group(1):
+                norm = info
+    def kpos(x, y):
+        if norm is None:
+            return x, y
+        return (x - norm['x0']) / (norm['x1'] - norm['x0']), (y - norm['y0']) / (norm['y1'] - norm['y0'])
+    kp = [kpos(x, y) for x, y in pts]
+
+    def txt(v):
+        return ' '.join(_fmt(float(q)) for q in v)
+    idx, edges, eprio = [], [], []
+    w = nx + 1
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            v = j * w + i
+            if i < nx:
+                edges.append((v, v + 1)); eprio.append(30 if j in (0, ny) else 10)
+            if j < ny:
+                edges.append((v, v + w)); eprio.append(30 if i in (0, nx) else 10)
+            if i < nx and j < ny:
+                edges.append((v, v + w + 1)); eprio.append(10)
+                idx += [v, v + 1, v + w + 1, v + w + 1, v + w, v]
+    head = blk[:k]
+    head = re.sub(r'<float-array xs\.n="point" count="\d+">[^<]*</float-array>',
+                  lambda m: '<float-array xs.n="point" count="%d">%s</float-array>' % (2 * n, txt([c for p in pts for c in p])), head)
+    head = re.sub(r'<byte-array xs\.n="pointPriority" count="\d+">[^<]*</byte-array>',
+                  lambda m: '<byte-array xs.n="pointPriority" count="%d">%s</byte-array>' % (n, ' '.join(['20'] * n)), head)
+    head = re.sub(r'<short-array xs\.n="edge" count="\d+">[^<]*</short-array>',
+                  lambda m: '<short-array xs.n="edge" count="%d">%s</short-array>' % (2 * len(edges), ' '.join('%d %d' % e for e in edges)), head)
+    head = re.sub(r'<byte-array xs\.n="edgePriority" count="\d+">[^<]*</byte-array>',
+                  lambda m: '<byte-array xs.n="edgePriority" count="%d">%s</byte-array>' % (len(edges), ' '.join(str(p) for p in eprio)), head)
+    head = re.sub(r'<int-array xs\.n="pointUid" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="pointUid" count="%d">%s</int-array>' % (n, ' '.join(str(i) for i in range(n))), head)
+    head = re.sub(r'nextPointUid="\d+"', 'nextPointUid="%d"' % n, head, count=1)
+    head = re.sub(r'<int-array xs\.n="indices" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="indices" count="%d">%s</int-array>' % (len(idx), ' '.join(str(i) for i in idx)), head)
+    kf = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                lambda m: m.group(1) + str(2 * n) + m.group(2) + txt([c for p in kp for c in p]) + m.group(3), blk[k:k2])
+    rest = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                  lambda m: m.group(1) + str(2 * n) + m.group(2) + txt([c for p in pts for c in p]) + m.group(3), rest, count=1)
+    rest = re.sub(r'(<float-array xs\.n="uvs" count=")\d+(">)[^<]*(</float-array>)',
+                  lambda m: m.group(1) + str(2 * n) + m.group(2) + txt(newuv.ravel()) + m.group(3), rest, count=1)
+    # indices がメッシュ直下（keyforms の後ろ）にある場合
+    rest = re.sub(r'<int-array xs\.n="indices" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="indices" count="%d">%s</int-array>' % (len(idx), ' '.join(str(i) for i in idx)), rest)
+    doc.xml = doc.xml[:a] + head + kf + rest + doc.xml[b:]
+
+
 def retarget_warp(doc, name, x0, x1, y0, y1, col, row):
     w = doc.warp_info(name)
     children = meshes_in_warp(doc, name)

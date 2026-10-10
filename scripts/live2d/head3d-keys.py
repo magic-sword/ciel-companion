@@ -58,6 +58,10 @@ CHEEK_H = 60.0       # ふっくらした頬の高さ
 MOUTH_Y = 1250.0
 MOUTH_RX, MOUTH_RY, MOUTH_H = 120.0, 70.0, 25.0
 EDGE_FADE = 90.0
+# 目のある所は平らにする（目の中心、楕円の半径、この割合より内側は完全に平ら）
+EYES = [(891.0, 1046.0), (1316.0, 1033.0)]
+EYE_RX, EYE_RY = 200.0, 150.0
+EYE_FLAT_CORE = 0.6
 KEYS = [-30.0, -15.0, 0.0, 15.0, 30.0]
 # 角度X（＋が画面の右を向く）→ yaw（度）。目の間隔の縮み（0.876・0.986・0.951・0.795）と、目の中心の動きから。
 YAW = {-30.0: -26.5, -15.0: -10.5, 0.0: 0.0, 15.0: 13.0, 30.0: 36.0}
@@ -111,6 +115,21 @@ def relief(x, y):
 
 
 def depth(x, y):
+    """顔の表面の深さ。目のある所は、目の中心の接平面へ寄せる（目が曲面に沿って曲がらず、平行移動と縮みだけになる）。"""
+    z = depth_curved(x, y)
+    for ex, ey in EYES:
+        d2 = ((x - ex) / EYE_RX) ** 2 + ((y - ey) / EYE_RY) ** 2
+        if d2 < 1.0:
+            z0 = depth_curved(ex, ey)
+            gx = (depth_curved(ex + 4.0, ey) - depth_curved(ex - 4.0, ey)) / 8.0
+            gy = (depth_curved(ex, ey + 4.0) - depth_curved(ex, ey - 4.0)) / 8.0
+            plane = z0 + gx * (x - ex) + gy * (y - ey)
+            k = 1.0 - smoothstep((math.sqrt(d2) - EYE_FLAT_CORE) / (1.0 - EYE_FLAT_CORE))
+            z = z + (plane - z) * k
+    return z
+
+
+def depth_curved(x, y):
     w = plate_half_width(y)
     ax = abs(x - CX)
     # 顔の横断面は、丸い（楕円）：中央（鼻筋）が手前で、左右へ向かって奥へ回る。逆さのホームベース形の輪郭は、

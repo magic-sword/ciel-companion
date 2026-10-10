@@ -86,8 +86,10 @@
 | 横髪L（画面右） | 頬まわり修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Hair_Side_L.png`。頬の毛束を局所的に内側・下側へ調整。±20px各9位置で隠れる頬の輪郭線の露出なし。報告：`v5/_work/cheek-fix/report-ja.md` |
 | 横髪R（画面左） | 頬まわり修正済み・確認待ち（今回生成0回／累計1回） | `v5/parts/Hair_Side_R.png`。頬の毛先の高さと下側の内縁を調整。±20px各9位置で隠れる頬の輪郭線の露出なし。報告：`v5/_work/cheek-fix/report-ja.md` |
 | 後ろ髪 | 採用済み（今回変更なし／生成2回） | `v5/parts/Hair_Back.png`。自然な毛先・隠れる髪の描き足しを採用。前回報告：`v5/_work/back-body/report-ja.md` |
-| 体 | 採用済み（今回変更なし／生成1回） | `v5/parts/Body_Base.png`。毛皮は保持。独立した `Body_Fur.png` を腕の服より上へ重ね、二重線なし。今回報告：`v5/_work/finishing/report-ja.md` |
-| 首輪 | 採用済み（今回変更なし／生成0回） | `v5/parts/Neck_Gear.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
+| 体 | 顎裏の影は採用済み、濃さの微調整後・確認待ち（今回生成0回／既往体1回・首1回） | `v5/parts/Body_Base.png`。採用済みV字影だけ少し濃くした。透明度・左右輪郭保持、輪郭線の追加なし。報告：`v5/_work/closed-collar-fix/report-ja.md` |
+| 目R（画面左） | 開き・半目は採用済み、閉じまつ毛修正後・確認待ち（今回生成0回／上限4回、既往1回） | `v5/parts/eyes/R_*.png` 10枚。閉じまつ毛を細くし、短い下まつ毛を補修。配置と開いた目の採取色を維持。旧layersではなくこの出力を使用。報告：`v5/_work/closed-collar-fix/report-ja.md` |
+| 目L（画面右） | 開き・半目は採用済み、閉じまつ毛修正後・確認待ち（今回生成0回／上限4回、既往1回） | `v5/parts/eyes/L_*.png` 10枚。閉じまつ毛を細くし、短い下まつ毛を補修。配置と開いた目の採取色を維持。旧layersではなくこの出力を使用。報告：`v5/_work/closed-collar-fix/report-ja.md` |
+| 首輪 | 後ろ側の輪を修正済み・確認待ち（今回生成0回） | `v5/parts/Neck_Gear.png`。首幅内の後ろの弧を除去し、外側だけ保持。前の帯・バックル・チャームは同一。顔を上120pxの図で首前への露出なし。報告：`v5/_work/closed-collar-fix/report-ja.md` |
 | 腕の服L（画面右） | 採用済み（今回変更なし／生成1回） | `v5/parts/Outer_L.png`。今回 `Body_Fur.png` を手前に重ね、肩口を覆う。報告：`v5/_work/finishing/report-ja.md` |
 | 腕の服R（画面左） | 採用済み（今回変更なし／生成1回） | `v5/parts/Outer_R.png`。今回 `Body_Fur.png` を手前に重ね、肩口を覆う。報告：`v5/_work/finishing/report-ja.md` |
 | 胸の宝石 | 採用済み（今回変更なし／生成0回） | `v5/parts/Chest_Gem.png`。今回の最終順で使用。前回報告：`v5/_work/gear-face/report-ja.md` |
