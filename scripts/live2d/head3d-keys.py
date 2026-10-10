@@ -39,6 +39,8 @@ CHEEK_BULGE = 0.0      # 頬の高さで、横断面を広げる量（px）。�
 CHEEK_BULGE_Y = 1150.0
 CHEEK_BULGE_SIG = 130.0
 PROFILE_K = 0.92     # 横断面の丸さ（大きいほど丸い。小さいほど平ら）
+JAW_BLEND_Y0, JAW_BLEND_Y1 = 1100.0, 1300.0   # この範囲で、顎の付近のなだらかな横断面へ移す
+JAW_SOFT = 1.6       # 顎の付近の横断面の半径（顔の半幅に対する倍率。大きいほど、縁がなだらか）
 EAR_BLEND_Y = 600.0
 EAR_Z = 290.0        # 耳は、板と同じ向きの平らなカード（回しても、細くつぶれない）
 EAR_W = 700.0
@@ -115,7 +117,14 @@ def depth(x, y):
     # その高さでの顔の半幅 w に比例した半径 w / PROFILE_K で表す（顎に向かって細くなる）。
     bump = CHEEK_BULGE * math.exp(-((y - CHEEK_BULGE_Y) / CHEEK_BULGE_SIG) ** 2)
     rf = (w + bump) / PROFILE_K
-    z = PLATE_Z * math.sqrt(max(0.0, 1.0 - (ax / rf) ** 2))
+    u = max(0.0, 1.0 - (ax / rf) ** 2)
+    z = PLATE_Z * math.sqrt(u)
+    # 顎の付近（顔が細くなる所）では、縁で深さが急に 0 へ落ちる（sqrt の傾きが無限大）と、格子のマス目ごとに折れて、
+    # 上を向いたとき顎の下端がジグザグになる。頬から顎へ、縁へなだらかに落ちる形（放物線、半径は JAW_SOFT 倍）へ移す。
+    jaw = smoothstep((y - JAW_BLEND_Y0) / (JAW_BLEND_Y1 - JAW_BLEND_Y0))
+    if jaw > 0.0:
+        z_soft = PLATE_Z * max(0.0, 1.0 - (ax / (rf * JAW_SOFT)) ** 2)
+        z = z + (z_soft - z) * jaw
     if y < EAR_Y and ax <= EAR_W:
         # 頭の上（耳・頭頂の髪）は、高さによらず、ほぼ同じ深さ EAR_Z に置く（耳が、斜めにゆがまない）。
         # 額に近づくにつれて、板の深さへつなぐ（EAR_BLEND_Y から EAR_Y まで）。

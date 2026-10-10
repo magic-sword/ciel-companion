@@ -25,7 +25,7 @@
 - `eyes/`：左右の目 4 層×（開き・半開き・閉じ）。
 
 ## 3. 作業の流れ
-1. レイヤー生成：`prepare-source.ps1` → `build-eye-layers.ps1`、`build-head-layers.py`、`build-ear-layers.py`、`build-body-layers.py`、`build-mouth-and-hair-layers.py`。耳：`clean-ear-layers.py`→`fill-ear-hull.py`→`trim-hair-under-ear.py`。体の縁：`soften-body-top.py`。首：`bake-neck-from-a2.py`。
+1. レイヤー生成：`prepare-source.ps1` → `build-eye-layers.ps1`、`build-head-layers.py`、`build-ear-layers.py`、`build-body-layers.py`、`build-mouth-and-hair-layers.py`。耳：`clean-ear-layers.py`→`fill-ear-hull.py`→`trim-hair-under-ear.py`。体の縁：`soften-body-top.py`。顔の土台：`face-skin-from-a2.py`。首と首輪：`bake-neck-from-a2.py`。
 2. モデル：`.cmo3` を `cmo3_tool.py`・`mesh_ops.py` で編集。画像の差し替えは `replace-image-same-size.py`、メッシュを書き出しから外すのは `hide-mesh.py`。試作は `.local/cmo3-test/`（Git 管理外）に別名で出す。
 3. 確認：Python の近似 `preview-pose.py`（数秒）→ Cubism でアトラス編集（Ctrl+T）→ OK →書き出し→ Unity の `CielRenderCheck`。
    - Python：`C:\Users\prog\anaconda3\python.exe -I`（bash の `python` は使えない）。
@@ -33,7 +33,7 @@
 4. Cubism の注意（仕様書 12.33・12.36・12.37・12.39）：**自動レイアウトは使わない**（頭が崩れる）。画像を差し替えたら、アトラス編集で、画像が 4096 の枠からはみ出していないか見る（はみ出すと Unity で別の絵が出る）。画面は java.exe が持つ。操作の前に `focus-window.ps1`。
 
 ## 4. 未完了のこと
-- 上向きで、顔の下端が波打って見える。
+- 上向きの顎は、仕様書 12.40 で改善（顎の線が顔と一緒に動く）。下端に小さな波が少し残る。
 - 左右 ±30° で、顔の側面が切れて見える（Face_Base を外したため、向きごとの頬の輪郭がない）。
 - 犬耳（サモエドの立ち耳）が、斜めの向きで頭から離れて見える。
 - 頬を覆う横髪（`cheek-hair-cover-L/R.png` の範囲）を、原画から切り出して別レイヤーにする。前髪の隙間を埋める頭頂の髪の下地。
