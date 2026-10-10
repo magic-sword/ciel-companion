@@ -117,6 +117,21 @@ namespace Ciel.EditorTools
         static void Begin()
         {
             ReimportModel();
+            // 取り込み直しの後処理（プレハブ・テクスチャの再生成）が終わるまで、更新ループを回してから置く。
+            // すぐに置くと、モデルが描かれず、背景だけの画像になることがあった。
+            int waited = 0;
+            EditorApplication.CallbackFunction wait = null;
+            wait = () =>
+            {
+                if (++waited < 120) return;
+                EditorApplication.update -= wait;
+                Place();
+            };
+            EditorApplication.update += wait;
+        }
+
+        static void Place()
+        {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             if (prefab == null)
             {
@@ -130,6 +145,18 @@ namespace Ciel.EditorTools
             _instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             _model = _instance.GetComponent<CubismModel>();
             Debug.Log("CielRenderCheck: drawables=" + _model.Drawables.Length + " parameters=" + _model.Parameters.Length);
+            // 各ドローアブルが参照するアトラスの範囲（UV の最小・最大）。どのメッシュに、どの絵が入っているかを確かめる
+            Directory.CreateDirectory(OutDir);
+            var sb = new System.Text.StringBuilder();
+            foreach (var d in _model.Drawables)
+            {
+                var uv = d.VertexUvs;
+                if (uv.Length == 0) continue;
+                float x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+                foreach (var u in uv) { x0 = Mathf.Min(x0, u.x); y0 = Mathf.Min(y0, u.y); x1 = Mathf.Max(x1, u.x); y1 = Mathf.Max(y1, u.y); }
+                sb.AppendLine(d.Id + " " + x0 + " " + x1 + " " + y0 + " " + y1);
+            }
+            File.WriteAllText(Path.Combine(OutDir, "uvrects.txt"), sb.ToString());
 
             var camGo = new GameObject("CielRenderCheckCamera");
             _cam = camGo.AddComponent<Camera>();
@@ -148,6 +175,16 @@ namespace Ciel.EditorTools
 
         static void Tick()
         {
+            // 同じインスタンスで撮り続けると、1枚目だけ描けて、残りが背景だけになることがあった（原因は未特定。
+            // 1枚目は常に描ける）。撮影ごとに、インスタンスを置き直す。
+            if (_ticks == 0 || _instance == null || _model == null)
+            {
+                if (_instance != null) Object.DestroyImmediate(_instance);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+                _instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                _model = _instance.GetComponent<CubismModel>();
+                _ticks = 0;
+            }
             var c = Cases[_caseIndex];
             Set("ParamAngleX", c.angleX);
             Set("ParamAngleY", c.angleY);
@@ -167,7 +204,7 @@ namespace Ciel.EditorTools
             var path = Path.Combine(OutDir, c.name + ".png");
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
-            Debug.Log("CielRenderCheck: wrote " + path);
+            Debug.Log("CielRenderCheck: wrote " + path + " " + Diagnose());
 
             _caseIndex++;
             _ticks = 0;
@@ -177,6 +214,23 @@ namespace Ciel.EditorTools
                 Debug.Log("CIEL_RENDER_CHECK_DONE");
                 Finish(0);
             }
+        }
+
+        // 描画が空になったときの手掛かり：頂点が NaN のドローアブル数、有効なレンダラー数、パラメータの NaN 数、メッシュの範囲
+        static string Diagnose()
+        {
+            int nanDrawables = 0, enabledRenderers = 0, nanParams = 0;
+            var bounds = new Bounds();
+            foreach (var d in _model.Drawables)
+            {
+                var v = d.VertexPositions;
+                if (v.Length > 0 && (float.IsNaN(v[0].x) || float.IsNaN(v[0].y))) nanDrawables++;
+                var r = d.GetComponent<Live2D.Cubism.Rendering.CubismRenderer>();
+                if (r != null && r.MeshRenderer != null && r.MeshRenderer.enabled) enabledRenderers++;
+                if (r != null && r.Mesh != null) bounds.Encapsulate(r.Mesh.bounds);
+            }
+            foreach (var p in _model.Parameters) if (float.IsNaN(p.Value)) nanParams++;
+            return "nanDrawables=" + nanDrawables + " renderers=" + enabledRenderers + " nanParams=" + nanParams + " bounds=" + bounds;
         }
 
         static void Finish(int code)
