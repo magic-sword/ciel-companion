@@ -1,0 +1,133 @@
+{
+  "canvas": [
+    2172,
+    2896
+  ],
+  "coordinates": "native 2172x2896; L/R are character perspective",
+  "transforms": {
+    "Body": {
+      "source": "assets/ciel/generated/v15/parts/body-01.png",
+      "uniform_scale": 1.1,
+      "translate": [
+        553,
+        1286
+      ],
+      "alpha_cut_above_y": 1420,
+      "hidden_undercoat_extension": {
+        "start_y": 2300,
+        "side_extension_px": 40,
+        "color_source": "18px inside the generated silhouette on the same row",
+        "neutral_mask": "Outer alpha >=250"
+      }
+    },
+    "Outer_R/Outer_L": {
+      "source": "assets/ciel/generated/v15/parts/outer-02.png",
+      "source_y": [
+        0,
+        130,
+        280,
+        430,
+        610,
+        1082
+      ],
+      "target_y": [
+        0,
+        90,
+        225,
+        400,
+        610,
+        1082
+      ],
+      "upper_fur_x_scale": "1+0.16*(1-clamp((source_y-130)/480,0,1))",
+      "x_pivots": [
+        160,
+        1294
+      ],
+      "full_canvas_scale": "2172/source_width",
+      "translate": [
+        0,
+        1280
+      ],
+      "split_canvas_x": 1086,
+      "reason": "二稿の肩露出が原画より大きかったため、袖を固定してファー上部の量感を戻す。"
+    },
+    "Hair_Back": {
+      "source": "assets/ciel/layers/v14c/Hair_Back.png",
+      "fixed_y_max": 1399,
+      "center_x": 1086,
+      "x_scale": "1 - 0.14*smoothstep(clamp((y-1400)/1000,0,1))",
+      "reason": "頭の外形を維持し、胴の左右だけを細くする。"
+    },
+    "Neck/Neck_Shadow_Chin": {
+      "source": "v14c corresponding layers",
+      "keep_y_below": 1470,
+      "reason": "旧服の上を覆う首の裾を除去。顎側の描き足しは既存y1194から維持。"
+    },
+    "Choker_Back/Choker_Inside": {
+      "source": "v14c corresponding layers",
+      "translate": [
+        0,
+        48
+      ]
+    },
+    "Choker_Front": {
+      "source": "assets/ciel/generated/v15/parts/choker-front-01.png",
+      "crop": "largest connected component bounding box with antialias fringe",
+      "target_bbox": [
+        931,
+        1377,
+        1303,
+        1545
+      ],
+      "anchors": "左右の前後帯の接点、中央x1117、金具下端1546"
+    },
+    "Choker_Buckle": {
+      "source": "assets/ciel/layers/v14c/Choker_Buckle.png",
+      "source_y": [
+        0,
+        1428,
+        1520,
+        2896
+      ],
+      "target_y": [
+        0,
+        1443,
+        1546,
+        2896
+      ]
+    },
+    "Choker_Pendant": {
+      "source": "assets/ciel/layers/v14c/Choker_Pendant.png",
+      "source_y": [
+        0,
+        1490,
+        1535,
+        1660,
+        2896
+      ],
+      "target_y": [
+        0,
+        1520,
+        1592,
+        1723,
+        2896
+      ],
+      "cleaning": "disconnected debris removed; silver buckle remnant at y1490..1500 replaced using y1506 tab colors"
+    }
+  },
+  "generated_source_sha256": {
+    "assets/ciel/generated/v15/parts/body-01.png": "7f1576a48a13813fbd24c56feefd016d9c10c81688a0dbfe68f634818a54a126",
+    "assets/ciel/generated/v15/parts/choker-front-01.png": "613181ac5d82b533c24e8b240e5e39ea000e91e2237657178e380c7a9813d3d8",
+    "assets/ciel/generated/v15/parts/outer-01.png": "05e6a7a5e30deeb7b7df8207343de6f6b50fadc9a32cd4ca700829a07b755306",
+    "assets/ciel/generated/v15/parts/outer-02.png": "e5c31254b1588e277fc25e97a447ef9e021eb0d5e1be4515655604bea36f2371"
+  },
+  "selected": [
+    "assets/ciel/generated/v15/parts/body-01.png",
+    "assets/ciel/generated/v15/parts/choker-front-01.png",
+    "assets/ciel/generated/v15/parts/outer-02.png"
+  ],
+  "rejected": [
+    "assets/ciel/generated/v15/parts/outer-01.png"
+  ],
+  "accepted_state": "composite visually inspected; translation checks in validation.json; not approved by user or rig-tested"
+}
