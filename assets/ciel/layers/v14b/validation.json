@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "generation_count": 3,
+  "generation_limit": 6,
+  "layer_count": 54,
+  "unchanged_v14_layers": 53,
+  "unchanged_source_files": 322,
+  "small_and_closed_composites_equal_v14": true,
+  "outside_large_patch_equal_v11": true,
+  "closed_line_fully_covered": true,
+  "private_gitignored": true,
+  "corner_height_difference_input_px": 0.0,
+  "corner_height_difference_canvas_px": 0.0,
+  "psd_export_run": false,
+  "symmetry_note": "Corner contour estimate, not a claim of bitwise mirror symmetry."
+}

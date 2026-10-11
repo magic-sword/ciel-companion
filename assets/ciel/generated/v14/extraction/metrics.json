@@ -1,0 +1,110 @@
+{
+  "small": {
+    "source": "small-03",
+    "roi_input_xyxy": [
+      555,
+      780,
+      730,
+      905
+    ],
+    "difference_threshold": 8,
+    "opaque_margin_input_px": 6,
+    "feather_input_px": 9,
+    "alpha_bbox_canvas": [
+      1045,
+      1217,
+      1172,
+      1286
+    ],
+    "outside_mouth_generated_difference_mae": 2.0706509974477223,
+    "outside_mouth_generated_changed_pixels": 1516693,
+    "inverse_space_opaque_core_mae": 0.00010932546190007652,
+    "inverse_space_opaque_core_max": 1,
+    "input_space_opaque_core_mae": 0.3630648330058939,
+    "changed_pixels_outside_patch": 0,
+    "landmarks": {
+      "pigment_bbox_input": [
+        609,
+        815,
+        683,
+        842
+      ],
+      "corner_midpoint_input": [
+        645.4444444444445,
+        823.6388888888889
+      ],
+      "corner_midpoint_canvas": [
+        1108.5922381711857,
+        1244.8591174906965
+      ],
+      "pigment_size_canvas": [
+        90.64114832535886,
+        33.07177033492823
+      ]
+    }
+  },
+  "large": {
+    "source": "large-04",
+    "roi_input_xyxy": [
+      555,
+      780,
+      730,
+      905
+    ],
+    "difference_threshold": 8,
+    "opaque_margin_input_px": 6,
+    "feather_input_px": 9,
+    "alpha_bbox_canvas": [
+      1032,
+      1203,
+      1177,
+      1322
+    ],
+    "outside_mouth_generated_difference_mae": 1.9809801237036813,
+    "outside_mouth_generated_changed_pixels": 1520353,
+    "inverse_space_opaque_core_mae": 0.00026673779674579886,
+    "inverse_space_opaque_core_max": 1,
+    "input_space_opaque_core_mae": 0.7019069147394656,
+    "changed_pixels_outside_patch": 0,
+    "landmarks": {
+      "pigment_bbox_input": [
+        599,
+        805,
+        686,
+        872
+      ],
+      "corner_midpoint_input": [
+        642.0847457627119,
+        816.0767419962335
+      ],
+      "corner_midpoint_canvas": [
+        1104.477009163896,
+        1235.596392110219
+      ],
+      "pigment_size_canvas": [
+        106.56459330143541,
+        82.06698564593302
+      ]
+    }
+  },
+  "closed_landmarks": {
+    "pigment_bbox_input": [
+      609,
+      824,
+      679,
+      831
+    ],
+    "corner_midpoint_input": [
+      643.6666666666667,
+      824.8166666666666
+    ],
+    "corner_midpoint_canvas": [
+      1106.4146730462521,
+      1246.3017543859648
+    ],
+    "pigment_size_canvas": [
+      85.74162679425838,
+      8.574162679425838
+    ]
+  }
+}

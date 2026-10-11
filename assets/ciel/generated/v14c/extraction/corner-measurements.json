@@ -1,0 +1,83 @@
+{
+  "v14": {
+    "left_input_xy": [
+      600.0,
+      805.0
+    ],
+    "right_input_xy": [
+      684.0,
+      812.0
+    ],
+    "height_difference_input_px": 7.0,
+    "left_canvas_xy": [
+      1052.9282296650717,
+      1222.0287081339711
+    ],
+    "right_canvas_xy": [
+      1155.818181818182,
+      1230.6028708133972
+    ],
+    "height_difference_canvas_px": 8.574162679425838,
+    "mouth_center_input_x": 642.0,
+    "pigment_bbox_input": [
+      599,
+      805,
+      686,
+      872
+    ]
+  },
+  "v14b": {
+    "left_input_xy": [
+      597.0,
+      805.0
+    ],
+    "right_input_xy": [
+      689.0,
+      805.0
+    ],
+    "height_difference_input_px": 0.0,
+    "left_canvas_xy": [
+      1049.2535885167463,
+      1222.0287081339711
+    ],
+    "right_canvas_xy": [
+      1161.9425837320573,
+      1222.0287081339711
+    ],
+    "height_difference_canvas_px": 0.0,
+    "mouth_center_input_x": 643.0,
+    "pigment_bbox_input": [
+      596,
+      802,
+      691,
+      863
+    ]
+  },
+  "v14c": {
+    "left_input_xy": [
+      597.0,
+      805.0
+    ],
+    "right_input_xy": [
+      689.0,
+      805.0
+    ],
+    "height_difference_input_px": 0.0,
+    "left_canvas_xy": [
+      1049.2535885167463,
+      1222.0287081339711
+    ],
+    "right_canvas_xy": [
+      1161.9425837320573,
+      1222.0287081339711
+    ],
+    "height_difference_canvas_px": 0.0,
+    "mouth_center_input_x": 643.0,
+    "pigment_bbox_input": [
+      596,
+      802,
+      691,
+      863
+    ]
+  }
+}

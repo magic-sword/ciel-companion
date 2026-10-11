@@ -1,0 +1,51 @@
+{
+  "source": "large-01",
+  "roi_input_xyxy": [
+    555,
+    780,
+    730,
+    905
+  ],
+  "difference_threshold": 8,
+  "opaque_margin_input_px": 6,
+  "feather_input_px": 9,
+  "alpha_bbox_canvas": [
+    1031,
+    1200,
+    1183,
+    1311
+  ],
+  "outside_mouth_generated_difference_mae": 1.8415079097396927,
+  "outside_mouth_generated_changed_pixels": 1458589,
+  "inverse_space_opaque_core_mae": 4.121332014507089e-05,
+  "inverse_space_opaque_core_max": 1,
+  "input_space_opaque_core_mae": 0.5083792842469456,
+  "corner_measurement": {
+    "left_input_xy": [
+      597.0,
+      805.0
+    ],
+    "right_input_xy": [
+      689.0,
+      805.0
+    ],
+    "height_difference_input_px": 0.0,
+    "left_canvas_xy": [
+      1049.2535885167463,
+      1222.0287081339711
+    ],
+    "right_canvas_xy": [
+      1161.9425837320573,
+      1222.0287081339711
+    ],
+    "height_difference_canvas_px": 0.0,
+    "mouth_center_input_x": 643.0,
+    "pigment_bbox_input": [
+      596,
+      802,
+      691,
+      863
+    ]
+  },
+  "geometry": "Only the inverse whole-face crop transform; no mouth reflection, warp, rotation, separate scaling or translation."
+}

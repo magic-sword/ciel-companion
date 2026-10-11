@@ -1,0 +1,17 @@
+{
+  "canvas": [
+    2172,
+    2896
+  ],
+  "crop_xyxy": [
+    318,
+    236,
+    1854,
+    1772
+  ],
+  "input_size": [
+    1254,
+    1254
+  ],
+  "inverse": "canvas_x = 318 + input_x * 1536 / 1254; canvas_y = 236 + input_y * 1536 / 1254"
+}
