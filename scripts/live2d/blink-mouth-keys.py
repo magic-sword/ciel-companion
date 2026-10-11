@@ -3,7 +3,7 @@
 
 前提：Cubism で、目の各メッシュに「左目 開閉」「右目 開閉」、口の差分（Mouth_Small・Mouth_Large）に「口 開閉」の
 キーの 3 点追加をしてある（キーの並びは値の小さい順）。
-目：0 は閉じ目（*_Closed）だけ、0.5 と 1 は開いた目の層だけ（0.5 の半目の形は、後で形のキーで作る）。
+目：0 は閉じ目（*_Closed）を表示。開いた目の層は不透明のまま、half-blink-keys.py の形のキーで線まで縮める（下まつげ・下まぶたは 0 で消す）。
 口：0 は閉じた口（差分なし）、0.5 は Mouth_Small、1 は Mouth_Large。
 実行  python -I scripts/live2d/blink-mouth-keys.py 入力.cmo3 出力.cmo3
 """
@@ -23,7 +23,9 @@ def main():
     for side in 'LR':
         doc.set_keyform_opacity('Eye_%s_Closed' % side, [1, 0, 0])
         for l in OPEN_LAYERS:
-            doc.set_keyform_opacity('Eye_%s_%s' % (side, l), [0, 1, 1])
+            # 上まぶた側と白目は、0 のキーで線まで縮める（half-blink-keys.py）ので、不透明のまま閉じていく。
+            # 下まつげ・下まぶたは縮めないので、閉じたら消す
+            doc.set_keyform_opacity('Eye_%s_%s' % (side, l), [0, 1, 1] if l in ('LashLower', 'LidSkin_Lower') else [1, 1, 1])
     doc.set_keyform_opacity('Mouth_Small', [0, 1, 0])
     doc.set_keyform_opacity('Mouth_Large', [0, 0, 1])
     doc.save(dst)
