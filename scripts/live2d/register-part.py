@@ -22,6 +22,7 @@ ROOT = os.path.join(HERE, '..', '..')
 BASE = os.path.join(ROOT, 'assets', 'ciel', 'master', 'ciel-upper-body-2x.png')
 CANVAS = (2172, 2896)
 TRUNC = 12.0          # 線どうしの距離の打ち切り（px）
+COLOR_W = 1.0         # 色の差の重み（線の距離は TRUNC で割って 0〜1 にしてある）
 
 
 def sobel(a, axis):
@@ -146,6 +147,11 @@ def main():
         k = np.random.default_rng(0).choice(len(px), 20000, replace=False)
         px, py = px[k], py[k]
     pts = np.stack([px, py], 1).astype(np.float64)
+    # 色の比較に使う点（不透明な所から間引き）と、その色（白背景に合成した RGB）
+    cy, cx = np.nonzero(alpha > 0.9)
+    k = np.random.default_rng(1).choice(len(cx), min(15000, len(cx)), replace=False)
+    cpts = np.stack([cx[k], cy[k]], 1).astype(np.float64)
+    ccol = part[cy[k], cx[k], :3]
 
     # 基準画像の、目安の箱を広げた範囲の線の距離マップ
     base = load(base_path)
@@ -159,20 +165,32 @@ def main():
     be = edge_map(luminance(reg), reg[..., 3])
     bthr = np.percentile(be, 88)
     dist = chamfer(be >= bthr, TRUNC)
+    regw = reg[..., :3] * reg[..., 3:4] + (1 - reg[..., 3:4])   # 白背景に合成
+    H, W = dist.shape
 
+    sw = bw / (pb[2] - pb[0])
+    sh = bh / (pb[3] - pb[1])
+    s0 = {'width': sw, 'height': sh}.get(fit, math.sqrt(sw * sh))
     def cost(p):
         s, th, tx, ty = p
+        if not (0.75 * s0 <= s <= 1.33 * s0) or abs(th) > math.radians(12):
+            return 10.0
         q = transform_points(pts, s, th, tx, ty, pc) - [rx0, ry0]
         qx = np.clip(q[:, 0], 0, dist.shape[1] - 1)
         qy = np.clip(q[:, 1], 0, dist.shape[0] - 1)
         outside = (q[:, 0] < 0) | (q[:, 1] < 0) | (q[:, 0] > dist.shape[1] - 1) | (q[:, 1] > dist.shape[0] - 1)
         d = bilinear(dist, qy, qx)
         d[outside] = TRUNC
-        return float(d.mean())
+        line = float(d.mean()) / TRUNC
+        q = transform_points(cpts, s, th, tx, ty, pc) - [rx0, ry0]
+        inside = (q[:, 0] >= 0) & (q[:, 1] >= 0) & (q[:, 0] < W - 1) & (q[:, 1] < H - 1)
+        diff = np.ones(len(q))
+        if inside.any():
+            qq = q[inside]
+            col = np.stack([bilinear(regw[..., c], qq[:, 1], qq[:, 0]) for c in range(3)], 1)
+            diff[inside] = np.minimum(np.abs(col - ccol[inside]).sum(1) / 0.6, 1.0)
+        return line + COLOR_W * float(diff.mean())
 
-    sw = bw / (pb[2] - pb[0])
-    sh = bh / (pb[3] - pb[1])
-    s0 = {'width': sw, 'height': sh}.get(fit, math.sqrt(sw * sh))
     c0 = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
     # 粗い探索 → 細かい最適化
     best = None
@@ -184,7 +202,11 @@ def main():
                     c = cost(p)
                     if best is None or c < best[0]:
                         best = (c, p)
-    (s, th, tx, ty), final = nelder_mead(cost, best[1], [0.02 * s0, 0.02, 4.0, 4.0])
+    if '--fixed' in args:
+        fs, fr, fx, fy = [float(v) for v in args[args.index('--fixed') + 1].split(',')]
+        s, th, tx, ty, final = fs, math.radians(fr), fx, fy, cost((fs, math.radians(fr), fx, fy))
+    else:
+      (s, th, tx, ty), final = nelder_mead(cost, best[1], [0.02 * s0, 0.02, 4.0, 4.0])
 
     # 置く：キャンバスの各画素 → パーツの画素（逆変換）で、双線形補間
     ct, st = math.cos(th), math.sin(th)
