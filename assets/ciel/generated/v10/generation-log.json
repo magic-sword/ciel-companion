@@ -1,0 +1,33 @@
+{
+  "limit": 40,
+  "attempted_calls": 2,
+  "successful_calls": 2,
+  "calls": [
+    {
+      "id": 1,
+      "original": "parts/Features_01.png",
+      "references": [
+        "assets/ciel/layers/v9/compose.png",
+        "assets/ciel/layers/v9/Hair_FrontAssembly.png"
+      ],
+      "purpose": "左右の丸い虹彩上端、閉じ目、会話用の小口・大口。見える通常虹彩はv9から保持。",
+      "prompt": "Create a production Live2D separated parts texture sheet for the exact silver-haired cyan-eyed anime dog-girl in reference. Transparent background. Do NOT draw a whole character. Arrange clearly separated with generous empty transparent gaps, NO labels/text: TOP LEFT a full round cyan iris with dark blue upper gradient, black vertical pupil, matching reference eyes, but NO white specular highlights; TOP RIGHT a second matching full round cyan iris. MIDDLE LEFT tiny gently open smiling anime mouth, dark muted mauve oral cavity, one subtle small white canine on upper edge and pink tongue along bottom, thin soft muted mauve lip outline; MIDDLE RIGHT same mouth opened wider for talking but still small and cute. BOTTOM LEFT isolated gently closed right eyelid eyelash curve, chocolate mauve thick tapered anime lashes, exact reference style; BOTTOM RIGHT matching opposite closed eyelid. All elements alone with no facial skin surrounding them. Retain delicate reference style. Output save if possible under D:/CIEL/apps/ciel-companion/assets/ciel/generated/v10/parts/Features_01.png.",
+      "sha256": "bb12dae720dd780e3c3c6525817daa061592d1133ef98d808416a6ad235e8e64",
+      "transparent_background": true,
+      "status": "adopted_in_part"
+    },
+    {
+      "id": 2,
+      "original": "parts/Hair_Underpaint_01.png",
+      "references": [
+        "assets/ciel/generated/v10/references/Hair_FrontAssembly.png"
+      ],
+      "purpose": "後ろ髪の丸い上端と、髪の分割境界の下塗り。原本外周のハローは採用せず内側の塗りだけ使用。",
+      "prompt": "Production Live2D hidden underpainting texture based on attached silver hair. One single broad smooth egg-shaped mass of white silver hair, rounded dome at top and rounded at bottom, tall oval aspect ratio 3:4. Entire interior filled with continuous opaque pale cool white/silver/lavender hair shading, very soft flowing vertical broad strand shading, NO dark internal outlines, NO parting line, NO fringe gaps, NO face opening, NO holes, NO wispy fringes. This is the hidden backing under separate hair locks and the round back of the head, NOT a hairstyle redesign. Same pure white and pale bluish lavender palette as attached. Subtle soft hair texture, no hard lines inside. Transparent outside oval, no shadow outside silhouette.",
+      "sha256": "c432ea5832ae794ca96c3171686882003c4209881246f602363cfc9d584d4148",
+      "transparent_background": true,
+      "status": "adopted_in_part"
+    }
+  ],
+  "notes": "生成ツールの自動キャッシュはツール管理。制作側の書き込みは指定の3つのv10ディレクトリ内。"
+}
