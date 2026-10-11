@@ -1,0 +1,31 @@
+{
+  "limit": 20,
+  "attempted_calls": 1,
+  "successful_calls": 1,
+  "calls": [
+    {
+      "id": 1,
+      "original": "parts/Expressions_01.png",
+      "prompt": "Production Live2D expression parts sheet, transparent RGBA background. Use supplied exact character/style references. Draw ONLY four isolated parts arranged as 2 rows x 2 columns, generous transparent gaps, no skin, no face, no hair, no labels. TOP ROW: pair of closed anime eyelash curves, viewer-left eyelid on left and viewer-right eyelid on right. Each curve should be broad, long, substantial, elegant, the full inner-to-outer corner width of the OPEN eye in reference 1. Shape like reference 2: gently sagging DOWNWARD arc (center lower than corners), thick dark navy-charcoal upper lash merged with lower lash, tapered inner corner, two or three small pointed outward lashes at OUTER corner, subtly upturned outer tip. NOT a happy upside-down U. Avoid long thin extra lines or eyebrow/crease. No lashes on inner corner. Dark cool navy-purple, matching existing upper eye line. BOTTOM LEFT: small-open mouth matching reference 4 with width:height about 3.4:1, muted warm mauve cavity, soft pink tongue bottom and TWO tiny white triangular canines attached to upper edge near both corners. BOTTOM RIGHT: large-open mouth matching reference 3 very closely, width:height 1.4:1, broad gently curved upper border, rounded U lower edge, muted rose-mauve interior and broad soft pink tongue along bottom, TWO small white triangular canines near both corners. Thin muted mauve outline, no lips, no skin halo, no separate lower-lip stroke. Keep colors and shapes coherent with supplied references. High resolution clean antialiasing. Save output if possible to D:/CIEL/apps/ciel-companion/assets/ciel/generated/v11/parts/Expressions_01.png",
+      "references": [
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v11/references/face-v10.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v11/references/approved-closed-eyes.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v11/references/approved-large-mouth.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v11/references/approved-small-mouth.png"
+      ],
+      "transparent_background": true,
+      "status": "adopted_after_final_composite_review",
+      "sha256": "aaac6699f99b6d3e5735c65a3a765943c87b4140b3dcc507d874329667cda81e",
+      "reviewed_proofs": [
+        "assets/ciel/layers/v11/proofs/expressions.png",
+        "assets/ciel/layers/v11/proofs/compare-closed-face.png",
+        "assets/ciel/layers/v11/proofs/eyes-width-height.png",
+        "assets/ciel/layers/v11/proofs/mouth-three-stages-reference.png",
+        "assets/ciel/layers/v11/proofs/mouth-parts.png",
+        "assets/ciel/generated/v11/candidates/02-mouth-separation.png"
+      ],
+      "review": "Full-width eyelids checked in assembled face; mouth size and two canines match supplied style. Initial nearest-colour cavity fill rejected; final smooth cavity and continuous separate outlines reviewed and adopted."
+    }
+  ],
+  "notes": "Tool-managed automatic cache copied into v11; no additional generation calls. User approval not yet received."
+}

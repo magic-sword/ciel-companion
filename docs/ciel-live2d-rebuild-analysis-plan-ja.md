@@ -141,7 +141,7 @@ Claude Code は、この経過で見た目の評価を 3 回甘く報告した�
 | 段階 | 担当 | 内容 | 区切り | 状態 |
 | --- | --- | --- | --- | --- |
 | 0〜2 | Codex | 基準の固定、配置での救済、顔まわりの組み上げ（前髪、頬に重なる横髪、胸へ垂れる髪、首の影、首輪と飾り） | **A 顔の印象** | 完了（v9、`assets/ciel/layers/v9/`）。2026-10-11 承認 |
-| 3 | Codex（Claude と構造を照合） | 動かすための層への分割（髪の束、目・口の内部、影、耳の根元、後ろ髪の上端の補い）。PSD への受け渡し | — | 完了（v10、`assets/ciel/layers/v10/`、62 層：通常 50・差分 12。層の説明は `layers.md`）。PSD は `scripts/live2d/v10/build_psd_with_state.py` で `assets/ciel/psd/ciel-v10.psd` に作成（Git 管理外、再生成できる） |
+| 3 | Codex（Claude と構造を照合） | 動かすための層への分割（髪の束、目・口の内部、影、耳の根元、後ろ髪の上端の補い）。PSD への受け渡し | — | 完了（v10、`assets/ciel/layers/v10/`、62 層：通常 50・差分 12。層の説明は `layers.md`）。続けて、ユーザーの指摘（閉じ目が小さい、顔の土台が左にずれて見える、開いた口が小さい）を v11 で修正（`assets/ciel/layers/v11/`）。PSD は `scripts/live2d/v11/build_psd_with_state.py` で `assets/ciel/psd/ciel-v11.psd` に作成（Git 管理外、再生成できる） |
 | 4 | Claude（Codex が素材修正） | 頭の小さな仮リグ（頭 XY、まばたき、口、横髪・耳の揺れ） | **B 動いた顔** | 作業中 |
 | 5 | 両方 | 残りの素材と本リグ（表情・物理・呼吸・体の傾き） | — | 未着手 |
 | 6 | Claude（Codex が見た目を点検） | Unity の会話画面、音声の口パク、表情の切り替え、性能 | **C 会話画面** | 未着手 |
@@ -164,7 +164,9 @@ Claude Code は、この経過で見た目の評価を 3 回甘く報告した�
 | `assets/ciel/generated/v9/` | v9 の生成原本・生成の記録・層の担当（`layer-contract.md`）・配置の試し |
 | `assets/ciel/layers/v9/` | 承認された v9 の層・配置の記録（`placement.json`）・確認図・報告 |
 | `scripts/live2d/v9/` | v9 を組み立てる Codex のスクリプト |
-| `assets/ciel/generated/v10/`・`assets/ciel/layers/v10/`・`scripts/live2d/v10/` | 段階 3 の生成原本、動かすための 62 層と層の説明・確認図、組み立てと PSD 作成のスクリプト |
+| `assets/ciel/generated/v10/`・`layers/v10/`・`scripts/live2d/v10/` | 段階 3 の生成原本、動かすための 62 層と層の説明・確認図、組み立てと PSD 作成のスクリプト |
+| `assets/ciel/generated/v11/`・`layers/v11/`・`scripts/live2d/v11/` | v10 の修正版（閉じ目・顔の土台の位置・開いた口）。**リグに使う最新の層** |
+| `assets/ciel/reference/mouth/` | 口の大きさの参考（以前作った口の 3 種） |
 | `assets/ciel/generated/pose-ref/` | 頭の向きの参考（AI の描き直し。形の正解ではなく、見た目の方向性の参考） |
 | `assets/ciel/rig/ciel-blink-test.cmo3`・`unity/Assets/Characters/Ciel/` | v5 の古いモデル。段階 4・5 の新しいモデルで置き換える |
 作業途中の候補・参照用の切り抜き・PSD は Git 管理しない（`.gitignore`）。
