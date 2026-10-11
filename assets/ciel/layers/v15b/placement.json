@@ -1,0 +1,140 @@
+{
+  "canvas": [
+    2172,
+    2896
+  ],
+  "coordinates": "native pixels; L/R are character perspective",
+  "sources_sha256": {
+    "assets/ciel/generated/v15b/parts/body-01.png": "1b0d3245c559c2ebc53ddb6d797d9bf27b889b175a4b16b27755608c1265d16f",
+    "assets/ciel/generated/v15b/parts/body-02.png": "aa5ce5b6c0c1c974ec76f443a9ab34026a6d23809cc97cf58c63167d41f546e7",
+    "assets/ciel/generated/v15b/parts/choker-01.png": "946e583e43c07404422c8d00c55391f72ac836c0f653428453e1269c4cf834c3",
+    "assets/ciel/generated/v15b/parts/fur-back-01.png": "fa4f214374c6fad3b9ac74ee3053855fddbe538e4aa32da1080b948f2c22962a"
+  },
+  "selected": [
+    "parts/body-02.png",
+    "parts/choker-01.png",
+    "parts/fur-back-01.png"
+  ],
+  "Body": {
+    "source_center_x": 526,
+    "target_center_x": 1117,
+    "source_y": [
+      0,
+      425,
+      578,
+      780,
+      1020,
+      1360,
+      1507
+    ],
+    "target_y": [
+      1256,
+      1724,
+      1892,
+      2200,
+      2450,
+      2790,
+      2937
+    ],
+    "base_x_scale": 1.1,
+    "scale_at_source_y": [
+      0,
+      400,
+      600,
+      780,
+      960,
+      1020,
+      1150,
+      1300,
+      1507
+    ],
+    "additional_x_scale": [
+      1,
+      1,
+      1,
+      1.05,
+      1.26,
+      1.26,
+      1.12,
+      1,
+      1
+    ],
+    "alpha_cut_above_y": 1440,
+    "color": "remove 80% of positive R-B; add 25% of that excess to B to neutralize warm skin tint",
+    "hidden_padding": "At y>=2480, use a 1.14x horizontally enlarged paint donor only under Outer alpha>=250; neutral visible pixels remain covered"
+  },
+  "Outer_L_R": {
+    "outward_offset_y": [
+      0,
+      1950,
+      2100,
+      2240,
+      2450,
+      2670,
+      2896
+    ],
+    "outward_offset_px": [
+      0,
+      0,
+      0,
+      20,
+      85,
+      45,
+      0
+    ],
+    "common_right_offset_y": [
+      0,
+      1950,
+      2450,
+      2670,
+      2896
+    ],
+    "common_right_offset_px": [
+      0,
+      0,
+      31,
+      31,
+      0
+    ],
+    "reason": "Open the waist and align the lower jacket opening with body center1117; upper fur remains fixed"
+  },
+  "Neck": {
+    "source": "v15/Neck.png",
+    "hidden_under_face_margin_px": 24,
+    "mask": "Face_Skin alpha>=250, preserve all exposed neck pixels"
+  },
+  "Fur_Back": {
+    "source": "parts/fur-back-01.png",
+    "crop": "main alpha component bbox",
+    "uniform_width": 1330,
+    "translate": [
+      452,
+      1370
+    ],
+    "z": 5,
+    "between": [
+      "Hair_Back",
+      "Body"
+    ]
+  },
+  "Choker": {
+    "source": "parts/choker-01.png",
+    "source_center_x": 745,
+    "target_center_x": 1117,
+    "origin_y": 1322,
+    "scale_xy": [
+      0.3,
+      0.34
+    ],
+    "pendant_scale_xy": [
+      0.34,
+      0.34
+    ],
+    "separation": "back arc and dark lining; front surface; rounded buckle; dark throat fabric; connector and round pendant",
+    "back_front_overlap_source_px": 60,
+    "hidden_connector_starts_source_y": 580,
+    "fabric_starts_source_y": 580,
+    "masks_and_fill": "Explicit source-space polygons and hidden fills in build.py; no additional output layers"
+  },
+  "status": "PNG composite inspected; +/-15px material tests in validation.json; not Cubism/Unity tested"
+}

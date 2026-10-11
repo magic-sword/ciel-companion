@@ -1,0 +1,816 @@
+{
+  "layer_count": 55,
+  "canvas": [
+    2172,
+    2896
+  ],
+  "new_layer": "Fur_Back",
+  "existing_order_z_visibility_clip_preserved": true,
+  "unchanged_layer_count": 45,
+  "protected_face_layer_count": 43,
+  "unchanged_sha256": {
+    "Hair_Back": "26cf42232da6fd1bfe8e9a0475ecf2b1e11dfe6945b6103a22a1856d9a5e7642",
+    "Neck_Shadow_Chin": "70182343d2ac71e2ffb6773cedff018f17c11d7edd4791b7ca33ff0474240698",
+    "Ear_R_Outer": "4a309a7fa3d0a3f2f9b1575caa83710f61d9218a50676e26991526fed7449750",
+    "Ear_R_Inner": "86d7c83bce8ea322ade529d5880f35e0fc585127830a4880733b01645c962b84",
+    "Ear_L_Outer": "4ce92fbac1f0bc81befbbcc2571bfb43bf2021fea17970385ac9f7f3fb2b3617",
+    "Ear_L_Inner": "c55c35972617ede0ca17742f92ff264f75cd06342db7873b52610cb90a2aff70",
+    "Face_Skin": "6b5714111cf02f53e88db951bd531271b8378099fa1c6d6563b8a70856eb1aff",
+    "Face_Shadow_Hair": "48945a072ef440886cbb8207a6594febe2b6db4d25761e3eb7c7b3e11138b98a",
+    "Nose": "facee34f791207c74eb73a2d20b6e9f0e84cbf106ed083dc84529c26cfbab85d",
+    "Mouth_Skin_Upper": "c5d60c368d1631b3273357d621b29b12ac9ea7149da0fe592f857e50ccffa073",
+    "Mouth_Skin_Lower": "04afe4a5ab404549efc9bc822c7755cc06f9a0149f52a10801d2d9fde6b47f55",
+    "Mouth_Line_Upper": "bdd3582451b241052a3a577780d9089177e19624e2591426d8dce50f303b8169",
+    "Mouth_Line_Lower": "9d433014ed707122334b3c33361022e6c16efde0c94e447b80cabda0f7edae03",
+    "Mouth_Small": "ad8da7b91733bae5666c53aac00d981bc32785b5a9dad4a247b6e567c832021d",
+    "Mouth_Large": "9ab4bdbf45b18314e7b4dc289b0b9aa75f958c3d48167bea17b0d3ac70dc634e",
+    "Eye_R_Sclera": "5eb5d3da49b6a9d7ea3032e7eb2f88547f5a9b73063739f66c2c31ad4ad8da41",
+    "Eye_R_Iris": "318ac720559c07a883bddbbd7028392fc4e285f19599ae947520b59d76e3ff9f",
+    "Eye_R_Highlight": "f957e8938c18af59f4f8fba4c3152e470dceb900551a70586e3efdb67648409e",
+    "Eye_R_LidSkin_Upper": "66029385430c90303915bdc085da9265f1c830140a7615f241f2f149258c8db9",
+    "Eye_R_LidSkin_Lower": "409ce45ad1b8e668bba44753cde597f2beaf0c9dae52cc42d2c836d8ce1dc9a9",
+    "Eye_R_LashUpper": "2fb3650855fdf16778ca72cf910737cf01cc1f5812ff6188408a032faea1ac4f",
+    "Eye_R_LashLower": "5605a82ae851f159852ad31250266bb3f5f248ab9d95aa7a63aae17baecf48fd",
+    "Eye_R_Crease": "ad79a996dac9364c9980d489de7496cfe79a7f6c9fd42ab6c9fc5d1cb376b9b1",
+    "Eye_R_Closed": "f7f695e5423218d7a3a7adf17dd2d50f3afec34e36ecd4261f1a3b5a271a3ee4",
+    "Eye_L_Sclera": "85116f5dfa2dc15a39b9604c6ea723dcbdade186c3d26c829a3051f295fba4b5",
+    "Eye_L_Iris": "0b986a38f2d9d425b624f21ca2740bfe0ef6526ce699b4f9283289c3ea6e598a",
+    "Eye_L_Highlight": "0e798f87f08bc7d6118ccdf6f239ab570ce936abb81dbbb7264845a67582f05c",
+    "Eye_L_LidSkin_Upper": "3f128e0289c4da5e485abbd7ed0b791637647b63aaa5e0a5a56d5b8850475714",
+    "Eye_L_LidSkin_Lower": "7f191037f084c32e265b7e54e64fc2b2c6fe6de1cd6085c29c9b755858cfdc4e",
+    "Eye_L_LashUpper": "9680170cff22670d03ff9516142bdaff43901f8b791d1475abb7754c6e3a9201",
+    "Eye_L_LashLower": "25a65de8f063eae858cd57b236d3a7dd58ba84d248976f9be07003ed68642a28",
+    "Eye_L_Crease": "3190f032980b3b77d664b9180fb464cac2d08381dcbbd72ae55f89662718ea43",
+    "Eye_L_Closed": "b9e6fb75ca80727a346d5da4f27c84b23dec38eeeda1dab0f1981804287cc9d7",
+    "Hair_Ahoge": "44df2c19c6418a5f859e76d8a6db19747cb9619d5aeae5017946b6740a1fec01",
+    "Ear_R_Base": "d1447b466920dfcae61dd64f3e3951b5e533a5599665766a9ff3e4072d52a657",
+    "Ear_L_Base": "cfb148e9b03bcf9ab1c38eb8b15573674f1705156428bf99063279096d378199",
+    "Hair_Side_R_LongFront": "e4c63d135ac8981e7228cdf9e9e11025b4506ecd2fcc1dec0190761109f5cddf",
+    "Hair_Side_L_LongFront": "6bbf07013087feda71a8549b1b7d10f9213d2b901d597a7773d7536943934f85",
+    "Hair_Side_R_Inner": "e2b20277d41ab953f7cda82b8bee7cd59ad872651f178dea9139a239bbde55a3",
+    "Hair_Side_L_Inner": "9428fafea51f8887f9189592327a987275410c6bc40c9324be0b3cab4e400b3b",
+    "Hair_Front_1": "97b50fca8e6792f0d27175636c66e6a56b1cf7de18ab3205a71cf652eaf255f6",
+    "Hair_Front_3": "3d887799358fce3a68900f672622f385db40614f0ce05588cd103200eca8c3ed",
+    "Hair_Front_2": "d231dbc2a79a72eac6c5ffad7ac552090837d907808295e76817093740af6c1f",
+    "Brow_R": "28ecafb69d967389ce9c7bb122afab8afee753846cfd253b8486618a461cbd95",
+    "Brow_L": "050f35656f662bbfaa6022f67eeccfaab0f265576c99ea362a1410da63fe1355"
+  },
+  "changed_sha256": {
+    "Body": "0130434408e055e45e022b6774c47e64f68424e4f75f2759e48e5805f911829e",
+    "Choker_Back": "9902a937fa21d995b713a9e6ca4ca2e14470bc1d3e94496209134124e5742fba",
+    "Choker_Inside": "eee3bfc7fde15b97932c47d0e9f2b939699739e0336d9d1d38e35713d51c819d",
+    "Neck": "bcadb284ef27cd299fde02709becc713262cd4eac1a036a6f43611abd61d5949",
+    "Outer_R": "95c4905b797296f168784ae0c3481a4a74bfd908ff5da06b225dc176b76d6ddf",
+    "Outer_L": "8002ad8ab73225f87482138d3aa6e015140c36299c200613115e8022a9d423ff",
+    "Choker_Pendant": "7ebcd6c24a62fe1a939783056ac3062c3b25bbdd7b1e49410e1a22ed2a1ed8dc",
+    "Choker_Front": "e78695cf6e2ec13927f19035e7a9535cc3bb0490e0a4d00e5cf4a7322672c8df",
+    "Choker_Buckle": "fb4891d79ecb0a5ad954c5741b2dfab520652d43747d7ef674bed3735586f235"
+  },
+  "prior_files_hash_checked": 98,
+  "generation_count": 4,
+  "generation_limit": 20,
+  "motion_case_count": 104,
+  "max_gap_pixels": 0,
+  "max_no_hair_gap_pixels": 5,
+  "motion_cases": [
+    {
+      "part": "Hair_Back",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Hair_Back",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Fur_Back",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Neck_Shadow_Chin",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_R",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Outer_L",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Back",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 5
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Inside",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Front",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Buckle",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Choker_Pendant",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": -15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": 0,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": 15,
+      "dy": -15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": -15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": 15,
+      "dy": 0,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": -15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": 0,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    },
+    {
+      "part": "Body_group",
+      "dx": 15,
+      "dy": 15,
+      "gap_pixels": 0,
+      "no_hair_gap_pixels": 0
+    }
+  ],
+  "fur_outer_overlap": {
+    "Outer_R": {
+      "neutral_overlap_pixels": 28584,
+      "minimum_in_81_relative_cases": 21082
+    },
+    "Outer_L": {
+      "neutral_overlap_pixels": 37417,
+      "minimum_in_81_relative_cases": 29452
+    }
+  },
+  "method": "Alpha >200, original interior farther than32px from outline, native +/-15px in8 directions; also without hair, ears and shadow-only support. Not a rig test."
+}

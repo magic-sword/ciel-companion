@@ -1,0 +1,48 @@
+{
+  "count": 4,
+  "limit": 20,
+  "tool": "image_gen.imagegen",
+  "date": "2026-10-12",
+  "attempts": [
+    {
+      "id": 1,
+      "output": "parts/body-01.png",
+      "references": [
+        "inputs/body-v15.png"
+      ],
+      "selected": false,
+      "prompt_summary": "黒い肩紐を取り除き、13歳程度の自然な胴に。白磁の肌・白い服・菱形・腰帯を維持し、肩と上腕を補う。",
+      "result": "紐は除けたが腰の細さが十分に減らなかった。"
+    },
+    {
+      "id": 2,
+      "output": "parts/choker-01.png",
+      "references": [
+        "../v15/inputs/choker-reference.png"
+      ],
+      "selected": true,
+      "prompt_summary": "元絵の首輪を一体で生成。前後の楕円の帯、銀縁の金具、黒い当て布、タブと丸飾り。肩へ伸びる紐なし。",
+      "result": "同一の透視と彩色を持つ首輪として採用。既存5層へ分離。"
+    },
+    {
+      "id": 3,
+      "output": "parts/fur-back-01.png",
+      "references": [
+        "inputs/fur-context-v15.png"
+      ],
+      "selected": true,
+      "prompt_summary": "首の後ろから左右の肩のファーへつながる、連続した横長の後ろ襟だけ。白と淡い青紫、透明背景。",
+      "result": "後ろ襟が一続きで、両端をOuterの下へ重ねられるため採用。"
+    },
+    {
+      "id": 4,
+      "output": "parts/body-02.png",
+      "references": [
+        "parts/body-01.png"
+      ],
+      "selected": true,
+      "prompt_summary": "腰の幅をさらに広げ、極端なくびれと胸の強調を減らす。トップス・腹部・腰帯・スカートを自然につなぐ。",
+      "result": "再生成だけでは胴幅の改善が小さかったため、合成時に胴下半分の幅と上着の開きを数値補正して採用。"
+    }
+  ]
+}
