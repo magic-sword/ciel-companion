@@ -4,12 +4,12 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 
 ## キャラクター（シエル）のLive2D制作
 
-制作の仕様と現在の進捗は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md)（第12節が現行の工程）にまとめています。新しく参加する人・新しいセッションは、まずこの第12節から読んでください。
+制作の仕様は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md)、**現在の方針・手順・進み具合は [作り直しの計画](docs/ciel-live2d-rebuild-analysis-plan-ja.md) の 6〜8 章**にまとめています。新しく参加する人・新しいセッションは、まずこの 6〜8 章から読んでください。
 
-- 外観の参考：[シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png)。控えめな鼻と、滑らかな白磁の肌を維持します。
-- 現在：高解像度の基準画像（2172×2896px）から目のレイヤーを作り、Cubism Editor 5.3.04で開眼・半目・閉眼の開閉キーを設定したところです（`assets/ciel/rig/ciel-blink-test.cmo3`）。次は体・髪・口のパーツ分けと、PRO版での書き出しです。Unityでの表示検証は未完了です。
-- 元画像・作業モデルはGitで管理し、再生成できる中間物は管理しません。素材は `scripts/live2d/` で再生成できます（手順は仕様書の第12.3節）。画像編集はGIMP 3.2.6を使います。
-- 過去の方式（280×195px素材など）は削除しました。Gitのタグ `archive/pre-v2-cleanup` で参照できます。
+- 外観の参考：[シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png)。控えめな鼻と、滑らかな白磁の肌を維持します。見た目の基準は承認済みの基準画像 `assets/ciel/master/ciel-upper-body-2x.png`（2172×2896px）です。
+- 現在：素材とリグを作り直しています（2026-10-11〜）。素材は Codex が生成から組み立て・調整まで担当し、顔まわり（`assets/ciel/layers/v9/`）がユーザーに承認されました。次は動かすための層への分割、続いて Claude Code が Cubism で頭の仮のリグを組みます。
+- 再生成できない素材（生成画像の原本、基準画像、採用した層と配置の記録）は Git で管理します。作業モデル（`.cmo3`）は Git LFS です。
+- 作り直す前の方式（素材 v2〜v5、外部の 3D 計算による頭の向き）は削除しました。Git のタグ `archive/pre-v9-cleanup` で参照できます。さらに古い方式（280×195px 素材など）は `archive/pre-v2-cleanup` です。
 
 ## Unity開発環境
 

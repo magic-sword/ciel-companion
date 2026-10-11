@@ -1,0 +1,1596 @@
+{
+  "schema": 1,
+  "canvas": [
+    2172,
+    2896
+  ],
+  "coordinates": "L/R はキャラクター視点。行列 [a,b,c,d,e,f]: x=a*u+b*v+c, y=d*u+e*v+f。基準点はキャンバス座標。",
+  "stage": "2: candidate 02 with cheek and front long hair; not adopted",
+  "layers": [
+    {
+      "name": "Hair_Back",
+      "source": "assets/ciel/generated/v8/parts/Hair_Back.png",
+      "sha256": "526928822d0eb4de5b09fef9eb8f498e7e9672c966afb4d89359b453b452e5c8",
+      "source_size": [
+        1086,
+        1448
+      ],
+      "frame": [
+        -87,
+        -101,
+        2259,
+        3027
+      ],
+      "matrix": [
+        2.160220994475138,
+        0,
+        -87,
+        0,
+        2.160220994475138,
+        -101
+      ],
+      "anchor_canvas": [
+        1086.0,
+        1463.0
+      ],
+      "z": 0,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。",
+      "canvas_rect": [
+        0,
+        365,
+        2172,
+        2896
+      ],
+      "mask_reason": "頭頂の重複を隠す仮切り分け。正面で前髪と耳の下へ入る。動作用の補完は段階3。"
+    },
+    {
+      "name": "Body",
+      "source": "assets/ciel/generated/v8/parts/Body.png",
+      "sha256": "27e0284b5acc2f4309569253c80171c1cf5c2e2ff92cf4eee8f33fc909b381d1",
+      "source_size": [
+        1448,
+        1086
+      ],
+      "frame": [
+        29,
+        1374,
+        2173,
+        2982
+      ],
+      "matrix": [
+        1.4806629834254144,
+        0,
+        29,
+        0,
+        1.4806629834254144,
+        1374
+      ],
+      "anchor_canvas": [
+        1101.0,
+        2178.0
+      ],
+      "z": 10,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Choker_Back",
+      "source": "assets/ciel/generated/v8/parts/Choker_Back-v2.png",
+      "sha256": "4d1fdcde106a5990fea828a31028db457468fd8cd603786e87f4cb795a1cb5ea",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        869,
+        1259,
+        1365,
+        1755
+      ],
+      "matrix": [
+        0.3876236044657097,
+        0.0,
+        873.96,
+        0.0,
+        0.3876236044657097,
+        1282.62
+      ],
+      "anchor_canvas": [
+        1117.0,
+        1507.0
+      ],
+      "z": 20,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [
+        {
+          "scale": 0.98,
+          "dx": 0,
+          "dy": 8,
+          "pivot": [
+            1117,
+            1440
+          ],
+          "angle_degrees": 0
+        },
+        {
+          "scale": 1,
+          "dx": 0,
+          "dy": 12,
+          "pivot": [
+            1117.0,
+            1507.0
+          ],
+          "angle_degrees": 0
+        }
+      ],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Neck",
+      "source": "assets/ciel/generated/v8/parts/Neck.png",
+      "sha256": "6432dfa12fa3513d7dc7ec12c4199083132348dcd80325eb146dc22f066c0acc",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        840,
+        1127,
+        1390,
+        1677
+      ],
+      "matrix": [
+        0.5175438596491228,
+        0,
+        790.14,
+        0,
+        0.43859649122807015,
+        1127
+      ],
+      "anchor_canvas": [
+        1115.0,
+        1402.0
+      ],
+      "z": 30,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。",
+      "nonuniform_reason": "首幅を18%だけ増やし、顎下と首輪内側の接続を確保。v8の白い立ち襟が首輪内へ露出する量を減らす。"
+    },
+    {
+      "name": "Outer_R",
+      "source": "assets/ciel/generated/v8/parts/Outer_R.png",
+      "sha256": "62ad3b318851e61b9fae15ee8df7da4bc1f3cdbce8ed4aca6af0ba50b70f1d86",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "frame": [
+        -103,
+        1232,
+        1088,
+        3019
+      ],
+      "matrix": [
+        1.1630859375,
+        0,
+        -103,
+        0,
+        1.1634114583333333,
+        1232
+      ],
+      "anchor_canvas": [
+        492.5,
+        2125.5
+      ],
+      "z": 40,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Outer_L",
+      "source": "assets/ciel/generated/v8/parts/Outer_L.png",
+      "sha256": "91c10cded3663f2389867a326a109429c72974ec295d5c01ab957825b8b1058c",
+      "source_size": [
+        1025,
+        1535
+      ],
+      "frame": [
+        1122,
+        1257,
+        2296,
+        3017
+      ],
+      "matrix": [
+        1.1453658536585365,
+        0,
+        1122,
+        0,
+        1.1465798045602607,
+        1257
+      ],
+      "anchor_canvas": [
+        1709.0,
+        2137.0
+      ],
+      "z": 50,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Choker",
+      "source": "assets/ciel/generated/v8/parts/Choker-v2.png",
+      "sha256": "1c0c9dcac0368dde55400383c4345e4f520de046dc581a8fb0b8865b6c9f6cdf",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        819,
+        1209,
+        1415,
+        1805
+      ],
+      "matrix": [
+        0.44200956937799046,
+        0.0,
+        839.86,
+        0.0,
+        0.44200956937799046,
+        1188.67
+      ],
+      "anchor_canvas": [
+        1117.0,
+        1507.0
+      ],
+      "z": 60,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [
+        {
+          "scale": 0.93,
+          "dx": 0,
+          "dy": -40,
+          "pivot": [
+            1117,
+            1490
+          ],
+          "angle_degrees": 0
+        }
+      ],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Face_Skin",
+      "source": "assets/ciel/generated/v8/parts/Face_Skin.png",
+      "sha256": "5eceded719143fc2875ced0c009590b66948cfa86f66bd5530a9f04eaf1f8917",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        551,
+        427,
+        1640,
+        1517
+      ],
+      "matrix": [
+        0.868421052631579,
+        0,
+        551,
+        0,
+        0.8692185007974481,
+        427
+      ],
+      "anchor_canvas": [
+        1095.5,
+        972.0
+      ],
+      "z": 70,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Nose",
+      "source": "assets/ciel/generated/v8/parts/Nose.png",
+      "sha256": "f188b64885a95a0e0f7255330bf22df6505ead6244df6cfc08e90a2d97370849",
+      "source_size": [
+        1086,
+        1448
+      ],
+      "frame": [
+        1046,
+        1076,
+        1154,
+        1220
+      ],
+      "matrix": [
+        0.09944751381215469,
+        0,
+        1046,
+        0,
+        0.09944751381215469,
+        1076
+      ],
+      "anchor_canvas": [
+        1100.0,
+        1148.0
+      ],
+      "z": 80,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Mouth",
+      "source": "assets/ciel/generated/v8/parts/Mouth.png",
+      "sha256": "e7582875a7bdd9c5ba3f0401629978955d99d8fbe683ed7371b4b5d0ec264816",
+      "source_size": [
+        2169,
+        725
+      ],
+      "frame": [
+        947,
+        1195,
+        1270,
+        1303
+      ],
+      "matrix": [
+        0.14891655140617796,
+        0,
+        947,
+        0,
+        0.1489655172413793,
+        1195
+      ],
+      "anchor_canvas": [
+        1108.5,
+        1249.0
+      ],
+      "z": 90,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Eye_R",
+      "source": "assets/ciel/generated/v8/parts/Eye_R.png",
+      "sha256": "6339e9f8be1a2e9d3d7d67c9041773be60eb9af1e7327d0589af25dd35bea8cc",
+      "source_size": [
+        1447,
+        1087
+      ],
+      "frame": [
+        656,
+        867,
+        1101,
+        1201
+      ],
+      "matrix": [
+        0.32290946786454733,
+        0.0,
+        642.3,
+        0.0,
+        0.32263109475620977,
+        857.85
+      ],
+      "anchor_canvas": [
+        878.5,
+        1034.0
+      ],
+      "z": 100,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [
+        {
+          "scale": 1.05,
+          "dx": 0,
+          "dy": 0,
+          "pivot": [
+            930,
+            1050
+          ],
+          "angle_degrees": 0
+        }
+      ],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Eye_L",
+      "source": "assets/ciel/generated/v8/parts/Eye_L.png",
+      "sha256": "89b780187e9f0d2ce2055120a7ed9b73e9350a4ed9b11fab45b2aab63a3b0c38",
+      "source_size": [
+        1448,
+        1086
+      ],
+      "frame": [
+        1111,
+        861,
+        1546,
+        1187
+      ],
+      "matrix": [
+        0.3154350828729282,
+        0.0,
+        1102.45,
+        0.0,
+        0.3151933701657459,
+        851.55
+      ],
+      "anchor_canvas": [
+        1328.5,
+        1024.0
+      ],
+      "z": 110,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [
+        {
+          "scale": 1.05,
+          "dx": 0,
+          "dy": 0,
+          "pivot": [
+            1282,
+            1050
+          ],
+          "angle_degrees": 0
+        }
+      ],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Ear_R",
+      "source": "assets/ciel/generated/v8/parts/Ear_R.png",
+      "sha256": "a24926bbf5e79d54b11a2602ccf8c372962adafee223eaea88db9b7504e23902",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "frame": [
+        411,
+        -109,
+        1059,
+        863
+      ],
+      "matrix": [
+        0.6328125,
+        0,
+        411,
+        0,
+        0.6328125,
+        -109
+      ],
+      "anchor_canvas": [
+        735.0,
+        377.0
+      ],
+      "z": 120,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Ear_L",
+      "source": "assets/ciel/generated/v8/parts/Ear_L.png",
+      "sha256": "5d2b4740682c125678ddf24d91bbe16679f1deef9e950f53666c6bc42dc89b92",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "frame": [
+        1135,
+        -86,
+        1778,
+        878
+      ],
+      "matrix": [
+        0.6279296875,
+        0,
+        1135,
+        0,
+        0.6276041666666666,
+        -86
+      ],
+      "anchor_canvas": [
+        1456.5,
+        396.0
+      ],
+      "z": 130,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Hair_Ahoge",
+      "source": "assets/ciel/generated/v8/parts/Hair_Ahoge.png",
+      "sha256": "9aca7a38020ca9c3faf56a16495d3714ef8f4349defbbc1e3a28bb62ce58ad5c",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        934,
+        -19,
+        1345,
+        393
+      ],
+      "matrix": [
+        0.3277511961722488,
+        0.0,
+        934.0,
+        0.0,
+        0.32854864433811803,
+        36.0
+      ],
+      "anchor_canvas": [
+        1139.5,
+        187.0
+      ],
+      "z": 140,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [
+        {
+          "scale": 1,
+          "dx": 0,
+          "dy": 55,
+          "pivot": [
+            1139.5,
+            187.0
+          ],
+          "angle_degrees": 0
+        }
+      ],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Hair_Side_R",
+      "source": "assets/ciel/generated/v8/parts/Hair_Side_R-v2.png",
+      "sha256": "5bab40dc6c813e9b7874aacdf70249f7437a0bdbfbd0d10da595197a8fd32bb0",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "frame": [
+        240,
+        420,
+        1000,
+        1560
+      ],
+      "matrix": [
+        0.7421875,
+        0,
+        240,
+        0,
+        0.7421875,
+        420
+      ],
+      "anchor_canvas": [
+        620.0,
+        990.0
+      ],
+      "z": 150,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。",
+      "enabled": false
+    },
+    {
+      "name": "Hair_Side_L",
+      "source": "assets/ciel/generated/v8/parts/Hair_Side_L-v2.png",
+      "sha256": "deadb5da96d8f14307c63987cd5b71e00b6c5869d38337ff3a5ee8ea2e8bdb25",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "frame": [
+        1180,
+        420,
+        1940,
+        1560
+      ],
+      "matrix": [
+        0.7421875,
+        0,
+        1180,
+        0,
+        0.7421875,
+        420
+      ],
+      "anchor_canvas": [
+        1560.0,
+        990.0
+      ],
+      "z": 160,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。",
+      "enabled": false
+    },
+    {
+      "name": "Hair_Front",
+      "source": "assets/ciel/generated/v8/parts/Hair_Front-v2.png",
+      "sha256": "10dac3568397b5cf3be5c5bf354472506e7f0e3cf225f92722be965c096e200a",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "frame": [
+        614,
+        216,
+        1588,
+        1189
+      ],
+      "matrix": [
+        0.7767145135566188,
+        0,
+        614,
+        0,
+        0.7759170653907496,
+        216
+      ],
+      "anchor_canvas": [
+        1101.0,
+        702.5
+      ],
+      "z": 170,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。",
+      "enabled": false
+    },
+    {
+      "name": "Brow_R",
+      "source": "assets/ciel/generated/v8/parts/Brow_R.png",
+      "sha256": "4c70609432c1b81f03856d94acd91db873fb74220d0fa8683f39731c3d7af330",
+      "source_size": [
+        2172,
+        724
+      ],
+      "frame": [
+        668,
+        745,
+        1115,
+        894
+      ],
+      "matrix": [
+        0.2058011049723757,
+        0,
+        668,
+        0,
+        0.2058011049723757,
+        745
+      ],
+      "anchor_canvas": [
+        891.5,
+        819.5
+      ],
+      "z": 200,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Brow_L",
+      "source": "assets/ciel/generated/v8/parts/Brow_L.png",
+      "sha256": "a95afec111dca816c8009b96b756d3d9c7c269d01525a8ca407fd37d9d36329f",
+      "source_size": [
+        2172,
+        724
+      ],
+      "frame": [
+        1063,
+        736,
+        1543,
+        895
+      ],
+      "matrix": [
+        0.22099447513812154,
+        0,
+        1063,
+        0,
+        0.21961325966850828,
+        736
+      ],
+      "anchor_canvas": [
+        1303.0,
+        815.5
+      ],
+      "z": 201,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "v8 inherited; v9 not yet reviewed",
+      "corrections": [],
+      "initial_fit_reason": "v8 枠変換を段階1の比較基準として明示的に継承。追加補正は原則等方倍率。"
+    },
+    {
+      "name": "Hair_Front_New",
+      "source": "assets/ciel/generated/v9/parts/Hair_Front-01.png",
+      "sha256": "78f703fafcb5ae188942a93b219a3234c5a7aef76eed9b16cf39124e6c6be1a4",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "matrix": [
+        0.82,
+        0,
+        578,
+        0,
+        0.82,
+        177
+      ],
+      "anchor_canvas": [
+        1095,
+        370
+      ],
+      "z": 180,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "candidate, awaiting composite inspection",
+      "corrections": [],
+      "placement_reason": "分け目(630,235)を(1095,370)付近、中央毛先を目の間へ。等方倍率。",
+      "remove_detached_alpha": true
+    },
+    {
+      "name": "Neck_Shadow_Chin",
+      "type": "shadow",
+      "clip_to": "Neck",
+      "color": [
+        178,
+        163,
+        189
+      ],
+      "opacity": 0.48,
+      "full_until_y": 1390,
+      "fade_end_y": 1550,
+      "z": 35,
+      "blend": "normal",
+      "status": "candidate",
+      "ownership": "顎の落ち影。首土台にクリップ。顔・首輪とは別層。"
+    },
+    {
+      "name": "Hair_Side_R_LongFront",
+      "source": "assets/ciel/generated/v9/parts/Hair_Side_R_LongFront-01.png",
+      "sha256": "aaa3e1dd2471ae3c34e5b692168c25a45415d27315dc7ad598ae2a343465615d",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "matrix": [
+        0.52,
+        0,
+        526,
+        0,
+        0.52,
+        1030
+      ],
+      "anchor_canvas": [
+        1095,
+        370
+      ],
+      "z": 170,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "candidate, awaiting composite inspection",
+      "corrections": [],
+      "placement_reason": "根元を頬髪の後ろへ入れ、主毛先を胸の宝石の横に置く。",
+      "source_bezier": [
+        [
+          384,
+          88
+        ],
+        [
+          [
+            434,
+            116
+          ],
+          [
+            494,
+            140
+          ],
+          [
+            512,
+            168
+          ]
+        ],
+        [
+          [
+            528,
+            191
+          ],
+          [
+            528,
+            232
+          ],
+          [
+            544,
+            281
+          ]
+        ],
+        [
+          [
+            612,
+            508
+          ],
+          [
+            744,
+            809
+          ],
+          [
+            651,
+            1005
+          ]
+        ],
+        [
+          [
+            650,
+            1115
+          ],
+          [
+            681,
+            1205
+          ],
+          [
+            745,
+            1243
+          ]
+        ],
+        [
+          [
+            700,
+            1221
+          ],
+          [
+            661,
+            1177
+          ],
+          [
+            638,
+            1131
+          ]
+        ],
+        [
+          [
+            655,
+            1268
+          ],
+          [
+            699,
+            1354
+          ],
+          [
+            789,
+            1397
+          ]
+        ],
+        [
+          [
+            653,
+            1370
+          ],
+          [
+            515,
+            1283
+          ],
+          [
+            495,
+            1113
+          ]
+        ],
+        [
+          [
+            497,
+            1198
+          ],
+          [
+            510,
+            1241
+          ],
+          [
+            535,
+            1274
+          ]
+        ],
+        [
+          [
+            435,
+            1218
+          ],
+          [
+            433,
+            1053
+          ],
+          [
+            445,
+            894
+          ]
+        ],
+        [
+          [
+            408,
+            963
+          ],
+          [
+            355,
+            1007
+          ],
+          [
+            301,
+            1017
+          ]
+        ],
+        [
+          [
+            388,
+            962
+          ],
+          [
+            432,
+            732
+          ],
+          [
+            438,
+            625
+          ]
+        ],
+        [
+          [
+            383,
+            589
+          ],
+          [
+            354,
+            518
+          ],
+          [
+            347,
+            419
+          ]
+        ],
+        [
+          [
+            333,
+            310
+          ],
+          [
+            362,
+            185
+          ],
+          [
+            384,
+            88
+          ]
+        ]
+      ],
+      "mask_reason": "生成原本の輪郭外にある広い白いハローを手動ベジェ輪郭で除外。色閾値による一律消去はしない。"
+    },
+    {
+      "name": "Hair_Side_R_Inner",
+      "source": "assets/ciel/generated/v9/parts/Hair_Side_R_Inner-01.png",
+      "sha256": "10f6ed694440d6aadee04899339a8003591631ba113151d0507422b77ca64285",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "matrix": [
+        0.5,
+        0,
+        515,
+        0,
+        0.5,
+        773
+      ],
+      "anchor_canvas": [
+        1095,
+        370
+      ],
+      "z": 171,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "candidate, awaiting composite inspection",
+      "corrections": [],
+      "placement_reason": "頬への2つの主要毛先を原画の高さへ。",
+      "source_bezier": [
+        [
+          540,
+          88
+        ],
+        [
+          [
+            376,
+            144
+          ],
+          [
+            249,
+            319
+          ],
+          [
+            238,
+            503
+          ]
+        ],
+        [
+          [
+            220,
+            730
+          ],
+          [
+            266,
+            990
+          ],
+          [
+            448,
+            1080
+          ]
+        ],
+        [
+          [
+            425,
+            1040
+          ],
+          [
+            415,
+            1010
+          ],
+          [
+            405,
+            983
+          ]
+        ],
+        [
+          [
+            466,
+            1047
+          ],
+          [
+            578,
+            1079
+          ],
+          [
+            647,
+            1053
+          ]
+        ],
+        [
+          [
+            602,
+            1032
+          ],
+          [
+            561,
+            988
+          ],
+          [
+            536,
+            941
+          ]
+        ],
+        [
+          [
+            582,
+            960
+          ],
+          [
+            644,
+            970
+          ],
+          [
+            689,
+            964
+          ]
+        ],
+        [
+          [
+            616,
+            942
+          ],
+          [
+            561,
+            868
+          ],
+          [
+            536,
+            777
+          ]
+        ],
+        [
+          [
+            595,
+            832
+          ],
+          [
+            690,
+            844
+          ],
+          [
+            748,
+            822
+          ]
+        ],
+        [
+          [
+            591,
+            849
+          ],
+          [
+            418,
+            439
+          ],
+          [
+            499,
+            180
+          ]
+        ],
+        [
+          [
+            510,
+            141
+          ],
+          [
+            527,
+            108
+          ],
+          [
+            540,
+            88
+          ]
+        ]
+      ],
+      "mask_reason": "生成原本の輪郭外にある広い白いハローを手動ベジェ輪郭で除外。色閾値による一律消去はしない。"
+    },
+    {
+      "name": "Hair_Side_L_LongFront",
+      "source": "assets/ciel/generated/v9/parts/Hair_Side_R_LongFront-01.png",
+      "sha256": "aaa3e1dd2471ae3c34e5b692168c25a45415d27315dc7ad598ae2a343465615d",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "matrix": [
+        -0.5198218089872898,
+        -0.01361201312009404,
+        1685.9875900874063,
+        -0.01361201312009404,
+        0.5198218089872898,
+        1028.2179281606418
+      ],
+      "anchor_canvas": [
+        1095,
+        370
+      ],
+      "z": 170,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "candidate, awaiting composite inspection",
+      "corrections": [
+        {
+          "scale": 1,
+          "dx": -5,
+          "dy": -8,
+          "pivot": [
+            1450,
+            1300
+          ],
+          "angle_degrees": 1.5
+        }
+      ],
+      "placement_reason": "根元を頬髪の後ろへ入れ、主毛先を胸の宝石の横に置く。",
+      "source_bezier": [
+        [
+          384,
+          88
+        ],
+        [
+          [
+            434,
+            116
+          ],
+          [
+            494,
+            140
+          ],
+          [
+            512,
+            168
+          ]
+        ],
+        [
+          [
+            528,
+            191
+          ],
+          [
+            528,
+            232
+          ],
+          [
+            544,
+            281
+          ]
+        ],
+        [
+          [
+            612,
+            508
+          ],
+          [
+            744,
+            809
+          ],
+          [
+            651,
+            1005
+          ]
+        ],
+        [
+          [
+            650,
+            1115
+          ],
+          [
+            681,
+            1205
+          ],
+          [
+            745,
+            1243
+          ]
+        ],
+        [
+          [
+            700,
+            1221
+          ],
+          [
+            661,
+            1177
+          ],
+          [
+            638,
+            1131
+          ]
+        ],
+        [
+          [
+            655,
+            1268
+          ],
+          [
+            699,
+            1354
+          ],
+          [
+            789,
+            1397
+          ]
+        ],
+        [
+          [
+            653,
+            1370
+          ],
+          [
+            515,
+            1283
+          ],
+          [
+            495,
+            1113
+          ]
+        ],
+        [
+          [
+            497,
+            1198
+          ],
+          [
+            510,
+            1241
+          ],
+          [
+            535,
+            1274
+          ]
+        ],
+        [
+          [
+            435,
+            1218
+          ],
+          [
+            433,
+            1053
+          ],
+          [
+            445,
+            894
+          ]
+        ],
+        [
+          [
+            408,
+            963
+          ],
+          [
+            355,
+            1007
+          ],
+          [
+            301,
+            1017
+          ]
+        ],
+        [
+          [
+            388,
+            962
+          ],
+          [
+            432,
+            732
+          ],
+          [
+            438,
+            625
+          ]
+        ],
+        [
+          [
+            383,
+            589
+          ],
+          [
+            354,
+            518
+          ],
+          [
+            347,
+            419
+          ]
+        ],
+        [
+          [
+            333,
+            310
+          ],
+          [
+            362,
+            185
+          ],
+          [
+            384,
+            88
+          ]
+        ]
+      ],
+      "mask_reason": "生成原本の輪郭外にある広い白いハローを手動ベジェ輪郭で除外。色閾値による一律消去はしない。",
+      "mirrored_from": "character R original, reflected around canvas x1105; left shape reviewed in composite"
+    },
+    {
+      "name": "Hair_Side_L_Inner",
+      "source": "assets/ciel/generated/v9/parts/Hair_Side_R_Inner-01.png",
+      "sha256": "10f6ed694440d6aadee04899339a8003591631ba113151d0507422b77ca64285",
+      "source_size": [
+        1024,
+        1536
+      ],
+      "matrix": [
+        -0.4996954135095479,
+        0.017449748351250485,
+        1691.4386171979606,
+        0.017449748351250485,
+        0.4996954135095479,
+        754.648822872643
+      ],
+      "anchor_canvas": [
+        1095,
+        370
+      ],
+      "z": 171,
+      "opacity": 1,
+      "blend": "normal",
+      "status": "candidate, awaiting composite inspection",
+      "corrections": [
+        {
+          "scale": 1,
+          "dx": 8,
+          "dy": -10,
+          "pivot": [
+            1450,
+            1100
+          ],
+          "angle_degrees": -2
+        }
+      ],
+      "placement_reason": "頬への2つの主要毛先を原画の高さへ。",
+      "source_bezier": [
+        [
+          540,
+          88
+        ],
+        [
+          [
+            376,
+            144
+          ],
+          [
+            249,
+            319
+          ],
+          [
+            238,
+            503
+          ]
+        ],
+        [
+          [
+            220,
+            730
+          ],
+          [
+            266,
+            990
+          ],
+          [
+            448,
+            1080
+          ]
+        ],
+        [
+          [
+            425,
+            1040
+          ],
+          [
+            415,
+            1010
+          ],
+          [
+            405,
+            983
+          ]
+        ],
+        [
+          [
+            466,
+            1047
+          ],
+          [
+            578,
+            1079
+          ],
+          [
+            647,
+            1053
+          ]
+        ],
+        [
+          [
+            602,
+            1032
+          ],
+          [
+            561,
+            988
+          ],
+          [
+            536,
+            941
+          ]
+        ],
+        [
+          [
+            582,
+            960
+          ],
+          [
+            644,
+            970
+          ],
+          [
+            689,
+            964
+          ]
+        ],
+        [
+          [
+            616,
+            942
+          ],
+          [
+            561,
+            868
+          ],
+          [
+            536,
+            777
+          ]
+        ],
+        [
+          [
+            595,
+            832
+          ],
+          [
+            690,
+            844
+          ],
+          [
+            748,
+            822
+          ]
+        ],
+        [
+          [
+            591,
+            849
+          ],
+          [
+            418,
+            439
+          ],
+          [
+            499,
+            180
+          ]
+        ],
+        [
+          [
+            510,
+            141
+          ],
+          [
+            527,
+            108
+          ],
+          [
+            540,
+            88
+          ]
+        ]
+      ],
+      "mask_reason": "生成原本の輪郭外にある広い白いハローを手動ベジェ輪郭で除外。色閾値による一律消去はしない。",
+      "mirrored_from": "character R original, reflected around canvas x1105; left shape reviewed in composite"
+    }
+  ]
+}

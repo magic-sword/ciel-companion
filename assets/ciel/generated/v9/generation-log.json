@@ -1,0 +1,40 @@
+{
+  "limit": 30,
+  "attempted_calls": 4,
+  "successful_calls": 4,
+  "calls": [
+    {
+      "id": 1,
+      "prompt": "prompts/01-Hair_Front.json",
+      "original": "parts/Hair_Front-01.png",
+      "sha256": "78f703fafcb5ae188942a93b219a3234c5a7aef76eed9b16cf39124e6c6be1a4",
+      "status": "rejected",
+      "reason": "中央束の長さは戻ったが、外側の巻き込みと別の頬髪が重なり過多。候補01/02で合成して不採用。"
+    },
+    {
+      "id": 2,
+      "prompt": "prompts/02-Hair_Side_R_Inner.json",
+      "original": "parts/Hair_Side_R_Inner-01.png",
+      "sha256": "10f6ed694440d6aadee04899339a8003591631ba113151d0507422b77ca64285",
+      "status": "rejected",
+      "reason": "原本に広いハロー。手動輪郭マスク後も全体では毛先が多く、候補02/03で不採用。左側はこの原本を反転して試したが最終稿には使用していない。"
+    },
+    {
+      "id": 3,
+      "prompt": "prompts/03-Hair_Side_R_LongFront.json",
+      "original": "parts/Hair_Side_R_LongFront-01.png",
+      "sha256": "aaa3e1dd2471ae3c34e5b692168c25a45415d27315dc7ad598ae2a343465615d",
+      "status": "rejected",
+      "reason": "細い長束。幅補正も試したが頬から胸のまとまりで一続きの候補04に劣る。左反転を含め最終稿に不使用。"
+    },
+    {
+      "id": 4,
+      "prompt": "prompts/04-Hair_FrontAssembly.json",
+      "original": "parts/Hair_FrontAssembly-01.png",
+      "sha256": "d7fda50b048684da24caee1f5d1fdc7bb97d73106200b09bf0655306987088fe",
+      "status": "adopted_for_review_A",
+      "reason": "前髪・頬・胸の髪の一続きの形を候補04で合成確認。候補05で縁・影、候補06で両目と間隔を確認して採用。動作用の分割は段階3。"
+    }
+  ],
+  "notes": "画像生成ツールは管理する自動キャッシュにも原本を保存する。制作側の原本コピー・作業物・採用品・スクリプトはユーザー指定の3つのv9ディレクトリ内。"
+}

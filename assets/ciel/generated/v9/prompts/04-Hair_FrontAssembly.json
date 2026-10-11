@@ -1,0 +1,14 @@
+{
+  "id": 4,
+  "prompt": "Edit reference 1: isolate ONLY Ciel's FRONT HAIR as one connected hair asset, keeping the approved drawing's shape closely. This includes the smooth crown/front bangs (long center tip between eyes), the cheek-hugging inner curtains with two gentle inward cheek tips, and the two smooth long locks descending in front of chest. Keep original simple flowing large locks, relative length, width, gentle curvature and low-contrast silver-white cel shading. Remove the face, eyes, eyebrows, nose, mouth, all skin, ears, ahoge, clothing, jewelry, fur AND the outward spiky BACK HAIR. Reconstruct modest hidden parts of the front hair only. Output the cohesive FRONT HAIR cap plus its two cheek-to-chest curtains on true transparent background. This is a layer for the original character, do not redesign or make it spikier. Do not paint brows onto hair. The openings where the eyes/face/neck were must be fully transparent, leaving the original long bangs dropping between the eyes and hair curling over the cheeks. The central bang is NOT shortened to eyebrow height. Original head parting and chest-length front-lock tips set scale; retain framing of reference 1 (1536x1536). Reference2 provides original full character context. Reference3 is current assembled head for contacts only, its narrow/spiky added side locks are NOT the design target; match reference1's broad rounded cheek curves and simple smooth hanging locks. Clean alpha edges with opaque paint inside the hair; no glow or outside haze. No human ears. Isolated production hair layer, no background or text.",
+  "refs": [
+    "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v9/references/master-head.png",
+    "D:/CIEL/apps/ciel-companion/assets/ciel/master/ciel-upper-body-2x.png",
+    "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v9/references/current-head-03.png"
+  ],
+  "status": "adopted_for_review_A",
+  "reason": "前髪・頬・胸の髪の一続きの形を候補04で合成確認。候補05で縁・影、候補06で両目と間隔を確認して採用。動作用の分割は段階3。",
+  "result": "parts/Hair_FrontAssembly-01.png",
+  "sha256": "d7fda50b048684da24caee1f5d1fdc7bb97d73106200b09bf0655306987088fe",
+  "transparent_background": true
+}
