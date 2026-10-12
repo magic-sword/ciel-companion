@@ -1,0 +1,59 @@
+{
+  "generation_count": 4,
+  "limit": 4,
+  "selected": 3,
+  "calls": [
+    {
+      "generation": 1,
+      "prompt": "Edit the FIRST reference body-01.png, not a new composition. Output a single transparent RGBA body asset at EXACTLY 1025 x 1534 pixels, the identical frame, scale, center, perspective and crop as the first reference. This is a precise anime character rig asset edit. Preserve the entire central torso exactly as seen: neck at top edge, neckline, black halter straps, white fitted sleeveless crop top, cyan diamond and its black frame, breast shape/volume and shading, waist width, top hem and black tabs, abdomen/navel, hip contour and skirt. Do not redesign, shrink, move or restyle any of those. ONLY redraw both bare arms and their shoulder joints. The second reference shows the original clothed pose: shoulders sit under the white fur and arms travel diagonally DOWN AND OUT into the sleeves. Change the arms from hanging vertically inward beside the waist to relaxed arms abducted outward about 20-25 degrees from vertical, symmetrically, with smooth rounded shoulder caps at the existing shoulder height and approximately existing width. From shoulder caps around x140 and x885 y270 the arm axes go down outward toward/beyond left and right frame edges. The inner arm contours must separate from the torso below the armpits, leaving TRUE TRANSPARENT widening wedge gaps beside the torso. Around bust-bottom height y820, the arms should have traveled beyond the left/right image borders. The arm continuation may exit through the SIDE edges because the original fixed frame must be kept. No floating stumps, no straight horizontal cuts under armpits, no remaining vertical strips of skin alongside waist. The third reference is the actual placed jacket front on a larger work canvas; it is for the diagonal sleeve direction and shoulder fit only. DO NOT include jacket, fur, sleeves, hands, hair, head, choker, extra ornaments or any background in output. Keep the original delicate thin outlines, pale skin and lavender shading. Preserve unedited central pixels as faithfully as possible. Deliver only the edited full-frame body asset on transparent alpha, no text or comparison sheet.",
+      "references": [
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v15/parts/body-01.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/master/ciel-upper-body-2x.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/layers/v16c/dressed/Jacket_Front.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12dc0-57c6-7bf0-8817-accc5f490778/exec-679ebacc-51d3-493b-9e4d-135ed6b5dd47.png",
+      "saved_copy": "assets/ciel/generated/v17/body-candidate-01.png",
+      "sha256": "e107f7c99a5dd2231e750c307ce3f3adcb7ffb5b8687a69d734f0f02673b43b9"
+    },
+    {
+      "generation": 2,
+      "prompt": "Precise local edit of reference 1 (the original body-01). Preserve the original 1025x1534 RGBA frame, original torso scale and exact alignment. Output one transparent body layer. The central NECK, white TOP including full chest volume, cyan diamond, waist, exposed abdomen and skirt must remain exactly at the original positions with the same outlines, shading and design. Edit ONLY the bare shoulder joints/arms.\nReference 2 is a first arm edit; DO NOT copy its arm angle: it is insufficiently outward and the frame ends are visible inside the jacket. Reference 3 is the test composite of that first edit in the actual jacket. It shows the PROBLEM: two long triangular skin strips hang below the fur and over the cyan lining, ending in vertical frame cutoffs. These must disappear under the sleeves by correctly drawing the arm trajectories, never by erasing/truncating arms.\nDraw the shoulders at the same height, with rounded caps that sit beneath the fur. Turn both upper arms MORE OUTWARD at the shoulder, with their inner edges sweeping diagonally down/out from the armpit immediately into the sleeve region, NOT traveling beside the bust. At source-frame coordinates, the inner left arm edge begins near x215 y430, then curves out to x100 y510 and crosses the LEFT frame boundary at x0 by y570 at latest. Mirror on right: x810 y430 to x925 y510 to x1025 y570. Arm axes approximately 45-50 degrees outward from vertical. The upper arms continue naturally beyond the side edges of the original frame. This fixed narrow body frame intentionally does not contain complete arms. There must be no arm pixels near the waist or lower sides of the bust; at every y below about 580 only the unchanged central torso remains in the frame. The real arms have continued offscreen to the sides, not amputated or hidden by a horizontal cut.\nMaintain natural anatomical rounded shoulder/deltoid/armpit contours and original pale skin/lavender shading. Transparent open wedges between arms and the unchanged torso. NO horizontal stumps, no pointed artificial arm ends. NO jacket, fur, sleeve fabric, hair, face, choker or text. Also remove detached white/color specks outside the character using image generation; transparency must be clean. Treat central torso preservation as paramount: do not widen, narrow, flatten, rescale, shift or change the breast/top/waist/hip silhouette. Output exactly the same 1025x1534 composition as reference 1.",
+      "references": [
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v15/parts/body-01.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/body-candidate-01.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/compare-upper-body-candidate-01.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12dc0-57c6-7bf0-8817-accc5f490778/exec-0c8cad33-8015-4663-855a-d68c06af1132.png",
+      "saved_copy": "assets/ciel/generated/v17/body-candidate-02.png",
+      "sha256": "263c2413bd4d52f143651ef18de165632ece8d389c9bef083a70842916524edb"
+    },
+    {
+      "generation": 3,
+      "prompt": "Edit reference 1 (body-candidate-02) IN PLACE. Keep exactly 1025 x 1534 pixels, transparent RGBA, identical fixed frame/scale/composition. Reference 2 is the clothed test of reference 1: there are still two little triangular skin tails below the fur, visible over the cyan jacket lining; fix these by adjusting arm direction. Reference 3 is body-01, the approved original torso. Preserve the CENTRAL TORSO of reference 1/3: original breast shape and size, top and straps, diamond, neck, waist, abdomen, hips, skirt, shading and outline positions. Do NOT rescale or move the torso.\nONLY raise the outward trajectory of both arms another 15-20 degrees. Both upper arms must leave through the left/right frame SIDES earlier/higher, and pass completely under the jacket fur/sleeve in reference 2. Make a natural relaxed open-arm pose with rounded shoulder caps, smooth deltoids, no sharp elbows or stumps. Keep shoulder cap height approximately y230, but shoulders may extend slightly wider into the fur. On the inner edge of the left upper arm, start at armpit x235 y410, travel diagonally outward via x120 y470 and EXIT the LEFT border at x0 y535. Mirror at right x790 y410 -> x905 y470 -> x1025 y535. In particular, at y600 and ALL rows below it, there must be NO ARM SKIN AT ALL within the frame, only the unchanged torso with transparent sides; the arms are continuing off frame to the sides. The left and right arms must NOT remain in frame down to y725 like reference 1. Do NOT cut the arm horizontally, do NOT create a pointed stump; show its natural diagonal continuation across the side frame border. No hands necessary because they lie far outside this frame. Leave transparent wedge gaps between upper arms and torso.\nPreserve all central body drawing exactly. No jacket, fur, choker, hair, face, or backgrounds. Use clean transparent alpha, no floating fragments or scattered colors around edges. Keep original fine anime linework and soft lavender skin tones. Return only the edited body artwork.",
+      "references": [
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/body-candidate-02.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/compare-upper-body-candidate-02.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v15/parts/body-01.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12dc0-57c6-7bf0-8817-accc5f490778/exec-8c705004-517d-457c-aa40-2f3304713ed5.png",
+      "saved_copy": "assets/ciel/generated/v17/body-candidate-03.png",
+      "sha256": "2c61560f9a24d5d46264f8709f6517da5b7e031296e7104f4174ed29a87404ed"
+    },
+    {
+      "generation": 4,
+      "prompt": "Final precision refinement of the FIRST reference (body-candidate-03). Output exactly the same 1025 x 1534 transparent RGBA image and composition. Preserve the central torso as faithfully as possible: the white top/bust volume and contour, all lines and shading, diamond, neck and neckline/straps, hem/waist, abdomen/navel/hips and skirt. The second reference is the untouched original body-01: use it to preserve central body details, NOT its vertical arms. Third reference is the successful jacket composite of candidate 03; keep the arms hidden under the existing fur and sleeves as in that composite.\nRefine ONLY the shoulders/upper arms of reference 1. The current raised rounded shoulders have a slight pinched valley near the trapezius and are a little too raised outward. Smooth the clavicle-to-shoulder transition into a relaxed natural rounded shoulder, without a pinched dip, at approximately the same height and width as candidate03. Lower the outward arm angle VERY SLIGHTLY, about 5-8 degrees, so it is a gentle diagonal down/out continuation rather than nearly spread wide. Both arms must still exit through the SIDE borders high enough to be covered by the fur, with inner edges crossing left/right frame border at about y605, NEVER below y630. Inner armpits remain near x235,y435 and x790,y435. Draw smooth anatomy and shading, no stumps or artificial tips, no horizontal arm cuts. Arm portions outside the existing narrow frame remain offscreen. Both transparent wedges beside the bust stay open, and at all rows below y630 only the original central torso remains in the frame. No arm strips by the waist.\nAlso make empty transparency clean: remove small detached white/pink/blue/red fragments around the shoulders and beside the bust using this image edit, while preserving the thin actual body outline and antialiasing. No checkerboard or painted background. Do not introduce any sleeve, fur, jacket, collar/choker, face, hair or text. The resulting torso design and proportions must remain unchanged. Keep delicate anime linework and matching soft pale skin shading. Single transparent body asset only.",
+      "references": [
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/body-candidate-03.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v15/parts/body-01.png",
+        "D:/CIEL/apps/ciel-companion/assets/ciel/generated/v17/compare-upper-body-candidate-03.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12dc0-57c6-7bf0-8817-accc5f490778/exec-6ca77192-3b9e-4470-b50a-e8ad77f1a862.png",
+      "saved_copy": "assets/ciel/generated/v17/body-candidate-04.png",
+      "sha256": "f143b8c565d8346e5ab4f38c6cef1282d943f78a586bb51c7f4c8b756ff3db00"
+    }
+  ]
+}
