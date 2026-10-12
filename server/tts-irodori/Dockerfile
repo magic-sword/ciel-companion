@@ -1,4 +1,4 @@
-# Irodori-TTS（コード MIT、モデル Aratako/Irodori-TTS-v4.1-Small も MIT）で、シエルの声を直接読み上げる（比較用）。
+# Irodori-TTS（コード MIT、モデル Aratako/Irodori-TTS-v4.1-Small も MIT）で、シエルの声を直接読み上げるサービス（server.py）。速さの測定は bench_tts.py。
 FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv==0.8.15
@@ -9,4 +9,4 @@ WORKDIR /opt/irodori
 RUN uv sync --extra cu128 --frozen
 COPY *.py /app/
 ENV HF_HOME=/data/hf
-CMD ["uv", "run", "--no-sync", "python", "/app/bench_tts.py"]
+CMD ["uv", "run", "--no-sync", "python", "/app/server.py"]

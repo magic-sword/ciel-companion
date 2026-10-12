@@ -8,6 +8,6 @@ services:
     network_mode: host
     env_file: .env
     environment:
-      # シエルの声へ変換する（声質変換サービス server/voice-conversion が同じマシンで動いていること）
-      - CIEL_VOICE=ciel
+      # シエルの声：Irodori-TTS で読み上げる（読み上げサービス server/tts-irodori が同じマシンで動いていること）
+      - CIEL_VOICE=irodori
     restart: unless-stopped
