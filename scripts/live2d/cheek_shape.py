@@ -21,7 +21,9 @@ PUFF = (28.0, 1215.0, 80.0)
 # 横髪（画面の右が左横髪の曲面＝Hair_Side_L_*、左が右横髪の曲面）。内側の束と、その下の長い束を一緒に動かす。根元（上）は動かさず、下ほど動かす
 HAIR_Y = (850.0, 1050.0)  # 動きの重みが 0 → 1 になる高さ
 NEAR_Y = (1000.0, 1260.0)  # 反対側の束を頬の輪郭に付いてこさせる高さの範囲（これより下は 1260 の動きのまま）
-FAR_HAIR_OUT = 15.0       # 向いた側（奥）の束：少し外へ
+FAR_HAIR_OUT = 40.0       # 向いた側（奥）の束：外へ（目の横から頬の輪郭が見えるように）
+NEAR_HAIR_EXTRA = 12.0    # 反対側（手前）の束：頬の輪郭に付いてきたうえで、さらに少し外へ（束の先が輪郭にかぶりすぎないように）
+CHIN_FROM = 1150.0        # 顎先を向いた側へ寄せる動きを、この高さから顎先までなめらかに効かせる
 FAR_HAIR_UP = 0.0         # 向いた側（奥）の束：先を持ち上げる量（下の長い束と離れて段ができるので 0）
 
 N = 100
@@ -118,7 +120,7 @@ def hair_shape(name, cur, rest, s, cdx):
     w = u * u * (3 - 2 * u)
     new = cur.copy()
     if near:
-        want = rest[:, 0] + cdx(rest[:, 1])
+        want = rest[:, 0] + cdx(rest[:, 1]) + out * NEAR_HAIR_EXTRA
         new[:, 0] += (want - cur[:, 0]) * w
     else:
         new[:, 0] += out * FAR_HAIR_OUT * w
@@ -139,7 +141,14 @@ def shape(cur, s):
     """cur：横向き（±30）での Face_Skin の頂点の位置（キャンバス px、頬の形を付ける前）。新しい位置を返す。"""
     o = outline_points(cur)
     curve = target_curve(o, s)
-    d = nearest_on(curve, o) - o
+    # 顎先を、お手本の顎先の横の位置へ寄せてから、曲線の最も近い点へ（最も近い点だけでは、顎の V が横へ動かない）
+    chin = o[np.argmax(o[:, 1])]
+    ref = ref_points(s)
+    shift = ref[np.argmax(ref[:, 1]), 0] - chin[0]
+    u = np.clip((o[:, 1] - CHIN_FROM) / (chin[1] - CHIN_FROM), 0, 1)
+    o2 = o.copy()
+    o2[:, 0] += shift * (u * u * (3 - 2 * u))
+    d = nearest_on(curve, o2) - o
     u = np.clip((o[:, 1] - Y_START) / 150.0, 0, 1)
     d *= (u * u * (3 - 2 * u))[:, None]
     k = np.ones(5) / 5
