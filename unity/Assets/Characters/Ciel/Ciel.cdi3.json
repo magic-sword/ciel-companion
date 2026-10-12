@@ -140,40 +140,8 @@
 	"ParameterGroups": [],
 	"Parts": [
 		{
-			"Id": "Part9",
-			"Name": "ciel-chin_under.psd"
-		},
-		{
-			"Id": "Part8",
-			"Name": "ciel-chin_under.psd"
-		},
-		{
-			"Id": "Part7",
-			"Name": "ciel-chin_under.psd"
-		},
-		{
-			"Id": "Part6",
-			"Name": "ciel-jawline.psd"
-		},
-		{
-			"Id": "Part5",
-			"Name": "ciel-v5.psd"
-		},
-		{
-			"Id": "Part4",
-			"Name": "ciel-mouth.psd"
-		},
-		{
-			"Id": "Part3",
-			"Name": "ciel-head-body.psd（対応無し）"
-		},
-		{
-			"Id": "Part2",
-			"Name": "ciel-head-body.psd"
-		},
-		{
 			"Id": "Part",
-			"Name": "ciel-v2-half-eyes.psd"
+			"Name": "ciel-v19-body.psd"
 		}
 	]
 }

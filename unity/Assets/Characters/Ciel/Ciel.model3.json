@@ -5,6 +5,24 @@
 		"Textures": [
 			"Ciel.4096/texture_00.png"
 		],
-		"DisplayInfo": "Ciel.cdi3.json"
-	}
+		"DisplayInfo": "Ciel.cdi3.json",
+		"Physics": "Ciel.physics3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthOpenY"
+			]
+		}
+	]
 }
