@@ -2,7 +2,7 @@
 """横を向いたときの顔の輪郭の形（cheek-keys.py と preview-cheek.py が共有する）。
 
 Face_Skin は remesh-face-contour.py の輪郭に沿ったメッシュ（N 点 × 7 輪 + 中心）であること。
-角度X ±30 で、顎より下の輪郭を「目標の曲線」へ寄せる。目標の曲線は、お手本（pose_xR15・xL15）の輪郭の線を自動で読み取り、
+角度X ±30 で、顎より下の輪郭を「目標の曲線」へ寄せる。目標の曲線は、お手本（pose_xL15。右向きはその左右反転）の輪郭の線を自動で読み取り、
 目の位置（横）と顎先の高さ（縦）で重ねたものに、上の方（横髪に隠れる所）を今の輪郭からなめらかにつないだもの。
 曲線は角を丸め（Chaikin）、輪郭の点はその曲線の最も近い点へ動かす。内側の輪は、動きを少しずつ弱めて付いてこさせる。
 """
@@ -14,6 +14,15 @@ from PIL import Image
 REF = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets', 'ciel', 'reference', 'pose')
 # お手本の絵とキャンバスの重ね方（横は目の位置、縦は顎先の高さで合わせた、お手本の座標に足す量）
 REF_POSE = {+1: ('pose_xR15_y0_porcelain.png', 280, 235), -1: ('pose_xL15_y0_porcelain.png', 346, 250)}
+# 左向き（-1）のお手本の頬が、ふくらみがあってかわいい（ユーザーの判断）。右向き（+1）は、それを左右反転して使う
+MIRROR_AXIS = 1102.0      # 正面の顎先の x
+# 向いた側（奥）の頬のふくらみ：お手本の線に、この量だけさらに外へ（px）。中心の高さと広がり
+PUFF = (28.0, 1215.0, 80.0)
+# 横髪（画面の右が左横髪の曲面＝Hair_Side_L_*、左が右横髪の曲面）。内側の束と、その下の長い束を一緒に動かす。根元（上）は動かさず、下ほど動かす
+HAIR_Y = (920.0, 1170.0)  # 動きの重みが 0 → 1 になる高さ
+NEAR_HAIR_OUT = 45.0      # 反対側（手前）の束：外へ逃がす（頬の線の外側＝顔の後ろへ）
+FAR_HAIR_OUT = 15.0       # 向いた側（奥）の束：少し外へ
+FAR_HAIR_UP = 0.0         # 向いた側（奥）の束：先を持ち上げる量（下の長い束と離れて段ができるので 0）
 
 N = 100
 RING_WEIGHT = [1.0, 1.0, 1.0, 0.85, 0.5, 0.25, 0.08]
@@ -55,9 +64,24 @@ def ref_outline(s):
     return p[np.abs(p[:, 2] - med) < 12, :2]
 
 
+def ref_points(s):
+    """目標に使うお手本の輪郭（キャンバスの座標、並びは画面の右 → 顎 → 左）。右向きは左向きの左右反転。
+    向いた側（奥）の頬には、ふくらみ PUFF を足す。"""
+    ref = ref_outline(-1)
+    if s > 0:
+        ref = np.stack([2 * MIRROR_AXIS - ref[:, 0], ref[:, 1]], 1)[::-1]
+    amt, yc, w = PUFF
+    bump = amt * np.exp(-((ref[:, 1] - yc) / w) ** 2)
+    far_left = s < 0
+    on_far = ref[:, 0] < MIRROR_AXIS if far_left else ref[:, 0] > MIRROR_AXIS
+    ref = ref.copy()
+    ref[:, 0] += np.where(on_far, -bump if far_left else bump, 0)
+    return ref
+
+
 def target_curve(o, s):
     """目標の曲線：お手本の輪郭を、上の端（横髪に隠れる所）で今の輪郭へなめらかにつなぐ。"""
-    ref = ref_outline(s)
+    ref = ref_points(s)
     right = o[o[:, 0] >= np.median(o[:, 0])]
     left = o[o[:, 0] < np.median(o[:, 0])]
 
@@ -68,6 +92,24 @@ def target_curve(o, s):
     link_l = [cur(left, y) for y in np.arange(Y_START, top_l[1] - 40, 40)][::-1]
     pts = np.array(link_r + list(ref) + link_l, float)
     return chaikin(pts)
+
+
+def hair_shape(name, cur, s):
+    """横髪の内側の束の、横向き（±30）での新しい位置（キャンバス px）。
+    反対側（手前）の束は外へ逃がして顔の後ろに回し、向いた側（奥）の束は先を持ち上げて頬のふくらみを見せる。"""
+    on_right = name.startswith('Hair_Side_L')         # キャラクターの左＝画面の右
+    out = 1.0 if on_right else -1.0
+    near = (s < 0) == on_right                        # 左を向くと、画面の右の束が手前
+    y0, y1 = HAIR_Y
+    u = np.clip((cur[:, 1] - y0) / (y1 - y0), 0, 1)
+    w = u * u * (3 - 2 * u)
+    new = cur.copy()
+    if near:
+        new[:, 0] += out * NEAR_HAIR_OUT * w
+    else:
+        new[:, 0] += out * FAR_HAIR_OUT * w
+        new[:, 1] -= FAR_HAIR_UP * w
+    return new
 
 
 def nearest_on(curve, p):

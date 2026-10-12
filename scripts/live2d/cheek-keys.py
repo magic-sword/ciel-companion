@@ -6,7 +6,11 @@
 親（顔の曲面）の ±30 の変形はアフィン（拡大と移動）なので、正面 → 横向きの対応を一次式で求め、目標の位置を
 「正面ならどこにあたるか」へ戻してから、顔の曲面の正規化座標で書く。
 
-実行  python -I scripts/live2d/cheek-keys.py 入力.cmo3 書き出したモデル.model3.json 出力.cmo3
+あわせて、横髪のワープの角度X ±30 の格子に、横髪の動き（cheek_shape.hair_shape）を足す（hair_keys）。
+
+実行  python -I scripts/live2d/cheek-keys.py 入力.cmo3 書き出したモデル.model3.json 出力.cmo3 [正面の形の.cmo3]
+      正面の形の .cmo3：すでに頬の形が入っているモデルを作り直すとき、形を付ける前のもの（Face_Skin の頂点の並びが同じ）。
+      横髪の動きは足し算なので、横髪の動きがまだ入っていない入力に使う。
 """
 import importlib.util
 import os
@@ -22,13 +26,21 @@ import cubism_core as cc
 import cheek_shape as cs
 from cmo3_tool import _fmt
 
-_spec = importlib.util.spec_from_file_location('half_blink', os.path.join(HERE, 'half-blink-keys.py'))
-hb = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(hb)
+def _load(name, file):
+    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, file))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+hb = _load('half_blink', 'half-blink-keys.py')
+mk = _load('motion_keys', 'motion-keys.py')
+sk = _load('sway_keys', 'sway-keys.py')
 
 
 def main():
     src, model3, dst = sys.argv[1:4]
+    rest_src = sys.argv[4] if len(sys.argv) > 4 else None
     doc = t.Cmo3(src)
     name = 'Face_Skin'
     core = cc.Model(model3)
@@ -40,7 +52,10 @@ def main():
         return {d['id']: d['pos'] for d in core.drawables()}[name]
     blocks = hb.keyform_blocks(doc, name)
     vals = hb.key_values(doc, name)
-    base = np.mean([f[2] for f in blocks], 0)                   # キーを足した直後はどれも正面の形
+    if rest_src:   # 頬の形を作り直すとき：正面の形は、形を付ける前の .cmo3 から
+        base = np.mean([f[2] for f in hb.keyform_blocks(t.Cmo3(rest_src), name)], 0)
+    else:          # キーを足した直後はどれも正面の形
+        base = np.mean([f[2] for f in blocks], 0)
     core_front = pos(0)
     # 正面の位置は、メッシュの point（画像座標。remesh-face-contour.py はキーフォームと同じ並びで書く）。
     # 親の ±30 の変形（アフィン）は、書き出したモデルの頂点から求める（メッシュを作り直した後でも、親は同じなので使える）
@@ -62,8 +77,34 @@ def main():
             p = (new - M[2]) @ np.linalg.inv(M[:2])
             f = np.c_[p, np.ones(len(p))] @ to_n
         doc.xml = doc.xml[:s0] + ' '.join(_fmt(q) for q in f.ravel()) + doc.xml[e0:]
+    hair_keys(doc)
     doc.save(dst)
     print('CHEEK_KEYS_DONE', vals)
+
+
+def hair_keys(doc):
+    """横髪のワープ（左横髪の曲面・右横髪の曲面）の、角度X ±30 のキーの格子に、cheek_shape.hair_shape の動きを足す。
+    ワープの中の束（内側の束と下の長い束）が一緒に動く。正面の格子は、角度X が ±30 でないキーの形（なければ全キーの平均）。"""
+    mk.load_params(doc.xml)
+    for warp, mesh in (('左横髪の曲面', 'Hair_Side_L_Inner'), ('右横髪の曲面', 'Hair_Side_R_Inner')):
+        fx, fy = sk.px_map(doc, warp, mesh)
+        x = doc.xml
+        s, e = mk.block(x, 'CWarpDeformerSource', warp)
+        blk = x[s:e]
+        keys = mk.form_keys(x, blk, 'CWarpDeformerForm')
+        forms = mk.warp_forms(blk)
+        out = blk
+        for (a, b, g), k in sorted(zip(forms, keys), key=lambda z: -z[0][0]):
+            v = k.get('ParamAngleX', 0.0)
+            if abs(abs(v) - 30) > 1e-6:
+                continue
+            px = np.stack([(g[:, 0] - fx[1]) / fx[0], (g[:, 1] - fy[1]) / fy[0]], 1)
+            # 動きの重みは、正面の高さで決める（この格子は角度X の横の動きだけで、縦はほぼ正面と同じ）
+            moved = cs.hair_shape(mesh, px, int(np.sign(v)))
+            g2 = g + np.stack([(moved[:, 0] - px[:, 0]) * fx[0], (moved[:, 1] - px[:, 1]) * fy[0]], 1)
+            out = out[:a] + ' '.join(_fmt(q) for q in g2.ravel()) + out[b:]
+        doc.xml = x[:s] + out + x[e:]
+        print('横髪:', warp)
 
 
 if __name__ == '__main__':

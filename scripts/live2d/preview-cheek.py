@@ -2,7 +2,7 @@
 """横を向いたときの頬の形（cheek_shape.py）を、Cubism で書き出さずに試し描きする。
 
 書き出したモデル（Face_Skin が輪郭に沿ったメッシュで、頬の形のキーがまだ正面の形のもの）を Core で角度X ±30 にし、
-Face_Skin の頂点だけを cheek_shape.shape の位置に置き換えて描く。目標の曲線も重ねて描ける（--curve）。
+Face_Skin と横髪の内側の束の頂点を、cheek_shape の位置に置き換えて描く。目標の曲線も重ねて描ける（--curve）。
 実行  python -I scripts/live2d/preview-cheek.py モデル.model3.json 出力.png [--curve] [--scale S] [--crop x0,y0,x1,y1]
 """
 import importlib.util
@@ -34,6 +34,8 @@ class Patched:
             for d in ds:
                 if d['id'] == 'Face_Skin':
                     d['pos'], self.curve = cs.shape(d['pos'], self.s)
+                elif d['id'].startswith('Hair_Side_'):
+                    d['pos'] = cs.hair_shape(d['id'], d['pos'], self.s)
         return ds
 
 
