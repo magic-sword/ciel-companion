@@ -1,4 +1,4 @@
-// 会話の確認用シーン（Assets/Scenes/Conversation.unity）を作る：カメラ、シエル、会話の部品（CielConversation）。
+// 会話の確認用シーン（Assets/Scenes/Conversation.unity）を作る：カメラ、シエル、会話の部品（CielConversation）と画面の操作（CielConversationUI）。
 // 接続先は Assets/Settings/LiveKitTokenSource.asset（Git 管理外）。LiveKit Cloud の開発用トークンサーバーの ID を
 // インスペクターで入れる（種類 DevelopmentTokenServer）。秘密の API キーはアプリに入れない。
 // 実行：メニュー CIEL ＞ Conversation ＞ Create Scene、または
@@ -61,6 +61,10 @@ namespace Ciel.EditorTools
             var c = new SerializedObject(conv.GetComponent<CielConversation>());
             c.FindProperty("_mouth").objectReferenceValue = model.GetComponent<CubismMouthController>();
             c.ApplyModifiedPropertiesWithoutUndo();
+            var ui = conv.AddComponent<CielConversationUI>();
+            var u = new SerializedObject(ui);
+            u.FindProperty("_conversation").objectReferenceValue = conv.GetComponent<CielConversation>();
+            u.ApplyModifiedPropertiesWithoutUndo();
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new InvalidOperationException("Could not save conversation scene.");
