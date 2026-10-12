@@ -4,8 +4,8 @@
 LiveKit Cloud のルームにアプリが入ると、このプログラムが呼ばれてルームに入り、
 アプリのマイク音声を OpenAI の音声会話モデルへ送り、返ってきた声をアプリへ返す。
 
-フェーズ1（今）：OpenAI の既定の声のまま返す。
-フェーズ2：返ってきた声を Seed-VC でシエルの声へ変換してから返す（voice_conversion.py、未実装）。
+返ってきた声は、声質変換サービス（server/voice-conversion、Seed-VC）でシエルの声へ変換してから返す（voice_conversion.py）。
+CIEL_VOICE=openai にすると、OpenAI の声のまま返す（比べるとき）。
 
 会話モデルは環境変数 CIEL_MODEL で切り替える：
   realtime（既定）… OpenAI Realtime API（gpt-realtime 系）
@@ -22,6 +22,7 @@ from livekit import agents
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext
 from livekit.plugins import openai
 
+import voice_conversion
 from persona import INSTRUCTIONS, GREETING
 
 load_dotenv()
@@ -45,6 +46,12 @@ def make_model():
 class Ciel(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=INSTRUCTIONS)
+
+    def realtime_audio_output_node(self, audio, model_settings):
+        # CIEL_VOICE=ciel：声質変換サービスでシエルの声へ。openai（既定）：OpenAI の声のまま
+        if os.environ.get('CIEL_VOICE', 'openai') == 'ciel':
+            return voice_conversion.convert(audio)
+        return Agent.default.realtime_audio_output_node(self, audio, model_settings)
 
 
 @server.rtc_session()

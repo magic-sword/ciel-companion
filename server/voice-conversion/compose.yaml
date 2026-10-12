@@ -1,0 +1,20 @@
+# 自宅の GPU サーバーで動かす。/data（このフォルダの data/）に参照音声とモデルのキャッシュを置く（Git の外）。
+services:
+  vc:
+    build:
+      context: .
+      network: host
+    network_mode: host
+    volumes:
+      - ./data:/data
+      - ./data/checkpoints:/opt/seed-vc/checkpoints   # Seed-VC がモデルを置く場所（hf_utils.py の ./checkpoints）
+    environment:
+      - VC_REFERENCE=/data/reference.wav
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
