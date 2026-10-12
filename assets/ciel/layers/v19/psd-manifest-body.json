@@ -1,0 +1,41 @@
+{
+ "canvas": [
+  2172,
+  2896
+ ],
+ "out": "assets/ciel/psd/ciel-v19-body",
+ "layers": [
+  {
+   "name": "Hair_Back",
+   "path": "assets/ciel/layers/v19/Hair_Back.png"
+  },
+  {
+   "name": "Jacket_Back",
+   "path": "assets/ciel/layers/v19/Jacket_Back.png"
+  },
+  {
+   "name": "Body",
+   "path": "assets/ciel/layers/v19/Body.png"
+  },
+  {
+   "name": "Choker_Back",
+   "path": "assets/ciel/layers/v19/Choker_Back.png"
+  },
+  {
+   "name": "Neck",
+   "path": "assets/ciel/layers/v19/Neck.png"
+  },
+  {
+   "name": "Neck_Shadow_Chin",
+   "path": "assets/ciel/layers/v19/Neck_Shadow_Chin.png"
+  },
+  {
+   "name": "Jacket_Front",
+   "path": "assets/ciel/layers/v19/Jacket_Front.png"
+  },
+  {
+   "name": "Choker_Front",
+   "path": "assets/ciel/layers/v19/Choker_Front.png"
+  }
+ ]
+}
