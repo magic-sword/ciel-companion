@@ -20,6 +20,8 @@ namespace Ciel.Conversation
     {
         [SerializeField] CubismMouthController _mouth;
         [SerializeField] bool _connectOnStart = true;
+        [Tooltip("使いたいマイクの名前の一部（空なら一覧の順に試す）")]
+        [SerializeField] string _preferredMic = "";
         [Tooltip("口の開きの倍率（声の大きさ → 口の開き）")]
         [SerializeField] float _mouthGain = 6f;
         [Tooltip("口が開くときと閉じるときのなめらかさ（秒）")]
@@ -61,7 +63,9 @@ namespace Ciel.Conversation
             try
             {
                 _platformAudio = new PlatformAudio();
-                if (_platformAudio.RecordingDeviceCount > 0) _platformAudio.SetRecordingDevice(0);
+                var (rec, play) = _platformAudio.GetDevices();
+                foreach (var d in rec) Debug.Log($"[CielConversation] マイク {d.Index}: {d.Name}");
+                foreach (var d in play) Debug.Log($"[CielConversation] スピーカー {d.Index}: {d.Name}");
                 if (_platformAudio.PlayoutDeviceCount > 0) _platformAudio.SetPlayoutDevice(0);
             }
             catch (System.Exception e)
@@ -76,8 +80,14 @@ namespace Ciel.Conversation
             yield return _room.Connect(details.ServerUrl, details.ParticipantToken, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した");
 
-            // マイク（OS の許可を求める）。エコー除去・雑音除去・自動音量を有効にする
-            yield return _platformAudio.StartRecording();
+            // マイク（OS の許可を求める）。使えるマイクが見つかるまで順に試す。見つからなければ、聞くだけで続ける
+            yield return StartMicrophone();
+            if (!_recording)
+            {
+                Debug.LogWarning("[CielConversation] 使えるマイクがない。シエルの声を聞くだけで続ける");
+                yield break;
+            }
+            // エコー除去・雑音除去・自動音量を有効にする
             _micSource = new PlatformAudioSource(_platformAudio, AudioProcessingOptions.Default);
             _micTrack = LocalAudioTrack.CreateAudioTrack("ciel-user-mic", _micSource, _room);
             var publish = _room.LocalParticipant.PublishTrack(_micTrack, new TrackPublishOptions
@@ -93,6 +103,45 @@ namespace Ciel.Conversation
                 yield break;
             }
             Debug.Log("[CielConversation] 会話の準備ができた");
+        }
+
+        bool _recording;
+
+        // 録音機器を、指定の名前（_preferredMic を含むもの）→ 一覧の順 に試す。
+        // StartRecording は失敗すると例外を投げるので、列挙子を手で進めて受け止める（エラーで再生が一時停止しないように）
+        IEnumerator StartMicrophone()
+        {
+            _recording = false;
+            var (rec, _) = _platformAudio.GetDevices();
+            var order = new System.Collections.Generic.List<AudioDevice>(rec);
+            if (!string.IsNullOrEmpty(_preferredMic))
+                order.Sort((a, b) => (b.Name?.Contains(_preferredMic) == true ? 1 : 0) - (a.Name?.Contains(_preferredMic) == true ? 1 : 0));
+            foreach (var d in order)
+            {
+                try { _platformAudio.SetRecordingDevice(d.Guid ?? ""); }
+                catch (System.Exception e) { Debug.LogWarning($"[CielConversation] マイク '{d.Name}' を選べない: {e.Message}"); continue; }
+                var it = _platformAudio.StartRecording();
+                while (true)
+                {
+                    object current;
+                    try
+                    {
+                        if (!it.MoveNext()) { _recording = true; break; }
+                        current = it.Current;
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogWarning($"[CielConversation] マイク '{d.Name}' を開けない: {e.Message}");
+                        break;
+                    }
+                    yield return current;
+                }
+                if (_recording)
+                {
+                    Debug.Log($"[CielConversation] マイク '{d.Name}' を使う");
+                    yield break;
+                }
+            }
         }
 
         void OnTrackSubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
@@ -136,8 +185,9 @@ namespace Ciel.Conversation
             DisposeVoice();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);
             _micTrack = null;
-            if (_platformAudio != null)
+            if (_platformAudio != null && _recording)
             {
+                _recording = false;
                 try { _platformAudio.StopRecording(); } catch (System.Exception e) { Debug.LogWarning(e.Message); }
             }
             _micSource?.Dispose();
