@@ -19,8 +19,8 @@ MIRROR_AXIS = 1102.0      # 正面の顎先の x
 # 向いた側（奥）の頬のふくらみ：お手本の線に、この量だけさらに外へ（px）。中心の高さと広がり
 PUFF = (28.0, 1215.0, 80.0)
 # 横髪（画面の右が左横髪の曲面＝Hair_Side_L_*、左が右横髪の曲面）。内側の束と、その下の長い束を一緒に動かす。根元（上）は動かさず、下ほど動かす
-HAIR_Y = (920.0, 1170.0)  # 動きの重みが 0 → 1 になる高さ
-NEAR_HAIR_OUT = 45.0      # 反対側（手前）の束：外へ逃がす（頬の線の外側＝顔の後ろへ）
+HAIR_Y = (850.0, 1050.0)  # 動きの重みが 0 → 1 になる高さ
+NEAR_Y = (1000.0, 1260.0)  # 反対側の束を頬の輪郭に付いてこさせる高さの範囲（これより下は 1260 の動きのまま）
 FAR_HAIR_OUT = 15.0       # 向いた側（奥）の束：少し外へ
 FAR_HAIR_UP = 0.0         # 向いた側（奥）の束：先を持ち上げる量（下の長い束と離れて段ができるので 0）
 
@@ -94,18 +94,32 @@ def target_curve(o, s):
     return chaikin(pts)
 
 
-def hair_shape(name, cur, s):
-    """横髪の内側の束の、横向き（±30）での新しい位置（キャンバス px）。
-    反対側（手前）の束は外へ逃がして顔の後ろに回し、向いた側（奥）の束は先を持ち上げて頬のふくらみを見せる。"""
+def contour_dx(face_rest, face_new, s):
+    """反対側（手前）の頬の輪郭の、高さごとの横の動き（px）。face_rest：正面の Face_Skin の頂点、face_new：横向きの頂点。
+    戻り値は、正面の高さ y → 横の動き の関数。NEAR_Y より下は、その高さの値のまま（下の長い束が顔へ寄りすぎないように）。"""
+    o0, o1 = outline_points(face_rest), outline_points(face_new)
+    near_right = s < 0                                # 左を向くと、画面の右が手前
+    side = o0[:, 0] > MIRROR_AXIS if near_right else o0[:, 0] < MIRROR_AXIS
+    y, d = o0[side, 1], (o1 - o0)[side, 0]
+    k = np.argsort(y)
+    y, d = y[k], d[k]
+    return lambda q: np.interp(np.clip(q, NEAR_Y[0], NEAR_Y[1]), y, d)
+
+
+def hair_shape(name, cur, rest, s, cdx):
+    """横髪（束）の、横向き（±30）での新しい位置（キャンバス px）。cur：今の横向きの位置、rest：正面の位置、
+    cdx：contour_dx の関数。反対側（手前）の束は、頬の輪郭と同じだけ動かして、輪郭のすぐ外に付いてこさせる
+    （輪郭と髪の間にすき間ができると、頭の側面が平らに見える）。向いた側（奥）の束は少し外へ。"""
     on_right = name.startswith('Hair_Side_L')         # キャラクターの左＝画面の右
     out = 1.0 if on_right else -1.0
-    near = (s < 0) == on_right                        # 左を向くと、画面の右の束が手前
+    near = (s < 0) == on_right
     y0, y1 = HAIR_Y
-    u = np.clip((cur[:, 1] - y0) / (y1 - y0), 0, 1)
+    u = np.clip((rest[:, 1] - y0) / (y1 - y0), 0, 1)
     w = u * u * (3 - 2 * u)
     new = cur.copy()
     if near:
-        new[:, 0] += out * NEAR_HAIR_OUT * w
+        want = rest[:, 0] + cdx(rest[:, 1])
+        new[:, 0] += (want - cur[:, 0]) * w
     else:
         new[:, 0] += out * FAR_HAIR_OUT * w
         new[:, 1] -= FAR_HAIR_UP * w
