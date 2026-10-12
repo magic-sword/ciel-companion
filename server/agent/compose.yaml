@@ -1,0 +1,10 @@
+# 自宅の GPU サーバー（chris_local）で動かす。秘密情報は同じフォルダの .env から読む。
+# Docker の既定のネットワークでは名前解決ができなかったので、ホストのネットワークを使う（外から入る口は開かない）。
+services:
+  agent:
+    build:
+      context: .
+      network: host
+    network_mode: host
+    env_file: .env
+    restart: unless-stopped

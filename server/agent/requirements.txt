@@ -1,0 +1,4 @@
+# 版は公開から 2 週間以上たったものに固定する（2026-10-12 時点）
+livekit-agents==1.8.3
+livekit-plugins-openai==1.8.3
+python-dotenv==1.1.1
