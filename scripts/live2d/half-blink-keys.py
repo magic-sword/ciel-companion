@@ -25,7 +25,7 @@ import cmo3_tool as t
 import cubism_core as cc
 from cmo3_tool import _fmt
 
-LAYERS = os.path.join(HERE, '..', '..', 'assets', 'ciel', 'layers', 'v14c')
+LAYERS = os.path.join(HERE, '..', '..', 'assets', 'ciel', 'current', 'layers')
 UPPER = ['Sclera', 'LidSkin_Upper', 'LashUpper', 'Crease']
 
 

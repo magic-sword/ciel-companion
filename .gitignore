@@ -39,11 +39,6 @@
 # Live2D素材（計画書 docs/ciel-live2d-rebuild-analysis-plan-ja.md の「素材と記録」）
 # 再生成できない物（生成画像の原本、承認済みの基準画像、採用した層と配置の記録）は Git 管理。
 # 作業途中の候補・参照用の切り抜き・PSD は管理しない。
-/assets/ciel/generated/*/candidate*/
-/assets/ciel/generated/*/stage*/
-/assets/ciel/generated/*/references/
-/assets/ciel/generated/*/_work/
-/assets/ciel/generated/*/_rejected/
 /assets/ciel/psd/
 # Cubism Editorが作る一時・自動バックアップ
 *.cmo3.bak

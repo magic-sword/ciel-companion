@@ -142,7 +142,7 @@ Claude Code は、この経過で見た目の評価を 3 回甘く報告した�
 | --- | --- | --- | --- | --- |
 | 0〜2 | Codex | 基準の固定、配置での救済、顔まわりの組み上げ（前髪、頬に重なる横髪、胸へ垂れる髪、首の影、首輪と飾り） | **A 顔の印象** | 完了（v9、`assets/ciel/layers/v9/`）。2026-10-11 承認 |
 | 3 | Codex（Claude と構造を照合） | 動かすための層への分割（髪の束、目・口の内部、影、耳の根元、後ろ髪の上端の補い）。PSD への受け渡し | — | 完了（v10、`assets/ciel/layers/v10/`、62 層：通常 50・差分 12。層の説明は `layers.md`）。続けて、ユーザーの指摘（閉じ目が小さい、顔の土台が左にずれて見える、開いた口が小さい）を v11 で修正。続けて開いた口を作り直した：アニメ上のシエルのイラスト（ユーザー提供、非公開のため `.local/reference/`）を参照に、口を閉じた顔の中で口を自由に描かせ、口だけを透明素材にした（v14）。大きく開いた口を左右対称に生成し直し（v14b）、小さな八重歯を足した（v14c）。**v14c がリグに使う最新の層**（54 層、口は `Mouth_Small`・`Mouth_Large` の 2 枚）。PSD は `scripts/live2d/v14c/build_psd_with_state.py` で `assets/ciel/psd/ciel-v14c.psd` に作成（Git 管理外、再生成できる） |
-| 4 | Claude（Codex が素材修正） | 頭の小さな仮リグ（頭 XY、まばたき、口、横髪・耳の揺れ） | **B 動いた顔** | 作業中 |
+| 4 | Claude（Codex が素材修正） | 頭の小さな仮リグ（頭 XY、まばたき、口、横髪・耳の揺れ） | **B 動いた顔** | 頭 XY・まばたき・口・体の差し替えまで完了。首の傾き・揺れ・呼吸が残り |
 | 5 | 両方 | 残りの素材と本リグ（表情・物理・呼吸・体の傾き） | — | 未着手 |
 | 6 | Claude（Codex が見た目を点検） | Unity の会話画面、音声の口パク、表情の切り替え、性能 | **C 会話画面** | 未着手 |
 
@@ -157,20 +157,10 @@ Claude Code は、この経過で見た目の評価を 3 回甘く報告した�
 | `scripts/codex/run-codex.ps1` | Codex への依頼（`codex exec`） |
 
 ### 素材と記録（Git）
-| 場所 | 内容 |
-| --- | --- |
-| `assets/ciel/master/ciel-upper-body-2x.png` | 承認済みの基準画像 |
-| `assets/ciel/generated/v8/parts/` | v9 が使う、Codex の生成原本（17 枚） |
-| `assets/ciel/generated/v9/` | v9 の生成原本・生成の記録・層の担当（`layer-contract.md`）・配置の試し |
-| `assets/ciel/layers/v9/` | 承認された v9 の層・配置の記録（`placement.json`）・確認図・報告 |
-| `scripts/live2d/v9/` | v9 を組み立てる Codex のスクリプト |
-| `assets/ciel/generated/v10/`・`layers/v10/`・`scripts/live2d/v10/` | 段階 3 の生成原本、動かすための 62 層と層の説明・確認図、組み立てと PSD 作成のスクリプト |
-| `assets/ciel/generated/v11/`・`layers/v11/`・`scripts/live2d/v11/` | v10 の修正版（閉じ目・顔の土台の位置）。v14 の土台 |
-| `assets/ciel/generated/v14*/`・`layers/v14*/`・`scripts/live2d/v14*/` | 口の作り直し（v14：口を顔の中で描いて切り出す、v14b：大きく開いた口を左右対称に、v14c：八重歯を足す）。**v14c がリグに使う最新の層**。v14・v14b は v14c の組み立ての入力 |
-| `assets/ciel/reference/mouth/` | 口の大きさの参考（以前作った口の 3 種） |
-| `assets/ciel/generated/pose-ref/` | 頭の向きの参考（AI の描き直し。形の正解ではなく、見た目の方向性の参考） |
-| `assets/ciel/rig/ciel-blink-test.cmo3`・`unity/Assets/Characters/Ciel/` | v5 の古いモデル。段階 4・5 の新しいモデルで置き換える |
-作業途中の候補・参照用の切り抜き・PSD は Git 管理しない（`.gitignore`）。
+**最新の素材は `assets/ciel/current/` だけ（シングルソース、`assets/ciel/current/README.md`）。** 作業モデルは `assets/ciel/rig/ciel.cmo3`。v8〜v19 の生成原本・試作の層・Codex のスクリプトは削除した（Git のタグ `archive/pre-current-cleanup`）。
+現在の素材の由来：顔まわりは v14c（Codex、口は v14c）、体は v18（元の絵だけを参照して生成）、上着は v16（1 着として生成し、後ろ側は全体、前側は v18 で描き直し）、首輪は v16（1 つの物として生成し、前後に切り分け）。
+
+---
 
 ## 9. 評価の見方
 

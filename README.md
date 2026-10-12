@@ -7,7 +7,7 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 制作の仕様は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md)、**現在の方針・手順・進み具合は [作り直しの計画](docs/ciel-live2d-rebuild-analysis-plan-ja.md) の 6〜8 章**にまとめています。新しく参加する人・新しいセッションは、まずこの 6〜8 章から読んでください。
 
 - 外観の参考：[シエル外観参考](assets/ciel/reference/ciel-approved-appearance-v1.png)。控えめな鼻と、滑らかな白磁の肌を維持します。見た目の基準は承認済みの基準画像 `assets/ciel/master/ciel-upper-body-2x.png`（2172×2896px）です。
-- 現在：素材とリグを作り直しています（2026-10-11〜）。素材は Codex が生成から組み立て・調整まで担当し、顔まわり（`assets/ciel/layers/v9/`）がユーザーに承認されました。次は動かすための層への分割、続いて Claude Code が Cubism で頭の仮のリグを組みます。
+- 現在：素材とリグを作り直しています（2026-10-11〜）。素材は Codex が生成から組み立て・調整まで担当し、最新の素材は `assets/ciel/current/` にまとめています（作業モデルは `assets/ciel/rig/ciel.cmo3`）。
 - 再生成できない素材（生成画像の原本、基準画像、採用した層と配置の記録）は Git で管理します。作業モデル（`.cmo3`）は Git LFS です。
 - 作り直す前の方式（素材 v2〜v5、外部の 3D 計算による頭の向き）は削除しました。Git のタグ `archive/pre-v9-cleanup` で参照できます。さらに古い方式（280×195px 素材など）は `archive/pre-v2-cleanup` です。
 
