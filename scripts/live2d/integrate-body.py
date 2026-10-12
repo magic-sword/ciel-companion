@@ -24,7 +24,7 @@ from cmo3_tool import _fmt
 
 # 名前: (親のワープ, 参照モデルで同じワープに入っていたメッシュ, 描画順)
 PLAN = {
-    'Hair_Back': ('呼吸', 'Body', 100),
+    'Hair_Back': ('呼吸', 'Body', 100),        # 後に上半身の曲面Y の直下へ移した（呼吸で波打たないように）
     'Jacket_Back': ('呼吸', 'Body', 105),
     'Body': ('呼吸', 'Body', 110),
     'Choker_Back': ('首の曲面', 'Neck', 120),
