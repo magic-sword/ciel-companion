@@ -1,0 +1,9 @@
+{
+  "candidate": "jacket-front-04.png",
+  "prompt": "Make a precision transparent PNG edit of the provided jacket, keeping the canvas 1441 x 1092 and leaving all retained front parts at exactly their existing coordinates. Remove the rear fur collar bridge across the neck opening and remove the central turquoise back lining panel. Retain the complete two puffy sleeves, their complete cuffs, black panels and glowing cyan hardware, white/cyan front facings, and the two big white shoulder fur collars. Redraw the inner ends of the two shoulder collars into natural short fur tufts so no straight severed collar edge remains. This forms two separate front garment sections with an empty transparent space between them. Match all existing front geometry, sleeve widths, shoulder fur contours, details, white/lavender shadows and colors exactly. No rescaling, repositioning or reframing. Clean production-quality isolated clothing layer: every visible pixel belongs to one of the two main garment sections. Empty space around and between the sleeves must be perfectly empty transparency, with no debris, sparkles, stray dots, white stains, blue fragments or stray hair. Natural crisp antialiased cloth edges and natural fur points. No figure, added clothing or background. Transparent background. Preserve 1441x1092 image size. This is the fourth and final candidate. If configurable, output to D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16b/jacket-front-04.png.",
+  "transparent_background": true,
+  "references": [
+    "assets/ciel/generated/v16/jacket.png"
+  ],
+  "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-4a47445f-643a-48b7-b12a-c08bb0de5400.png"
+}

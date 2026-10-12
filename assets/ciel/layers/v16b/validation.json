@@ -1,0 +1,123 @@
+{
+  "generation_count": 4,
+  "selected": "jacket-front-03.png",
+  "source_size": [
+    1441,
+    1092
+  ],
+  "output_size": [
+    2172,
+    2896
+  ],
+  "mode": "RGBA",
+  "alpha_extrema": [
+    0,
+    255
+  ],
+  "selected_source_byte_identical": true,
+  "placement_pixel_verified": true,
+  "reference_hashes_unchanged": {
+    "assets\\ciel\\generated\\v16\\jacket.png": "9bfeb9eabf54d1e6b5b3d23841cb99e997e2189129695541c6c414711ac6a40a",
+    "assets\\ciel\\layers\\v16\\placement.json": "dd21a1e611684dd7aefa6f81ce395488e0218124af8e43cdc5934409d0aa40a4"
+  },
+  "delivered_source_sha256": "de3dc4cdd3784fbd1fffb83283f7715fe497811b535ebcc570fa999a4abbb97d",
+  "placed_sha256": "f3461cbee58a0b1c5158303da5d661847210050d72c8efccc3051e6b3a6ac2a0",
+  "sample_boxes_xyxy": [
+    [
+      250,
+      250,
+      430,
+      450
+    ],
+    [
+      140,
+      650,
+      250,
+      790
+    ],
+    [
+      320,
+      600,
+      450,
+      820
+    ],
+    [
+      990,
+      250,
+      1170,
+      450
+    ],
+    [
+      1190,
+      650,
+      1300,
+      790
+    ],
+    [
+      970,
+      600,
+      1100,
+      820
+    ]
+  ],
+  "candidate_comparison": [
+    {
+      "candidate": "jacket-front-01.png",
+      "sha256": "9f4e47f2ace5f5b38a52e8fb8f74587d3f5053c92dabc84c6a4f9c58a2e5d2cb",
+      "sample_rgb_mae": [
+        9.036583333333333,
+        14.070519480519481,
+        11.731818181818182,
+        11.01825925925926,
+        23.266839826839828,
+        17.659475524475525
+      ],
+      "mean_sample_rgb_mae": 14.463915934374269
+    },
+    {
+      "candidate": "jacket-front-02.png",
+      "sha256": "d31e667ac2778ae2c547b5536f2244ace807e66cb5c117f47ac1bf011cd30f05",
+      "sample_rgb_mae": [
+        8.592953703703703,
+        14.967380952380953,
+        10.59051282051282,
+        7.191064814814815,
+        14.546320346320346,
+        12.697307692307692
+      ],
+      "mean_sample_rgb_mae": 11.430923388340055
+    },
+    {
+      "candidate": "jacket-front-03.png",
+      "sha256": "de3dc4cdd3784fbd1fffb83283f7715fe497811b535ebcc570fa999a4abbb97d",
+      "sample_rgb_mae": [
+        3.4167870370370372,
+        8.280779220779221,
+        3.1744405594405594,
+        2.9273425925925927,
+        6.696147186147186,
+        3.513018648018648
+      ],
+      "mean_sample_rgb_mae": 4.66808587400254
+    },
+    {
+      "candidate": "jacket-front-04.png",
+      "sha256": "608da50bee27b9a07108c1d12fbcd7f9e4e25384f137cb1de96f02b9e59605fc",
+      "sample_rgb_mae": [
+        4.665796296296296,
+        13.140324675324676,
+        6.266165501165501,
+        3.795574074074074,
+        12.066060606060606,
+        7.988636363636363
+      ],
+      "mean_sample_rgb_mae": 7.987092919426253
+    }
+  ],
+  "metric_limitation": "RGB MAE on six retained front patches, not a full-image registration guarantee.",
+  "prohibited_art_operations_used": [],
+  "remaining_issues": [
+    "Small isolated alpha specks and edge residue from image generation remain.",
+    "Generated outlines and details are not pixel-identical to the original."
+  ]
+}

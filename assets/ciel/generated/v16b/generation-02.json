@@ -1,0 +1,10 @@
+{
+  "candidate": "jacket-front-02.png",
+  "prompt": "Refine this exact FRONT-ONLY jacket layer, using image 1 as the authoritative original geometry/design and image 2 as the correct front-only structure. Produce an exact registered transparent asset at 1441x1092. Image 2 already has the correct two full sleeves and shoulder fur masses, disconnected with transparency in the center. Preserve their positions, dimensions, outlines and all ornament locations as exactly as possible against image 1. Improve ONLY the edge finish: remove stray isolated white/cyan/blue specks in the transparent areas, especially beside the outer sleeves and inside the central opening; finish the newly exposed inner edges of the cyan side facings as clean naturally drawn fabric edges instead of jagged cyan residue. Keep the natural fluffy inner top ends on each separate shoulder fur collar; no straight cut. Full left sleeve and full right sleeve, both entire large front shoulder fur masses, white cloth, black reinforcement hardware, cyan glowing decorations, cuffs, front white facings and cyan SIDE facings all retained. The REAR neck collar bridge and the CENTRAL broad cyan back lining are absent and must remain truly transparent; do not reconnect the shoulders. Do not change the fur proportions, redraw details into a different design, reposition parts, add extra fur, add outlines around empty space or fill the transparent center. Same cool white/lavender clean anime shading and vivid cyan. Real transparent RGBA, clean transparent margins, no colored backdrop or checkerboard. Same 1441x1092 canvas and exact same asset registration. If local saving is supported save only D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16b/jacket-front-02.png.",
+  "transparent_background": true,
+  "references": [
+    "assets/ciel/generated/v16/jacket.png",
+    "assets/ciel/generated/v16b/jacket-front-01.png"
+  ],
+  "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-f1393e3a-d719-44e5-8877-cae811c4e686.png"
+}
