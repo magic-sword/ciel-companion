@@ -1,0 +1,16 @@
+# 比較用。自宅の GPU サーバーで動かす。/data に参照音声とモデルのキャッシュ（Git の外）。
+services:
+  tts:
+    build:
+      context: .
+      network: host
+    network_mode: host
+    volumes:
+      - ./data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
