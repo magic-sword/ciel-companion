@@ -24,9 +24,10 @@ from livekit import agents
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext
 from livekit.plugins import openai
 
+import emotion
 import irodori_tts
 import voice_conversion
-from persona import INSTRUCTIONS, GREETING
+from persona import EMOTION_INSTRUCTIONS, GREETING, INSTRUCTIONS
 
 load_dotenv()
 logger = logging.getLogger('ciel-agent')
@@ -51,7 +52,19 @@ def make_model():
 
 class Ciel(Agent):
     def __init__(self) -> None:
-        super().__init__(instructions=INSTRUCTIONS)
+        super().__init__(instructions=INSTRUCTIONS + (EMOTION_INSTRUCTIONS if VOICE == 'irodori' else ''))
+        self.events = emotion.ExpressionEvents()
+
+    def tts_node(self, text, model_settings):
+        # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）
+        if VOICE == 'irodori':
+            return emotion.tts_node(text, self.events)
+        return Agent.default.tts_node(self, text, model_settings)
+
+    def transcription_node(self, text, model_settings):
+        if VOICE == 'irodori':
+            return emotion.transcription_node(text)
+        return Agent.default.transcription_node(self, text, model_settings)
 
     def realtime_audio_output_node(self, audio, model_settings):
         if VOICE == 'ciel':
