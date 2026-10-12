@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 24
+  _unmanagedIndex: 25
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -524,7 +524,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 2
+  _unmanagedIndex: 3
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -605,7 +605,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 3
+  _unmanagedIndex: 4
   Value: 1
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -665,6 +665,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1668822390598754699}
+  - {fileID: 1130670445152210010}
   - {fileID: 2302095230288128760}
   - {fileID: 1944070302877497042}
   - {fileID: 67433660102153005}
@@ -739,7 +740,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 18
+  _unmanagedIndex: 19
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -1367,7 +1368,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 16
+  _unmanagedIndex: 17
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -1788,7 +1789,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 6
+  _unmanagedIndex: 7
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -2266,7 +2267,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 21
+  _unmanagedIndex: 22
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -2605,7 +2606,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 25
+  _unmanagedIndex: 26
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -3175,6 +3176,69 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3377252036137042775}
   m_Mesh: {fileID: 0}
+--- !u!1 &3439363556012304482
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1130670445152210010}
+  - component: {fileID: 8507250201873465063}
+  - component: {fileID: 3613951419305179625}
+  m_Layer: 0
+  m_Name: ParamBustY
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1130670445152210010
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3439363556012304482}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5118536600226086519}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8507250201873465063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3439363556012304482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
+  _unmanagedIndex: 1
+  Value: 0
+  _isOverriddenUserParameterRepeat: 0
+  _isParameterRepeated: 0
+--- !u!114 &3613951419305179625
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3439363556012304482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed02a7b9de37c2044b0bb2e36d490a6c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
+  Name: "\u80F8\u3000\u63FA\u308C"
+  DisplayName: 
 --- !u!1 &3549419144732440616
 GameObject:
   m_ObjectHideFlags: 0
@@ -3634,7 +3698,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 4
+  _unmanagedIndex: 5
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -3835,7 +3899,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 15
+  _unmanagedIndex: 16
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -3930,7 +3994,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 14
+  _unmanagedIndex: 15
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -4270,7 +4334,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 23
+  _unmanagedIndex: 24
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -4351,7 +4415,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 1
+  _unmanagedIndex: 2
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -5441,6 +5505,108 @@ MonoBehaviour:
           Maximum: 10
           Minimum: -10
           Default: 0
+    - Name: "\u5F8C\u308D\u9AEA\u306E\u63FA\u308C"
+      Input:
+      - SourceId: ParamAngleX
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 60
+        SourceComponent: 0
+        IsInverted: 0
+      - SourceId: ParamAngleZ
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 60
+        SourceComponent: 2
+        IsInverted: 0
+      - SourceId: ParamBodyAngleX
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 40
+        SourceComponent: 0
+        IsInverted: 0
+      - SourceId: ParamBodyAngleZ
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 40
+        SourceComponent: 2
+        IsInverted: 0
+      Output:
+      - DestinationId: ParamHairBack
+        ParticleIndex: 1
+        TranslationScale: {x: 0, y: 0}
+        AngleScale: 1.6
+        Weight: 100
+        SourceComponent: 2
+        IsInverted: 0
+      Particles:
+      - InitialPosition: {x: 0, y: 0}
+        Mobility: 1
+        Delay: 1
+        Acceleration: 1
+        Radius: 0
+      - InitialPosition: {x: 0, y: 15}
+        Mobility: 0.95
+        Delay: 0.8
+        Acceleration: 1.5
+        Radius: 15
+      Normalization:
+        Position:
+          Maximum: 10
+          Minimum: -10
+          Default: 0
+        Angle:
+          Maximum: 30
+          Minimum: -30
+          Default: 0
+    - Name: "\u80F8\u306E\u63FA\u308C"
+      Input:
+      - SourceId: ParamBodyAngleY
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 100
+        SourceComponent: 0
+        IsInverted: 0
+      - SourceId: ParamBodyAngleZ
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 50
+        SourceComponent: 2
+        IsInverted: 0
+      - SourceId: ParamBodyAngleX
+        ScaleOfTranslation: {x: 0, y: 0}
+        AngleScale: 0
+        Weight: 50
+        SourceComponent: 0
+        IsInverted: 0
+      Output:
+      - DestinationId: ParamBustY
+        ParticleIndex: 1
+        TranslationScale: {x: 0, y: 0}
+        AngleScale: 1
+        Weight: 100
+        SourceComponent: 2
+        IsInverted: 0
+      Particles:
+      - InitialPosition: {x: 0, y: 0}
+        Mobility: 1
+        Delay: 1
+        Acceleration: 1
+        Radius: 0
+      - InitialPosition: {x: 0, y: 3}
+        Mobility: 0.8
+        Delay: 0.9
+        Acceleration: 1.5
+        Radius: 3
+      Normalization:
+        Position:
+          Maximum: 10
+          Minimum: -10
+          Default: 0
+        Angle:
+          Maximum: 10
+          Minimum: -10
+          Default: 0
     Gravity: {x: 0, y: -1}
     Wind: {x: 0, y: 0}
     Fps: 0
@@ -5643,7 +5809,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 12
+  _unmanagedIndex: 13
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -6121,7 +6287,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 10
+  _unmanagedIndex: 11
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -6322,7 +6488,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 9
+  _unmanagedIndex: 10
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -6524,7 +6690,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 5
+  _unmanagedIndex: 6
   Value: 1
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -6957,7 +7123,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 22
+  _unmanagedIndex: 23
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -7451,7 +7617,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 19
+  _unmanagedIndex: 20
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -7652,7 +7818,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 20
+  _unmanagedIndex: 21
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -7853,7 +8019,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 17
+  _unmanagedIndex: 18
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -8054,7 +8220,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 13
+  _unmanagedIndex: 14
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -8117,7 +8283,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 11
+  _unmanagedIndex: 12
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -8180,7 +8346,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 26
+  _unmanagedIndex: 27
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -8243,7 +8409,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 7
+  _unmanagedIndex: 8
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0
@@ -9272,7 +9438,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dafbb7ec1700e8147a48dbed2e4e543c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Core.CubismParameter
-  _unmanagedIndex: 8
+  _unmanagedIndex: 9
   Value: 0
   _isOverriddenUserParameterRepeat: 0
   _isParameterRepeated: 0

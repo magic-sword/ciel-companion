@@ -7,6 +7,11 @@
 			"Name": "角度 X"
 		},
 		{
+			"Id": "ParamBustY",
+			"GroupId": "",
+			"Name": "胸　揺れ"
+		},
+		{
 			"Id": "ParamAngleY",
 			"GroupId": "",
 			"Name": "角度 Y"

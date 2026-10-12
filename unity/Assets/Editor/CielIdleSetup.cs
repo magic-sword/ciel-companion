@@ -1,4 +1,4 @@
-// シエルのモデル（Ciel.prefab）に、待機中の呼吸と小さな揺れ（CubismHarmonicMotion）を設定する。
+// シエルのモデルを読み込み直し（Ciel.prefab を作り直す）、待機中の呼吸と小さな揺れ（CubismHarmonicMotion）を設定する。
 // 値は Live2D 公式の呼吸のサンプル（docs.live2d.com/en/cubism-sdk-manual/breath）を、顔と体は半分程度に控えめにしたもの。
 // 実行：Unity.exe -batchmode -projectPath unity -executeMethod Ciel.EditorTools.CielIdleSetup.Run -quit -logFile <log>
 using Live2D.Cubism.Core;
@@ -24,6 +24,8 @@ namespace Ciel.EditorTools
 
         public static void Run()
         {
+            // 書き出し直したモデル（moc3・物理演算）を、プレハブへ反映させてから設定する
+            AssetDatabase.ImportAsset("Assets/Characters/Ciel/Ciel.model3.json", ImportAssetOptions.ForceUpdate);
             var root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
