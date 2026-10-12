@@ -48,3 +48,9 @@
 1 分の目安は、音声 1 分 = 入力 600 トークン・出力 1,200 トークン、会話の履歴のキャッシュが効く前提の第三者の試算（[forasoft](https://www.forasoft.com/blog/article/openai-realtime-api-pricing)）。
 
 方針：開発の既定は **gpt-realtime-2.1-mini**（安い）。会話の質を gpt-realtime-2.1 と比べ、GPT-Live は日本語と Seed-VC との相性を確かめてから判断する（`CIEL_MODEL`・`CIEL_REALTIME_MODEL` で切り替え）。
+
+## 声質変換の測定（2026-10-13、自宅 GPU RTX A2000 12GB）
+
+- 構成：Seed-VC のリアルタイム用モデル（xlsr tiny、`DiT_uvit_tat_xlsr_ema.pth`）、block 0.18 秒、拡散 8 ステップ、fp16。GPU のメモリは約 1.2 GB。
+- 5.2 秒の音声を実時間で流して：処理の実時間比 0.33（間に合う）、変換による遅れ 約 0.19 秒（声の始まりを送ってから、変換した声の始まりが届くまで）。
+- vLLM（gemma4-developer-agent-model-1）は、ユーザーの了承のうえ止めてある（しばらく止めたままでよい）。戻すときは `docker start gemma4-developer-agent-model-1`（GPU のメモリが足りなくなるので、声質変換サービスを止めてから）。

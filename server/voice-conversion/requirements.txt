@@ -4,6 +4,7 @@ librosa==0.10.2
 huggingface-hub==0.28.1
 munch==4.0.0
 einops==0.8.0
+descript-audio-codec==1.0.0
 transformers==4.46.3
 soundfile==0.12.1
 numpy==1.26.4
