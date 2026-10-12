@@ -36,7 +36,7 @@ def make_model():
     if kind == 'gpt-live':
         return openai.realtime.GPTLiveModel(voice=voice)
     return openai.realtime.RealtimeModel(
-        model=os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime'),
+        model=os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini'),
         voice=voice,
     )
 

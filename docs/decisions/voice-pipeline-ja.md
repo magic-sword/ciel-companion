@@ -26,3 +26,25 @@
 4. Unity：`Assets/Settings/LiveKitTokenSource.asset`（Git 管理外）の Token Server Id に、1 の ID を入れる。`Assets/Scenes/Conversation.unity` を開いて再生する（メニュー CIEL ＞ Conversation ＞ Create Scene で作り直せる）。
 
 開発用トークンサーバーは誰でもトークンを取れるので、開発中だけ使う。公開前に、認証つきのトークン発行（仕様書の `server/session-api/`）へ切り替える。
+
+## OpenAI の独自の声（Custom voices）を使わない理由（2026-10-12 調査）
+
+- 利用できるのは「対象の顧客」だけで、営業窓口への申し込みが要る（[Custom voices ガイド](https://developers.openai.com/api/docs/guides/custom-voices)）。
+- 声の持ち主本人が決められた同意文を読んだ録音と、同じ人の声の見本（30 秒以内）が要る。Irodori-TTS で合成した声は「本人の同意」を用意できないので、この仕組みの対象外と判断した（合成音声で同意文を作ることは、同意の仕組みのすり抜けになるのでしない）。
+- GPT-Live の独自の声は英語のアクセントのみと書かれている。日本語は未確認。
+- 以上から、シエルの声は Seed-VC による変換で作る方針を続ける。
+
+## 会話モデルの比較（2026-10-12、公式の料金表 https://developers.openai.com/api/docs/pricing）
+
+| | gpt-realtime-2.1-mini | gpt-realtime-2.1 | gpt-live-1 |
+| --- | --- | --- | --- |
+| 料金 | 音声 入力 $10・出力 $20／100 万トークン（キャッシュ入力 $0.30） | 音声 入力 $32・出力 $64／100 万トークン（キャッシュ入力 $0.40） | $0.05／分（秒単位）。裏側のモデル・ツールを使うと別料金 |
+| 会話 1 分の目安 | 約 $0.02〜0.05 | 約 $0.06〜0.11 | 約 $0.05 |
+| 話し方 | 交代で話す（割り込みあり） | 交代で話す（割り込みあり） | 聞きながら話す全二重。あいづち・割り込みが自然 |
+| Seed-VC との相性 | よい（変換の遅れ 約 0.4 秒は、返事の出だしが遅れるだけ） | よい | 要検証（全二重のあいづちや重なりが、変換の遅れでずれる） |
+| 日本語 | 対応 | 対応 | 公式ページに記載なし（要検証） |
+| 利用条件 | 一般 | 一般 | 無料枠では使えない（利用実績の段階 Build 以上） |
+
+1 分の目安は、音声 1 分 = 入力 600 トークン・出力 1,200 トークン、会話の履歴のキャッシュが効く前提の第三者の試算（[forasoft](https://www.forasoft.com/blog/article/openai-realtime-api-pricing)）。
+
+方針：開発の既定は **gpt-realtime-2.1-mini**（安い）。会話の質を gpt-realtime-2.1 と比べ、GPT-Live は日本語と Seed-VC との相性を確かめてから判断する（`CIEL_MODEL`・`CIEL_REALTIME_MODEL` で切り替え）。
