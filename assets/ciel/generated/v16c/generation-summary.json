@@ -1,0 +1,68 @@
+{
+  "generation_count": 4,
+  "limit": 4,
+  "selected": "jacket-front-03.png",
+  "calls": [
+    {
+      "candidate": "jacket-front-01.png",
+      "prompt": "Edit this exact jacket image into a SLEEVES-AND-SHOULDER-FUR-ONLY front overlay. EXACT same 1441x1092 canvas, scale, position and framing as reference. Preserve existing sleeve positions, outlines, cuffs, black upper arm straps, round glowing cyan hardware and forearm plaques. Keep the two large white fur masses sitting on the OUTER shoulders and upper arms. REMOVE ALL jacket torso fabric: the central back cloth, ALL cyan lining panels beside the torso, ALL front bodice panels, ALL turned-back lapels, ALL white long front facings with black diagonal piping and their little black oval buttons, ALL hanging lower side flaps. Remove the rear fur collar that bridges the neck. This is NOT a full open coat. Output ONLY TWO detached sleeve tubes with fluffy shoulder caps. Each sleeve must end on its INNER side along a natural rounded white sleeve seam below the armpit, with nothing projecting inward over the chest. Fur is on shoulders and upper arms only, with natural tufted inner boundaries that keep the chest free. A very broad transparent opening separates the sleeves from top to bottom. Cyan is permitted ONLY in the small glowing hardware accents on the sleeve, narrow small sleeve hardware stripes, and INSIDE THE CUFF OPENINGS. There must be ZERO cyan fabric, ZERO cyan inner lapels, ZERO white torso facings and ZERO jacket torso panels anywhere beside the chest or waist. Do not replace cyan lapels with white panels: remove lapels and all front panels entirely to transparency. Keep the outer puffy sleeve silhouette and cuff location registered to the reference; do not widen, translate, recenter or scale the sleeves. The new inner white sleeve edge should be naturally drawn cloth folds and seams, never a straight cut, and shoulder fur should end in naturally flowing tufts. Preserve original white/lavender anime shading and delicate linework. Transparent RGBA background with clean empty space, no colored backdrop, checkerboard, stray specks, person, mannequin, body, hair or neck. Same exact 1441x1092 frame. If supported save only D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16c/jacket-front-01.png.",
+      "references": [
+        "assets/ciel/generated/v16/jacket.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-34e85d3d-510a-4e02-b2b7-d80e409b4ed4.png",
+      "sha256": "524a0c97909509ece1992198bae45d9cec0b89e4d28e72849e2de6c37b9eff9e",
+      "source_size": [
+        1441,
+        1092
+      ]
+    },
+    {
+      "candidate": "jacket-front-02.png",
+      "prompt": "Create corrected candidate 02 of the sleeves-only front overlay. Image 1 is the original jacket geometry; image 2 is the previous sleeves-only attempt; image 3 shows that attempt on the body (left column body alone, right column candidate): USE IMAGE 3 ONLY to understand what must NOT overlap the white chest top. Output the same 1441x1092 transparent isolated garment frame as images 1 and 2, not a dressed character or comparison sheet. Candidate 1 correctly removed all lapels and cyan fabric, but its two shoulder fur masses project too far INWARD and cover the outer sides of the white chest top. Correct this: keep only fur on shoulders/upper arms, reshape the INNER fur contours to lie farther OUTWARD, tapering down along the arm rather than pointing toward the chest. For the image-left fur, its rightmost edge must retreat leftward progressively below the shoulder; mirror on the right. Approximate safe inner contour in the 1441x1092 asset: left fur inner boundary around x=505 at y=230, x=480 at y=330, x=450 at y=430, and x=405 at y=505; right counterpart at x=936,961,991,1036. These are guides for naturally tufted fur, NOT straight mask cuts. Keep the original upper shoulder peaks and outer silhouette unchanged. No fur tips or fabric may extend inward past these chest-facing guides at those heights. The sleeve immediately below fur must curve into a natural white inner upper-arm edge, x no greater than about 450 on the left at y=560-650, mirrored on the right; retain full outer puffy sleeves, the lower forearm shape and cuff positions. Preserve black upper-arm reinforcement straps, cyan round lights and long dark forearm plaques in their original image-1 positions. ONLY two sleeve tubes capped with fluffy white fur. NO front bodice, lapels, turned facings, back collar, cyan side panels, dangling waist flaps or cyan lining anywhere except inside cuffs. Small cyan hardware lights/stripes are retained. Broad clear transparent gap, with no garment covering the chest or abdomen when placed at original scale. Preserve white/lavender anime art, exact original 1441x1092 registration, crisp natural edges, no detached specks. Do not move whole sleeves or scale anything. If supported save only D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16c/jacket-front-02.png.",
+      "references": [
+        "assets/ciel/generated/v16/jacket.png",
+        "assets/ciel/generated/v16c/jacket-front-01.png",
+        "assets/ciel/generated/v16c/proofs/body-candidate-01.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-3ac264e4-caa7-4104-9d0b-124dbc06f377.png",
+      "sha256": "e64775e825ab59ec2fd73526525163e243ea246ea19fd75a251363978eab888a",
+      "source_size": [
+        1441,
+        1092
+      ]
+    },
+    {
+      "candidate": "jacket-front-03.png",
+      "prompt": "Precisely revise the reference jacket into TWO DETACHED SLEEVES WITH SHORT OUTER-SHOULDER FUR CAPS ONLY. Same 1441x1092 frame, same sleeve outer contour and hardware/cuff coordinates. The inner half of each long fur lapel MUST BE REMOVED, not retained: the current long pointed fur reaching down along the chest is forbidden. Keep the big fluffy OUTER shoulder volume, but shorten and round its CHEST-FACING half into a shoulder cap ending ABOVE the upper-arm round cyan light height. Its tuft tips must stay over the upper arm, not the chest. On the left the inner lower fur should finish around x=400,y=380-410, not x=540,y=520. On the right mirror this around x=1040. Make a visibly MUCH WIDER transparent chest gap below the shoulder: from y=350 to y=750 there should be no garment at all inside the broad central band x=450 through x=990. These are anatomical extent guides, draw natural irregular fur tufts and curved sleeve seams, NO rectangular cuts. Upper fur shoulder peaks and outer fluffy silhouette remain at their original locations. Below the short fur caps paint only the white upper-arm sleeve continuing to the original black armband, lower puffy forearm and cuff. The inner sleeve seam hugs the arm and stays outside the broad central chest gap. Do not keep or invent white bulging torso panels on the inner sides. Remove ALL cyan fabric except inside cuffs, ALL front torso panels, lapels, turned facings, black diagonal lapel piping, lapel buttons, side waist flaps, back lining and rear neck collar. Keep the small cyan hardware accents on the sleeves. Reference 1 original governs sleeve registration, reference 2 shows body proportions for the chest/torso that MUST remain uncovered. Do not output body or person; isolated sleeves and shoulder caps only on transparent background. Exact original cool white/lavender anime shading, crisp natural fabric and tuft edges, clean transparency with no floating specks. No repositioning whole sleeves, no new framing, no scale change. Output original 1441x1092. If supported save only D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16c/jacket-front-03.png.",
+      "references": [
+        "assets/ciel/generated/v16/jacket.png",
+        "assets/ciel/layers/v16/dressed/Body.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-fe1db5fe-76a3-450a-afbf-c8c7c87c6080.png",
+      "sha256": "b46fbad9f0bf40f0675521fd357223260d16269a5eefb500452b022460e882fd",
+      "source_size": [
+        1441,
+        1092
+      ]
+    },
+    {
+      "candidate": "jacket-front-04.png",
+      "prompt": "Final precision refinement of the sleeves-and-shoulder-caps-only layer. Image 1 = original sleeve registration and details. Image 2 = candidate 03, the correct basic design to retain. Image 3 = body-only versus body+candidate03 review, for understanding the remaining small collision with chest top; do not reproduce this layout or body. Output same 1441x1092 transparent isolated layer as image 2. Keep candidate03's TWO SLEEVES, their short rounded fluffy shoulder caps and broad empty chest gap, all sleeve hardware, all outer contours and cuffs at the exact same coordinates. Make ONLY this shape correction: retreat the inner edge of each fur cap OUTWARD by about 40 pixels over the mid-height area y=170..370, tapering the correction naturally toward zero at the upper peak and lower outer fur tips. For image-left move only the cap's right-facing boundary leftwards, for image-right move only the cap's left-facing boundary rightwards. Render new soft tuft tips naturally. This prevents even the inner tips from crossing onto the white chest top visible in review image 3. Keep the fluffy shoulder cap substantial over the shoulder/upper arm, just keep its chest-facing edge away from the top. Do not move or rescale whole parts. Do NOT restore long inner fur lapels, white torso facings, cyan lining, front bodice, coat tails or back collar. ONLY sleeve tubes with shoulder fur. Cyan fabric is allowed only inside cuffs; small cyan hardware accents remain. Preserve the original white puffy sleeve shading, pale lavender outlines and cyan hardware. Clean alpha background with no stray isolated dots or stains. No body, background, text or comparison sheet. 1441x1092 exact source framing. If supported save only D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16c/jacket-front-04.png.",
+      "references": [
+        "assets/ciel/generated/v16/jacket.png",
+        "assets/ciel/generated/v16c/jacket-front-03.png",
+        "assets/ciel/generated/v16c/proofs/body-candidate-03.png"
+      ],
+      "transparent_background": true,
+      "tool_original": "C:/Users/prog/.codex/generated_images/01a12d7d-99ab-7452-b85d-57836a30c31e/exec-2cf679de-4451-4a9b-91ff-0ad41eade923.png",
+      "sha256": "e79cec09912136e651b1a321343f3877e08da89d282fedcf3cb3e7560372ae79",
+      "source_size": [
+        1441,
+        1092
+      ]
+    }
+  ]
+}
