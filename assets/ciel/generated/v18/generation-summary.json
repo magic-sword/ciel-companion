@@ -1,0 +1,18 @@
+{
+  "attempt_counts_including_failure": {
+    "Body": 4,
+    "Jacket_Front": 4
+  },
+  "successful_image_counts": {
+    "Body": 3,
+    "Jacket_Front": 4
+  },
+  "limit_per_layer": 4,
+  "selected": {
+    "Body": 3,
+    "Jacket_Front": 4
+  },
+  "all_body_references_original_only": true,
+  "all_saved_images_match_tool_originals": true,
+  "full_log": "generation-log.json"
+}

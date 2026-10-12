@@ -1,0 +1,29 @@
+{
+  "body": {
+    "selected": 3,
+    "observations": [
+      "Shoulder and arm contours are smoother and broader than v17.",
+      "Cool porcelain skin and shaded volume retained.",
+      "The torso still has stronger bust/waist shaping than the requested young natural proportions.",
+      "Black neckline design was redrawn and differs from the original.",
+      "Forearms intersect the source side borders near the lower part of the proof."
+    ]
+  },
+  "jacket_front": {
+    "selected": 4,
+    "observations": [
+      "Medial upper shoulder fur lobes removed; rear collar remains only in unchanged Jacket_Back.",
+      "Large front panels, folded lapels and cyan lining webs removed.",
+      "Retained fur and sleeves are not pixel-identical to v16/v16c.",
+      "Some downward fur tips still overlap the outer edges of the top."
+    ]
+  },
+  "composite": {
+    "observations": [
+      "Upper-arm skin remains visible inside the existing sleeves.",
+      "Fine generated alpha residue remains; no programmatic cleanup was applied."
+    ],
+    "live2d_motion_tested": false
+  },
+  "strict_zero_top_overlap_achieved": false
+}
