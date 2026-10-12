@@ -1,0 +1,25 @@
+{
+  "canvas": [2172, 2896],
+  "coordinates": "Top-left origin. translate places the full original source image top-left after uniform scaling; no source crop, no rotation.",
+  "resampling": "Pillow LANCZOS; each dimension round(source_dimension * uniform_scale)",
+  "transforms": {
+    "Body": {
+      "source": "assets/ciel/generated/v15/parts/body-01.png",
+      "uniform_scale": 1.10,
+      "translate": [553, 1286]
+    },
+    "Choker": {
+      "source": "assets/ciel/generated/v16/choker.png",
+      "uniform_scale": 0.33,
+      "translate": [875, 1327]
+    },
+    "Jacket": {
+      "source": "assets/ciel/generated/v16/jacket.png",
+      "uniform_scale": 1.61,
+      "translate": [-35, 1280]
+    }
+  },
+  "proof_order": "v15b Hair_Back, Body, visible v14c face/head/neck layers in their original order, Jacket, Choker",
+  "proof_limitation": "Jacket rear lining and rear collar intentionally cover body/hair because the complete unsplit garment is on top. Claude Code will split front/back later.",
+  "prohibited_operations_used": []
+}

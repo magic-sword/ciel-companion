@@ -1,0 +1,94 @@
+{
+  "generation_counts": {
+    "choker": 1,
+    "jacket": 4,
+    "body": 0
+  },
+  "count_note": "Includes four existing generated candidates from the preceding v16 session and one new jacket generation. An unexecuted prepared prompt is not counted.",
+  "calls": [
+    {
+      "candidate": "choker-01",
+      "source": "assets/ciel/generated/v16/parts/choker-01.png",
+      "prompt": "Create ONE complete isolated choker accessory as a single naturally painted coherent object, based closely on the attached approved anime character collar reference. True transparent background. Front view, worn shape around an invisible upright neck: a shallow oval closed ring, NOT a flat strip and not separate front/back pieces. Render the entire continuous rear arc and the dark navy inner wall visible inside the left and right ends of the ring, smoothly joining the front band with consistent thickness and perspective. The empty neck opening is transparent. Preserve the reference design: broad luminous cyan panels, charcoal black upper and lower edging and vertical panel separators, central upright rounded rectangular dark clasp with a silver frame and two small cyan lights vertically stacked, a short cyan/silver connector hanging in front, one round cyan luminous pendant with silver dark edging. Include the small black triangular fabric backing below the collar and behind the pendant. The backing belongs only below the band, not inside the neck hole. Refined clean 2D anime linework, soft cool lilac shadows, subtle cel shading, front view same as reference. No neck, skin, body, hair, clothes, mannequin, text, labels, cast shadow, extra accessories or detached fragments. Complete silhouette with transparent margin all around. Keep the collar band and pendant proportions exactly like the reference; do not exaggerate the depth of the oval. Save the generated original PNG to D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16/parts/choker-01.png. Do not write anywhere else.",
+      "references": [
+        "assets/ciel/generated/v16/inputs/choker-reference.png"
+      ],
+      "transparent_background": true,
+      "selected": true,
+      "sha256": "a4e7b8348528906206473892bb8916f3c3856cdc3b8a39fb01f859e55103c437",
+      "size": [
+        1470,
+        1070
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "candidate": "jacket-01",
+      "source": "assets/ciel/generated/v16/parts/jacket-01.png",
+      "prompt": "Paint ONE complete isolated white puffer jacket from the attached approved anime character reference as a coherent finished garment on a truly transparent background. Front view in the SAME worn off-shoulder silhouette as the reference, with the wearer invisible. This is a single jacket, not two separate sleeves: the two large fluffy white shoulder collars must connect naturally through ONE continuous rear fur collar across the back of the neck. Paint that previously occluded back arc and the continuous cyan inner back lining as physical parts of this jacket. The back fur arc is fairly low, just behind the base of the neck; it smoothly rolls forward and down to the two broad fluffy shoulder lapels with no pasted seams. Preserve the generous shoulder fur shapes tapering down towards the chest, white puffy sleeves hanging down and slightly outward in the reference pose, cyan interior lining visible inside the open front edges, charcoal reinforcement panels and straps, round cyan glowing ornaments near each upper sleeve, elongated charcoal panels with round cyan glowing discs lower on both sleeves, fine lilac seam linework and cool lavender cel shadows. Match the original broad jacket silhouette and sleeve angles precisely, shoulders slipped down and a wide open front. Draw the inward-facing back lining behind the invisible torso naturally, with fabric depth and folds, as part of the same garment. No body, skin, neck, face, hair, ears, hands, mannequin, white central shirt, diamond chest gem, choker, pendant, belt or skirt. Do not mistake the long white hair for fur or jacket: no long hair tendrils. Only one jacket. Preserve the reference's clean polished 2D anime illustration style, soft cool shading, white fabric and bright cyan accents, near bilateral symmetry. Full jacket object with transparent margin; no captions, no ground shadow, no extra objects, no split panels. Save original PNG to D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16/parts/jacket-01.png if output path is configurable.",
+      "references": [
+        "assets/ciel/generated/v16/inputs/jacket-reference.png",
+        "assets/ciel/master/ciel-upper-body-2x.png"
+      ],
+      "transparent_background": true,
+      "selected": false,
+      "sha256": "651a0897924c4c13ef7b008697c5052d31904537a5167940fdeedeeddf9f8a8b",
+      "size": [
+        1441,
+        1092
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "candidate": "jacket-02",
+      "source": "assets/ciel/generated/v16/parts/jacket-02.png",
+      "prompt": "Create a refined new version of the SINGLE complete isolated white off-shoulder puffer jacket. Reference 1 is the approved original character: match its garment design and WIDE OPEN FRONT silhouette. Reference 2 is the first standalone jacket draft: preserve its one-piece rear collar and natural continuous cyan back lining, but correct its overly narrow front opening and excessive inward white lapels. Both sleeves are worn slipped down off the shoulders, with arms down, not stretched sideways. Make the two big white fluffy front fur lapels fall along the OUTSIDE of the invisible shoulders/chest as in reference 1; keep a broader gap between the inward edges, with the cyan back lining visible through that broad open gap. The two front fur masses join smoothly through ONE lower rear fur collar extending across the shoulder blades behind the base of the invisible neck. This is a coherent volumetric jacket, no detached parts. Only cyan lining inside: eliminate the extra white front vertical facings with black waist straps seen in draft 2; those resemble the central shirt from the character and do not belong to this jacket. Keep the white puffy sleeves, cyan inner side lining, black reinforcement armbands with round cyan lights and elongated dark lower sleeve patches with round lights. Fine cool lavender anime linework, luminous white cloth, fur with natural tufts and soft lilac shadows, polished clean cel shading matching reference 1. The front fur lapels should be long and full like reference 1, tapering to the upper-arm round ornaments. No actual body, skin, neck, head, hands, mannequin, hair, shirt, chest diamond, waist belt, choker or pendant. Front view, symmetrical, complete garment including both empty cuff openings. True transparent background, no text, no backdrop, no ground shadows, no extra objects, generous clear margin. Draw the inner rear lining continuously as a physical jacket back, not a transparent hole. Output as one finished garment painting.",
+      "references": [
+        "assets/ciel/generated/v16/inputs/jacket-reference.png",
+        "assets/ciel/generated/v16/parts/jacket-01.png"
+      ],
+      "transparent_background": true,
+      "selected": false,
+      "sha256": "42c46b33ab1b2c0cf8094e1a9e8c2d9fb33836ab788f6d8527ff57ed63832dfe",
+      "size": [
+        1441,
+        1092
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "candidate": "jacket-03",
+      "source": "assets/ciel/generated/v16/parts/jacket-03.png",
+      "prompt": "Using the attached original anime character image as the design reference, paint ONLY her white puffer jacket as ONE complete coherent garment, including the previously hidden back. Transparent background. Think of the wearer becoming invisible while the jacket retains its exact worn position and silhouette. The jacket is worn OFF BOTH SHOULDERS, the collar slipped outward around the upper arms. It is NOT a zipped coat or a coat worn normally up at the neck. Keep the front opening VERY WIDE as in the original: the inward edge of left front fur is about 36 percent across the overall garment width, and right front fur at about 64 percent, so the center third remains broadly open. Large white fluffy fur lapels sit on the outer shoulders and descend toward the upper-arm cyan lights. The highest tufts are around the outer shoulders. Both side fur lapels connect naturally through one LOWER narrow soft rear collar around the back/base of the neck, continuously painted with matching thickness and flowing tufts. The rear collar should sag gently in the center behind the invisible nape, not rise into a high stand collar. Draw the continuous cyan back lining naturally between the two sides, behind the invisible chest: broad back fabric with gentle folds. Its upper edge follows the lower back collar. The back lining is part of the jacket and is opaque cyan fabric, not a hole. Keep both puffy white sleeves falling almost vertically down beside the body with only a modest outward angle like the original, longer and with roomy cuffs. Preserve original black upper arm reinforcements, round cyan glowing ornaments near the upper arms, elongated black plaques with larger round cyan lights below, cyan side lining, white seams with pale cool lavender shadows. No extra white central vest panels or long front white shirt strips. No skin, body, neck, hands, head, hair, mannequin, choker, shirt, chest diamond, skirt or waist belt. One naturally drawn connected jacket only, no separate panels or duplicate parts. Refined 2D anime artwork with crisp delicate lavender outlines and soft cel shading, coherent material and lighting. Centered front view, complete silhouette and transparent margin on all sides, no text or ground shadow.",
+      "references": [
+        "assets/ciel/generated/v16/inputs/jacket-reference.png",
+        "assets/ciel/master/ciel-upper-body-2x.png"
+      ],
+      "transparent_background": true,
+      "selected": true,
+      "sha256": "9bfeb9eabf54d1e6b5b3d23841cb99e997e2189129695541c6c414711ac6a40a",
+      "size": [
+        1441,
+        1092
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "candidate": "jacket-04",
+      "source": "assets/ciel/generated/v16/parts/jacket-04.png",
+      "prompt": "Create one complete isolated white puffer jacket as a transparent PNG asset. Use the first reference as the authoritative anime artwork and clothing design. The second reference is the current complete jacket candidate: improve its silhouette to match the original relaxed off-shoulder worn pose, with the two shoulders dropped outward. Draw the jacket ONLY, no person, skin, neck, head, hair, chest garment, choker, jewelry, mannequin, hanger or background. Front view at the original viewing angle, as worn by an invisible person. The left and right fluffy white fur lapels MUST flow smoothly into ONE continuous fur collar passing behind the neck/back, a shallow curved U-shaped back neckline lower in the center, not a high upright wall and not two detached pieces. Preserve full continuous cyan back lining with plausible cloth folds and seams behind the invisible torso, naturally connected to the cyan side lining. Preserve the original white puff sleeves, black reinforcement bands, round glowing cyan upper-arm decorations, dark oval forearm hardware, thin lavender anime linework, cool white and pale lilac cel shading. All garment parts are one coherent connected object painted together, with soft naturally joined collar transitions. No long hair-like wisps trailing behind the collar. Both sleeves hang downward slightly outward, with original large puffy proportions and a wide open front. Include complete sleeve cuffs and all edges with transparent margin. Use a landscape canvas like the second reference and similar object framing. Real alpha transparency, no background color, no checkerboard, no floating debris. This is candidate jacket-04, the fourth and final jacket generation for v16. Save the resulting image to D:/CIEL/apps/ciel-companion/assets/ciel/generated/v16/parts/jacket-04.png if local output paths are supported.",
+      "references": [
+        "assets/ciel/generated/v16/inputs/jacket-reference.png",
+        "assets/ciel/generated/v16/parts/jacket-03.png"
+      ],
+      "transparent_background": true,
+      "selected": false,
+      "sha256": "9e57dff35eeabe2dc0424a383db438d0d9d1c16e36e1edbe98f97329f2603935",
+      "size": [
+        1441,
+        1092
+      ],
+      "mode": "RGBA"
+    }
+  ]
+}
