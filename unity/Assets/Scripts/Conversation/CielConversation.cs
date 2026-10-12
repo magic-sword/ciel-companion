@@ -1,7 +1,7 @@
 // シエルとの音声会話（フェーズ1）。LiveKit のルームに入り、会話サーバー（server/agent）の声を再生し、
 // その声の大きさで口を動かす。マイクは最初は切っておき、SetMicEnabled（画面のマイクボタン）で入れる。
 //
-// 流れ：トークンを取得（TokenSourceComponent）→ 端末の音声（WebRTC のエコー除去つき）を用意 → ルームへ接続
+// 流れ：トークンを取得（UnityWebRequest。設定は TokenSourceComponentConfig）→ 端末の音声（WebRTC のエコー除去つき）を用意 → ルームへ接続
 //       → 会話サーバーの音声トラックが届いたら、口パク用の音量を測る。
 //       マイクを入れると、録音を始めて（初回はトラックを公開）、切ると録音を止めてトラックをミュートする。
 // 声の再生は端末の音声（PlatformAudio）が自動で行う。口パク用には同じトラックを Unity の AudioSource でも受け、
@@ -19,10 +19,11 @@ using RoomOptions = LiveKit.RoomOptions;
 
 namespace Ciel.Conversation
 {
-    [RequireComponent(typeof(TokenSourceComponent))]
     public sealed class CielConversation : MonoBehaviour
     {
         [SerializeField] CubismMouthController _mouth;
+        [Tooltip("接続の設定（Assets/Settings/LiveKitTokenSource.asset）")]
+        [SerializeField] TokenSourceComponentConfig _tokenConfig;
         [SerializeField] bool _connectOnStart = true;
         [Tooltip("口の開きの倍率（声の大きさ → 口の開き）")]
         [SerializeField] float _mouthGain = 6f;
@@ -70,23 +71,28 @@ namespace Ciel.Conversation
             Changed?.Invoke();
         }
 
+        static void Trace(string what) =>
+            Debug.Log($"[CielConversation] {what}（frame={Time.frameCount}, t={Time.realtimeSinceStartup:0.00}）");
+
         IEnumerator Connect()
         {
             SetStatus(State.Connecting);
-            var fetch = GetComponent<TokenSourceComponent>().FetchConnectionDetails();
-            yield return fetch;
-            if (fetch.IsError)
+            Trace("トークンを取得");
+            string serverUrl = null, token = null;
+            yield return FetchToken((u, t) => { serverUrl = u; token = t; });
+            Trace("トークンを取得した");
+            if (string.IsNullOrEmpty(token))
             {
-                Debug.LogError($"[CielConversation] トークンを取得できない: {fetch.Exception?.Message}");
                 SetStatus(State.Failed);
                 yield break;
             }
-            var details = fetch.Result;
 
             // 端末の音声は、ルームへ接続する前に作る（後から作ると、届いた声が再生されない）
             try
             {
+                Trace("端末の音声を作る");
                 _platformAudio = new PlatformAudio();
+                Trace("端末の音声を作った");
                 var (rec, play) = _platformAudio.GetDevices();
                 MicDevices.Clear();
                 foreach (var d in rec)
@@ -108,9 +114,58 @@ namespace Ciel.Conversation
             _room = new Room();
             _room.TrackSubscribed += OnTrackSubscribed;
             _room.TrackUnsubscribed += OnTrackUnsubscribed;
-            yield return _room.Connect(details.ServerUrl, details.ParticipantToken, new RoomOptions());
+            Trace("ルームへ接続");
+            yield return _room.Connect(serverUrl, token, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
             SetStatus(State.Connected);
+        }
+
+        [System.Serializable]
+        class ConnectionDetailsJson
+        {
+            public string server_url;
+            public string participant_token;
+        }
+
+        // 接続のトークンを取る。LiveKit の TokenSourceComponent は .NET の HttpClient を使い、エディタの再生中に
+        // スクリプトの再読み込みが起きて、シエルが描かれなくなった。Unity の UnityWebRequest で同じ要求を送る。
+        // 開発用トークンサーバー（DevelopmentTokenServer）と、任意の取得先（Endpoint）に対応する。
+        IEnumerator FetchToken(Action<string, string> done)
+        {
+            var config = _tokenConfig;
+            string url;
+            var headers = new List<(string, string)>();
+            if (config == null) { Debug.LogError("[CielConversation] 接続の設定（Token Config）がない"); yield break; }
+            switch (config.TokenSourceType)
+            {
+                case TokenSourceType.DevelopmentTokenServer:
+                    url = "https://cloud-api.livekit.io/api/v2/sandbox/connection-details";
+                    headers.Add(("X-Sandbox-ID", config.TokenServerId));
+                    break;
+                case TokenSourceType.Endpoint:
+                    url = config.EndpointUrl;
+                    if (config.EndpointHeaders != null) foreach (var h in config.EndpointHeaders) headers.Add((h.key, h.value));
+                    break;
+                case TokenSourceType.Literal:
+                    done(config.ServerUrl, config.Token);
+                    yield break;
+                default:
+                    yield break;
+            }
+            var body = string.IsNullOrEmpty(config.RoomName) ? "{}" : $"{{\"room_name\":\"{config.RoomName}\"}}";
+            using var req = new UnityEngine.Networking.UnityWebRequest(url, "POST");
+            req.uploadHandler = new UnityEngine.Networking.UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+            req.downloadHandler = new UnityEngine.Networking.DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            foreach (var (k, v) in headers) if (!string.IsNullOrEmpty(k)) req.SetRequestHeader(k, v);
+            yield return req.SendWebRequest();
+            if (req.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[CielConversation] トークンを取得できない: {req.error} {req.downloadHandler?.text}");
+                yield break;
+            }
+            var d = JsonUtility.FromJson<ConnectionDetailsJson>(req.downloadHandler.text);
+            done(d.server_url, d.participant_token);
         }
 
         /// マイクを入れる・切る（画面のマイクボタン）
@@ -240,6 +295,7 @@ namespace Ciel.Conversation
             var source = go.AddComponent<AudioSource>();
             _voiceStream = new AudioStream(audio, source);
             _meter = go.AddComponent<AgentVoiceMeter>();   // AudioStream の後に付けて、届いた音を読む
+            Trace("声の受信を始めた");
             Debug.Log($"[CielConversation] {participant.Identity} の声を受信");
         }
 

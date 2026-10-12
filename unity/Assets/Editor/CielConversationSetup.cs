@@ -54,11 +54,9 @@ namespace Ciel.EditorTools
             camera.transform.position = new Vector3(bounds.center.x, bounds.center.y + bounds.extents.y * 0.1f, bounds.min.z - 10);
             camera.orthographicSize = bounds.extents.y * 1.05f;
 
-            var conv = new GameObject("Conversation", typeof(TokenSourceComponent), typeof(CielConversation));
-            var tokenSource = new SerializedObject(conv.GetComponent<TokenSourceComponent>());
-            tokenSource.FindProperty("_config").objectReferenceValue = config;
-            tokenSource.ApplyModifiedPropertiesWithoutUndo();
+            var conv = new GameObject("Conversation", typeof(CielConversation));
             var c = new SerializedObject(conv.GetComponent<CielConversation>());
+            c.FindProperty("_tokenConfig").objectReferenceValue = config;
             c.FindProperty("_mouth").objectReferenceValue = model.GetComponent<CubismMouthController>();
             c.ApplyModifiedPropertiesWithoutUndo();
             var ui = conv.AddComponent<CielConversationUI>();
