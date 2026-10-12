@@ -58,6 +58,9 @@ namespace Ciel.EditorTools
             var c = new SerializedObject(conv.GetComponent<CielConversation>());
             c.FindProperty("_tokenConfig").objectReferenceValue = config;
             c.FindProperty("_mouth").objectReferenceValue = model.GetComponent<CubismMouthController>();
+            // 表情はモデルの GameObject に付ける（Cubism の更新の順番に入れるため）
+            var expression = model.GetComponent<CielExpression>() ?? model.AddComponent<CielExpression>();
+            c.FindProperty("_expression").objectReferenceValue = expression;
             c.ApplyModifiedPropertiesWithoutUndo();
             var ui = conv.AddComponent<CielConversationUI>();
             var u = new SerializedObject(ui);

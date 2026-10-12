@@ -65,6 +65,9 @@ namespace Ciel.Conversation
             var shadow = _status.gameObject.AddComponent<Shadow>();
             shadow.effectColor = new Color(0, 0, 0, 0.6f);
 
+            // 表情の確認用のボタン（画面の右。表情を作りながら確かめる）
+            BuildExpressionButtons(canvasGo.transform);
+
             // マイクの選択（PC だけ。画面の上）
             _devices = NewDropdown(canvasGo.transform);
             _devices.onValueChanged.AddListener(i => _conversation.SelectMic(i <= 0 ? null : _deviceGuids[i]));
@@ -98,6 +101,27 @@ namespace Ciel.Conversation
             }
             if (c.CanSelectMic)
                 _devices.SetValueWithoutNotify(Mathf.Max(0, _deviceGuids.IndexOf(c.SelectedMic)));
+        }
+
+        [SerializeField] bool _showExpressionButtons = true;
+
+        void BuildExpressionButtons(Transform canvas)
+        {
+            if (!_showExpressionButtons) return;
+            var expression = FindAnyObjectByType<CielExpression>();
+            if (expression == null) return;
+            var names = CielExpression.Names;
+            for (int i = 0; i < names.Length; i++)
+            {
+                var n = names[i];
+                var r = NewRect("Expr_" + n, canvas, new Vector2(1f, 1f), new Vector2(-110, -200 - i * 78), new Vector2(190, 66));
+                var img = r.gameObject.AddComponent<Image>();
+                img.color = new Color(0.12f, 0.14f, 0.22f, 0.8f);
+                r.gameObject.AddComponent<Button>().onClick.AddListener(() => expression.Set(n, 4f));
+                var t = NewText("Label", r, 28, TextAnchor.MiddleCenter);
+                Stretch(t.rectTransform);
+                t.text = CielExpression.JapaneseNames[n];
+            }
         }
 
         // ---- 画面の部品 ----

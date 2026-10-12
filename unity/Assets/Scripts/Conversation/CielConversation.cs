@@ -22,6 +22,7 @@ namespace Ciel.Conversation
     public sealed class CielConversation : MonoBehaviour
     {
         [SerializeField] CubismMouthController _mouth;
+        [SerializeField] CielExpression _expression;
         [Tooltip("接続の設定（Assets/Settings/LiveKitTokenSource.asset）")]
         [SerializeField] TokenSourceComponentConfig _tokenConfig;
         [SerializeField] bool _connectOnStart = true;
@@ -114,6 +115,7 @@ namespace Ciel.Conversation
             _room = new Room();
             _room.TrackSubscribed += OnTrackSubscribed;
             _room.TrackUnsubscribed += OnTrackUnsubscribed;
+            _room.DataReceived += OnDataReceived;
             Trace("ルームへ接続");
             yield return _room.Connect(serverUrl, token, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
@@ -299,6 +301,31 @@ namespace Ciel.Conversation
             Debug.Log($"[CielConversation] {participant.Identity} の声を受信");
         }
 
+        [Serializable]
+        class EventJson
+        {
+            public int v;
+            public string type;
+            public int seq;
+            public string expression;
+            public float intensity;
+            public int ttl_ms;
+        }
+
+        // 会話サーバーのイベント（仕様書 6 章）。今は表情（character.expression）だけ
+        void OnDataReceived(byte[] data, Participant participant, DataPacketKind kind, string topic)
+        {
+            if (topic != "ciel.event") return;
+            EventJson e;
+            try { e = JsonUtility.FromJson<EventJson>(System.Text.Encoding.UTF8.GetString(data)); }
+            catch (Exception ex) { Debug.LogWarning($"[CielConversation] イベントを読めない: {ex.Message}"); return; }
+            if (e.type == "character.expression" && _expression != null)
+            {
+                _expression.Set(e.expression, e.ttl_ms / 1000f);
+                Debug.Log($"[CielConversation] 表情 {e.expression}（{e.ttl_ms} ms）");
+            }
+        }
+
         void OnTrackUnsubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
             if (track is RemoteAudioTrack) DisposeVoice();
@@ -337,6 +364,7 @@ namespace Ciel.Conversation
             {
                 _room.TrackSubscribed -= OnTrackSubscribed;
                 _room.TrackUnsubscribed -= OnTrackUnsubscribed;
+                _room.DataReceived -= OnDataReceived;
                 _room.Disconnect();
                 _room = null;
             }
