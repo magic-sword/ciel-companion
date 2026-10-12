@@ -17,6 +17,7 @@ W, H = manifest['canvas']
 out = ROOT / manifest['out']
 out.parent.mkdir(parents=True, exist_ok=True)
 stack = [(l['name'], ROOT / l['path']) for l in manifest['layers']]
+visible = {l['name']: l.get('visible', True) for l in manifest['layers']}   # 差分（閉じ目など）は非表示で書く
 for name, path in stack:
     assert re.fullmatch(r'[A-Za-z0-9_]+', name), f'bad layer name {name}'
     assert path.exists(), f'missing {path}'
@@ -37,6 +38,7 @@ for name, path in stack:
     item = Gimp.file_load_layer(Gimp.RunMode.NONINTERACTIVE, doc, Gio.File.new_for_path(str(path)))
     assert (item.get_width(), item.get_height()) == (W, H), f'{name}: size {item.get_width()}x{item.get_height()}'
     item.set_name(name)
+    item.set_visible(visible[name])
     doc.insert_layer(item, None, 0)
 expect = [n for n, _ in reversed(stack)]
 assert [l.get_name() for l in doc.get_layers()] == expect

@@ -10,6 +10,8 @@ retarget_warp(doc, name, x0, x1, y0, y1, col, row)
     キーフォームの格子は、新しい範囲の一様な格子に置き換える（形の情報は捨てる）。
 meshes_in_warp(doc, name)
     ワープデフォーマを親に持つメッシュの名前の一覧。
+remesh_points(doc, mesh, pts, tris, edges, outer)
+    任意の頂点（画像座標）と三角形で、メッシュを作り直す（輪郭に沿ったメッシュなど）。UV・キーフォームは remesh_rect と同じ。
 """
 import re
 
@@ -119,6 +121,69 @@ def remesh_quad(doc, mesh, bbox, nx, ny):
                   lambda m: m.group(1) + str(2 * n) + m.group(2) + txt(interp(uv)) + m.group(4), rest, count=1)
     blk = blk[:tail] + rest
     doc.xml = doc.xml[:a] + blk + doc.xml[b:]
+
+
+def remesh_points(doc, mesh, pts, tris, edges, outer=()):
+    """メッシュを、頂点 pts（画像座標の (x, y) の並び）・三角形 tris（頂点番号の 3 つ組）・辺 edges で作り直す。
+    outer：外周の辺の番号（編集画面での優先度を上げる）。全キーフォームの形は、新しい頂点の正面の位置になる。"""
+    import numpy as np
+    pts = [tuple(map(float, p)) for p in pts]
+    idx = [int(i) for t in tris for i in t]
+    eprio = [30 if i in set(outer) else 10 for i in range(len(edges))]
+    _write_mesh(doc, mesh, pts, idx, edges, eprio)
+
+
+def _write_mesh(doc, mesh, pts, idx, edges, eprio):
+    import numpy as np
+    a, b = doc.mesh_block(mesh)
+    blk = doc.xml[a:b]
+    P = np.array(_arr(blk, 'point')).reshape(-1, 2)
+    k = blk.index('<carray_list xs.n="keyforms"')
+    k2 = blk.index('</carray_list>', k) + len('</carray_list>')
+    rest = blk[k2:]
+    UV = np.array(_arr(rest, 'uvs')).reshape(-1, 2)
+    coef, *_ = np.linalg.lstsq(np.c_[P, np.ones(len(P))], UV, rcond=None)
+    n = len(pts)
+    newuv = np.c_[np.array(pts), np.ones(n)] @ coef
+    tg = re.search(r'<CDeformerGuid xs\.n="targetDeformerGuid" xs\.ref="(#\d+)"', blk)
+    norm = None
+    if tg:
+        for wm in re.finditer(r'<CWarpDeformerSource xs\.id="#\d+"[^>]*>.*?<s xs\.n="localName">([^<]*)</s>', doc.xml, flags=re.S):
+            info = doc.warp_info(wm.group(1))
+            if info['guid'] == tg.group(1):
+                norm = info
+
+    def kpos(x, y):
+        if norm is None:
+            return x, y
+        return (x - norm['x0']) / (norm['x1'] - norm['x0']), (y - norm['y0']) / (norm['y1'] - norm['y0'])
+    kp = [kpos(x, y) for x, y in pts]
+
+    def txt(v):
+        return ' '.join(_fmt(float(q)) for q in v)
+    head = blk[:k]
+    head = re.sub(r'<float-array xs\.n="point" count="\d+">[^<]*</float-array>',
+                  lambda m: '<float-array xs.n="point" count="%d">%s</float-array>' % (2 * n, txt([c for p in pts for c in p])), head)
+    head = re.sub(r'<byte-array xs\.n="pointPriority" count="\d+">[^<]*</byte-array>',
+                  lambda m: '<byte-array xs.n="pointPriority" count="%d">%s</byte-array>' % (n, ' '.join(['20'] * n)), head)
+    head = re.sub(r'<short-array xs\.n="edge" count="\d+">[^<]*</short-array>',
+                  lambda m: '<short-array xs.n="edge" count="%d">%s</short-array>' % (2 * len(edges), ' '.join('%d %d' % tuple(e) for e in edges)), head)
+    head = re.sub(r'<byte-array xs\.n="edgePriority" count="\d+">[^<]*</byte-array>',
+                  lambda m: '<byte-array xs.n="edgePriority" count="%d">%s</byte-array>' % (len(edges), ' '.join(str(p) for p in eprio)), head)
+    head = re.sub(r'<int-array xs\.n="pointUid" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="pointUid" count="%d">%s</int-array>' % (n, ' '.join(str(i) for i in range(n))), head)
+    head = re.sub(r'nextPointUid="\d+"', 'nextPointUid="%d"' % n, head, count=1)
+    head = re.sub(r'<int-array xs\.n="indices" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="indices" count="%d">%s</int-array>' % (len(idx), ' '.join(str(i) for i in idx)), head)
+    kf = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                lambda m: m.group(1) + str(2 * n) + m.group(2) + txt([c for p in kp for c in p]) + m.group(3), blk[k:k2])
+    rest = re.sub(r'(<float-array xs\.n="positions" count=")\d+(">)[^<]*(</float-array>)',
+                  lambda m: m.group(1) + str(2 * n) + m.group(2) + txt([c for p in pts for c in p]) + m.group(3), rest, count=1)
+    rest = re.sub(r'(<float-array xs\.n="uvs" count=")\d+(">)[^<]*(</float-array>)',
+                  lambda m: m.group(1) + str(2 * n) + m.group(2) + txt(newuv.ravel()) + m.group(3), rest, count=1)
+    rest = re.sub(r'<int-array xs\.n="indices" count="\d+">[^<]*</int-array>',
+                  lambda m: '<int-array xs.n="indices" count="%d">%s</int-array>' % (len(idx), ' '.join(str(i) for i in idx)), rest)
+    doc.xml = doc.xml[:a] + head + kf + rest + doc.xml[b:]
 
 
 def remesh_rect(doc, mesh, bbox, nx, ny):

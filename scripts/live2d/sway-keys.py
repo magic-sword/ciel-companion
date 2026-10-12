@@ -38,7 +38,7 @@ def px_map(doc, warp, mesh):
     pts = np.array(re.search(r'<float-array xs\.n="point" count="\d+">([^<]*)<', blk).group(1).split(), float).reshape(-1, 2)
     k = blk.index('<carray_list xs.n="keyforms"')
     nrm = np.array(re.search(r'<float-array xs\.n="positions" count="\d+">([^<]*)<', blk[k:]).group(1).split(), float).reshape(-1, 2)
-    rest = np.array(doc.warp_keyform_positions(warp)[0])
+    rest = np.mean(np.array(doc.warp_keyform_positions(warp)), 0)     # 正面の形（±のキーの平均）
     lo, hi = rest.min(0), rest.max(0)
     q = lo + nrm * (hi - lo)
     return np.polyfit(pts[:, 0], q[:, 0], 1), np.polyfit(pts[:, 1], q[:, 1], 1)
