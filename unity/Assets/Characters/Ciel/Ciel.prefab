@@ -5583,7 +5583,7 @@ MonoBehaviour:
       - DestinationId: ParamBustY
         ParticleIndex: 1
         TranslationScale: {x: 0, y: 0}
-        AngleScale: 1
+        AngleScale: 1.5
         Weight: 100
         SourceComponent: 2
         IsInverted: 0

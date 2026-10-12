@@ -3,7 +3,7 @@
 
 前提：Cubism で次のキーを「キーの3点追加」してある（±1 の 2 キー。ほかのキーとの組み合わせはそのまま）。
   後ろ髪の曲面（角度X・Y・Z の格子）  ParamHairBack  -1/1 → 顎より下ほど横へずらす（根元は頭に付いたまま）
-  胸の曲面（Body を包むワープ）        ParamBustY     -1/1 → 胸のふくらみのまわりだけ上下へ（+ が上）
+  胸の曲面（Body を包むワープ）        ParamBustY     -1/1 → 左右の胸のふくらみのまわりだけ上下へ（+ が上）
 揺れのキーは、同じほかのキーの形（角度X・Y・Z の形）からの差として作る（back-hair-keys.py の後に実行する）。
 キャンバス px と、ワープの親の座標の換算は、ワープの中のメッシュの point（px）と位置から一次式で求める。
 
@@ -26,9 +26,9 @@ _spec.loader.exec_module(mk)
 
 CHIN_Y = 1395.0                 # 顎の高さ（キャンバス px。back-hair-keys.py の計算値）
 HAIR_SWAY = 60.0                # 後ろ髪の毛先の横の動き（px）
-BUST_C = (1090.0, 2030.0)       # 胸のふくらみの中心（px）
-BUST_S = (220.0, 90.0)          # 広がり（px、ガウスの σ）
-BUST_LIFT = 7.0                 # 胸の上下の動き（px）
+BUST_C = ((910.0, 2060.0), (1310.0, 2060.0))    # 左右のふくらみの中心（px。胸は横 710〜1510、縦 1850〜2200）
+BUST_S = (170.0, 120.0)         # 広がり（px、ガウスの σ）
+BUST_LIFT = 18.0                # 胸の上下の動き（px）
 
 
 def px_map(doc, warp, mesh):
@@ -64,7 +64,8 @@ def main():
     def bust(g, v):
         x = (g[:, 0] - bx[1]) / bx[0]
         y = (g[:, 1] - by[1]) / by[0]
-        w = np.exp(-0.5 * (((x - BUST_C[0]) / BUST_S[0]) ** 2 + ((y - BUST_C[1]) / BUST_S[1]) ** 2))
+        w = sum(np.exp(-0.5 * (((x - cx) / BUST_S[0]) ** 2 + ((y - cy) / BUST_S[1]) ** 2)) for cx, cy in BUST_C)
+        w = np.minimum(w, 1.0)
         n = g.copy()
         n[:, 1] -= v * BUST_LIFT * by[0] * w
         return n
