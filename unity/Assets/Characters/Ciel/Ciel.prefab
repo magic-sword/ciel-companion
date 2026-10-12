@@ -325,7 +325,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 6405830058793506335}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -1170,7 +1170,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 275474369788932271}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -2069,7 +2069,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 275474369788932271}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -4936,14 +4936,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Rendering.CubismPartColorsEditor
   _childDrawableRenderers:
-  - {fileID: 3088227080946638928}
-  - {fileID: 8505705291403199476}
-  - {fileID: 5682153664976411807}
-  - {fileID: 8939846199095908133}
-  - {fileID: 1455297771521927728}
-  - {fileID: 5067620489557587110}
-  - {fileID: 2844305296577218619}
-  - {fileID: 3684864270812722681}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   _childPartColorEditors: []
   _isOverriddenPartMultiplyColors: 0
   _isOverriddenPartScreenColors: 0
@@ -5382,7 +5382,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd9e6647bfff7542acb0200ab74bdd1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.MotionFade.CubismFadeController
-  CubismFadeMotionList: {fileID: 0}
+  CubismFadeMotionList: {fileID: 11400000, guid: 9949756a9a720354a93d71877fe43b9a, type: 2}
 --- !u!114 &8293615187789031621
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5749,7 +5749,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 3614004009540700735}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -5951,7 +5951,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 6405830058793506335}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -9580,7 +9580,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 3614004009540700735}
+  - {fileID: 0}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
