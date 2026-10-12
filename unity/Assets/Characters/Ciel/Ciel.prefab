@@ -325,7 +325,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 6405830058793506335}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -489,6 +489,7 @@ GameObject:
   - component: {fileID: 1944070302877497042}
   - component: {fileID: 4542581426807605502}
   - component: {fileID: 4314185077368254839}
+  - component: {fileID: 3967805024697292024}
   m_Layer: 0
   m_Name: ParamAngleZ
   m_TagString: Untagged
@@ -541,6 +542,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
   Name: "\u89D2\u5EA6 Z"
   DisplayName: 
+--- !u!114 &3967805024697292024
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 845322869587260582}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aef61b2310c3336498fc218c4dffb25e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionParameter
+  Channel: 0
+  Direction: 2
+  NormalizedOrigin: 0.5
+  NormalizedRange: 0.083
+  Duration: 5.5345
 --- !u!1 &853449334018016856
 GameObject:
   m_ObjectHideFlags: 0
@@ -1151,7 +1169,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 275474369788932271}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -2050,7 +2068,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 275474369788932271}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -4217,6 +4235,7 @@ GameObject:
   - component: {fileID: 4247520657853456550}
   - component: {fileID: 1474490502814658740}
   - component: {fileID: 9178667934804036225}
+  - component: {fileID: 9149179167768547977}
   m_Layer: 0
   m_Name: ParamBreath
   m_TagString: Untagged
@@ -4269,6 +4288,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
   Name: "\u547C\u5438"
   DisplayName: 
+--- !u!114 &9149179167768547977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4608057553812711847}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aef61b2310c3336498fc218c4dffb25e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionParameter
+  Channel: 0
+  Direction: 2
+  NormalizedOrigin: 0.5
+  NormalizedRange: 0.5
+  Duration: 3.2345
 --- !u!1 &4676022941074649384
 GameObject:
   m_ObjectHideFlags: 0
@@ -4280,6 +4316,7 @@ GameObject:
   - component: {fileID: 2302095230288128760}
   - component: {fileID: 6692828207445951694}
   - component: {fileID: 7891642090220007369}
+  - component: {fileID: 501473473439628773}
   m_Layer: 0
   m_Name: ParamAngleY
   m_TagString: Untagged
@@ -4332,6 +4369,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
   Name: "\u89D2\u5EA6 Y"
   DisplayName: 
+--- !u!114 &501473473439628773
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4676022941074649384}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aef61b2310c3336498fc218c4dffb25e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionParameter
+  Channel: 0
+  Direction: 2
+  NormalizedOrigin: 0.5
+  NormalizedRange: 0.067
+  Duration: 3.5345
 --- !u!1 &4818822727340145381
 GameObject:
   m_ObjectHideFlags: 0
@@ -4818,14 +4872,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Rendering.CubismPartColorsEditor
   _childDrawableRenderers:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 3088227080946638928}
+  - {fileID: 8505705291403199476}
+  - {fileID: 5682153664976411807}
+  - {fileID: 8939846199095908133}
+  - {fileID: 1455297771521927728}
+  - {fileID: 5067620489557587110}
+  - {fileID: 2844305296577218619}
+  - {fileID: 3684864270812722681}
   _childPartColorEditors: []
   _isOverriddenPartMultiplyColors: 0
   _isOverriddenPartScreenColors: 0
@@ -5005,6 +5059,7 @@ GameObject:
   - component: {fileID: 7398223348626240200}
   - component: {fileID: 9213255648179418440}
   - component: {fileID: 8293615187789031621}
+  - component: {fileID: 2081406381678817275}
   m_Layer: 0
   m_Name: Ciel
   m_TagString: Untagged
@@ -5389,6 +5444,21 @@ MonoBehaviour:
     Gravity: {x: 0, y: -1}
     Wind: {x: 0, y: 0}
     Fps: 0
+--- !u!114 &2081406381678817275
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5324912893236854583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fdbd2f0b5a84544698d697356f8fea0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionController
+  BlendMode: 1
+  ChannelTimescales:
+  - 1
 --- !u!1 &5374179144490196019
 GameObject:
   m_ObjectHideFlags: 0
@@ -5513,7 +5583,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 3614004009540700735}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -5715,7 +5785,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 6405830058793506335}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
@@ -6633,6 +6703,7 @@ GameObject:
   - component: {fileID: 1668822390598754699}
   - component: {fileID: 697287581638178612}
   - component: {fileID: 2334122657176392334}
+  - component: {fileID: 8208899224205420719}
   m_Layer: 0
   m_Name: ParamAngleX
   m_TagString: Untagged
@@ -6685,6 +6756,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
   Name: "\u89D2\u5EA6 X"
   DisplayName: 
+--- !u!114 &8208899224205420719
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6471987958444307880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aef61b2310c3336498fc218c4dffb25e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionParameter
+  Channel: 0
+  Direction: 2
+  NormalizedOrigin: 0.5
+  NormalizedRange: 0.125
+  Duration: 6.5345
 --- !u!1 &6537093487679799939
 GameObject:
   m_ObjectHideFlags: 0
@@ -6834,6 +6922,7 @@ GameObject:
   - component: {fileID: 4212468752431179220}
   - component: {fileID: 3388507383154174382}
   - component: {fileID: 2036514825534003304}
+  - component: {fileID: 7022216563219623004}
   m_Layer: 0
   m_Name: ParamBodyAngleZ
   m_TagString: Untagged
@@ -6886,6 +6975,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.CubismDisplayInfoParameterName
   Name: "\u4F53\u306E\u56DE\u8EE2 Z"
   DisplayName: 
+--- !u!114 &7022216563219623004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6920316200186618455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aef61b2310c3336498fc218c4dffb25e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.HarmonicMotion.CubismHarmonicMotionParameter
+  Channel: 0
+  Direction: 2
+  NormalizedOrigin: 0.5
+  NormalizedRange: 0.1
+  Duration: 15.5345
 --- !u!1 &6931352908887460063
 GameObject:
   m_ObjectHideFlags: 0
@@ -9308,7 +9414,7 @@ MonoBehaviour:
   _depthOffset: 0.00001
   _opacity: 1
   _masks:
-  - {fileID: 0}
+  - {fileID: 3614004009540700735}
   ColorBlendType: 0
   AlphaBlendType: 0
   DrawObjectType: 0
