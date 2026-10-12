@@ -36,7 +36,7 @@
 - 白磁の肌・薄い青紫の細い輪郭線など、元の絵の色と線に合わせる。
 - 体型は 13 歳くらいの自然な体型（元の絵に合わせすぎない所はそう書く）。
 
-実例：`.local/codex/req-45-face-base-edit.md`（顔の土台を編集で作る）。
+実例：`.local/codex/req-45-face-base-edit.md`（顔の土台を編集で作る）。生成物は、採用した物を `assets/ciel/current/` へ入れたあと、`.local/archive/codex-generated/vNN/` へ移す（Git の外。v20・v21 の報告・確認図・試した絵はそこにある）。
 
 ## 3. 依頼の実行
 
