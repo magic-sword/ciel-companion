@@ -27,7 +27,8 @@ from persona import INSTRUCTIONS, GREETING
 load_dotenv()
 logger = logging.getLogger('ciel-agent')
 
-server = AgentServer()
+# 待機させておく子プロセスの数（既定は CPU の数 = 24 で多すぎる。会話は 1 人ずつなので 2 で足りる）
+server = AgentServer(num_idle_processes=2)
 
 
 def make_model():
