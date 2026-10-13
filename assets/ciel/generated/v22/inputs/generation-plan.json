@@ -1,0 +1,69 @@
+{
+  "source": "assets/ciel/master/ciel-upper-body-2x.png",
+  "crop": {
+    "x": 260,
+    "y": 0,
+    "width": 1664,
+    "height": 1664
+  },
+  "expressions": [
+    {
+      "name": "happy",
+      "label": "嬉しい",
+      "description": "Warm smiling narrowed eyes, raised lower eyelids, a small open upturned smile; dog ears alert upright."
+    },
+    {
+      "name": "relaxed",
+      "label": "にこにこ・穏やか",
+      "description": "Soft gently narrowed eyes; closed mouth gentle smile; ears natural."
+    },
+    {
+      "name": "surprised",
+      "label": "驚き（わふっ！？）",
+      "description": "Eyes opened wide with visible whites and smaller highlights, raised eyebrows, small round open O mouth; ears perked upright. Cute surprise."
+    },
+    {
+      "name": "angry",
+      "label": "ぷんすか",
+      "description": "Cute mild sulking anger: eyebrows slightly knitted and slanted inward, subtly puffed cheeks without changing outer face contour, closed downturned pout, ears slightly swept back. Never scary."
+    },
+    {
+      "name": "sad",
+      "label": "しょんぼり",
+      "description": "Dejected expression: lowered outer brow ends, gaze slightly downcast, tiny downturned mouth, ears droop downward. Lovable."
+    },
+    {
+      "name": "troubled",
+      "label": "困り（汗）",
+      "description": "Worried eyebrows raised at inner ends (八 shape), small awkward apologetic smile, one tiny sweat droplet at temple, ears slightly lowered."
+    },
+    {
+      "name": "embarrassed",
+      "label": "照れ",
+      "description": "Soft pink blush across cheeks and nose, eyes glance slightly aside, very small shy hesitant mouth, ears slightly lowered."
+    },
+    {
+      "name": "teary",
+      "label": "半泣き",
+      "description": "Cute near-tears expression: cyan eyes moist with tears pooled along lower eyelids, bright wet tear rim but not running down cheeks, lowered outer brow ends, small tightly closed trembling mouth, drooping ears. Not painful or distressed."
+    },
+    {
+      "name": "excited",
+      "label": "わくわく（キラキラ目）",
+      "description": "Joyfully excited: cyan irises sparkle with star-shaped eye highlights, open happy smile, ears perked upright."
+    },
+    {
+      "name": "jitome",
+      "label": "ジト目",
+      "description": "Half-lidded flat horizontal upper eyelids, small straight or slightly pursed closed mouth, ears slightly sideways. Affectionate mild skeptical look, not cold."
+    },
+    {
+      "name": "thinking",
+      "label": "考え中",
+      "description": "Thinking: eyes glance upward and sideways, small pursed mouth, one eyebrow slightly raised, ears slightly asymmetrically tilted. Keep the head itself perfectly still."
+    }
+  ],
+  "basePrompt": "Edit the supplied APPROVED portrait with MINIMAL LOCAL changes. Do not draw a new portrait. Freeze all existing pixels outside eyes/eyelids/eyebrows/mouth/cheek blush/ears/tiny expression effects. Preserve EXACT hairstyle, hair strand curves, ahoge, head and face contour, jaw and chin, head scale and position, tiny nose, collar buckle and pendant, clothing, porcelain white skin and blue-lavender fine linework, palette and transparency. Do not simplify, beautify, recolor, shift, recenter, zoom, rotate or repaint unchanged regions. Output one square 1664x1664 image at the EXACT input crop and alignment, without text or layout. The head does not move; only eyes, brows, mouth and dog ears express emotion. Ciel is bright, honest and lovable like a Samoyed puppy. Expression: ",
+  "normalization": "Uniform whole-canvas 1254 -> 1664 when required, no registration, no masking or local retouch.",
+  "maxAttempts": 4
+}

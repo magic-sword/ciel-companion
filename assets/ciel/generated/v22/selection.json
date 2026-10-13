@@ -1,0 +1,85 @@
+[
+  {
+    "name": "neutral",
+    "label": "通常",
+    "attempt": 0,
+    "status": "unchanged_source_crop"
+  },
+  {
+    "name": "happy",
+    "label": "嬉しい",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "relaxed",
+    "label": "にこにこ・穏やか",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "surprised",
+    "label": "驚き（わふっ！？）",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "angry",
+    "label": "ぷんすか",
+    "attempt": 1,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "sad",
+    "label": "しょんぼり",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "troubled",
+    "label": "困り（汗）",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "embarrassed",
+    "label": "照れ",
+    "attempt": 2,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "teary",
+    "label": "半泣き",
+    "attempt": 2,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "excited",
+    "label": "わくわく（キラキラ目）",
+    "attempt": 1,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "jitome",
+    "label": "ジト目",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  },
+  {
+    "name": "thinking",
+    "label": "考え中",
+    "attempt": 4,
+    "attempts": 4,
+    "status": "provisional_non_expression_drift_remains"
+  }
+]
