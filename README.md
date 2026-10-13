@@ -59,6 +59,8 @@ Editorを閉じて以下を実行してください。アプリ名、画面方�
 
 ## 実装状況
 
+会話サーバーのプロンプト本文は Markdown、参照先は TOML で管理します。編集方法は [会話サーバーの README](server/agent/README.md)、他のセッション・AI エージェントへの引き継ぎは [プロンプト管理方針](docs/decisions/prompt-management-ja.md) を参照してください。
+
 現在はUnity開発基盤とLive2D・LiveKit SDKの導入までです。Mainは空のシーンです。
 会話UI、サーバー、Seed-VC、シエルのモデルはまだ組み込んでいません。
 APIキーはUnityへ入れずサーバー側で管理します。
