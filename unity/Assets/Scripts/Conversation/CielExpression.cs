@@ -35,16 +35,16 @@ namespace Ciel.Conversation
         static readonly Dictionary<string, (string id, float v)[]> Targets = new Dictionary<string, (string, float)[]>
         {
             { "neutral", new (string, float)[0] },
-            { "happy", new[] { ("ParamEyeLSmile", 1f), ("ParamEyeRSmile", 1f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.3f), ("ParamBrowRY", 0.3f) } },
+            { "happy", new[] { ("ParamEyeLSmile", 1f), ("ParamEyeRSmile", 1f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.3f), ("ParamBrowRY", 0.3f), ("ParamEar", 1f) } },
             { "relaxed", new[] { ("ParamEyeLSmile", 0.6f), ("ParamEyeRSmile", 0.6f), ("ParamMouthForm", 0.6f) } },
-            { "surprised", new[] { ("ParamEyeLOpen", 0.3f), ("ParamEyeROpen", 0.3f), ("ParamBrowLY", 0.8f), ("ParamBrowRY", 0.8f) } },
-            { "angry", new[] { ("ParamBrowLAngle", -0.8f), ("ParamBrowRAngle", -0.8f), ("ParamBrowLForm", -0.6f), ("ParamBrowRForm", -0.6f), ("ParamMouthForm", -0.6f), ("ParamCheek", 0.3f) } },
-            { "sad", new[] { ("ParamBrowLAngle", 0.7f), ("ParamBrowRAngle", 0.7f), ("ParamBrowLY", -0.3f), ("ParamBrowRY", -0.3f), ("ParamMouthForm", -0.7f), ("ParamEyeLOpen", -0.2f), ("ParamEyeROpen", -0.2f) } },
-            { "troubled", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.2f) } },
-            { "embarrassed", new[] { ("ParamCheek", 1f), ("ParamEyeLSmile", 0.3f), ("ParamEyeRSmile", 0.3f), ("ParamEyeBallX", 0.6f) } },
-            { "teary", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.8f), ("ParamEyeLOpen", -0.15f), ("ParamEyeROpen", -0.15f) } },
-            { "excited", new[] { ("ParamEyeLOpen", 0.2f), ("ParamEyeROpen", 0.2f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.6f), ("ParamBrowRY", 0.6f) } },
-            { "jitome", new[] { ("ParamEyeLOpen", -0.5f), ("ParamEyeROpen", -0.5f), ("ParamMouthForm", -0.3f) } },
+            { "surprised", new[] { ("ParamEyeLOpen", 0.3f), ("ParamEyeROpen", 0.3f), ("ParamBrowLY", 0.8f), ("ParamBrowRY", 0.8f), ("ParamEar", 1f) } },
+            { "angry", new[] { ("ParamBrowLAngle", -0.8f), ("ParamBrowRAngle", -0.8f), ("ParamBrowLForm", -0.6f), ("ParamBrowRForm", -0.6f), ("ParamMouthForm", -0.6f), ("ParamCheek", 0.3f), ("ParamEar", -0.5f) } },
+            { "sad", new[] { ("ParamBrowLAngle", 0.7f), ("ParamBrowRAngle", 0.7f), ("ParamBrowLY", -0.3f), ("ParamBrowRY", -0.3f), ("ParamMouthForm", -0.7f), ("ParamEyeLOpen", -0.2f), ("ParamEyeROpen", -0.2f), ("ParamEar", -1f) } },
+            { "troubled", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.2f), ("ParamEar", -0.4f) } },
+            { "embarrassed", new[] { ("ParamCheek", 1f), ("ParamEyeLSmile", 0.3f), ("ParamEyeRSmile", 0.3f), ("ParamEyeBallX", 0.6f), ("ParamEar", -0.3f) } },
+            { "teary", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.8f), ("ParamEyeLOpen", -0.15f), ("ParamEyeROpen", -0.15f), ("ParamEar", -1f) } },
+            { "excited", new[] { ("ParamEyeLOpen", 0.2f), ("ParamEyeROpen", 0.2f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.6f), ("ParamBrowRY", 0.6f), ("ParamEar", 1f) } },
+            { "jitome", new[] { ("ParamEyeLOpen", -0.5f), ("ParamEyeROpen", -0.5f), ("ParamMouthForm", -0.3f), ("ParamEar", -0.5f) } },
             { "thinking", new[] { ("ParamEyeBallX", -0.5f), ("ParamEyeBallY", 0.6f), ("ParamBrowLY", 0.4f), ("ParamMouthForm", -0.3f) } },
         };
 
