@@ -170,10 +170,19 @@
 			"Id": "ParamRelaxed",
 			"GroupId": "",
 			"Name": "にこにこ"
+		},
+		{
+			"Id": "ParamSurprised",
+			"GroupId": "",
+			"Name": "驚き"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part6",
+			"Name": "surprised-mouth.psd"
+		},
 		{
 			"Id": "Part5",
 			"Name": "lid-lines.psd"

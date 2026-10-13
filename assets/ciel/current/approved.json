@@ -1,12 +1,38 @@
 {
-  "approved_date": "2026-10-13",
-  "approved_expressions": ["happy", "relaxed"],
+  "approved_date": "2026-10-14",
+  "approved_expressions": [
+    "happy",
+    "relaxed",
+    "surprised"
+  ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "06f919c3b3b9a7026b064f6f11ded7e889041a77b2e7fbc8b954c4ab53c7563d",
+  "rig_sha256": "ff5a8947af5f12028a5a024f5ccc89e8c739c75673a2d92e5d5733565f4ab008",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 66,
+  "material_count": 67,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
-  "other_expressions": "pending_visual_adjustment"
+  "other_expressions": "pending_visual_adjustment",
+  "surprised_revision": "v34-with-iris-position-adjustment",
+  "surprised_control": "ParamSurprised",
+  "latest_proofs": "assets/ciel/rig/proofs/surprised-v34",
+  "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
+  "export_files": [
+    {
+      "path": "Ciel.4096/texture_00.png",
+      "sha256": "4f94c4c9c82178890826c23ba4c4b9f2d67744c6e90f939a22e90801980e300a"
+    },
+    {
+      "path": "Ciel.cdi3.json",
+      "sha256": "afa0bc8309b46700170496372c8f6092758436c42f6820c7c465c51a622f54d0"
+    },
+    {
+      "path": "Ciel.moc3",
+      "sha256": "d5ac2c309ff9f0c87a8cafa3555886a915010d5223753b7a8fc1328d42f6dea1"
+    },
+    {
+      "path": "Ciel.model3.json",
+      "sha256": "526172a2bba4d438b8ddfebec165d70c148b8911c60425b874fc05d656af4d76"
+    }
+  ]
 }

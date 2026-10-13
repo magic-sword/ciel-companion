@@ -22,6 +22,31 @@
       "Id": "ParamRelaxed",
       "Value": 0,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamSurprised",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEar",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowLY",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowRY",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamCheek",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

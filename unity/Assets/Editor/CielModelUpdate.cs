@@ -19,6 +19,7 @@ namespace Ciel.EditorTools
         {
             public string source_rig;
             public string source_rig_sha256;
+            public int material_count;
             public FileEntry[] files;
             public FileEntry[] materials;
         }
@@ -42,7 +43,7 @@ namespace Ciel.EditorTools
         static Manifest Validate()
         {
             var manifest = JsonUtility.FromJson<Manifest>(File.ReadAllText(Path.Combine(Package, "manifest.json")));
-            if (manifest.files == null || manifest.files.Length == 0 || manifest.materials == null || manifest.materials.Length != 66)
+            if (manifest.files == null || manifest.files.Length == 0 || manifest.materials == null || manifest.material_count <= 0 || manifest.materials.Length != manifest.material_count)
                 throw new InvalidDataException("Current package manifest is incomplete.");
             if (Hash(SafePath(Root, manifest.source_rig)) != manifest.source_rig_sha256)
                 throw new InvalidDataException("Cubism model changed after export. Prepare the package again.");
@@ -77,8 +78,9 @@ namespace Ciel.EditorTools
                 typeof(CielExpression).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(expression, null);
                 var method = typeof(CielExpression).GetMethod("GetTargets", BindingFlags.Instance | BindingFlags.NonPublic);
                 bool modern = model.Parameters.Any(p => p.Id == "ParamRelaxed");
+                bool surprise = model.Parameters.Any(p => p.Id == "ParamSurprised");
                 if (requireNewRig && !modern) throw new InvalidDataException("Package has no ParamRelaxed.");
-                foreach (var name in new[] { "happy", "relaxed", "neutral" })
+                foreach (var name in new[] { "happy", "relaxed", "surprised", "neutral" })
                 {
                     expression.Set(name);
                     var targets = (Dictionary<string, float>)method.Invoke(expression, null);
@@ -91,6 +93,15 @@ namespace Ciel.EditorTools
                     }
                     else if (name == "relaxed" && targets["ParamEyeLOpen"] != -0.25f)
                         throw new InvalidDataException("Legacy model compatibility failed.");
+                    if (surprise)
+                    {
+                        if (targets["ParamSurprised"] != (name == "surprised" ? 1 : 0))
+                            throw new InvalidDataException("Surprise reset failed: " + name);
+                        if (name == "surprised" && (targets.ContainsKey("ParamEyeLOpen") || targets.ContainsKey("ParamMouthOpenY")))
+                            throw new InvalidDataException("Legacy surprise values applied to the new pose.");
+                    }
+                    else if (name == "surprised" && targets["ParamMouthOpenY"] != 0.3f)
+                        throw new InvalidDataException("Legacy surprise compatibility failed.");
                 }
             }
             finally

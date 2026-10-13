@@ -34,6 +34,8 @@ def main():
     # Match CielExpression's new-rig branch; old exported rigs retain the legacy targets.
     if 'ParamRelaxed' in model.param_range:targets['relaxed']={'ParamRelaxed':1.0}
     if 'ParamHappy' in model.param_range:targets['happy']['ParamHappy']=1.0
+    if 'ParamSurprised' in model.param_range:
+        targets['surprised']={'ParamSurprised':1.0,'ParamEar':1.0,'ParamBrowLY':.8,'ParamBrowRY':.8,'ParamCheek':.15}
     controls = {'ParamCheek':['Cheek_Blush'], 'ParamEyeLSmile':['Eye_L_Happy'], 'ParamEyeRSmile':['Eye_R_Happy'],
                 'ParamTear':['Tear_L','Tear_R'], 'ParamSweat':['Sweat'], 'ParamSparkle':['Eye_L_Sparkle','Eye_R_Sparkle']}
     report={'model':str(modelpath), 'parameters':model.param_range, 'controls':{}, 'expressions':targets}

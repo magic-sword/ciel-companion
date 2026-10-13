@@ -1,0 +1,21 @@
+{
+  "neutral_happy_relaxed_preserved": true,
+  "iris_white_metrics": {
+    "L": {
+      "iris_width_ratio": 0.6999997873428873,
+      "iris_height_ratio": 0.7420006125133153,
+      "white_height_ratio": 1.1499997320074988,
+      "lower_white_margin_px": 10
+    },
+    "R": {
+      "iris_width_ratio": 0.7000003431132736,
+      "iris_height_ratio": 0.7420048837808676,
+      "white_height_ratio": 1.1499980255087978,
+      "lower_white_margin_px": 11
+    }
+  },
+  "blink_preserved": true,
+  "existing_open_mouth_preserved": true,
+  "finite_combined_poses": 81,
+  "reset_passed": true
+}

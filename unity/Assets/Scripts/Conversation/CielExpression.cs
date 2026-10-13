@@ -81,11 +81,18 @@ namespace Ciel.Conversation
         Dictionary<string, float> GetTargets()
         {
             var target = new Dictionary<string, float>();
-            // 新リグのにこにこは専用キーで一括切り替え。旧リグには以前の設定を使う。
-            if (Current != "relaxed" || !_params.ContainsKey("ParamRelaxed"))
+            // 新リグのにこにこ・驚きは専用キーで切り替え。旧リグには以前の設定を使う。
+            if (Current == "surprised" && _params.ContainsKey("ParamSurprised"))
+            {
+                target["ParamEar"] = 1f;
+                target["ParamBrowLY"] = target["ParamBrowRY"] = 0.8f;
+                target["ParamCheek"] = 0.15f;
+            }
+            else if (Current != "relaxed" || !_params.ContainsKey("ParamRelaxed"))
                 foreach (var (id, v) in Targets[Current]) target[id] = v;
             if (_params.ContainsKey("ParamHappy")) target["ParamHappy"] = Current == "happy" ? 1f : 0f;
             if (_params.ContainsKey("ParamRelaxed")) target["ParamRelaxed"] = Current == "relaxed" ? 1f : 0f;
+            if (_params.ContainsKey("ParamSurprised")) target["ParamSurprised"] = Current == "surprised" ? 1f : 0f;
             return target;
         }
 
@@ -105,7 +112,7 @@ namespace Ciel.Conversation
                 w = Mathf.MoveTowards(w, t, step);
                 _weights[id] = w;
                 if (!_params.TryGetValue(id, out var p)) continue;
-                if (id == "ParamHappy" || id == "ParamRelaxed")
+                if (id == "ParamHappy" || id == "ParamRelaxed" || id == "ParamSurprised")
                     // 専用の切り替え値は毎フレーム上書きし、通常復帰時も0へ戻す。
                     p.Value = Mathf.Clamp(w, p.MinimumValue, p.MaximumValue);
                 else if (Mathf.Abs(w) > 1e-4f)

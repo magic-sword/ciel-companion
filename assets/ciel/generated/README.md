@@ -16,5 +16,7 @@ Gitには、再生成で一致を保証できない画像の原本、分離素�
 大量の中間合成と試行ごとのQA画像は`.gitignore`で除外し、ローカルで保持する。
 
 完成モデルの比較・検証は`../rig/proofs/`。
+v34の驚きは瞳位置補正後を採用済み。丸口を現行素材へ追加し、正式モデルは67層。
+素材の入口は`../current/`、Unityへの更新一式は`../runtime/`。
 生成方法は[素材の頼み方](../../../docs/ciel-codex-request-guide-ja.md)、
 取り込みと適用範囲は[表情の取り込み記録](../../../docs/ciel-expression-integration-ja.md)を参照。

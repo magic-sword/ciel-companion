@@ -1,24 +1,25 @@
 {
-  "approved_date": "2026-10-13",
+  "approved_date": "2026-10-14",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "06f919c3b3b9a7026b064f6f11ded7e889041a77b2e7fbc8b954c4ab53c7563d",
-  "material_count": 66,
+  "source_rig_sha256": "ff5a8947af5f12028a5a024f5ccc89e8c739c75673a2d92e5d5733565f4ab008",
+  "material_count": 67,
   "approved_expressions": [
     "happy",
-    "relaxed"
+    "relaxed",
+    "surprised"
   ],
   "files": [
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "037b9bc650fccb93c67ebad5f2545d0c52f595cebc9337706418ac46347cb279"
+      "sha256": "4f94c4c9c82178890826c23ba4c4b9f2d67744c6e90f939a22e90801980e300a"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "71ca6c14c667f57607ff7da617927faccdbfc477e0a7240ac3aec33c150df31a"
+      "sha256": "afa0bc8309b46700170496372c8f6092758436c42f6820c7c465c51a622f54d0"
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "b5d281863c6a658cf2e5b82170684f3384566323abb7dbce378877a6c2ac100a"
+      "sha256": "d5ac2c309ff9f0c87a8cafa3555886a915010d5223753b7a8fc1328d42f6dea1"
     },
     {
       "path": "Ciel.model3.json",
@@ -30,15 +31,19 @@
     },
     {
       "path": "Expressions/happy.exp3.json",
-      "sha256": "78b8cbc1b9a24981f2805e394a06121e301f37a7a9bc7a0d33ba50e5cfe1cbdc"
+      "sha256": "f6cac52ee48781343c2964c5caac66065d2b065e08945af95a4e6eab9f10fc5a"
     },
     {
       "path": "Expressions/neutral.exp3.json",
-      "sha256": "868162980a06846b210f3d1fbd8535d37db083feff4974eb392ba8f483b439b0"
+      "sha256": "f132f4f74c583f50bd2dc9444a7cb711a303b4306c8579062532914facd6811a"
     },
     {
       "path": "Expressions/relaxed.exp3.json",
-      "sha256": "d5e58a4f85352ab2174a065e028f4a290318854faa4861cfe23c29768fb2b195"
+      "sha256": "8fed70fa28fe3460adbbed462719b58d58ba9785ef7ccc4d0faff3c8476fa002"
+    },
+    {
+      "path": "Expressions/surprised.exp3.json",
+      "sha256": "33f578ebd9887a88f66f6ab17dd500fce8271eb52be01c277a21729331cb81a1"
     },
     {
       "path": "Motions/Ciel_Nod.motion3.json",
@@ -153,6 +158,10 @@
     {
       "path": "assets/ciel/current/layers/Mouth_Relaxed.png",
       "sha256": "2a5a5c0253e3d51c315b08f0064ad6da360ca20b9323a1c45c2fdaaa7a8abc48"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Surprised.png",
+      "sha256": "a131a03d047614e1660ed0f83a17e0a46ed3ed44a3e3c0e4af09fa9c00c55542"
     },
     {
       "path": "assets/ciel/current/layers/Eye_R_Sclera.png",

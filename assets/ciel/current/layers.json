@@ -141,6 +141,11 @@
       "visible": false
     },
     {
+      "name": "Mouth_Surprised",
+      "path": "assets/ciel/current/layers/Mouth_Surprised.png",
+      "visible": false
+    },
+    {
       "name": "Eye_R_Sclera",
       "path": "assets/ciel/current/layers/Eye_R_Sclera.png",
       "visible": true

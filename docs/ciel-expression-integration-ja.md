@@ -244,3 +244,23 @@ Unityの`CielExpression`は新モデルを検出すると`ParamRelaxed`を使い
 `ParamHappy`も制御し、通常復帰時は両方を0へ上書きする。旧モデルは従来の設定を使う。
 モデル自体はまだUnityへ適用せず、`CIEL > Model > Apply Current Package`で更新できる状態にした。
 詳細は[更新パッケージの手順](../assets/ciel/runtime/README.md)。
+
+### 驚きの調整案 v34
+
+目の開きを増やす従来の値は上限で止まるため、専用の`ParamSurprised`を試作モデルへ追加した。
+瞳を縮小し、白目・まぶたを丸く開く。縮小後の瞳とハイライトを下げ、下側の白目の余白を見本へ近づけた。
+口は見本画像から画像編集で丸口を抽出して追加。新規生成は行っていない。
+通常・嬉しい・にこにこの全既存メッシュは位置と不透明度が一致し、81組み合わせの動作検証も成功。
+
+[見本・調整前・調整後](../assets/ciel/rig/proofs/surprised-v34/reference-comparison.png)と
+[正式モデルの扱い](../assets/ciel/rig/README.md)を参照。
+作成時点では試作として別保存し、採用済みモデルとUnity更新一式は変更していなかった。
+
+### 驚きの採用とUnity更新一式
+
+2026-10-14、ユーザーがv34の驚きを採用。正式な`rig/ciel.cmo3`、現行素材67層、PSD・XCF、
+通常・嬉しい・にこにこ・驚きの4表情ファイルへ反映した。試作一式は`.local/surprised-adoption/adopted-draft/`へ退避。
+`current/approved.json`には新しい正式モデルと検証済み書き出しのハッシュを記録した。
+Unityの表情制御は新モデルでは`ParamSurprised`を使い、旧来の目・口の開き値を重ねない。
+新旧モデルの切り替え設定、10ファイルの更新パッケージ、67層のハッシュをUnityで検証済み。
+モデル自体は未適用で、`CIEL > Model > Apply Current Package`から反映できる。
