@@ -1,0 +1,73 @@
+{
+  "reference": "assets/ciel/generated/v22/expressions/angry.png",
+  "reference_sha256": "44e9f54ef0241707ac3a867f9ea964a6a4193ada500310776a87adf8a378dc04",
+  "face_scale": 0.9382716049382716,
+  "face_offset": [
+    311.85185185185185,
+    84.04938271604942
+  ],
+  "ear_pair_scale": 1.041178652981327,
+  "ear_pair_offset": [
+    455.4035141642334,
+    50.614210337585234
+  ],
+  "ear_registration": "shared transform from the two visible reference ear tips",
+  "parts": {
+    "Mouth_Angry": {
+      "source_bbox": [
+        817,
+        1210,
+        877,
+        1238
+      ],
+      "target_bbox": [
+        1077,
+        1218,
+        1136,
+        1247
+      ]
+    },
+    "Brow_Angry": {
+      "source_bbox": [
+        529,
+        852,
+        1162,
+        953
+      ],
+      "target_bbox": [
+        807,
+        882,
+        1403,
+        979
+      ]
+    },
+    "Ear_R_Folded": {
+      "source_bbox": [
+        26,
+        236,
+        526,
+        697
+      ],
+      "target_bbox": [
+        482,
+        296,
+        1003,
+        777
+      ]
+    },
+    "Ear_L_Folded": {
+      "source_bbox": [
+        729,
+        236,
+        1229,
+        697
+      ],
+      "target_bbox": [
+        1214,
+        296,
+        1736,
+        777
+      ]
+    }
+  }
+}

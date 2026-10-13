@@ -14,3 +14,5 @@ Unityへ更新するときは[../runtime/README.md](../runtime/README.md)に従�
 
 採用した驚きは[比較画像](proofs/surprised-v34/reference-comparison.png)で確認できる。
 採用前の試作一式は`.local/surprised-adoption/adopted-draft/`へ退避し、編集対象の重複をなくした。
+
+次の調整中の表情はぷんすか（v35）。正式モデルとは別に [drafts/angry/](drafts/angry/README.md) へ候補を保存した。顔と折れ耳を独立したキーで切り替える。見本との比較は [proofs/angry-v35/](proofs/angry-v35/reference-comparison.png)。

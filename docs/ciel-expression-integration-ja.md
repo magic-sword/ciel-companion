@@ -264,3 +264,11 @@ Unityの`CielExpression`は新モデルを検出すると`ParamRelaxed`を使い
 Unityの表情制御は新モデルでは`ParamSurprised`を使い、旧来の目・口の開き値を重ねない。
 新旧モデルの切り替え設定、10ファイルの更新パッケージ、67層のハッシュをUnityで検証済み。
 モデル自体は未適用で、`CIEL > Model > Apply Current Package`から反映できる。
+
+### ぷんすかと折れ耳の候補（v35）
+
+`rig/drafts/angry/angry.cmo3` に口・眉・左右の折れ耳の4層を追加した候補を保存する。`ParamAngry` と `ParamEarFold` は別キーで、折れ耳を他の表情にも利用できる。原画の向き・毛の重なりが変わるため、耳の大変形は差分素材で表現する。既存の耳デフォーマーを親として使い、顔の動きに追従させる。折れ耳時の `ParamEar` は基本0。
+
+生成した文脈付き画像から使うのは耳だけ。眉・口は見本を直接画像編集して抽出し、眉に残った地色を透過処理した。目・まばたき・目線・頬・顔土台は既存のものを利用する。発話時は既存の開口パーツへ切り替える。
+
+検証と比較は [ぷんすかの比較画像](../assets/ciel/rig/proofs/angry-v35/reference-comparison.png)、[動作の確認](../assets/ciel/rig/proofs/angry-v35/blink-and-mouth.png)、[候補の説明](../assets/ciel/rig/drafts/angry/README.md)。採用済みの通常・嬉しい・にこにこ・驚きのメッシュ位置と不透明度を比較し、候補の81組み合わせの動作を検証する。正式モデル・現行素材・Unity更新用パッケージは採用済みv34を維持する。

@@ -1,0 +1,16 @@
+{
+  "status": "draft",
+  "files": {
+    "Ciel.cdi3.json": "bd21880dda8ded2ff199227a6467201fe4262d7f98337c916de6c1d8a4f0a543",
+    "Ciel.moc3": "1f007686f63c66b68b503299def8deb3ea109f701a94a91626553705447fa9a1",
+    "Ciel.model3.json": "51159feca531791c26ee10dd30ea2acebaaeb0fc7c0de910429d2b22b62b9b90",
+    "Ciel.physics3.json": "fb5124bb37abdd65acfe65215c2be50cae4aef36e69d65e4961681824f09aa1d",
+    "Ciel.4096/texture_00.png": "8b10576a30b277d146c75098dd6eb526dedc41b5b5f9cd00b20a05c0e3da21bf",
+    "Expressions/angry.exp3.json": "9972a69eef5ff3a0bb62ec950ed8e7f271bb3c381a35aa7df3ea44fb8befd32d",
+    "Expressions/happy.exp3.json": "354699b5d9682d249de85ec57041bc43481808f0981e0ff2c7283afaafa68a5d",
+    "Expressions/neutral.exp3.json": "c37f2f97037ad84cf5a3ee977bc317d276d50fbc9dbc187ecfccf3678955dd1a",
+    "Expressions/relaxed.exp3.json": "21ceba98c3c634940106898ceaaf899f9dcc99f188b55f0205834ad1ad448e2e",
+    "Expressions/surprised.exp3.json": "7f4f78e02c10b7def766cf5621e004908251d898d4bb315a5fbddbb1a691e10f",
+    "Motions/Ciel_Nod.motion3.json": "8dcd3d5569fd799df4ae55c493560566fb4595dbfe5636d342633a9f802aa57a"
+  }
+}

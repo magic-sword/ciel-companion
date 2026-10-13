@@ -1,0 +1,18 @@
+{
+  "brow_translation_canvas_pixels": [
+    -1.108512282371521e-05,
+    -31.99994947385788
+  ],
+  "all_other_meshes_preserved": true,
+  "uv_and_opacity_preserved": true,
+  "brow_crease_overlap_pixels": {
+    "変更前": {
+      "L": 383,
+      "R": 303
+    },
+    "眉だけを上へ32px移動": {
+      "L": 0,
+      "R": 81
+    }
+  }
+}

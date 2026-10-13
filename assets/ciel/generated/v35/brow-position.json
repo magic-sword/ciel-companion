@@ -1,0 +1,9 @@
+{
+  "part": "Brow_Angry",
+  "canvas": [2172, 2896],
+  "mesh_offset_pixels": [0, -32],
+  "shape_unchanged": true,
+  "material_unchanged": true,
+  "reason": "Separate the eyebrow from the upper eyelid crease",
+  "rebuild_script": "scripts/live2d/integrate-angry.py"
+}

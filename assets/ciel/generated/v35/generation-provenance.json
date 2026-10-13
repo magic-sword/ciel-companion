@@ -1,0 +1,25 @@
+{
+  "method": "contextual image edit followed by non-generative separation",
+  "reference": "assets/ciel/generated/v22/expressions/angry.png",
+  "generated_original": "edits/angry-face-ears-with-contour.png",
+  "original_sha256": "77fbcef49a62c7785e4339b12038b6bc1b248ce36f41e5237bdec426e7be1a1f",
+  "generator": "image_gen",
+  "image_edit_count": 1,
+  "used_generated_parts": [
+    "Ear_R_Folded",
+    "Ear_L_Folded"
+  ],
+  "direct_reference_parts": [
+    "Mouth_Angry",
+    "Brow_Angry"
+  ],
+  "existing_materials_reused": [
+    "eyes",
+    "cheeks",
+    "face base"
+  ],
+  "placement": "placement.json",
+  "brow_cleanup": "Reference brow outlines traced and cleaned to remove overlapping hair strokes",
+  "brow_model_position": "brow-position.json",
+  "approved": false
+}
