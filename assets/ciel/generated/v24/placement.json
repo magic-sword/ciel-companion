@@ -1,0 +1,284 @@
+{
+  "Ear_R_Outer": {
+    "uniform_scale": 0.5379805697839349,
+    "translate": [
+      466,
+      -41
+    ],
+    "fit_loss": 0.0005168972310041176,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_R_Outer-01.png",
+    "original_bbox": [
+      496,
+      0,
+      967,
+      625
+    ],
+    "new_bbox": [
+      496,
+      0,
+      967,
+      772
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Ear_R_Inner": {
+    "uniform_scale": 0.36940703320936125,
+    "translate": [
+      499,
+      154
+    ],
+    "fit_loss": 0.000562036101810601,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_R_Inner-01.png",
+    "original_bbox": [
+      529,
+      194,
+      824,
+      568
+    ],
+    "new_bbox": [
+      529,
+      194,
+      824,
+      737
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Ear_R_Base": {
+    "uniform_scale": 0.29487529190920037,
+    "translate": [
+      505,
+      395
+    ],
+    "fit_loss": 0.00031191295576621993,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_R_Base-02.png",
+    "original_bbox": [
+      535,
+      586,
+      720,
+      763
+    ],
+    "new_bbox": [
+      535,
+      473,
+      720,
+      763
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Ear_L_Outer": {
+    "uniform_scale": 0.567429881350562,
+    "translate": [
+      1173,
+      -11
+    ],
+    "fit_loss": 0.002511124693760997,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_L_Outer-02.png",
+    "original_bbox": [
+      1199,
+      33,
+      1720,
+      647
+    ],
+    "new_bbox": [
+      1199,
+      33,
+      1720,
+      757
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Ear_L_Inner": {
+    "uniform_scale": 0.329592496135209,
+    "translate": [
+      1379,
+      191
+    ],
+    "fit_loss": 0.0009072007011048952,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_L_Inner-01.png",
+    "original_bbox": [
+      1410,
+      226,
+      1636,
+      584
+    ],
+    "new_bbox": [
+      1410,
+      226,
+      1636,
+      731
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Ear_L_Base": {
+    "uniform_scale": 0.37621272340478373,
+    "translate": [
+      1362,
+      420
+    ],
+    "fit_loss": 0.0001179849402890049,
+    "assembly": "cut/composite original ear artwork and generated hidden continuation; Outer also includes existing same-side Base; Base upper overlap is cut from existing full ear",
+    "source": "edits\\Ear_L_Base-01.png",
+    "original_bbox": [
+      1392,
+      611,
+      1706,
+      822
+    ],
+    "new_bbox": [
+      1392,
+      456,
+      1706,
+      822
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Eye_R_Sclera": {
+    "uniform_scale": 0.3191676222213273,
+    "source_crop": [
+      144,
+      159,
+      920,
+      724
+    ],
+    "translate": [
+      782,
+      966
+    ],
+    "cut_mask": "unchanged original sclera alpha",
+    "alpha_identical": true,
+    "source": "edits\\Eye_R_Sclera-01.png",
+    "original_bbox": [
+      800,
+      982,
+      1011,
+      1130
+    ],
+    "new_bbox": [
+      800,
+      982,
+      1011,
+      1130
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Eye_R_Iris": {
+    "uniform_scale": 0.22339159434343633,
+    "translate": [
+      819,
+      942
+    ],
+    "fit_loss": 0.0016003935264886971,
+    "original_core_from_y": 1000,
+    "source": "edits\\Eye_R_Iris-01.png",
+    "original_bbox": [
+      850,
+      982,
+      996,
+      1129
+    ],
+    "new_bbox": [
+      850,
+      978,
+      996,
+      1129
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Eye_L_Sclera": {
+    "uniform_scale": 0.3392816901408451,
+    "source_crop": [
+      161,
+      210,
+      871,
+      755
+    ],
+    "translate": [
+      1190,
+      945
+    ],
+    "cut_mask": "unchanged original sclera alpha",
+    "alpha_identical": true,
+    "source": "edits\\Eye_L_Sclera-01.png",
+    "original_bbox": [
+      1200,
+      957,
+      1421,
+      1118
+    ],
+    "new_bbox": [
+      1200,
+      957,
+      1421,
+      1118
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  },
+  "Eye_L_Iris": {
+    "uniform_scale": 0.2209270862167192,
+    "translate": [
+      1186,
+      932
+    ],
+    "fit_loss": 0.000859958170931898,
+    "original_core_from_y": 990,
+    "source": "edits\\Eye_L_Iris-01.png",
+    "original_bbox": [
+      1216,
+      972,
+      1360,
+      1117
+    ],
+    "new_bbox": [
+      1216,
+      969,
+      1360,
+      1117
+    ],
+    "size": [
+      2172,
+      2896
+    ],
+    "mode": "RGBA"
+  }
+}

@@ -99,10 +99,14 @@ def ear(outward_sign):
         d = g - pivot
         if v > 0:   # ぴんと立つ：上へ少し伸ばす
             return pivot + d * np.array([1.0, 1 + EAR_UP * v])
-        th = math.radians(EAR_DOWN_DEG * -v) * outward_sign   # 外側へ倒す（画面で外向き）
-        r = np.array([[math.cos(th), -math.sin(th)], [math.sin(th), math.cos(th)]])
-        out = d @ r.T
-        out[:, 1] *= 1 - 0.12 * -v                             # 少し短く見せる
+        # 根元の下側 25% を固定し、先端ほど曲げる。根元を含む剛体回転は切り口を露出させる。
+        height = np.clip(-d[:, 1] / h, 0, 1)
+        bend = np.clip((height - 0.25) / 0.75, 0, 1)
+        bend = bend * bend * (3 - 2 * bend)
+        th = math.radians(EAR_DOWN_DEG * -v) * outward_sign * bend
+        out = np.stack([d[:, 0] * np.cos(th) - d[:, 1] * np.sin(th),
+                        d[:, 0] * np.sin(th) + d[:, 1] * np.cos(th)], axis=1)
+        out[:, 1] *= 1 - 0.12 * -v * bend
         return pivot + out
     return fn
 

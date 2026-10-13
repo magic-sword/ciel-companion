@@ -1,0 +1,163 @@
+{
+  "registration": {
+    "reference_nose": [
+      491,
+      459
+    ],
+    "reference_chin": [
+      504,
+      697
+    ],
+    "target_nose": [
+      1100,
+      1165
+    ],
+    "target_chin": [
+      1106,
+      1386
+    ],
+    "scale": 0.9285714285714286,
+    "offset": [
+      644.0714285714286,
+      738.7857142857142
+    ],
+    "method": "Uniform registration anchored at nose; scale from nose-to-chin distance"
+  },
+  "Eye_R_Happy": {
+    "source": "assets\\ciel\\generated\\v27\\edits\\reference-extracted-01.png",
+    "source_crop": [
+      124,
+      393,
+      516,
+      561
+    ],
+    "reference_dark_bounds": [
+      164,
+      313,
+      388,
+      404
+    ],
+    "uniform_scale": 0.537467700258398,
+    "size": [
+      211,
+      90
+    ],
+    "translate": [
+      795,
+      1028
+    ],
+    "bbox": [
+      796,
+      1028,
+      1006,
+      1118
+    ],
+    "previous_size": [
+      259,
+      111
+    ]
+  },
+  "Eye_L_Happy": {
+    "source": "assets\\ciel\\generated\\v27\\edits\\reference-extracted-01.png",
+    "source_crop": [
+      764,
+      387,
+      1145,
+      546
+    ],
+    "reference_dark_bounds": [
+      605,
+      307,
+      825,
+      395
+    ],
+    "uniform_scale": 0.541871921182266,
+    "size": [
+      206,
+      86
+    ],
+    "translate": [
+      1205,
+      1023
+    ],
+    "bbox": [
+      1205,
+      1023,
+      1411,
+      1109
+    ],
+    "previous_size": [
+      260,
+      109
+    ]
+  },
+  "Mouth_Happy": {
+    "source": "assets\\ciel\\generated\\v27\\edits\\reference-extracted-01.png",
+    "source_crop": [
+      541,
+      705,
+      733,
+      801
+    ],
+    "reference_dark_bounds": [
+      436,
+      528,
+      553,
+      544
+    ],
+    "uniform_scale": 0.577887537993921,
+    "size": [
+      111,
+      55
+    ],
+    "translate": [
+      1048,
+      1224
+    ],
+    "bbox": [
+      1048,
+      1224,
+      1159,
+      1279
+    ],
+    "previous_size": [
+      130,
+      65
+    ]
+  },
+  "Cheek_Blush_Happy": {
+    "source": "assets/ciel/current/layers/Cheek_Blush.png",
+    "sides": [
+      {
+        "reference_center": [
+          275,
+          443
+        ],
+        "source_center": [
+          921.9815319991075,
+          1172.7639109050165
+        ],
+        "translate": [
+          -23,
+          -23
+        ]
+      },
+      {
+        "reference_center": [
+          712,
+          437
+        ],
+        "source_center": [
+          1287.4638122075642,
+          1171.9493463297454
+        ],
+        "translate": [
+          18,
+          -27
+        ]
+      }
+    ],
+    "preview_weight": 0.45,
+    "uniform_scale": 1
+  }
+}

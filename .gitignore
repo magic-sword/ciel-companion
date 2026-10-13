@@ -44,3 +44,10 @@
 *.cmo3.bak
 *.can3.bak
 __pycache__/
+
+# Rebuildable intermediate composites and per-attempt QA grids.
+# Keep generation originals, accepted layers, placement and main comparison proofs.
+/assets/ciel/generated/v23/assembled/
+/assets/ciel/generated/v23/qa/
+/assets/ciel/generated/v24/qa/
+/unity/.utmp/

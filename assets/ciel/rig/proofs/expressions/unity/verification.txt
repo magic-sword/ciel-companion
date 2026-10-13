@@ -1,0 +1,27 @@
+0: neutral OK tear=0 sweat=0 sparkle=0
+render neutral: 189305 foreground pixels
+1: happy OK tear=0 sweat=0 sparkle=0
+render happy: 190871 foreground pixels
+2: relaxed OK tear=0 sweat=0 sparkle=0
+render relaxed: 188395 foreground pixels
+3: surprised OK tear=0 sweat=0 sparkle=0
+render surprised: 191235 foreground pixels
+4: angry OK tear=0 sweat=0 sparkle=0
+render angry: 187794 foreground pixels
+5: sad OK tear=0 sweat=0 sparkle=0
+render sad: 187599 foreground pixels
+6: troubled OK tear=0 sweat=1 sparkle=0
+render troubled: 187090 foreground pixels
+7: embarrassed OK tear=0 sweat=0 sparkle=0
+render embarrassed: 187188 foreground pixels
+8: teary OK tear=1 sweat=0 sparkle=0
+render teary: 187510 foreground pixels
+9: excited OK tear=0 sweat=0 sparkle=1
+render excited: 191337 foreground pixels
+10: jitome OK tear=0 sweat=0 sparkle=0
+render jitome: 187273 foreground pixels
+11: thinking OK tear=0 sweat=0 sparkle=0
+render thinking: 188933 foreground pixels
+12: neutral OK tear=0 sweat=0 sparkle=0
+render ttl-neutral: 189310 foreground pixels
+12 expressions + TTL passed

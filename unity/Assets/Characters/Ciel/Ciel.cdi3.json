@@ -62,6 +62,11 @@
 			"Name": "右眉　上下"
 		},
 		{
+			"Id": "ParamEar",
+			"GroupId": "",
+			"Name": "耳　感情"
+		},
+		{
 			"Id": "ParamBrowLX",
 			"GroupId": "",
 			"Name": "左眉　左右"
@@ -140,10 +145,29 @@
 			"Id": "ParamHairBack",
 			"GroupId": "",
 			"Name": "髪揺れ　後"
+		},
+		{
+			"Id": "ParamTear",
+			"GroupId": "",
+			"Name": "涙"
+		},
+		{
+			"Id": "ParamSweat",
+			"GroupId": "",
+			"Name": "汗"
+		},
+		{
+			"Id": "ParamSparkle",
+			"GroupId": "",
+			"Name": "キラキラ"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part2",
+			"Name": "ciel-expression-additions.psd"
+		},
 		{
 			"Id": "Part",
 			"Name": "ciel-v19-body.psd"

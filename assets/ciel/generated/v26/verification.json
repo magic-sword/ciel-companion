@@ -1,0 +1,17 @@
+{
+  "current_unchanged": true,
+  "layers": [
+    "Eye_R_Happy",
+    "Eye_L_Happy",
+    "Cheek_Blush_Happy",
+    "Mouth_Happy"
+  ],
+  "canvas": [
+    2172,
+    2896
+  ],
+  "mouth_unchanged_from_v25": true,
+  "blush_preview_weight": 0.55,
+  "eye_skin_patches": false,
+  "rig_imported": false
+}

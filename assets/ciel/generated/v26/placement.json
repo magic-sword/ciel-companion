@@ -1,0 +1,114 @@
+{
+  "Eye_R_Happy": {
+    "separation_crop": [
+      100,
+      440,
+      570,
+      710
+    ],
+    "alpha_bounds": [
+      40,
+      50,
+      438,
+      219
+    ],
+    "uniform_scale": 0.6532663316582915,
+    "translate": [
+      769,
+      984
+    ],
+    "bbox": [
+      770,
+      984,
+      1029,
+      1094
+    ],
+    "sha256": "117e45b8b7e2da841a8011a1558dae0768ffe5681dfd4f5c8db4942e80b6ae43"
+  },
+  "Eye_L_Happy": {
+    "separation_crop": [
+      720,
+      440,
+      1190,
+      710
+    ],
+    "alpha_bounds": [
+      37,
+      49,
+      433,
+      219
+    ],
+    "uniform_scale": 0.6565656565656566,
+    "translate": [
+      1179,
+      979
+    ],
+    "bbox": [
+      1179,
+      979,
+      1439,
+      1091
+    ],
+    "sha256": "810a0394cc4d4ea77f13bded6cf8e35af6dbdb0f238719c358567f464d7295dd"
+  },
+  "Cheek_Blush_R": {
+    "separation_crop": [
+      200,
+      400,
+      600,
+      720
+    ],
+    "alpha_bounds": [
+      76,
+      63,
+      319,
+      232
+    ],
+    "uniform_scale": 0.6995884773662552,
+    "translate": [
+      825,
+      1074
+    ],
+    "bbox": [
+      825,
+      1074,
+      995,
+      1192
+    ]
+  },
+  "Cheek_Blush_L": {
+    "separation_crop": [
+      650,
+      400,
+      1100,
+      720
+    ],
+    "alpha_bounds": [
+      141,
+      62,
+      380,
+      226
+    ],
+    "uniform_scale": 0.7112970711297071,
+    "translate": [
+      1215,
+      1070
+    ],
+    "bbox": [
+      1215,
+      1070,
+      1385,
+      1187
+    ]
+  },
+  "Cheek_Blush_Happy": {
+    "source": "../v25/layers/Mouth_Happy.png",
+    "operation": "unchanged copy",
+    "sha256": "714f3e28940cc890318cfffeceb34d5abb65f63025548e82c7a3d70c76408159"
+  },
+  "Mouth_Happy": {
+    "source": "../v25/layers/Mouth_Happy.png",
+    "operation": "unchanged copy",
+    "sha256": "bcfbacef2aa3a22ad0661ea37729a84f6683e3f8025bb0278bb9f766848e146f"
+  }
+}

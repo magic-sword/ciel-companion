@@ -1,0 +1,94 @@
+{
+  "Eye_R_Happy": {
+    "source": "edits/reference-extracted-01.png",
+    "separation_crop": [
+      100,
+      360,
+      570,
+      590
+    ],
+    "alpha_crop": [
+      24,
+      33,
+      416,
+      201
+    ],
+    "uniform_scale": 0.6632653061224489,
+    "translate": [
+      769,
+      984
+    ],
+    "bbox": [
+      770,
+      984,
+      1029,
+      1095
+    ],
+    "sha256": "6d4c615b23cc632a88be9a1e45bd8f3536180118bce7646dde634f7950577d22"
+  },
+  "Eye_L_Happy": {
+    "source": "edits/reference-extracted-01.png",
+    "separation_crop": [
+      720,
+      360,
+      1180,
+      590
+    ],
+    "alpha_crop": [
+      44,
+      27,
+      425,
+      186
+    ],
+    "uniform_scale": 0.6824146981627297,
+    "translate": [
+      1179,
+      979
+    ],
+    "bbox": [
+      1179,
+      979,
+      1439,
+      1088
+    ],
+    "sha256": "f8bad842127bd9554c2edf7a6f5b3fcbe7279c5b3cdf25c54a29a995622c9e64"
+  },
+  "Mouth_Happy": {
+    "source": "edits/reference-extracted-01.png",
+    "separation_crop": [
+      500,
+      670,
+      780,
+      840
+    ],
+    "alpha_crop": [
+      41,
+      35,
+      233,
+      131
+    ],
+    "uniform_scale": 0.6770833333333334,
+    "translate": [
+      1043,
+      1220
+    ],
+    "bbox": [
+      1043,
+      1220,
+      1173,
+      1285
+    ],
+    "sha256": "3c5e01266f2706fedf9879082d2d4705cc15be75e986c8f8a5c1b6a848e9271f"
+  },
+  "Cheek_Blush_Happy": {
+    "source": "assets/ciel/current/layers/Cheek_Blush.png",
+    "uniform_scale": 1,
+    "translate": [
+      0,
+      -41
+    ],
+    "preview_weight": 0.45,
+    "note": "Same pigment and strength as v25, translated upward only",
+    "sha256": "fdef0b43455fdca6becff23ca1656d590d25ed5d64468b47a99a8dba70249608"
+  }
+}

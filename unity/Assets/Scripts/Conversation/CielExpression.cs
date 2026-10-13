@@ -2,7 +2,7 @@
 //
 // 表情は Live2D の表情ファイル（*.exp3.json、Cubism の表情の仕組み）に置き換える予定。それまでの仮として、
 // 表情ごとに「パラメーターの目標値」を下の表に持ち、なめらかに近づける（加算。目パチ・口パク・頭の動きと重ねられる）。
-// リグに各パラメーターの形（笑い目・眉・口の形・頬など）が入ると、見た目が変わる。
+// リグの笑い目・頬・涙・汗・キラキラと、眉・口・耳の変形を制御する。
 // 寿命（ttl）が切れたら、通常（neutral）へ戻る。
 using System.Collections.Generic;
 using Live2D.Cubism.Core;
@@ -35,15 +35,15 @@ namespace Ciel.Conversation
         static readonly Dictionary<string, (string id, float v)[]> Targets = new Dictionary<string, (string, float)[]>
         {
             { "neutral", new (string, float)[0] },
-            { "happy", new[] { ("ParamEyeLSmile", 1f), ("ParamEyeRSmile", 1f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.3f), ("ParamBrowRY", 0.3f), ("ParamEar", 1f) } },
-            { "relaxed", new[] { ("ParamEyeLSmile", 0.6f), ("ParamEyeRSmile", 0.6f), ("ParamMouthForm", 0.6f) } },
-            { "surprised", new[] { ("ParamEyeLOpen", 0.3f), ("ParamEyeROpen", 0.3f), ("ParamBrowLY", 0.8f), ("ParamBrowRY", 0.8f), ("ParamEar", 1f) } },
+            { "happy", new[] { ("ParamEyeLSmile", 1f), ("ParamEyeRSmile", 1f), ("ParamCheek", 0.45f), ("ParamMouthOpenY", 0.8f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.3f), ("ParamBrowRY", 0.3f), ("ParamEar", 1f) } },
+            { "relaxed", new[] { ("ParamEyeLOpen", -0.25f), ("ParamEyeROpen", -0.25f), ("ParamMouthForm", 0.6f), ("ParamCheek", 0.2f) } },
+            { "surprised", new[] { ("ParamEyeLOpen", 0.3f), ("ParamEyeROpen", 0.3f), ("ParamMouthOpenY", 0.3f), ("ParamBrowLY", 0.8f), ("ParamBrowRY", 0.8f), ("ParamEar", 1f) } },
             { "angry", new[] { ("ParamBrowLAngle", -0.8f), ("ParamBrowRAngle", -0.8f), ("ParamBrowLForm", -0.6f), ("ParamBrowRForm", -0.6f), ("ParamMouthForm", -0.6f), ("ParamCheek", 0.3f), ("ParamEar", -0.5f) } },
             { "sad", new[] { ("ParamBrowLAngle", 0.7f), ("ParamBrowRAngle", 0.7f), ("ParamBrowLY", -0.3f), ("ParamBrowRY", -0.3f), ("ParamMouthForm", -0.7f), ("ParamEyeLOpen", -0.2f), ("ParamEyeROpen", -0.2f), ("ParamEar", -1f) } },
-            { "troubled", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.2f), ("ParamEar", -0.4f) } },
-            { "embarrassed", new[] { ("ParamCheek", 1f), ("ParamEyeLSmile", 0.3f), ("ParamEyeRSmile", 0.3f), ("ParamEyeBallX", 0.6f), ("ParamEar", -0.3f) } },
-            { "teary", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.8f), ("ParamEyeLOpen", -0.15f), ("ParamEyeROpen", -0.15f), ("ParamEar", -1f) } },
-            { "excited", new[] { ("ParamEyeLOpen", 0.2f), ("ParamEyeROpen", 0.2f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.6f), ("ParamBrowRY", 0.6f), ("ParamEar", 1f) } },
+            { "troubled", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.2f), ("ParamSweat", 1f), ("ParamEar", -0.4f) } },
+            { "embarrassed", new[] { ("ParamCheek", 1f), ("ParamMouthForm", 0.2f), ("ParamEyeBallX", 0.6f), ("ParamEar", -0.3f) } },
+            { "teary", new[] { ("ParamBrowLAngle", 0.9f), ("ParamBrowRAngle", 0.9f), ("ParamMouthForm", -0.8f), ("ParamEyeLOpen", -0.15f), ("ParamEyeROpen", -0.15f), ("ParamTear", 1f), ("ParamEar", -1f) } },
+            { "excited", new[] { ("ParamEyeLOpen", 0.2f), ("ParamEyeROpen", 0.2f), ("ParamSparkle", 1f), ("ParamMouthOpenY", 0.9f), ("ParamMouthForm", 1f), ("ParamBrowLY", 0.6f), ("ParamBrowRY", 0.6f), ("ParamEar", 1f) } },
             { "jitome", new[] { ("ParamEyeLOpen", -0.5f), ("ParamEyeROpen", -0.5f), ("ParamMouthForm", -0.3f), ("ParamEar", -0.5f) } },
             { "thinking", new[] { ("ParamEyeBallX", -0.5f), ("ParamEyeBallY", 0.6f), ("ParamBrowLY", 0.4f), ("ParamMouthForm", -0.3f) } },
         };
@@ -95,7 +95,8 @@ namespace Ciel.Conversation
                 w = Mathf.MoveTowards(w, t, step);
                 _weights[id] = w;
                 if (Mathf.Abs(w) > 1e-4f && _params.TryGetValue(id, out var p))
-                    p.Value = Mathf.Clamp(p.Value + w * (p.MaximumValue - p.MinimumValue) * 0.5f, p.MinimumValue, p.MaximumValue);
+                    // 値はパラメーターの単位。0〜1 の素材表示にも 1 をそのまま渡す。
+                    p.Value = Mathf.Clamp(p.Value + w, p.MinimumValue, p.MaximumValue);
             }
         }
     }

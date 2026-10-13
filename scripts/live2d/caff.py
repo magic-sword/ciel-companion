@@ -8,7 +8,7 @@ CAFF 自体はLive2Dの非公開形式なので、書き込んだファイルが
   ヘッダ  'CAFF'(4) + archive_version(3) + format_id(4) + format_version(3) + key(u32)
           + 36バイト（pad・プレビュー画像の情報・pad）         ＝ 54 バイト（実ファイルで確認）
   本体    entry_count(u32 ^ key) → メタデータ × entry_count → 各ファイルのバイト列 → 残り(trailing)
-  メタデータ  file_name・tag（1バイトの長さ ^ key8 ＋ 文字 ^ key8）、pad(4)、pad(4)、
+  メタデータ  file_name・tag（1バイトの長さ ^ key8 ＋ 文字 ^ key8）、データの絶対位置（u64、上下のu32それぞれ ^ key）、
               file_size(u32 ^ key)、is_obfuscated(u8 ^ key8)、compression(u8 ^ key8)、pad(8)
   ファイル本体  is_obfuscated が真なら、1バイトずつ ^ key8
 """
@@ -39,7 +39,8 @@ def _xor_bytes(b, k8):
 
 
 def read(path):
-    raw = open(path, 'rb').read()
+    with open(path, 'rb') as stream:
+        raw = stream.read()
     if raw[:4] != b'CAFF':
         raise ValueError('not a CAFF file')
     pos = 0
@@ -108,16 +109,26 @@ def write(caff, path):
         out.append(len(b) ^ k8)
         out.extend(_xor_bytes(b, k8))
 
+    # These two encrypted u32 fields form the absolute u64 data offset.
+    # Keeping the old offsets works only when preceding entries keep their size.
+    # Replacing PNGs changes every later offset, including main.xml.
+    offset = 58 + sum(1 + len(e.name.encode('utf-8')) + 1 + len(e.tag.encode('utf-8')) + 22
+                      for e in caff.entries)
     for e in caff.entries:
         string(e.name)
         string(e.tag)
-        out += e.pad1
-        out += e.pad2
+        # Cubism's signed key uses sign extension in this field when the high bit
+        # is set. Retain that convention from archives written by the editor.
+        high_mask = 0xFFFFFFFF if key & 0x80000000 else key
+        out += struct.pack('>I', (offset >> 32) ^ high_mask)
+        out += struct.pack('>I', (offset & 0xFFFFFFFF) ^ key)
         out += struct.pack('>I', len(e.data) ^ key)
         out.append((1 if e.obfuscated else 0) ^ k8)
         out.append(e.compression ^ k8)
         out += e.pad3
+        offset += len(e.data)
     for e in caff.entries:
         out += _xor_bytes(e.data, k8) if e.obfuscated else e.data
     out += caff.trailing
-    open(path, 'wb').write(bytes(out))
+    with open(path, 'wb') as stream:
+        stream.write(bytes(out))

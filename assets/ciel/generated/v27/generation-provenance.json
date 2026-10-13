@@ -1,0 +1,16 @@
+{
+  "version": "v27",
+  "method": "Direct image edit/extraction of approved v22 happy reference, no intermediate face redesign",
+  "source": "inputs/happy-reference-face.png",
+  "prompt": "Extract the EXISTING artwork directly from the attached USER-APPROVED HAPPY FACE reference. Do NOT redesign or redraw the expression. Remove the surrounding character to transparency, keeping only these three exact pieces: (1) viewer-left CLOSED HAPPY EYE: existing dark curved eyelash silhouette, lash tips, 3 tiny embedded white glints, and its very fine short mauve upper lid crease; (2) viewer-right CLOSED HAPPY EYE with the same existing details; (3) the EXISTING small pink round-bottom smiling mouth including its thin mauve edge and existing gentle interior pink shading. Preserve the reference's exact artwork, rounded curves, varied lash thickness, short faint creases, muted colors, fine glints and mouth shape. These are extracted pixels/artwork from the supplied image, NOT a newly drawn pair of eyes and mouth. Preserve original size/relative spacing and same square canvas composition; no zooming or recentering. Approximate source 970x970 locations: viewer-left eye x150..400 y300..415, viewer-right x595..835 y295..415, mouth x430..560 y525..587. Remove all skin, hair, brows, nose, cheek blush, face contour, neck, collar, jewelry and background. No opaque white or skin patches. Everything around the eye lines and mouth is fully TRANSPARENT. If hair crosses a crease, only complete the tiny occluded section naturally; visible curves must remain the same. The thin short crease is part of each eye and must not be lengthened. Keep white highlights inside the lashes opaque, not punched-out holes. One transparent RGBA square image, no labels, no checkerboard pattern.",
+  "result_file": "edits/reference-extracted-01.png",
+  "output_hint": "Generated images are saved to C:\\Users\\prog\\.codex\\generated_images\\01a133cf-393b-7850-bdf3-29fe2bdb4fa3 as C:\\Users\\prog\\.codex\\generated_images\\01a133cf-393b-7850-bdf3-29fe2bdb4fa3\\exec-814fb97f-6844-44c8-9875-f445af90be5e.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+  "generation_count": 1,
+  "blush_source": "assets/ciel/current/layers/Cheek_Blush.png",
+  "blush_translation": [
+    0,
+    -41
+  ],
+  "blush_preview_weight": 0.45,
+  "note": "Tool extraction is not a pixel-identical cutout; source/extraction details document differences"
+}

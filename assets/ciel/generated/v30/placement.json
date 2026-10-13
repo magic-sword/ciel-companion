@@ -1,0 +1,34 @@
+{
+  "raw_file": "edits/face-details-with-contour-02.png",
+  "raw_canvas": [
+    1254,
+    1254
+  ],
+  "registered_canvas": [
+    970,
+    970
+  ],
+  "source_nose": [
+    628,
+    627
+  ],
+  "source_chin": [
+    641,
+    952
+  ],
+  "reference_nose": [
+    491,
+    459
+  ],
+  "reference_chin": [
+    504,
+    697
+  ],
+  "uniform_scale": 0.7323076923076923,
+  "offset": [
+    31.110769230769222,
+    -0.1569230769230785
+  ],
+  "all_parts_share_transform": true,
+  "parts_separated": false
+}

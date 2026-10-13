@@ -1,0 +1,83 @@
+{
+  "Eye_R_Happy": {
+    "source": "keyed/happy-overlay-01.png",
+    "separation_crop": [
+      100,
+      500,
+      550,
+      720
+    ],
+    "alpha_crop": [
+      44,
+      37,
+      405,
+      171
+    ],
+    "uniform_scale": 0.7202216066481995,
+    "translate": [
+      769,
+      1000
+    ],
+    "bbox": [
+      769,
+      1000,
+      1029,
+      1097
+    ],
+    "sha256": "7cae0140c4a283415e684efae3a118583c0cd4bcb21e273be89f31252703e8c3"
+  },
+  "Eye_L_Happy": {
+    "source": "keyed/happy-overlay-01.png",
+    "separation_crop": [
+      750,
+      500,
+      1180,
+      720
+    ],
+    "alpha_crop": [
+      43,
+      35,
+      397,
+      168
+    ],
+    "uniform_scale": 0.7344632768361582,
+    "translate": [
+      1179,
+      995
+    ],
+    "bbox": [
+      1179,
+      996,
+      1438,
+      1093
+    ],
+    "sha256": "675dc61c1a3760828fd0c9a5aa68d85fb27e1559e12ff2fc57351a9ea4329aaa"
+  },
+  "Mouth_Happy": {
+    "source": "keyed/happy-overlay-01.png",
+    "separation_crop": [
+      520,
+      800,
+      790,
+      980
+    ],
+    "alpha_crop": [
+      45,
+      39,
+      216,
+      133
+    ],
+    "uniform_scale": 0.7602339181286549,
+    "translate": [
+      1043,
+      1220
+    ],
+    "bbox": [
+      1043,
+      1220,
+      1173,
+      1291
+    ],
+    "sha256": "bcfbacef2aa3a22ad0661ea37729a84f6683e3f8025bb0278bb9f766848e146f"
+  }
+}

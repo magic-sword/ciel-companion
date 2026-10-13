@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Ear_R_Outer-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-57fe4455-ef0c-4162-8884-9245b0ebc341.png",
+    "prompt": "See session: original keyed outer R minimal edit with head context."
+  },
+  {
+    "name": "Ear_L_Outer-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-3fe32ca8-8a4f-4c29-9646-956f9cfd9d8d.png",
+    "prompt": "Edit FIRST attached existing Ear_L_Outer green-backed layer in place, using SECOND assembled head for anatomical context. This is a minimal edit of the supplied painting. Preserve original upper ear tip, silhouette, white fur, cool lavender shading, thin lines and the lavender interior underpaint; inner white fur is a separate layer, DO NOT add it. ONLY repair the amputated horizontal bottom at y618 of first 581x844 image: extend existing ear smoothly down another 150 pixels to y~780 as a broad natural curved ear root following skull roundness with white fur tufts and a rounded oblique ending. No straight horizontal cutoff anywhere. Preserve all existing painting above y570. No zoom, recenter, relayout or change of upper shape. Entire outside background flat #00FF00. No other parts or text. Return same aspect ratio."
+  },
+  {
+    "name": "Ear_R_Inner-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-6d610b25-6f7a-4683-a049-81efa64ac49b.png",
+    "prompt": "Minimal edit of the FIRST provided existing inner-ear fur layer. Second image is only context of this same character. Keep every existing fur lock, thin pale periwinkle line, original colors and top silhouette. Extend ONLY the lower root of this white inner-ear fur downward into the green area by about 150 px (first image 355x604, present lowest fur tip y410; new tips around y550). Continue coherent overlapping white tufts with light lavender shadows. This supplies the hidden ear attachment when the ear rotates sideways. Do not change width, position or size of existing upper fur. Do not draw outer ear, face, skin, or any other part. Use same portrait aspect ratio and framing; background remains completely flat pure #00FF00. This is completion of this supplied layer, not new artwork from scratch."
+  },
+  {
+    "name": "Ear_L_Inner-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-91d12a9b-64d4-4233-abe3-2f271f664714.png",
+    "prompt": "Minimal edit of FIRST existing Ear_L_Inner fur layer on green. Second is anatomical context only. Preserve its existing upper pointed white fur locks, thin lavender outline, white/light lavender painted shading, width and position. ONLY continue the LOWER ear root down by 150 original pixels (first 286x588 image, original bottom tip y400, new fur tips around y550). This is a fluffy inner-ear lining extending under hair, with natural tapering overlapping fur tufts, matching exact upper style. Do not draw outer ear, face, eyelid, or any other object. Keep same aspect ratio and original upper-layer size and placement; no zoom/recenter. Flat pure #00FF00 everywhere outside the completed inner-ear fur. No text."
+  },
+  {
+    "name": "Ear_R_Base-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-13f85365-79ef-4cde-b88f-380cd03ea1d6.png",
+    "prompt": "Edit first existing Ear_R_Base white fur attachment layer IN PLACE. Second assembled character shows the ear attachment context. First layer is an amputated piece with an unnatural straight horizontal TOP at y190 in the 245x557 image. Complete the missing upper root into the green space: extend UP 150 pixels from that cut to about y40, naturally rounded with a few white fur points, a continuous broad ear attachment rather than a flat line. Preserve all existing lower fur contours, tips, line weight, blue-lavender shadow and placement exactly. Keep bottom fur at original y360, DO NOT grow the bottom, enlarge, recenter, or add full ear/head. This is only completion of the original cut fur patch. Background flat #00FF00, no text. Same portrait aspect ratio."
+  },
+  {
+    "name": "Ear_R_Base-02",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-d44a3716-f5bd-4d4c-b93f-4058ddece868.png",
+    "prompt": "添付画像の最小限の編集。これは白い毛束の切り抜きです。動物の耳全体を描かないでください。いま存在する白い毛束の下側の形・模様・位置・大きさはそのまま保つ。上端の水平な切り口だけを直します。切り口は245×557の画像のy190にあります。この線から上の緑の余白へ白い毛束の続きを150px描き足し、上端は丸みのある白いふわふわした根元としてy40付近で閉じる。先の尖った三角形の耳、青い耳穴、目、顔は一切描かない。白と薄い青紫だけの小さい毛束のまま。下端はy360付近から変えない。拡大も位置移動もしない。背景は均一な#00FF00。出力は入力と同じ縦横比。"
+  },
+  {
+    "name": "Ear_L_Base-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-7c0d5c3d-12f6-4a99-b250-8ee2c56ce6a5.png",
+    "prompt": "添付画像の最小限の編集。既存の白い毛束だけを編集する。毛束の上端の水平な切り口を直してください。374×591の画像でy190にある水平線から上の緑の余白へ白い毛束の続きを約150px描き足し、上端はy40付近で、丸みのある自然な毛束の根元としてふわふわした毛先で閉じる。動物の耳全体や三角の耳や耳穴は描かない。既存の下側の毛先、色、青紫の線、模様、位置、大きさは変えない。下端y360前後の毛先をそのまま残す。拡大・移動・構図変更はしない。白と薄い青紫だけの毛束で、外は完全に均一な#00FF00の緑。出力は同じ縦横比。"
+  },
+  {
+    "name": "Eye_R_Sclera-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-4094a6e4-22df-432c-8d8d-f6e897bc8685.png",
+    "prompt": "添付の既存レイヤーの編集。白目だけの画像です。白目の外周の形、サイズ、位置は完全に維持してください。内側にある不自然なもう1つの大きな白い楕円、楕円の周りの薄い青い縁、くっきりした陰の境目だけを消す。1枚の連続したなめらかな白目に直す。上端はごく薄い青紫の柔らかい上まぶたの影、下に向かって白に滑らかに変わるグラデーション。上の影は横全体につながり、円や楕円の縁は全く無い。まつげ・瞳・輪郭線を追加しない。白目の外形の変形禁止。元の輪郭を厳密にトレースした中だけの塗り直し。背景は均一な#00FF00。構図、位置、余白、縦横比を入力から変えない。"
+  },
+  {
+    "name": "Eye_L_Sclera-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-b3c349e8-1ed7-4251-9f86-beaac27a0fc9.png",
+    "prompt": "添付の既存レイヤーの編集。白目だけの画像です。白目の外周の形、サイズ、位置は完全に維持してください。内側にある不自然なもう1つの大きな白い楕円、楕円の周りの薄い青い縁、くっきりした陰の境目だけを消す。1枚の連続したなめらかな白目に直す。上端はごく薄い青紫の柔らかい上まぶたの影、下に向かって白に滑らかに変わるグラデーション。上の影は横全体につながり、円や楕円の縁は全く無い。まつげ・瞳・輪郭線を追加しない。白目の外形の変形禁止。元の輪郭を厳密にトレースした中だけの塗り直し。背景は均一な#00FF00。構図、位置、余白、縦横比を入力から変えない。"
+  },
+  {
+    "name": "Eye_R_Iris-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-66326f5f-c696-46b3-954f-2746e6f9b34c.png",
+    "prompt": "Minimal surgical edit of this existing BLUE IRIS layer. Preserve existing iris color, ALL internal patterns, pupil, reflections, size and position. Remove only the irregular detached black EYELASH fragments at the upper-left outer rim. Complete the very top of the blue iris into a smooth ROUND arc where the black eyelash had obscured it; add only 5-10 original pixels upward if needed. Keep deep blue thin iris outline as a smooth continuous curve, but NO jagged black triangular lash projections. Do not change center pupil, blue/cyan gradient, lower white circular glow, highlights, width, lower contour, or framing. No new sparkle dots. Background remains perfectly flat #00FF00. Keep original portrait aspect ratio and exact location within canvas. Edit the supplied image, do not redesign an eye."
+  },
+  {
+    "name": "Eye_L_Iris-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-4e835e17-e736-4e04-8906-c5d995d00360.png",
+    "prompt": "Minimal surgical edit of this existing BLUE IRIS layer. Preserve existing iris color, ALL internal patterns, pupil, reflections, size and position. Remove only the irregular detached black EYELASH fragments at the upper-left outer rim. Complete the very top of the blue iris into a smooth ROUND arc where the black eyelash had obscured it; add only 5-10 original pixels upward if needed. Keep deep blue thin iris outline as a smooth continuous curve, but NO jagged black triangular lash projections. Do not change center pupil, blue/cyan gradient, lower white circular glow, highlights, width, lower contour, or framing. No new sparkle dots. Background remains perfectly flat #00FF00. Keep original portrait aspect ratio and exact location within canvas. Edit the supplied image, do not redesign an eye."
+  },
+  {
+    "name": "Ear_L_Outer-02",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132b1-564f-7e93-9dc9-c96b84578f05\\exec-c7206c9d-de04-411f-a361-dd4f9eede3d5.png",
+    "prompt": "添付の画像を最小限だけ編集。耳の外側の既存レイヤーです。上側の見えている部分の色・形・線は一切変えない。中央の薄紫の平坦な領域は別レイヤーの下塗りなので、そのまま薄紫で残し、白い内側の毛を描かない。直すのは下端の水平な切断線のみ。581×844の画像のy618の切り口から下へ150px程度、既存の白い外側の毛と薄紫の内側の続きを自然に描き足す。丸い頭に沿う太さのある耳の付け根として、下端y775付近で斜めの丸みと毛先で閉じる。長い細い房にならない。元の輪郭と内部をy570より上では完全に維持。拡大・移動・新しいデザインはしない。外は完全な単色#00FF00。"
+  }
+]

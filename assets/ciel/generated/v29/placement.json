@@ -1,0 +1,128 @@
+{
+  "size-only": {
+    "Eye_R_Happy": {
+      "width": 260,
+      "uniform_scale": 0.6632653061224489,
+      "translate": [
+        770,
+        1028
+      ],
+      "lash_tip": [
+        773,
+        1110
+      ],
+      "hair_boundary_x": 792,
+      "skin_gap_px": -19,
+      "bbox": [
+        771,
+        1028,
+        1030,
+        1139
+      ]
+    },
+    "Eye_L_Happy": {
+      "width": 260,
+      "uniform_scale": 0.6824146981627297,
+      "translate": [
+        1178,
+        1023
+      ],
+      "lash_tip": [
+        1434,
+        1099
+      ],
+      "hair_boundary_x": 1410,
+      "skin_gap_px": -24,
+      "bbox": [
+        1178,
+        1023,
+        1438,
+        1132
+      ]
+    }
+  },
+  "contact-only": {
+    "Eye_R_Happy": {
+      "width": 211,
+      "uniform_scale": 0.5382653061224489,
+      "translate": [
+        777,
+        1028
+      ],
+      "lash_tip": [
+        780,
+        1095
+      ],
+      "hair_boundary_x": 783,
+      "skin_gap_px": -3,
+      "bbox": [
+        778,
+        1028,
+        988,
+        1118
+      ]
+    },
+    "Eye_L_Happy": {
+      "width": 206,
+      "uniform_scale": 0.5406824146981627,
+      "translate": [
+        1219,
+        1023
+      ],
+      "lash_tip": [
+        1422,
+        1083
+      ],
+      "hair_boundary_x": 1419,
+      "skin_gap_px": -3,
+      "bbox": [
+        1219,
+        1023,
+        1425,
+        1109
+      ]
+    }
+  },
+  "size-and-contact": {
+    "Eye_R_Happy": {
+      "width": 260,
+      "uniform_scale": 0.6632653061224489,
+      "translate": [
+        775,
+        1008
+      ],
+      "lash_tip": [
+        778,
+        1090
+      ],
+      "hair_boundary_x": 781,
+      "skin_gap_px": -3,
+      "bbox": [
+        776,
+        1008,
+        1035,
+        1119
+      ]
+    },
+    "Eye_L_Happy": {
+      "width": 260,
+      "uniform_scale": 0.6824146981627297,
+      "translate": [
+        1168,
+        1003
+      ],
+      "lash_tip": [
+        1424,
+        1079
+      ],
+      "hair_boundary_x": 1421,
+      "skin_gap_px": -3,
+      "bbox": [
+        1168,
+        1003,
+        1428,
+        1112
+      ]
+    }
+  }
+}

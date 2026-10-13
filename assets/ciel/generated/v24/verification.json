@@ -1,0 +1,34 @@
+{
+  "current_unchanged": true,
+  "layer_count": 10,
+  "canvas_and_rgba_ok": true,
+  "sclera_alpha_identical": true,
+  "ears_front_max_rgba_difference": 40,
+  "ears_front_changed_pixels": 2460,
+  "registration": "uniform scale + translation only",
+  "runtime_live2d_test": false,
+  "iris_core_pixel_identical": {
+    "Eye_R_Iris": true,
+    "Eye_L_Iris": true
+  },
+  "layer_sha256": {
+    "Ear_R_Outer": "63b6b50bd7306cfe36d1be7267b3684af0af033c72b8a05af7030395fbfca148",
+    "Ear_R_Inner": "5964fa051277a70dea31bced1cddb3f922220d0cbe7d51f129e25055fa5eacf2",
+    "Ear_R_Base": "47f4ed574dd359d683b52b5d1acfaaf46604391d13520b480d378677866952be",
+    "Ear_L_Outer": "6bcf87f2866faa239e67dbbdeac226d8409ff3cbb4d44c54e227c23fe9195b49",
+    "Ear_L_Inner": "3d1e64170c4d9e844fb50498ed1e4974ffb8d11b3ebfe21267a62fca15197958",
+    "Ear_L_Base": "95182738b774e4389454bdf359b4abbf42c083148e81253b95030fe5a120f20b",
+    "Eye_R_Sclera": "acb9788757f3e84491db3a148138d4cfa2812cad388fafabdf8d34e9c0a55f67",
+    "Eye_R_Iris": "374c4044a5082f9c397f8bf5668afc3be3cf62c5355882ca21fc30bedc4056c3",
+    "Eye_L_Sclera": "43972cddc8e5b8b86ba7f5f591aa9ef631e797c6d312e54d3ef45270b1bc9137",
+    "Eye_L_Iris": "4c49410360790677a3ce1a459696987964c80aefab58b5c52e65cc915a74a7a6"
+  },
+  "ears_front_difference": {
+    "max": 40,
+    "changed_pixels": 2460,
+    "pixels_over_5": 892,
+    "mean_absolute_rgba": 0.00127545423674491
+  },
+  "outside_replaced_layer_support_identical": true,
+  "motion_proofs": "Rigid rotation and clipped iris translation on PNG composites only, not Cubism deformation tests"
+}

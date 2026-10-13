@@ -1,0 +1,72 @@
+[
+  {
+    "name": "blush-02",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-586830e7-d073-41db-8f24-adef83cf6a6b.png",
+    "prompt": "Surgical edit of the attached ORIGINAL face image. Retain the exact same square framing and feature coordinates. Add ONLY very soft oval pink blush to both cheeks beneath the eyes, plus 5 fine pale pink diagonal short strokes per cheek. EVERYTHING else must stay the same: do not redraw, zoom, reframe or enlarge any features. Hair edge/strand curves, eyes, brows, nose, closed mouth, face outline and collar all unchanged. Cheek blush centers at approximately (350,535) and (750,525) on the input 1050-square, oval widths ~155 and heights ~90. No central nose blush. Edit the existing face in place; do not create separate parts, no text. Minimal edit."
+  },
+  {
+    "name": "happy-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-dfbe532c-9cd7-4281-a110-04ac62bef09c.png",
+    "prompt": "Edit the attached original assembled FACE CROP in place. Keep its EXACT square framing, scale and all feature coordinates. Do not reframe. Preserve the original white hair including every strand, eyebrows, face contour, nose, closed mouth, collar and colors. Change ONLY the two open eyes into fully closed HAPPY smiling eyes: upward arches like inverted U / ^, lifted centers and lower outer corners, dark purple-black curved tapered upper eyelash strokes with a few outer lashes, and a little pale mauve shadow beneath. Replace the ENTIRE old open-eye whites, irises and eyelashes with the matching porcelain skin of closed eyelids, no open eye pixels remain. Keep brows neutral and mouth closed, no added blush. The closed lash curves occupy the old eye area at about y=390 in the 1050-pixel input. Draw this change as part of the FACE, not isolated. No labels."
+  },
+  {
+    "name": "tears-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-9394a49d-a351-4da3-93ee-2445041fb117.png",
+    "prompt": "Edit the attached original assembled FACE CROP in place. Keep its EXACT square framing, scale and all feature coordinates. Do not reframe. Preserve the original white hair including every strand, eyebrows, face contour, nose, closed mouth, collar and colors. Add ONLY pooled tears sitting along both existing lower eyelid edges (approximately x=295..445 y=460..480 and x=665..810 y=450..470 on the 1050 input). Thin shallow glassy pale cyan water meniscus/band, a few tiny rounded pools near the outer corners, small white specular glints. Just about to spill but NO falling droplets or streaks. Preserve BOTH open eyes, irises and their lower contours in place, do not change gaze or brows, no blush. Match delicate anime linework; restrained tear scale. Draw on the existing face, no labels."
+  },
+  {
+    "name": "sweat-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-570105ce-34a6-41bc-84f0-3c3b18b2f2e2.png",
+    "prompt": "Edit the attached original assembled FACE CROP in place. Keep its EXACT square framing, scale and all feature coordinates. Do not reframe. Preserve the original white hair including every strand, eyebrows, face contour, nose, closed mouth, collar and colors. Add ONLY ONE small pale cyan glossy anime sweat droplet on the viewer RIGHT temple at the side of the forehead, over the white bangs just above the outer eye corner, at approximately x=855 y=245 on the 1050 input. Droplet about 25 pixels wide and 50 tall, pointed at top, rounded bottom, fine pale blue outline, small white glint. No other changes, no blush, do not change eyes or brows or mouth. Draw on the existing face, no labels."
+  },
+  {
+    "name": "sparkle-01",
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-a9721af5-58c5-4f70-a1a2-df5c798cc8f0.png",
+    "prompt": "Edit the attached original assembled FACE CROP in place. Keep its EXACT square framing, scale and all feature coordinates. Do not reframe. Preserve the original white hair including every strand, eyebrows, face contour, nose, closed mouth, collar and colors. Add ONLY white four-point STAR highlights and two tiny white twinkles INSIDE each existing blue iris. Stars centered on existing dark pupils (x=380 y=400, and x=730 y=390 in the 1050 input), about 52 pixels wide and 72 tall, elegantly tapered curved edges, solid white, no yellow, no color aura. Keep the blue iris artwork intact beneath, retain existing circular highlights. Do not enlarge eyes, change gaze, mouth, brows, add blush or change anything else. Draw the star highlights ON the face, not isolated parts. No labels."
+  },
+  {
+    "name": "blush-01",
+    "stage": 1,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-2c62b1f5-6f97-4d71-8cdd-e2a66d2783a3.png",
+    "prompt": "Edit the FIRST attached image (the exact square face crop of the current assembled character), preserving its framing, face outline, hair, eyebrows, eyes, nose, mouth, collar, skin color and all other pixels. The SECOND image is ONLY a blush style reference, do not copy its pose/framing. Add ONLY a pair of soft rose-pink translucent oval blushes to the exposed cheeks just BELOW the open eyes, with a few fine pale pink diagonal hatch strokes like the reference. Keep blush away from eyes, mouth and hair. Gentle visible happy/embarrassed blush. Do not change eyes, eyebrows, mouth, hair or face shape. Output ONE square minimally edited original face, same crop and coordinates, no labels. Keep original transparency. This is stage 1 edit in context; do not isolate parts yet.",
+    "selected": false,
+    "reason": "Face proportions drifted"
+  },
+  {
+    "name": "happy-02",
+    "stage": 1,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-613bb730-c06e-4bb5-838e-cb0b4240437a.png",
+    "prompt": "Edit this attached original face image in place, preserving EXACT crop, proportions, coordinates and unchanged pixels. Change ONLY both open eyes to happy CLOSED smiling eyes, upward arches (like ^ or inverted U), tapered dark violet eyelashes and a SMALL pale mauve shadow immediately beneath. Completely replace original open-eye areas with OPAQUE porcelain skin matching adjacent original skin. No blue irises/white sclera remain. No gray shadows, no vignette, no transparency, no blush. Keep all hair, brows, nose, closed mouth, contour, neck and collar unchanged. Same square composition. Closed lashes sit at old pupils' height near y=390 of 1050px input. This is a local edit of the full face, not cutout parts. Output opaque image.",
+    "selected": true
+  },
+  {
+    "name": "blush-key-01",
+    "stage": 2,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-168076a6-5f7b-450a-8bc6-1cbb005fe702.png",
+    "prompt": "Extract the existing two pink cheek blush marks FROM this attached edited FACE, preserving exactly their shapes, fine diagonal strokes, relative spacing, size and position. Remove ALL the face, skin, eyes, mouth, nose, hair, collar and every other element. Output ONLY the same pink blush pigment including its soft oval fading edges, composited translucently over perfectly uniform pure BLACK #000000. No white/skin patches. The blush must remain subtle and semitransparent: on black it appears muted dark rose, NOT opaque bright neon pink. Same square canvas and original coordinates, no moving/recentering/enlarging. This is extraction of the drawn blush, not new design. Flat black everywhere else, no checkerboard, no text."
+  },
+  {
+    "name": "happy-key-01",
+    "stage": 2,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-5f4a30a7-6abe-432f-aecc-58c0498f9be0.png",
+    "prompt": "Extract FROM this attached edited FACE only BOTH existing happy closed eyes PLUS their surrounding opaque porcelain eyelid SKIN. Preserve the exact lash curves, crease lines, faint under-lash shadows, skin colors and coordinates. Keep generous rounded skin patches around each closed eye covering the entire area where the original open eyes were: each patch extends well above the eye crease and below the old lower eyelid. On this 1254-square source, patches approximately x=245..570,y=320..600 and x=755..1090,y=320..595. Skin is fully opaque warm near-white matching original face, not gray. Preserve the existing artwork; remove ALL hair, eyebrows, face outline, nose, mouth, neck, collar. Replace everything outside these two skin patches with perfectly FLAT saturated GREEN #00FF00. Same square canvas, identical eye positions and sizes, no rearrangement. No borders or text. Output opaque green-backed extraction."
+  },
+  {
+    "name": "tears-key-01",
+    "stage": 2,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-8e41cf5a-9aaa-4f4a-be7f-e4764c515fbe.png",
+    "prompt": "Extract ONLY the two existing bands of pooled tears from the attached edited FACE. Preserve their exact shallow meniscus shapes, tiny outer pools, pale cyan water and white glints, same placement and dimensions. Remove ALL irises, eyelashes, sclera, skin, hair, nose, mouth and collar. The water pools must contain NO copied blue iris or skin; glassy pale cyan translucent water and white reflections only. Composite the extracted translucent water over completely flat GREEN #00FF00. Maintain same square canvas, exact coordinates and spacing, no moving or enlargement, no text. All other pixels uniform pure green. This is extraction of already-drawn tears, not drawing from scratch."
+  },
+  {
+    "name": "sweat-key-01",
+    "stage": 2,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-11d33907-d69f-4ac9-8861-e8023536bb7a.png",
+    "prompt": "Extract ONLY the single existing small pale cyan sweat drop over the viewer RIGHT temple from this attached edited FACE, preserving its original precise shape, colors, white glint, size, position. Remove everything else, all hair/skin/eyes/clothes, to perfectly flat GREEN #00FF00. Keep same square canvas, original exact droplet location and dimensions. No enlarging or moving, no new elements, no text. This is extraction from this image, not new drawing."
+  },
+  {
+    "name": "sparkle-key-01",
+    "stage": 2,
+    "toolOutputPath": "C:\\Users\\prog\\.codex\\generated_images\\01a132a1-eb4b-7f43-9a94-792b08cf2db5\\exec-fa5dbd3e-0793-4c59-8ed8-535ea8caf406.png",
+    "prompt": "Extract ONLY the newly added pure WHITE four-point star and tiny WHITE twinkle dots INSIDE each iris of this edited FACE. Preserve existing star silhouettes, sizes, spacing and exact positions. Keep the two stars and the small extra dots near each star, but exclude the original round large upper eye highlights and the original bottom eye highlights. Remove all colored irises, dark pupils, lashes, face, hair and collar. Composite extracted white glints on perfectly flat BLACK #000000. Same square canvas, exact source positions, no recentering or enlargement, no text. White stars/dots ONLY on black; no blue/skin-colored artwork or halo."
+  }
+]

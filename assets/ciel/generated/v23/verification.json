@@ -1,0 +1,36 @@
+{
+  "assembled_matches_supplied_input": true,
+  "current_files_unchanged": true,
+  "layer_count": 8,
+  "all_rgba_2172_2896": true,
+  "all_layers_nonempty": true,
+  "scope_checks": {
+    "Cheek_Blush": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Eye_R_Happy": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Eye_L_Happy": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Tear_R": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Tear_L": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Sweat": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Eye_R_Sparkle": {
+      "changed_pixels_outside_face_work_area": 0
+    },
+    "Eye_L_Sparkle": {
+      "changed_pixels_outside_face_work_area": 0
+    }
+  },
+  "happy_open_eye_on_off_changed_pixels": 1569,
+  "happy_open_eye_on_off_pixels_over_8": 0,
+  "happy_open_eye_on_off_max_difference": 5
+}
