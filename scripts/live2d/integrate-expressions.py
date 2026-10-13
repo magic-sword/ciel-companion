@@ -87,7 +87,7 @@ class Editor:
         children.set('count', str(len(children)))
         self.params[ident] = guid.get('xs.id')
 
-    def opacity_binding(self, name, param, visible_when_one):
+    def opacity_binding(self, name, param, visible_when_one, key_values=(0, 1)):
         mesh = self.meshes[name]
         gridref = named(mesh, 'KeyformGridSource', 'keyformGridSource')
         if gridref.get('xs.ref'):
@@ -105,7 +105,8 @@ class Editor:
         ET.SubElement(binding, 'KeyformGridSource', {'xs.n': '_gridSource', 'xs.ref': grid.get('xs.id')})
         ET.SubElement(binding, 'CParameterGuid', {'xs.n': 'parameterGuid', 'xs.ref': self.params[param]})
         vals = ET.SubElement(binding, 'array_list', {'xs.n': 'keys', 'count': '2'})
-        for v in ('0.0', '1.0'): ET.SubElement(vals, 'f').text = v
+        vals.set('count',str(len(key_values)))
+        for v in key_values: ET.SubElement(vals, 'f').text = str(float(v))
         for tag in ('InterpolationType', 'ExtendedInterpolationType'):
             ET.SubElement(binding, tag, {'xs.n': tag[0].lower() + tag[1:], 'v': 'LINEAR'})
         ET.SubElement(binding, 'i', {'xs.n': 'insertPointCount'}).text = '1'
@@ -117,7 +118,7 @@ class Editor:
         oldforms = list(forms)
         forms.clear(); forms.set('xs.n', 'keyforms')
         ongrid.clear(); ongrid.set('xs.n', 'keyformsOnGrid')
-        for value in (0, 1):
+        for value_index,value in enumerate(key_values):
             for oldform in oldforms:
                 form = copy.deepcopy(oldform)
                 oldguid = named(form, 'CFormGuid', 'guid').get('xs.ref')
@@ -136,7 +137,7 @@ class Editor:
                     ET.SubElement(item, 'CFormGuid', {'xs.n': 'keyformGuid'})
                 key = ET.SubElement(keys, 'KeyOnParameter')
                 ET.SubElement(key, 'KeyformBindingSource', {'xs.n': 'binding', 'xs.ref': binding.get('xs.id')})
-                ET.SubElement(key, 'i', {'xs.n': 'keyIndex'}).text = str(value)
+                ET.SubElement(key, 'i', {'xs.n': 'keyIndex'}).text = str(value_index)
                 keys.set('count', str(len(keys)))
                 named(item, 'CFormGuid', 'keyformGuid').set('xs.ref', guid.get('xs.id'))
                 ongrid.append(item)

@@ -31,6 +31,9 @@ def main():
     assert len(targets)==12
     names = dict(re.findall(r'\{ "(\w+)", "([^"\n]+)" \}', source.split('JapaneseNames')[1].split('// 表情 →')[0]))
     model = cc.Model(modelpath); textures=renderer.load_textures(model)
+    # Match CielExpression's new-rig branch; old exported rigs retain the legacy targets.
+    if 'ParamRelaxed' in model.param_range:targets['relaxed']={'ParamRelaxed':1.0}
+    if 'ParamHappy' in model.param_range:targets['happy']['ParamHappy']=1.0
     controls = {'ParamCheek':['Cheek_Blush'], 'ParamEyeLSmile':['Eye_L_Happy'], 'ParamEyeRSmile':['Eye_R_Happy'],
                 'ParamTear':['Tear_L','Tear_R'], 'ParamSweat':['Sweat'], 'ParamSparkle':['Eye_L_Sparkle','Eye_R_Sparkle']}
     report={'model':str(modelpath), 'parameters':model.param_range, 'controls':{}, 'expressions':targets}

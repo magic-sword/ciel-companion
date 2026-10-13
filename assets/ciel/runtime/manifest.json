@@ -1,0 +1,314 @@
+{
+  "approved_date": "2026-10-13",
+  "source_rig": "assets/ciel/rig/ciel.cmo3",
+  "source_rig_sha256": "06f919c3b3b9a7026b064f6f11ded7e889041a77b2e7fbc8b954c4ab53c7563d",
+  "material_count": 66,
+  "approved_expressions": [
+    "happy",
+    "relaxed"
+  ],
+  "files": [
+    {
+      "path": "Ciel.4096/texture_00.png",
+      "sha256": "037b9bc650fccb93c67ebad5f2545d0c52f595cebc9337706418ac46347cb279"
+    },
+    {
+      "path": "Ciel.cdi3.json",
+      "sha256": "71ca6c14c667f57607ff7da617927faccdbfc477e0a7240ac3aec33c150df31a"
+    },
+    {
+      "path": "Ciel.moc3",
+      "sha256": "b5d281863c6a658cf2e5b82170684f3384566323abb7dbce378877a6c2ac100a"
+    },
+    {
+      "path": "Ciel.model3.json",
+      "sha256": "6f729e5e446b9423aea53be41cc38b85a3329865726ef1de82d38831e030da1a"
+    },
+    {
+      "path": "Ciel.physics3.json",
+      "sha256": "fb5124bb37abdd65acfe65215c2be50cae4aef36e69d65e4961681824f09aa1d"
+    },
+    {
+      "path": "Expressions/happy.exp3.json",
+      "sha256": "78b8cbc1b9a24981f2805e394a06121e301f37a7a9bc7a0d33ba50e5cfe1cbdc"
+    },
+    {
+      "path": "Expressions/neutral.exp3.json",
+      "sha256": "868162980a06846b210f3d1fbd8535d37db083feff4974eb392ba8f483b439b0"
+    },
+    {
+      "path": "Expressions/relaxed.exp3.json",
+      "sha256": "d5e58a4f85352ab2174a065e028f4a290318854faa4861cfe23c29768fb2b195"
+    },
+    {
+      "path": "Motions/Ciel_Nod.motion3.json",
+      "sha256": "8dcd3d5569fd799df4ae55c493560566fb4595dbfe5636d342633a9f802aa57a"
+    }
+  ],
+  "materials": [
+    {
+      "path": "assets/ciel/current/layers/Hair_Back.png",
+      "sha256": "26cf42232da6fd1bfe8e9a0475ecf2b1e11dfe6945b6103a22a1856d9a5e7642"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket_Back.png",
+      "sha256": "59fb87c160a058fed549b77e6bd52ceb871fc65d31103f59b28c321d3c27d960"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body.png",
+      "sha256": "45a27cb1d91136894ce4417f34ae660f8c6695ce77d57d825192625e7f28a572"
+    },
+    {
+      "path": "assets/ciel/current/layers/Choker_Back.png",
+      "sha256": "1faec90310cf8115c05919b4732c81780bc85b9db06ae81cf8a219f7d7edc8c0"
+    },
+    {
+      "path": "assets/ciel/current/layers/Neck.png",
+      "sha256": "bcadb284ef27cd299fde02709becc713262cd4eac1a036a6f43611abd61d5949"
+    },
+    {
+      "path": "assets/ciel/current/layers/Neck_Shadow_Chin.png",
+      "sha256": "70182343d2ac71e2ffb6773cedff018f17c11d7edd4791b7ca33ff0474240698"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket_Front.png",
+      "sha256": "7b333cfc0e240c585408c3e50f886369eec3275d18452eee22e8d11a12503e91"
+    },
+    {
+      "path": "assets/ciel/current/layers/Choker_Front.png",
+      "sha256": "b1a68a281165619f2a6841935673bb145f374b0807ffcdefa5ebcdbb0401e0b8"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_R_Outer.png",
+      "sha256": "63b6b50bd7306cfe36d1be7267b3684af0af033c72b8a05af7030395fbfca148"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_R_Inner.png",
+      "sha256": "5964fa051277a70dea31bced1cddb3f922220d0cbe7d51f129e25055fa5eacf2"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_L_Outer.png",
+      "sha256": "6bcf87f2866faa239e67dbbdeac226d8409ff3cbb4d44c54e227c23fe9195b49"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_L_Inner.png",
+      "sha256": "3d1e64170c4d9e844fb50498ed1e4974ffb8d11b3ebfe21267a62fca15197958"
+    },
+    {
+      "path": "assets/ciel/current/layers/Face_Skin.png",
+      "sha256": "5b2a3db39dbc876f3d99f15499905304421fe86478545514e8abe47adcf9a304"
+    },
+    {
+      "path": "assets/ciel/current/layers/Face_Shadow_Hair.png",
+      "sha256": "48945a072ef440886cbb8207a6594febe2b6db4d25761e3eb7c7b3e11138b98a"
+    },
+    {
+      "path": "assets/ciel/current/layers/Cheek_Happy.png",
+      "sha256": "04f55ca47d8bd7ee8fba71481d2592de0cf6d44f55902fb8b9dc19003020be48"
+    },
+    {
+      "path": "assets/ciel/current/layers/Cheek_Relaxed.png",
+      "sha256": "e21b04150f90f4ac8c4d169c7b16ad5b9f4c8ab884affc6e4d9f7eb622e1d492"
+    },
+    {
+      "path": "assets/ciel/current/layers/Cheek_Blush.png",
+      "sha256": "b558a51c25e5465dc60ea1bf7ff433c67f53460c60c6f1b3ba4ee03fea78d4d3"
+    },
+    {
+      "path": "assets/ciel/current/layers/Nose.png",
+      "sha256": "facee34f791207c74eb73a2d20b6e9f0e84cbf106ed083dc84529c26cfbab85d"
+    },
+    {
+      "path": "assets/ciel/current/layers/Nose_Happy.png",
+      "sha256": "9321f1905b7586e654a89381a8bec81d8ffa07dee383b7c0bcb6ef1161b21337"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Skin_Upper.png",
+      "sha256": "7c659735a7092245ffd49fd9080d291e5878ff850ad6fb419ee79bbb017adec8"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Skin_Lower.png",
+      "sha256": "f2c0c7a9ae72122086ec79bdbab266597be8ba24c3703adba9cfd943363160e5"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Line_Upper.png",
+      "sha256": "bdd3582451b241052a3a577780d9089177e19624e2591426d8dce50f303b8169"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Line_Lower.png",
+      "sha256": "9d433014ed707122334b3c33361022e6c16efde0c94e447b80cabda0f7edae03"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Small.png",
+      "sha256": "ad8da7b91733bae5666c53aac00d981bc32785b5a9dad4a247b6e567c832021d"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Large.png",
+      "sha256": "9ab4bdbf45b18314e7b4dc289b0b9aa75f958c3d48167bea17b0d3ac70dc634e"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Happy.png",
+      "sha256": "94073371c8105ca546cfb344bb724887863a96757988bf99c51694d1d857ace6"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Relaxed.png",
+      "sha256": "2a5a5c0253e3d51c315b08f0064ad6da360ca20b9323a1c45c2fdaaa7a8abc48"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Sclera.png",
+      "sha256": "acb9788757f3e84491db3a148138d4cfa2812cad388fafabdf8d34e9c0a55f67"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Iris.png",
+      "sha256": "374c4044a5082f9c397f8bf5668afc3be3cf62c5355882ca21fc30bedc4056c3"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Highlight.png",
+      "sha256": "f957e8938c18af59f4f8fba4c3152e470dceb900551a70586e3efdb67648409e"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_LidSkin_Upper.png",
+      "sha256": "66061d00aed3aba84217df869c8721f253c191b809bf8b4d39b4d05ab1c13097"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_LidSkin_Lower.png",
+      "sha256": "802edeeb1409c7f1c3e1853ffd60807695e47684916faeded498ad09a798da24"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_LashUpper.png",
+      "sha256": "2fb3650855fdf16778ca72cf910737cf01cc1f5812ff6188408a032faea1ac4f"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_LashLower.png",
+      "sha256": "5605a82ae851f159852ad31250266bb3f5f248ab9d95aa7a63aae17baecf48fd"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_RelaxedLowerLine.png",
+      "sha256": "0afba344e7edce377b57acc45484247596756ad5e7baadb3351ebd52dd721e58"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Crease.png",
+      "sha256": "ad79a996dac9364c9980d489de7496cfe79a7f6c9fd42ab6c9fc5d1cb376b9b1"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Closed.png",
+      "sha256": "f7f695e5423218d7a3a7adf17dd2d50f3afec34e36ecd4261f1a3b5a271a3ee4"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Happy.png",
+      "sha256": "9561e771a1c8d156476744a62b239c7071a98d5306ec40aeb5e612e511021657"
+    },
+    {
+      "path": "assets/ciel/current/layers/Tear_R.png",
+      "sha256": "a6cd91a17aac8c5d3d216a000a64035a9f73c8489d4110842b2ad06bf8655a85"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_R_Sparkle.png",
+      "sha256": "4327fab58b0e1169d9e9a98fc1da3d5951adb834a8128edb0e1256258a3e39dc"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Sclera.png",
+      "sha256": "43972cddc8e5b8b86ba7f5f591aa9ef631e797c6d312e54d3ef45270b1bc9137"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Iris.png",
+      "sha256": "4c49410360790677a3ce1a459696987964c80aefab58b5c52e65cc915a74a7a6"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Highlight.png",
+      "sha256": "0e798f87f08bc7d6118ccdf6f239ab570ce936abb81dbbb7264845a67582f05c"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_LidSkin_Upper.png",
+      "sha256": "a32988289c108ea116056486e9d596aca09bf1e2a3ccd8472fc6e3f0744f57de"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_LidSkin_Lower.png",
+      "sha256": "63614040e10de528ce66a06c4b1c9eb77c46bbedce95b181507216bf9335d955"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_LashUpper.png",
+      "sha256": "9680170cff22670d03ff9516142bdaff43901f8b791d1475abb7754c6e3a9201"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_LashLower.png",
+      "sha256": "25a65de8f063eae858cd57b236d3a7dd58ba84d248976f9be07003ed68642a28"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_RelaxedLowerLine.png",
+      "sha256": "db0f55fe3b856209701359e3ef2a075b013a51a0d4aef051352d62b08560c712"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Crease.png",
+      "sha256": "3190f032980b3b77d664b9180fb464cac2d08381dcbbd72ae55f89662718ea43"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Closed.png",
+      "sha256": "b9e6fb75ca80727a346d5da4f27c84b23dec38eeeda1dab0f1981804287cc9d7"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Happy.png",
+      "sha256": "567b393953cfae6fd244b7cc8b0ba6f2852f8554dedd1b2ca668900e058d206a"
+    },
+    {
+      "path": "assets/ciel/current/layers/Tear_L.png",
+      "sha256": "59cb894d8245a2ce23b93f91f15017b84ab47c767e8f3f814a2e7ed62835f461"
+    },
+    {
+      "path": "assets/ciel/current/layers/Eye_L_Sparkle.png",
+      "sha256": "a66db395518f4a7bda4ecf7b816c3c040bf60db000b70834f6c326d31424c1e7"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Ahoge.png",
+      "sha256": "44df2c19c6418a5f859e76d8a6db19747cb9619d5aeae5017946b6740a1fec01"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_R_Base.png",
+      "sha256": "47f4ed574dd359d683b52b5d1acfaaf46604391d13520b480d378677866952be"
+    },
+    {
+      "path": "assets/ciel/current/layers/Ear_L_Base.png",
+      "sha256": "95182738b774e4389454bdf359b4abbf42c083148e81253b95030fe5a120f20b"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Side_R_LongFront.png",
+      "sha256": "e4c63d135ac8981e7228cdf9e9e11025b4506ecd2fcc1dec0190761109f5cddf"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Side_L_LongFront.png",
+      "sha256": "6bbf07013087feda71a8549b1b7d10f9213d2b901d597a7773d7536943934f85"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Side_R_Inner.png",
+      "sha256": "e2b20277d41ab953f7cda82b8bee7cd59ad872651f178dea9139a239bbde55a3"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Side_L_Inner.png",
+      "sha256": "9428fafea51f8887f9189592327a987275410c6bc40c9324be0b3cab4e400b3b"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Front_1.png",
+      "sha256": "97b50fca8e6792f0d27175636c66e6a56b1cf7de18ab3205a71cf652eaf255f6"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Front_3.png",
+      "sha256": "3d887799358fce3a68900f672622f385db40614f0ce05588cd103200eca8c3ed"
+    },
+    {
+      "path": "assets/ciel/current/layers/Hair_Front_2.png",
+      "sha256": "d231dbc2a79a72eac6c5ffad7ac552090837d907808295e76817093740af6c1f"
+    },
+    {
+      "path": "assets/ciel/current/layers/Brow_R.png",
+      "sha256": "28ecafb69d967389ce9c7bb122afab8afee753846cfd253b8486618a461cbd95"
+    },
+    {
+      "path": "assets/ciel/current/layers/Brow_L.png",
+      "sha256": "050f35656f662bbfaa6022f67eeccfaab0f265576c99ea362a1410da63fe1355"
+    },
+    {
+      "path": "assets/ciel/current/layers/Sweat.png",
+      "sha256": "eb350416d822cf51da89fe18cd26e7ae9b35b15b0f482e76eb13a672fbc06af9"
+    }
+  ]
+}

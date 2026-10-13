@@ -161,3 +161,86 @@ CAFFの書き込みでは符号ビットの立ったキーの上位オフセッ�
 今回はCubismへの反映まで。Unityのモデル・表情割り当ては更新していないため、
 Unityへ適用する際は新モデルの取り込みと、嬉しい表情への`ParamHappy=1`の追加が必要。
 素材生成の知見は[ciel-codex-request-guide-ja.md](ciel-codex-request-guide-ja.md)に追記した。
+
+## v32 にこにこ：専用パラメーターで切り替え
+
+ユーザーの再生成許可と切り替えやすさの要望を受け、`ParamRelaxed`（にこにこ）を追加。
+1で専用の口・頬とまぶたの形をまとめて変更し、0で元の形へ戻す。
+目・瞳・ハイライトと開口素材は既存のものを使い、まばたき・目線・口パクの制御を維持。
+原画の再生成は口と頬のために1回実施し、輪郭付き一体画像から画像編集で分離した。
+[詳しい構成](../assets/ciel/generated/v32/report.md)、
+[見本との実モデル比較](../assets/ciel/rig/proofs/relaxed-v32/reference-comparison.png)、
+[まばたきと開口](../assets/ciel/rig/proofs/relaxed-v32/blink-and-mouth.png)。
+
+通常顔と前回の嬉しい顔は、専用パラメーター0で全既存メッシュの頂点・不透明度が一致。
+81組み合わせの有限頂点と、閉眼・開口時の表示・通常復帰・重複IDなしを検証した。
+正式モデル`assets/ciel/rig/ciel.cmo3`と現行素材64層へ反映済み。
+通常・嬉しい・にこにこの切り替え用exp3.jsonを`assets/ciel/rig/expressions/`に用意した。
+これらは表情用パラメーターだけを変更し、目の開閉・目線・口の開閉を固定しない。
+前回の嬉しいから切り替える場合も、旧表情用の4パラメーターを明示的に切り替える。
+Unityへの取り込みと会話からの割り当ては未実施。
+
+### にこにこの下まぶたの追加調整
+
+ユーザーの指摘を受け、下まぶたの中央を追加で持ち上げた。
+目頭・目尻で変位が小さくなる曲線を使い、白目の下端・下まぶたの肌・下まつ毛を合わせた。
+上まぶたは変更していない。追加量は中央で最大18pxを基準とし、目の開閉値に比例するため
+完全閉眼では追加の変位が0になる。画像の再生成や素材の変更は行っていない。
+[見本・調整前・調整後の比較](../assets/ciel/rig/proofs/relaxed-lower-lid/lower-lid-comparison.png)、
+[まばたきと開口](../assets/ciel/rig/proofs/relaxed-lower-lid/blink-and-mouth.png)。
+
+通常顔・前回の嬉しい顔・完全閉眼の全メッシュの頂点と不透明度が調整前と一致。
+にこにこ中に位置が変わるのは左右の白目・下まぶたの肌・下まつ毛の計6メッシュで、
+白目の上端も一致することを確認した。81組み合わせの動作検証も成功。
+検証済みの変更を正式な`assets/ciel/rig/ciel.cmo3`へ反映した。
+再現はv32のモデルに`adjust-relaxed-lower-lid.py 入力.cmo3 出力.cmo3 18`を1回適用し、
+Cubismで保存・書き出し後、`check-relaxed-lower-lid.py`と`check-relaxed.py`で確認する。
+変更前モデルは`.local/lower-lid-integration/ciel-before.cmo3`に退避。Unityは未更新。
+
+### v33：下側が浮いて見える白い帯の修正
+
+瞳と白目の下端は一致していたが、下まぶたの薄い肌パーツが瞳の下端に重なり、
+既存の下まつ毛線も中央まで届いていなかった。にこにこ中だけ両者を隠し、
+v32の一体画像から画像編集で分離した薄い下まぶた線を、白目の描画下端へ合わせた。
+瞳・白目の形と位置は変更していない。開眼と半閉眼にキーを設け、完全閉眼では追加線を消す。
+
+[変更前後](../assets/ciel/rig/proofs/relaxed-boundary-v33/boundary-comparison.png)・
+[承認見本との比較](../assets/ciel/rig/proofs/relaxed-boundary-v33/reference-comparison.png)・
+[まばたきと開口](../assets/ciel/rig/proofs/relaxed-boundary-v33/blink-and-mouth.png)。
+通常・嬉しい・完全閉眼は全既存メッシュの位置と不透明度が以前と一致。
+左右の線と白目の下端の距離は95百分位で1.32px未満、81組み合わせの動作検証も成功した。
+正式モデル`assets/ciel/rig/ciel.cmo3`と現行素材66層・PSD・XCFへ反映済み。
+共通の下まぶた素材は他の表情で使うため保持している。Unityは未更新。
+再現手順は[v33の記録](../assets/ciel/generated/v33/report.md)。
+
+### にこにこの目尻調整
+
+目尻で下へ長く伸びていた上まつ毛の外側を、`ParamRelaxed=1`の変形キーだけで短縮した。
+素材の生成・差し替えはしていない。中央の上まつ毛、瞳・白目・下まぶた、横髪・顔土台は変更なし。
+半閉眼では調整量を減らし、完全閉眼では元のキーを保つ。
+
+[変更前後](../assets/ciel/rig/proofs/relaxed-eye-corners/eye-corner-comparison.png)・
+[見本との比較](../assets/ciel/rig/proofs/relaxed-eye-corners/reference-comparison.png)・
+[まばたきと開口](../assets/ciel/rig/proofs/relaxed-eye-corners/blink-and-mouth.png)。
+描画された外側の黒い部分の下端は右目で20px、左目で24px上がった（モデルの2172×2896キャンバス）。
+通常・嬉しい・完全閉眼の位置と不透明度は以前と一致。
+変わるのは左右の`LashUpper`だけで、中央と横幅は維持し、メッシュの反転もない。
+81組み合わせの動作と前回の下まぶたの境界検証も成功した。
+
+正式モデル`assets/ciel/rig/ciel.cmo3`へ反映。素材66層とPSD・XCFは変更不要。Unityは未更新。
+再現はv33のモデルに`adjust-relaxed-eye-corners.py 入力.cmo3 出力.cmo3 0.55`を1回適用し、
+Cubismで保存・書き出し後、`check-relaxed-eye-corners.py`・`check-relaxed.py`・
+`check-relaxed-lid-boundary.py`で確認し、`promote-relaxed-eye-corners.py`で採用する。
+変更前モデルは`.local/eye-corner-integration/ciel-before.cmo3`に退避した。
+
+### にこにこの確定とUnity更新の準備
+
+2026-10-13、ユーザーが目尻調整後のにこにこを確定。`current/approved.json`へ採用状態と正式モデルのハッシュを記録した。
+最新素材66枚は`current/layers.json`と一致し、旧候補は`generated/`、過去の比較は`rig/proofs/`の記録として区別する。
+他の表情で必要な共通素材は保持し、にこにこ中には専用素材へ切り替える。
+
+検証済み書き出しを`assets/ciel/runtime/`へ整理。物理演算・うなずき・まばたき・口パクの既存設定を引き継ぐ。
+Unityの`CielExpression`は新モデルを検出すると`ParamRelaxed`を使い、以前の目の細め方を重ねない。
+`ParamHappy`も制御し、通常復帰時は両方を0へ上書きする。旧モデルは従来の設定を使う。
+モデル自体はまだUnityへ適用せず、`CIEL > Model > Apply Current Package`で更新できる状態にした。
+詳細は[更新パッケージの手順](../assets/ciel/runtime/README.md)。

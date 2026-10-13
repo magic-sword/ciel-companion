@@ -1,0 +1,8 @@
+{
+  "new_generation": false,
+  "source": "assets/ciel/generated/v32/edits/relaxed-details-with-contour-01.png",
+  "source_sha256": "14b997e1477999ef94ded7c75442c5c463a1e2795e4ca503b92436dcd109bd5f",
+  "method": "ROI and connected-component color masking; shared v32 placement; rendered boundary alignment in rig",
+  "script": "scripts/live2d/prepare-relaxed-lid-lines.py",
+  "source_pixel_colors_preserved_before_resampling": true
+}

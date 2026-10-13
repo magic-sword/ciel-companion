@@ -1,7 +1,7 @@
 // シエルの表情を切り替える。会話サーバーの表情のイベント（character.expression）か、画面の確認用のボタンから使う。
 //
 // 表情は Live2D の表情ファイル（*.exp3.json、Cubism の表情の仕組み）に置き換える予定。それまでの仮として、
-// 表情ごとに「パラメーターの目標値」を下の表に持ち、なめらかに近づける（加算。目パチ・口パク・頭の動きと重ねられる）。
+// 表情ごとに「パラメーターの目標値」を持ち、なめらかに近づける。専用の顔切り替えは上書き、動作と重ねる値は加算。
 // リグの笑い目・頬・涙・汗・キラキラと、眉・口・耳の変形を制御する。
 // 寿命（ttl）が切れたら、通常（neutral）へ戻る。
 using System.Collections.Generic;
@@ -78,13 +78,23 @@ namespace Ciel.Conversation
             if (!HasUpdateController) OnLateUpdate();
         }
 
-        // 目パチ・口パク・頭の動きなど、ほかの制御の後に足す
+        Dictionary<string, float> GetTargets()
+        {
+            var target = new Dictionary<string, float>();
+            // 新リグのにこにこは専用キーで一括切り替え。旧リグには以前の設定を使う。
+            if (Current != "relaxed" || !_params.ContainsKey("ParamRelaxed"))
+                foreach (var (id, v) in Targets[Current]) target[id] = v;
+            if (_params.ContainsKey("ParamHappy")) target["ParamHappy"] = Current == "happy" ? 1f : 0f;
+            if (_params.ContainsKey("ParamRelaxed")) target["ParamRelaxed"] = Current == "relaxed" ? 1f : 0f;
+            return target;
+        }
+
+        // 目パチ・口パク・頭の動きなど、ほかの制御の後に適用する
         public void OnLateUpdate()
         {
             if (!enabled) return;
             if (Current != "neutral" && Time.time > _until) Current = "neutral";
-            var target = new Dictionary<string, float>();
-            foreach (var (id, v) in Targets[Current]) target[id] = v;
+            var target = GetTargets();
             var keys = new HashSet<string>(_weights.Keys);
             keys.UnionWith(target.Keys);
             var step = Time.deltaTime / Mathf.Max(_fadeTime, 1e-3f);
@@ -94,7 +104,11 @@ namespace Ciel.Conversation
                 target.TryGetValue(id, out var t);
                 w = Mathf.MoveTowards(w, t, step);
                 _weights[id] = w;
-                if (Mathf.Abs(w) > 1e-4f && _params.TryGetValue(id, out var p))
+                if (!_params.TryGetValue(id, out var p)) continue;
+                if (id == "ParamHappy" || id == "ParamRelaxed")
+                    // 専用の切り替え値は毎フレーム上書きし、通常復帰時も0へ戻す。
+                    p.Value = Mathf.Clamp(w, p.MinimumValue, p.MaximumValue);
+                else if (Mathf.Abs(w) > 1e-4f)
                     // 値はパラメーターの単位。0〜1 の素材表示にも 1 をそのまま渡す。
                     p.Value = Mathf.Clamp(p.Value + w, p.MinimumValue, p.MaximumValue);
             }

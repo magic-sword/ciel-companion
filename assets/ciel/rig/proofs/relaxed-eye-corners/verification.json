@@ -1,0 +1,12 @@
+{
+  "active_control": "ParamRelaxed",
+  "single_expression_control": true,
+  "baseline_neutral_and_happy_preserved": true,
+  "blink_closed_shape_preserved": true,
+  "gaze_reuses_existing_iris": true,
+  "existing_open_mouth_preserved": true,
+  "new_closed_mouth_hidden_when_open": true,
+  "reset_passed": true,
+  "finite_combined_poses": 81,
+  "duplicate_drawable_ids": false
+}

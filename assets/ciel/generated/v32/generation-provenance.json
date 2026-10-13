@@ -1,0 +1,14 @@
+{
+  "version": "v32",
+  "source": "inputs/relaxed-reference-face.png",
+  "generation_count": 1,
+  "raw": "edits/relaxed-details-with-contour-01.png",
+  "prompt": "Edit the attached approved gentle-smiling face reference to extract the EXISTING facial features together on ONE true-transparent RGBA canvas. Preserve the original face balance and all original relative positions, sizes, eye shape and colors. Keep both gently smiling OPEN eyes including eyelashes, short fine eyelid creases, white sclera, vivid cyan-blue irises with white highlights, and slightly lifted curved lower eyelids; the small CLOSED smiling mouth (thin continuous mauve shallow U arc with subtly raised corners, NO open mouth); the two faint pink cheek blush gradients with delicate short diagonal hatch marks; the tiny nose dot; and the fine existing cheek/jaw/chin contour. These all stay registered as one face in situ, NOT a separated parts sheet. Original square 970x970 layout: nose (491,459), chin (504,697), mouth x445..550 y540..560, eyes left x145..405 y275..420, right x590..840 y265..410. Preserve margins, no zooming, recentering, widening or slimming. Remove hair, skin fill, skin shadows, eyebrows, neck, collar, jewelry and clothes to full transparency. Blush must retain only translucent pink pigment and hatch marks, no opaque white skin disks. Keep opaque white eye highlights and sclera. Remove hair outlines; only minimally complete cheek contour where obscured by hair without altering the visible original jaw line. Maintain the subtle, tender expression, not sleepy eyes or a broad grin. No opaque face silhouette, no text or checkerboard pixels. We will separate layers with image-editing masks afterwards; do not arrange pieces separately or change their positions.",
+  "output_hint": "Generated images are saved to C:\\Users\\prog\\.codex\\generated_images\\01a134bd-2783-7b52-8159-94d03b886cfc as C:\\Users\\prog\\.codex\\generated_images\\01a134bd-2783-7b52-8159-94d03b886cfc\\exec-16d24707-4c51-4925-a8d8-89e767423dd7.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+  "eye_artwork_reference_only": true,
+  "runtime_materials": [
+    "Mouth_Relaxed",
+    "Cheek_Relaxed"
+  ],
+  "notes": "Generated extraction is not pixel-identical; existing iris, sclera and blink rig reused."
+}
