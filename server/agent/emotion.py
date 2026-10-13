@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """感情：会話モデルが文の頭に付けた印（例 [happy]）を読み取り、声の説明（キャプション）と、Unity の表情に使う。
 
-- 会話モデルには、persona.EMOTION_INSTRUCTIONS で印の付け方を教える。
+- 会話モデルには、config/prompts/emotion.md で印の付け方を教える。
 - tts_node：届いた文字を 1 文ずつに分け、印を外して Irodori-TTS で読み上げる。その文の声を流し始めるときに、
   Unity へ表情のイベント（仕様書 6 章の character.expression）を LiveKit のデータのメッセージで送る。
 - transcription_node：文字起こしから印を外す。

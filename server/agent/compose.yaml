@@ -7,6 +7,9 @@ services:
       network: host
     network_mode: host
     env_file: .env
+    volumes:
+      # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
+      - ./config:/app/config:ro
     environment:
       # シエルの声：Irodori-TTS で読み上げる（読み上げサービス server/tts-irodori が同じマシンで動いていること）
       - CIEL_VOICE=irodori

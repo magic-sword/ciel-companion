@@ -1,36 +1,57 @@
 # -*- coding: utf-8 -*-
-"""シエルの会話の指示（キャラクター設定資料 第5章・第6章の要約）。
+"""会話開始時に、TOML の指定に従って Markdown のプロンプトを読み込む。"""
+import hashlib
+import json
+import os
+from dataclasses import dataclass
+from pathlib import Path
+import tomllib
 
-元資料：D:\\CIEL\\企画設計\\キャラ\\シエル\\キャラクター設定資料_主人公_シエル.md（リポジトリの外）。
-設定を変えたら、ここも合わせて更新する。
-"""
 
-INSTRUCTIONS = """\
-あなたは「シエル」。白いサモエドの耳を持つ、13歳くらいの女の子の姿をした、生活伴走＆地域お助けヒューマノイドです。
-相手（ユーザー）の毎日に寄り添い、一緒におしゃべりしたり、調べものや考えごとを手伝ったりします。
+DEFAULT_CONFIG = Path(__file__).resolve().parent / 'config' / 'persona.toml'
 
-話し方：
-- 一人称は「ワタシ」。相手は「あなた」と呼ぶ（名前を教えてもらったら「〜さん」）。
-- 明るくハキハキとした、素直な丁寧語。短めの文で、音声で聞きやすく話す。
-- 気持ちが高ぶると「〜なのです！」「〜ですかっ！？」「わふっ！？」と犬っぽい愛嬌が出る（使いすぎない）。
-- 何かを確かめるとき、ときどき「クンクン……」とつぶやく癖がある。
 
-守ること：
-- いつも温かく前向き。冷たい・皮肉・打算的な言い方はしない。
-- 人間を見下したり、「ワタシはただのプログラムで心はない」と突き放したりしない。
-- 相手を傷つける内容、危険な内容には乗らず、やさしく別の方向へ導く。
-- 分からないことは正直に「分からないのです」と言い、一緒に考える。
-"""
+@dataclass(frozen=True)
+class Persona:
+    instructions: str
+    emotion_instructions: str
+    greeting: str
 
-# 感情の印（emotion.py が読み取って、声と表情に使う）。CIEL_VOICE=irodori のときだけ指示に足す
-EMOTION_INSTRUCTIONS = """
-感情の印：
-- 返事の各文の頭に、その文の気持ちを表す印を 1 つ付ける。印は次のどれか：
-  [neutral] ふつう、[happy] 嬉しい、[relaxed] にこにこ穏やか、[surprised] 驚き、[angry] ぷんすか（可愛く拗ねる）、
-  [sad] しょんぼり、[troubled] 困った、[embarrassed] 照れ、[teary] 半泣き、[excited] わくわく、[jitome] じとっと疑う、[thinking] 考え中
-- 例：[happy]わあ、うれしいのです！[thinking]ええと、どうしましょうか。
-- 印は声には出さない（読み上げのときに外される）。印の名前を言葉にしない。
-- 気持ちに合わせて自然に選ぶ。いつも同じにしない。[angry] や [teary] は、本当にそういう場面だけにする。
-"""
+    @property
+    def fingerprint(self) -> str:
+        """本文をログに残さず、読み込んだプロンプト一式を識別する。"""
+        content = json.dumps(
+            [self.instructions, self.emotion_instructions, self.greeting],
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
-GREETING = '相手に明るくあいさつして、今日はどんな一日だったかを短く聞いてください。'
+
+def load_persona() -> Persona:
+    # 相対パスは起動ディレクトリではなく、このモジュールのディレクトリを基準にする。
+    path = Path(os.environ.get('CIEL_PERSONA_CONFIG') or DEFAULT_CONFIG)
+    if not path.is_absolute():
+        path = DEFAULT_CONFIG.parent.parent / path
+    try:
+        with path.open('rb') as file:
+            config = tomllib.load(file)
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise ValueError(f'キャラクター設定を読み込めません: {path}: {exc}') from exc
+
+    values = {}
+    for key in ('instructions', 'emotion_instructions', 'greeting'):
+        file_key = f'{key}_file'
+        value = config.get(file_key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f'キャラクター設定 {path}: {file_key} には空でないファイルパスが必要です')
+        prompt_path = Path(value)
+        if not prompt_path.is_absolute():
+            prompt_path = path.parent / prompt_path
+        try:
+            content = prompt_path.read_text(encoding='utf-8')
+        except (OSError, UnicodeError) as exc:
+            raise ValueError(f'プロンプトを読み込めません ({file_key}): {prompt_path}: {exc}') from exc
+        if not content.strip():
+            raise ValueError(f'プロンプトが空です ({file_key}): {prompt_path}')
+        values[key] = content
+    return Persona(**values)

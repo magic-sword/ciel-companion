@@ -27,7 +27,7 @@ from livekit.plugins import openai
 import emotion
 import irodori_tts
 import voice_conversion
-from persona import EMOTION_INSTRUCTIONS, GREETING, INSTRUCTIONS
+from persona import load_persona
 
 load_dotenv()
 logger = logging.getLogger('ciel-agent')
@@ -52,7 +52,9 @@ def make_model():
 
 class Ciel(Agent):
     def __init__(self) -> None:
-        super().__init__(instructions=INSTRUCTIONS + (EMOTION_INSTRUCTIONS if VOICE == 'irodori' else ''))
+        persona = load_persona()
+        super().__init__(instructions=persona.instructions + (persona.emotion_instructions if VOICE == 'irodori' else ''))
+        self.persona = persona
         self.events = emotion.ExpressionEvents()
 
     def tts_node(self, text, model_settings):
@@ -77,8 +79,13 @@ async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
     session = AgentSession(llm=make_model(), tts=irodori_tts.make() if VOICE == 'irodori' else None)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
-    await session.start(room=ctx.room, agent=Ciel(), record=False)
-    await session.generate_reply(instructions=GREETING)
+    agent = Ciel()
+    logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
+                agent.persona.fingerprint, os.environ.get('CIEL_MODEL', 'realtime'),
+                os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
+                if os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live' else 'n/a', VOICE)
+    await session.start(room=ctx.room, agent=agent, record=False)
+    await session.generate_reply(instructions=agent.persona.greeting)
 
 
 if __name__ == '__main__':
