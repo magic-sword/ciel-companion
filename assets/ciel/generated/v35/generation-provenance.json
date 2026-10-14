@@ -21,5 +21,6 @@
   "placement": "placement.json",
   "brow_cleanup": "Reference brow outlines traced and cleaned to remove overlapping hair strokes",
   "brow_model_position": "brow-position.json",
-  "approved": false
+  "approved": true,
+  "current_materials": "assets/ciel/current/layers.json"
 }

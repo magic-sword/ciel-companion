@@ -339,6 +339,36 @@
       "name": "Sweat",
       "path": "assets/ciel/current/layers/Sweat.png",
       "visible": false
+    },
+    {
+      "name": "Mouth_Angry",
+      "path": "assets/ciel/current/layers/Mouth_Angry.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Angry",
+      "path": "assets/ciel/current/layers/Brow_Angry.png",
+      "visible": false
+    },
+    {
+      "name": "Ear_R_Folded",
+      "path": "assets/ciel/current/layers/Ear_R_Folded.png",
+      "visible": false
+    },
+    {
+      "name": "Ear_L_Folded",
+      "path": "assets/ciel/current/layers/Ear_L_Folded.png",
+      "visible": false
+    },
+    {
+      "name": "Mouth_Sad",
+      "path": "assets/ciel/current/layers/Mouth_Sad.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Sad",
+      "path": "assets/ciel/current/layers/Brow_Sad.png",
+      "visible": false
     }
   ]
 }

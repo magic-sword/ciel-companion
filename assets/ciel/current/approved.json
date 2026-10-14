@@ -3,36 +3,44 @@
   "approved_expressions": [
     "happy",
     "relaxed",
-    "surprised"
+    "surprised",
+    "angry",
+    "sad"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "ff5a8947af5f12028a5a024f5ccc89e8c739c75673a2d92e5d5733565f4ab008",
+  "rig_sha256": "2de0c50a91f1e34bb3ea5f0208f4be6d2be6ff05285c0df7aee02d1f77a0e38f",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 67,
+  "material_count": 73,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/surprised-v34",
+  "latest_proofs": "assets/ciel/rig/proofs/sad-v36",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
-      "path": "Ciel.4096/texture_00.png",
-      "sha256": "4f94c4c9c82178890826c23ba4c4b9f2d67744c6e90f939a22e90801980e300a"
+      "path": "Ciel.moc3",
+      "sha256": "52ca0c2e5973473a6c72dd6534a51ef401b98cbcac6472ecc2566e3ed09432ea"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "afa0bc8309b46700170496372c8f6092758436c42f6820c7c465c51a622f54d0"
-    },
-    {
-      "path": "Ciel.moc3",
-      "sha256": "d5ac2c309ff9f0c87a8cafa3555886a915010d5223753b7a8fc1328d42f6dea1"
+      "sha256": "e8081aeb8388be662d1e64b374283aec59963923be669856a5711b4eee595418"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "526172a2bba4d438b8ddfebec165d70c148b8911c60425b874fc05d656af4d76"
+      "sha256": "0e4a05590beabb5d07e54e3bc0da51b013f2494fcd87697984c12d4c73c46870"
+    },
+    {
+      "path": "Ciel.4096/texture_00.png",
+      "sha256": "8e760cba86d1ace9b38ef8879662539531bc5d5c9fc204424e92adb291ee2355"
     }
-  ]
+  ],
+  "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
+  "latest_angry_proofs": "assets/ciel/rig/proofs/angry-v35",
+  "sad_control": "ParamSad",
+  "angry_control": "ParamAngry",
+  "folded_ear_control": "ParamEarFold",
+  "sad_revision": "v36-reference-lid-profile"
 }

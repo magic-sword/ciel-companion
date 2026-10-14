@@ -2,15 +2,15 @@
 
 **現行モデルに使う素材はこのフォルダだけ。** 同じ役割の旧版を混在させない。`generated/`の候補・比較図は検証履歴であり、現行素材ではない。さらに過去の版は Git のタグ `archive/pre-current-cleanup` で参照できる。
 
-**2026-10-14：嬉しい・にこにこ・驚きは採用済み。** 驚きはv34の瞳位置補正後を反映。他の表情は調整予定。
+**2026-10-14：嬉しい・にこにこ・驚き・ぷんすか・しょんぼりは採用済み。** 驚きはv34の瞳位置補正後を反映。他の表情は調整予定。
 採用状態は[approved.json](approved.json)、最新の見た目は[にこにこの比較](../rig/proofs/relaxed-eye-corners/reference-comparison.png)。
 正式なCubismモデルへ反映済み。[Unity更新用パッケージ](../runtime/README.md)を用意した。
-Unityのモデル自体はまだ更新していない。素材一覧とPNG67枚に過不足・名前の重複はない。
+Unityのモデル自体はまだ更新していない。素材一覧とPNG73枚に過不足・名前の重複はない。
 驚きの最新比較は[こちら](../rig/proofs/surprised-v34/reference-comparison.png)。`ParamSurprised=1`で目と丸口を切り替える。
 
 | 場所 | 内容 |
 | --- | --- |
-| `layers/*.png` | リグに使う 67 層（キャンバス 2172×2896 の透明 PNG。レイヤー名＝ファイル名）。v23・v24・v31・v32・v33と、v34の驚き専用丸口を反映 |
+| `layers/*.png` | リグに使う 73 層（キャンバス 2172×2896 の透明 PNG。レイヤー名＝ファイル名）。v23・v24・v31・v32・v33と、v34の驚き専用丸口を反映 |
 | `layers.json` | 下から上の重なり順と、通常の表示（`visible: false` は差分：閉じ目・開いた口・表情素材）。PSD 作成の一覧を兼ねる |
 | `proofs/` | 現在のモデルの確認画像：向き 3×3（`angles-3x3.png`）、目と口（`eyes-mouth.png`）、上下と体の傾き（`angle-y.png`）、頷き（`nod.gif`）、横向きの頬（`cheek-compare.png`・`cheek-sweep.gif`）、待機（`idle.gif`）、揺れの形（`sway-shapes.gif`・`bust-sway.gif`）、Unity の描画（`unity-check.png`） |
 | `../rig/ciel.cmo3` | 現在の作業モデル（Cubism Editor 5.3、Git LFS） |
@@ -49,3 +49,5 @@ Unityは未更新。
 にこにこの目尻も、上まつ毛の外側だけを変形して下向きの部分を短くした。
 素材の変更はなく、現行66層のまま。比較・検証は`../rig/proofs/relaxed-eye-corners/`。
 正式なCubismモデルへ反映済み。Unityは未更新。
+
+2026-10-14：v35のぷんすか・折れ耳、v36のしょんぼり（見本の上瞼へ合わせた最終版）を採用。正式モデルは73層。しょんぼりはParamSad、ぷんすかはParamAngry、耳はParamEarFoldで切り替える。旧候補は `.local/sad-adoption/adopted-drafts/` に退避した。

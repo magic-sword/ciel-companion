@@ -1,0 +1,30 @@
+{
+  "material_generation": false,
+  "upper_lid_center_down_px": 28,
+  "upper_lid_outer_down_inner_up_px": 9,
+  "lower_lid_center_up_px": 3,
+  "lower_lid_outer_down_inner_up_px": 4,
+  "iris_and_highlight": {
+    "y_scale": 0.9,
+    "pivot_y": 1070,
+    "y_offset": 28,
+    "x_unchanged": true
+  },
+  "controls": "ParamSad only; closed and smile keys preserved",
+  "recipe": "scripts/live2d/sad_eye_shapes.py",
+  "iris_hidden_top_extension_px": 38,
+  "reference_lash_profile_correction": {
+    "R_coefficients": [
+      -5.20619048,
+      -18.57380952,
+      24.42857143
+    ],
+    "L_coefficients": [
+      -10.41238095,
+      30.51904762,
+      28.14285714
+    ],
+    "parameter": "u=(x-eye_center)/145",
+    "iris_and_highlight_unchanged_from_previous_candidate": true
+  }
+}

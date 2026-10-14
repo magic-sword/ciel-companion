@@ -175,10 +175,33 @@
 			"Id": "ParamSurprised",
 			"GroupId": "",
 			"Name": "驚き"
+		},
+		{
+			"Id": "ParamAngry",
+			"GroupId": "",
+			"Name": "ぷんすか"
+		},
+		{
+			"Id": "ParamEarFold",
+			"GroupId": "",
+			"Name": "折れ耳"
+		},
+		{
+			"Id": "ParamSad",
+			"GroupId": "",
+			"Name": "しょんぼり"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part8",
+			"Name": "sad-additions.psd"
+		},
+		{
+			"Id": "Part7",
+			"Name": "angry-additions.psd"
+		},
 		{
 			"Id": "Part6",
 			"Name": "surprised-mouth.psd"

@@ -13,3 +13,5 @@
 顔は鼻と顎、耳は左右の先端を基準に共通倍率で配置した。左右を個別に拡縮していない。配置値と原本のハッシュは placement.json に記録する。
 
 原本は edits/、分離前の座標を保ったパーツは parts/、Cubism用の2172×2896画像は layers/。正式素材の入口 assets/ciel/current/ とは区別する。比較・検証結果は assets/ciel/rig/proofs/angry-v35/ に保存する。
+
+正式採用済み。現在の編集対象は `assets/ciel/rig/ciel.cmo3`、素材は `assets/ciel/current/`、Unity更新は `assets/ciel/runtime/`。旧候補はローカルの採用時アーカイブへ退避した。

@@ -47,6 +47,21 @@
       "Id": "ParamCheek",
       "Value": 0.15,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamAngry",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEarFold",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamSad",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

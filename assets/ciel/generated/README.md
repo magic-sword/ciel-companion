@@ -22,4 +22,8 @@ v34の驚きは瞳位置補正後を採用済み。丸口を現行素材へ追�
 生成方法は[素材の頼み方](../../../docs/ciel-codex-request-guide-ja.md)、
 取り込みと適用範囲は[表情の取り込み記録](../../../docs/ciel-expression-integration-ja.md)を参照。
 
-ぷんすかの最新候補は **v35**。正式採用済みの素材とは区別し、[Cubism候補](../rig/drafts/angry/README.md)と[見本との比較](../rig/proofs/angry-v35/reference-comparison.png)を参照する。左右の折れ耳は文脈付きの生成画像から分離し、口・眉は見本から直接抽出した。目・頬・顔土台は既存素材を利用する。元画像・分離素材・配置情報は v35/ にまとめた。
+ぷんすかの採用版は **v35**。原本と検証履歴を保持し、[Cubism候補](../rig/drafts/angry/README.md)と[見本との比較](../rig/proofs/angry-v35/reference-comparison.png)を参照する。左右の折れ耳は文脈付きの生成画像から分離し、口・眉は見本から直接抽出した。目・頬・顔土台は既存素材を利用する。元画像・分離素材・配置情報は v35/ にまとめた。
+
+しょんぼりの採用版は **v36**。[Cubism候補](../rig/drafts/sad/README.md)と[見本との比較](../rig/proofs/sad-v36/reference-comparison.png)を参照する。新規生成はせず、口・眉を見本から画像編集で用意し、目は専用の変形キーで伏せ目にした。v35の折れ耳を共用する。モデルは73層で、ぷんすかも含む。
+
+両表情は正式モデルへ採用済み。最新の素材は `../current/`、モデルは `../rig/ciel.cmo3`、Unity更新は `../runtime/`。候補モデル・旧書き出しは `.local/sad-adoption/adopted-drafts/` に退避した。

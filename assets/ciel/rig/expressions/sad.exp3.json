@@ -4,13 +4,18 @@
   "FadeOutTime": 0.2,
   "Parameters": [
     {
-      "Id": "ParamAngry",
+      "Id": "ParamSad",
       "Value": 1,
       "Blend": "Overwrite"
     },
     {
       "Id": "ParamEarFold",
       "Value": 1,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamAngry",
+      "Value": 0,
       "Blend": "Overwrite"
     },
     {
@@ -29,16 +34,6 @@
       "Blend": "Overwrite"
     },
     {
-      "Id": "ParamEyeLSmile",
-      "Value": 0,
-      "Blend": "Overwrite"
-    },
-    {
-      "Id": "ParamEyeRSmile",
-      "Value": 0,
-      "Blend": "Overwrite"
-    },
-    {
       "Id": "ParamEar",
       "Value": 0,
       "Blend": "Overwrite"
@@ -46,6 +41,16 @@
     {
       "Id": "ParamCheek",
       "Value": 0.2,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeLSmile",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeRSmile",
+      "Value": 0,
       "Blend": "Overwrite"
     },
     {

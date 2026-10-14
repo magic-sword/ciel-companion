@@ -272,3 +272,19 @@ Unityの表情制御は新モデルでは`ParamSurprised`を使い、旧来の�
 生成した文脈付き画像から使うのは耳だけ。眉・口は見本を直接画像編集して抽出し、眉に残った地色を透過処理した。目・まばたき・目線・頬・顔土台は既存のものを利用する。発話時は既存の開口パーツへ切り替える。
 
 検証と比較は [ぷんすかの比較画像](../assets/ciel/rig/proofs/angry-v35/reference-comparison.png)、[動作の確認](../assets/ciel/rig/proofs/angry-v35/blink-and-mouth.png)、[候補の説明](../assets/ciel/rig/drafts/angry/README.md)。採用済みの通常・嬉しい・にこにこ・驚きのメッシュ位置と不透明度を比較し、候補の81組み合わせの動作を検証する。正式モデル・現行素材・Unity更新用パッケージは採用済みv34を維持する。
+
+### しょんぼりの候補（v36）
+
+v35のぷんすか候補に `ParamSad` を追加し、眉・口・目をまとめて切り替える。口は見本から抽出、眉は見本の輪郭を画像編集で清書した。目元は初案の中央40pxの下げ方から修正し、中央28pxと目尻・目頭の上下差で伏せ目を作る。虹彩・ハイライトを同じ変換で縦0.9倍、下へ28px移動する。閉眼キーと他の表情は維持し、目線にも補正を適用する。素材の再生成は行っていない。
+
+耳は `ParamEarFold=1` でv35の折れ耳を共用し、`ParamEar=0` を基本とする。頬は既存素材を使う。しょんぼり時は他の専用表情キーを0にする。発話時は既存の開口パーツへ切り替える。
+
+[候補モデル](../assets/ciel/rig/drafts/sad/README.md)は73層で、既存のぷんすかも含む。[見本との比較](../assets/ciel/rig/proofs/sad-v36/reference-comparison.png)、[まばたき・発話](../assets/ciel/rig/proofs/sad-v36/blink-and-mouth.png)を保存する。正式モデル・現行素材・正式なUnity更新用パッケージは、この候補へ変更していない。
+
+虹彩の上側に白い帯が出ないよう、虹彩の上端だけを最大38px延長し、瞼の裏まで覆う。瞳孔付近とハイライトにはこの延長を適用しない。
+
+上瞼は、見本と前回候補のまつげ上端を測り、左右別の二次曲線で追加補正済み。虹彩・ハイライトは前回の位置を維持する。最新の比較は [上瞼の変更前後](../assets/ciel/rig/proofs/sad-v36/lid-shape-comparison.png)。
+
+### しょんぼり・ぷんすかの正式採用
+
+ユーザー承認によりv36の上瞼の最終調整を正式モデルへ採用。v35のぷんすかと折れ耳を含む73層のモデルと現行PNG、PSD・XCF、6表情の切り替えファイル、12ファイルのUnity更新パッケージを整理した。旧候補一式は `.local/sad-adoption/adopted-drafts/` に退避。Unity側はParamSad・ParamAngry・ParamEarFoldをモデルに応じて使用し、旧リグの目・口・耳の変形を重ねず、他の表情では0へ戻す。Unityのモデル自体は未適用で、`CIEL > Model > Apply Current Package` から更新できる。

@@ -80,7 +80,7 @@ namespace Ciel.EditorTools
                 bool modern = model.Parameters.Any(p => p.Id == "ParamRelaxed");
                 bool surprise = model.Parameters.Any(p => p.Id == "ParamSurprised");
                 if (requireNewRig && !modern) throw new InvalidDataException("Package has no ParamRelaxed.");
-                foreach (var name in new[] { "happy", "relaxed", "surprised", "neutral" })
+                foreach (var name in new[] { "happy", "relaxed", "surprised", "angry", "sad", "neutral" })
                 {
                     expression.Set(name);
                     var targets = (Dictionary<string, float>)method.Invoke(expression, null);
@@ -102,6 +102,24 @@ namespace Ciel.EditorTools
                     }
                     else if (name == "surprised" && targets["ParamMouthOpenY"] != 0.3f)
                         throw new InvalidDataException("Legacy surprise compatibility failed.");
+                    bool angry = model.Parameters.Any(p => p.Id == "ParamAngry");
+                    bool sad = model.Parameters.Any(p => p.Id == "ParamSad");
+                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamEarFold" })
+                    {
+                        if (!model.Parameters.Any(p => p.Id == control)) continue;
+                        float expected = control == "ParamEarFold" ?
+                            ((name == "angry" && angry) || (name == "sad" && sad) ? 1 : 0) :
+                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" ? 1 : 0);
+                        if (!targets.TryGetValue(control, out var actual) || actual != expected)
+                            throw new InvalidDataException("Expression reset failed: " + name + " " + control);
+                    }
+                    if ((name == "angry" && angry) || (name == "sad" && sad))
+                    {
+                        if (targets.ContainsKey("ParamEar") || targets.ContainsKey("ParamEyeLOpen") || targets.ContainsKey("ParamMouthForm"))
+                            throw new InvalidDataException("Legacy deformation applied to the new pose: " + name);
+                    }
+                    else if (name == "angry" && targets["ParamEar"] != -0.5f || name == "sad" && targets["ParamEyeLOpen"] != -0.2f)
+                        throw new InvalidDataException("Legacy sad/angry compatibility failed.");
                 }
             }
             finally
