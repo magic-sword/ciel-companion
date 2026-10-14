@@ -210,10 +210,23 @@
 			"Id": "ParamExcited",
 			"GroupId": "",
 			"Name": "わくわく"
+		},
+		{
+			"Id": "ParamJitome",
+			"GroupId": "",
+			"Name": "ジト目"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part14",
+			"Name": "crown-addition.psd"
+		},
+		{
+			"Id": "Part13",
+			"Name": "jitome-additions.psd"
+		},
 		{
 			"Id": "Part12",
 			"Name": "excited-additions.psd"

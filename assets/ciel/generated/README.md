@@ -1,5 +1,9 @@
 # 素材生成の原本と検証履歴
 
+頭頂部の共通素材 **v45** とジト目 **v44** を正式採用。[全表情の実モデル描画](../rig/proofs/crown-v45/all-expressions.png)。現行92層とUnity更新パッケージへ反映済み。頭頂部は全表情で共用し、頭・後ろ髪の動きに追従する。旧メッシュ引き伸ばし案は採用しない。途中のCMO・SDKは`.local/crown-adoption/`へ退避した。Unity本体への適用はまだ行っていない。
+
+ジト目の原本・分離記録は **v44**。[見本との比較](../rig/proofs/crown-v45/reference-comparison.png)。見本から水平な上まつげと小さな口を分離し、平たい眉を合わせた。通常の虹彩・目線・まばたきと既存の耳を使う。現行素材は`../current/`、正式モデルは`../rig/ciel.cmo3`。
+
 わくわくの採用版は **v43**。[見本との比較](../rig/proofs/excited-v43/reference-comparison.png)。見本から笑い口・赤み・左右のキラキラ入り虹彩を画像編集で用意した。新規生成はせず、既存のまばたき・目線・立ち耳とつなぐ。現行87層とUnity更新パッケージへ反映済み。候補CMO・SDKは `.local/excited-adoption/adopted-draft/` へ退避した。Unity本体への適用はまだ行っていない。
 
 現行採用の折れ耳は **v42**、半泣きの顔は **v40**。[最新の実モデル比較](../rig/proofs/teary-v42/reference-comparison.png)。通常時の耳の量感を参考に見える面積を増やし、既存の折れ耳2層を差し替えた。正式モデル83層とUnity更新パッケージへ反映済み。Unity本体への適用はまだ行っていない。v41は不採用で、画像素材は `.local/archive/codex-generated/v41/` へ退避した。

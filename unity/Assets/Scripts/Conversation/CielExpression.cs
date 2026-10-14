@@ -82,7 +82,12 @@ namespace Ciel.Conversation
         {
             var target = new Dictionary<string, float>();
             // 専用キーがある表情は旧来の目・口・耳の値を重ねない。
-            if (Current == "excited" && _params.ContainsKey("ParamExcited"))
+            if (Current == "jitome" && _params.ContainsKey("ParamJitome"))
+            {
+                target["ParamEar"] = -0.35f;
+                target["ParamCheek"] = 0.15f;
+            }
+            else if (Current == "excited" && _params.ContainsKey("ParamExcited"))
             {
                 target["ParamEar"] = 1f;
                 target["ParamCheek"] = 0f;
@@ -118,6 +123,7 @@ namespace Ciel.Conversation
             if (_params.ContainsKey("ParamEmbarrassed")) target["ParamEmbarrassed"] = Current == "embarrassed" ? 1f : 0f;
             if (_params.ContainsKey("ParamTeary")) target["ParamTeary"] = Current == "teary" ? 1f : 0f;
             if (_params.ContainsKey("ParamExcited")) target["ParamExcited"] = Current == "excited" ? 1f : 0f;
+            if (_params.ContainsKey("ParamJitome")) target["ParamJitome"] = Current == "jitome" ? 1f : 0f;
             if (_params.ContainsKey("ParamEarFold"))
                 target["ParamEarFold"] = (Current == "angry" && _params.ContainsKey("ParamAngry")) ||
                     (Current == "sad" && _params.ContainsKey("ParamSad")) ||
@@ -144,7 +150,7 @@ namespace Ciel.Conversation
                 _weights[id] = w;
                 if (!_params.TryGetValue(id, out var p)) continue;
                 if (id == "ParamHappy" || id == "ParamRelaxed" || id == "ParamSurprised" ||
-                    id == "ParamAngry" || id == "ParamSad" || id == "ParamTroubled" || id == "ParamEmbarrassed" || id == "ParamTeary" || id == "ParamExcited" || id == "ParamEarFold")
+                    id == "ParamAngry" || id == "ParamSad" || id == "ParamTroubled" || id == "ParamEmbarrassed" || id == "ParamTeary" || id == "ParamExcited" || id == "ParamJitome" || id == "ParamEarFold")
                     // 専用の切り替え値は毎フレーム上書きし、通常復帰時も0へ戻す。
                     p.Value = Mathf.Clamp(w, p.MinimumValue, p.MaximumValue);
                 else if (Mathf.Abs(w) > 1e-4f)

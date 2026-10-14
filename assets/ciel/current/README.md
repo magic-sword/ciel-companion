@@ -3,7 +3,8 @@
 **現行モデルに使う素材はこのフォルダだけ。** 同じ役割の旧版を混在させない。`generated/`の候補・比較図は検証履歴であり、現行素材ではない。さらに過去の版は Git のタグ `archive/pre-current-cleanup` で参照できる。
 
 **2026-10-14：嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れ・半泣き・わくわくは採用済み。** 半泣きv40と大きめのサモエド折れ耳v42を反映。折れ耳はぷんすか・しょんぼり・困り・照れ・半泣きで共用する。他の表情は調整予定。
-採用状態は[approved.json](approved.json)、最新の見た目は[わくわくの比較](../rig/proofs/excited-v43/reference-comparison.png)。
+ジト目v44と頭頂部の共通素材v45も採用済み。現行92層に整理した。頭頂部は全表情で使い、頭の向き・後ろ髪の揺れに追従する。
+採用状態は[approved.json](approved.json)、最新の見た目は[全表情の描画](../rig/proofs/crown-v45/all-expressions.png)。
 わくわくv43の笑い口・赤み・左右のキラキラ入り虹彩を反映。`ParamExcited=1`・`ParamEar=1`で表示。[最新比較](../rig/proofs/excited-v43/reference-comparison.png)。
 正式なCubismモデルへ反映済み。[Unity更新用パッケージ](../runtime/README.md)を用意した。
 Unityのモデル自体はまだ更新していない。素材一覧とPNG87枚に過不足・名前の重複はない。半泣きは`ParamTeary=1`・`ParamEarFold=1`で表示。[半泣きのモデル描画](../rig/proofs/teary-v42/teary.png)。

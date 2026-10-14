@@ -108,16 +108,18 @@ namespace Ciel.EditorTools
                     bool embarrassed = model.Parameters.Any(p => p.Id == "ParamEmbarrassed");
                     bool teary = model.Parameters.Any(p => p.Id == "ParamTeary");
                     bool excited = model.Parameters.Any(p => p.Id == "ParamExcited");
+                    bool jitome = model.Parameters.Any(p => p.Id == "ParamJitome");
                     if (requireNewRig && !troubled) throw new InvalidDataException("Package has no ParamTroubled.");
                     if (requireNewRig && !embarrassed) throw new InvalidDataException("Package has no ParamEmbarrassed.");
                     if (requireNewRig && !teary) throw new InvalidDataException("Package has no ParamTeary.");
                     if (requireNewRig && !excited) throw new InvalidDataException("Package has no ParamExcited.");
-                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamTeary", "ParamExcited", "ParamEarFold" })
+                    if (requireNewRig && !jitome) throw new InvalidDataException("Package has no ParamJitome.");
+                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamTeary", "ParamExcited", "ParamJitome", "ParamEarFold" })
                     {
                         if (!model.Parameters.Any(p => p.Id == control)) continue;
                         float expected = control == "ParamEarFold" ?
                             ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed) || (name == "teary" && teary) ? 1 : 0) :
-                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" || control == "ParamTeary" && name == "teary" || control == "ParamExcited" && name == "excited" ? 1 : 0);
+                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" || control == "ParamTeary" && name == "teary" || control == "ParamExcited" && name == "excited" || control == "ParamJitome" && name == "jitome" ? 1 : 0);
                         if (!targets.TryGetValue(control, out var actual) || actual != expected)
                             throw new InvalidDataException("Expression reset failed: " + name + " " + control);
                     }
@@ -139,6 +141,13 @@ namespace Ciel.EditorTools
                     }
                     else if (name == "excited" && targets["ParamSparkle"] != 1f)
                         throw new InvalidDataException("Legacy excited compatibility failed.");
+                    if (name == "jitome" && jitome)
+                    {
+                        if (targets.ContainsKey("ParamEyeLOpen") || targets.ContainsKey("ParamMouthForm") || targets["ParamEar"] != -0.35f || targets["ParamCheek"] != 0.15f)
+                            throw new InvalidDataException("Legacy values applied to the new jitome pose.");
+                    }
+                    else if (name == "jitome" && targets["ParamEyeLOpen"] != -0.5f)
+                        throw new InvalidDataException("Legacy jitome compatibility failed.");
                 }
             }
             finally

@@ -1,0 +1,18 @@
+{
+  "stage": "static material preview",
+  "native_model": "assets/ciel/rig/drafts/jitome/runtime/Ciel.model3.json",
+  "source_image_scaled": false,
+  "source_dimensions": [
+    2172,
+    2896
+  ],
+  "other_materials_changed": false,
+  "poses_rendered": [
+    "neutral",
+    "jitome",
+    "excited",
+    "teary"
+  ],
+  "cmo_updated": false,
+  "unity_updated": false
+}

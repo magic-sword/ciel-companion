@@ -1,0 +1,29 @@
+{
+  "reset_passed": true,
+  "previous_poses_preserved": 11,
+  "drawables": 92,
+  "iris_follows_gaze": true,
+  "sclera_clipping_preserved": true,
+  "legacy_upper_lash_and_sparkle_hidden": true,
+  "independent_blinks_preserved": true,
+  "speaking_mouth_preserved": true,
+  "standing_ears_reused": true,
+  "finite_combined_poses": 81,
+  "common_crown_in_all_expressions": true,
+  "crown_follows_head_and_preserves_hair_sway": true,
+  "crown_root_anchored_during_hair_sway": true,
+  "adopted_expression_poses": 11,
+  "expression_poses_including_pending_thinking": 12,
+  "common_crown_motion_controls": [
+    "ParamAngleX",
+    "ParamAngleY",
+    "ParamAngleZ",
+    "ParamHairBack"
+  ],
+  "unity_current_package_validated": true,
+  "unity_current_package_files": 17,
+  "unity_modern_and_legacy_expression_targets_verified": true,
+  "psd_and_xcf_layer_count": 92,
+  "psd_and_xcf_layer_names_verified": true,
+  "rig_sha256": "5e8a5ed9cff65bb4afed4ec33455872b83bd651e1cc110ba49ff31e584c8a986"
+}

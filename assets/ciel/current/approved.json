@@ -9,28 +9,29 @@
     "troubled",
     "embarrassed",
     "teary",
-    "excited"
+    "excited",
+    "jitome"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "077b19fdc42f7719e5e1f760157ad5a9b0324ec124c3cec503669a52b62a4cf0",
+  "rig_sha256": "5e8a5ed9cff65bb4afed4ec33455872b83bd651e1cc110ba49ff31e584c8a986",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 87,
+  "material_count": 92,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/excited-v43",
+  "latest_proofs": "assets/ciel/rig/proofs/crown-v45",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "0b0f21bc60d408d0e9d2e7ceba02b0230583336f711d6f18a15629564b7a2aff"
+      "sha256": "15821feb95e74f26b9b16d617873194e02f20b7138fff2d18a89fdc44cfac4e1"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "9a0f2068aba68a181fc9bd7b033c3334c1d5c2e699dd834607ae2fe5155069c6"
+      "sha256": "7e46afa6bf9847d63c826179ed5a33ea60e9fd7c8ada360d4e169cb737c9e093"
     },
     {
       "path": "Ciel.model3.json",
@@ -38,7 +39,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "25d4b159161f24dda1b0a1ea5af03cafe648980d1f001aeaa6e611b7dcfe2bd8"
+      "sha256": "a191ce67004f0f8fa9f0bcfa53b5e0f55615f15ad4015c1a6d01506b3f7e80ff"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -60,5 +61,10 @@
   "latest_folded_ear_proofs": "assets/ciel/rig/proofs/teary-v42",
   "latest_excited_proofs": "assets/ciel/rig/proofs/excited-v43",
   "excited_control": "ParamExcited",
-  "excited_revision": "v43-reference-sparkling-irises-and-smile"
+  "excited_revision": "v43-reference-sparkling-irises-and-smile",
+  "latest_jitome_proofs": "assets/ciel/rig/proofs/crown-v45",
+  "jitome_control": "ParamJitome",
+  "jitome_revision": "v44",
+  "common_crown_revision": "v45",
+  "latest_crown_proofs": "assets/ciel/rig/proofs/crown-v45"
 }

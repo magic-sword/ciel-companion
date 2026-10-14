@@ -11,6 +11,11 @@
       "visible": true
     },
     {
+      "name": "Hair_Crown",
+      "path": "assets/ciel/current/layers/Hair_Crown.png",
+      "visible": true
+    },
+    {
       "name": "Jacket_Back",
       "path": "assets/ciel/current/layers/Jacket_Back.png",
       "visible": true
@@ -438,6 +443,26 @@
     {
       "name": "Eye_L_ExcitedIris",
       "path": "assets/ciel/current/layers/Eye_L_ExcitedIris.png",
+      "visible": false
+    },
+    {
+      "name": "Mouth_Jitome",
+      "path": "assets/ciel/current/layers/Mouth_Jitome.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Jitome",
+      "path": "assets/ciel/current/layers/Brow_Jitome.png",
+      "visible": false
+    },
+    {
+      "name": "Eye_R_JitomeUpper",
+      "path": "assets/ciel/current/layers/Eye_R_JitomeUpper.png",
+      "visible": false
+    },
+    {
+      "name": "Eye_L_JitomeUpper",
+      "path": "assets/ciel/current/layers/Eye_L_JitomeUpper.png",
       "visible": false
     }
   ]

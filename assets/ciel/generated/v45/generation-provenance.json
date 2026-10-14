@@ -1,0 +1,12 @@
+{
+  "method": "non-generative master extraction and feathered clone repair",
+  "new_generation": false,
+  "source": "assets/ciel/master/ciel-upper-body-2x.png",
+  "source_sha256": "7031ba09647f2b78cfc6d49f0a8fa945c12b8431a263ddfcb24a7fb8d552a526",
+  "approved": true,
+  "part": "Hair_Crown",
+  "source_hair_scaling": false,
+  "cubism_integrated": true,
+  "unity_applied": false,
+  "current_materials": "assets/ciel/current/layers.json"
+}

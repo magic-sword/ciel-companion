@@ -1,0 +1,12 @@
+{
+  "approved_date": "2026-10-14",
+  "rig": "assets/ciel/rig/ciel.cmo3",
+  "rig_sha256": "5e8a5ed9cff65bb4afed4ec33455872b83bd651e1cc110ba49ff31e584c8a986",
+  "material_count": 92,
+  "common_material": "Hair_Crown",
+  "common_material_source": "v45",
+  "jitome_source": "v44",
+  "common_material_expressions": "all",
+  "sdk_package": "assets/ciel/runtime",
+  "unity_applied": false
+}
