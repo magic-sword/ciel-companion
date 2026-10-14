@@ -1,0 +1,19 @@
+{
+  "approved_date": "2026-10-14",
+  "rig": "assets/ciel/rig/ciel.cmo3",
+  "rig_sha256": "811004188a3c154c820c0bf18295047e134e02bb8b2497a1c6929ff9a31bd1a9",
+  "material_count": 83,
+  "face_source": "v40",
+  "folded_ear_source": "v42",
+  "ear_control": "ParamEarFold",
+  "expression_control": "ParamTeary",
+  "sdk_package": "assets/ciel/runtime",
+  "shared_ear_expressions": [
+    "angry",
+    "sad",
+    "troubled",
+    "embarrassed",
+    "teary"
+  ],
+  "unity_applied": false
+}

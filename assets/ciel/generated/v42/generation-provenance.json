@@ -1,0 +1,63 @@
+{
+  "method": "contextual image edit followed by non-generative mask separation",
+  "generator": "image_gen",
+  "image_edit_count": 3,
+  "selected_edit": 3,
+  "rejected_edit_reason": "First proposal produced long floppy ears instead of short folded triangular ears",
+  "reference": "assets/ciel/rig/proofs/teary-v40/teary.png",
+  "additional_references": [
+    "inputs/normal-ears-reference.png",
+    "assets/ciel/generated/v22/expressions/teary.png"
+  ],
+  "original": "edits/teary-samoyed-ears-context.png",
+  "original_sha256": "19e2563c4f1ef34615c8dca0042fe11e595c28cc0602001d22cc7eda6e7aebdf",
+  "shared_scale": 1.292466765140325,
+  "offset": [
+    200,
+    50
+  ],
+  "parts": {
+    "Ear_R_Folded": {
+      "source_bbox": [
+        35,
+        197,
+        544,
+        648
+      ],
+      "target_bbox": [
+        245,
+        304,
+        905,
+        889
+      ]
+    },
+    "Ear_L_Folded": {
+      "source_bbox": [
+        799,
+        185,
+        1335,
+        648
+      ],
+      "target_bbox": [
+        1231,
+        287,
+        1927,
+        889
+      ]
+    }
+  },
+  "preview_method": "Static material planes substituted at native folded-ear render order; all other native drawables unchanged",
+  "reviewed_expressions": [
+    "半泣き",
+    "ぷんすか",
+    "しょんぼり",
+    "困り",
+    "照れ"
+  ],
+  "approved": true,
+  "cubism_integrated": true,
+  "unity_applied": false,
+  "previous_candidate_rejected": "v41: visible size change was too small",
+  "normal_reference_sha256": "2195fdf50d250a4d80449b9276076802b9c2b1eb7ba4ac8d0603a0123822e32d",
+  "current_materials": "assets/ciel/current/layers.json"
+}

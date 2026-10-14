@@ -106,25 +106,29 @@ namespace Ciel.EditorTools
                     bool sad = model.Parameters.Any(p => p.Id == "ParamSad");
                     bool troubled = model.Parameters.Any(p => p.Id == "ParamTroubled");
                     bool embarrassed = model.Parameters.Any(p => p.Id == "ParamEmbarrassed");
+                    bool teary = model.Parameters.Any(p => p.Id == "ParamTeary");
                     if (requireNewRig && !troubled) throw new InvalidDataException("Package has no ParamTroubled.");
                     if (requireNewRig && !embarrassed) throw new InvalidDataException("Package has no ParamEmbarrassed.");
-                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamEarFold" })
+                    if (requireNewRig && !teary) throw new InvalidDataException("Package has no ParamTeary.");
+                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamTeary", "ParamEarFold" })
                     {
                         if (!model.Parameters.Any(p => p.Id == control)) continue;
                         float expected = control == "ParamEarFold" ?
-                            ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed) ? 1 : 0) :
-                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" ? 1 : 0);
+                            ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed) || (name == "teary" && teary) ? 1 : 0) :
+                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" || control == "ParamTeary" && name == "teary" ? 1 : 0);
                         if (!targets.TryGetValue(control, out var actual) || actual != expected)
                             throw new InvalidDataException("Expression reset failed: " + name + " " + control);
                     }
-                    if ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed))
+                    if ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed) || (name == "teary" && teary))
                     {
                         if (targets.ContainsKey("ParamEar") || targets.ContainsKey("ParamEyeLOpen") || targets.ContainsKey("ParamMouthForm") || targets.ContainsKey("ParamSweat") || targets.ContainsKey("ParamEyeBallX"))
                             throw new InvalidDataException("Legacy deformation applied to the new pose: " + name);
                         if (name == "embarrassed" && targets["ParamCheek"] != 0f)
                             throw new InvalidDataException("Legacy blush applied to the new embarrassed pose.");
+                        if (name == "teary" && (targets.ContainsKey("ParamTear") || targets["ParamCheek"] != 0.25f))
+                            throw new InvalidDataException("Legacy tears applied to the new teary pose.");
                     }
-                    else if (name == "angry" && targets["ParamEar"] != -0.5f || name == "sad" && targets["ParamEyeLOpen"] != -0.2f || name == "troubled" && targets["ParamSweat"] != 1f || name == "embarrassed" && (targets["ParamEyeBallX"] != 0.6f || targets["ParamCheek"] != 1f))
+                    else if (name == "angry" && targets["ParamEar"] != -0.5f || name == "sad" && targets["ParamEyeLOpen"] != -0.2f || name == "troubled" && targets["ParamSweat"] != 1f || name == "embarrassed" && (targets["ParamEyeBallX"] != 0.6f || targets["ParamCheek"] != 1f) || name == "teary" && targets["ParamTear"] != 1f)
                         throw new InvalidDataException("Legacy sad/angry compatibility failed.");
                 }
             }

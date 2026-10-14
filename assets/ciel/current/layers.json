@@ -399,6 +399,26 @@
       "name": "Cheek_Embarrassed",
       "path": "assets/ciel/current/layers/Cheek_Embarrassed.png",
       "visible": false
+    },
+    {
+      "name": "Mouth_Teary",
+      "path": "assets/ciel/current/layers/Mouth_Teary.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Teary",
+      "path": "assets/ciel/current/layers/Brow_Teary.png",
+      "visible": false
+    },
+    {
+      "name": "Tears_R_Teary",
+      "path": "assets/ciel/current/layers/Tears_R_Teary.png",
+      "visible": false
+    },
+    {
+      "name": "Tears_L_Teary",
+      "path": "assets/ciel/current/layers/Tears_L_Teary.png",
+      "visible": false
     }
   ]
 }

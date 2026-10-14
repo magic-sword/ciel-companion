@@ -1,8 +1,8 @@
 {
   "approved_date": "2026-10-14",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "d2e3fb0d67213c118bd3a81d4ad91f8a64174297fd8ebdea907382366e71ce9a",
-  "material_count": 79,
+  "source_rig_sha256": "811004188a3c154c820c0bf18295047e134e02bb8b2497a1c6929ff9a31bd1a9",
+  "material_count": 83,
   "approved_expressions": [
     "happy",
     "relaxed",
@@ -10,24 +10,25 @@
     "angry",
     "sad",
     "troubled",
-    "embarrassed"
+    "embarrassed",
+    "teary"
   ],
   "files": [
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "c9a444f817c1f57406660ef98602ca49851b13530c91bdb9915dddc79a5a77ea"
+      "sha256": "c740ca67a4fc7c2bae93ad2e8bad98d10b79aec60b7d7d6b64bfb7f3c91fe386"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "c43e464971bcdd83869587799a7fbf89f458d0de7e2a11fff9c08afe8a535182"
+      "sha256": "cef6c6b826bcf2c586fdee8a8ebfeeeb0e25c95f9f6065d16726fa12a1a0b543"
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "5554c7a1513e866a1052e5970b501c181fb1a0153834b7f0350c4d6d5bb8f656"
+      "sha256": "d4ea42afe653b2840558001487a37217db8b3b95d7b3958c53c4cd46a997c3b9"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "05545af5d8c0ea8a510a1db532934fab5c011888b4161a00f6a8f9f58bd59fe1"
+      "sha256": "17a2c5ef9e8d4b31ef7739c6fef0de0528bf41529410fc2dec23f15016765434"
     },
     {
       "path": "Ciel.physics3.json",
@@ -35,35 +36,39 @@
     },
     {
       "path": "Expressions/angry.exp3.json",
-      "sha256": "b183e8ee520cf07ed6024216e94317c0d39e118cd9489fa29e32896550418f61"
+      "sha256": "8caac2335e4b979cebc53a1837c26d8861760e8defa6460395748ece66df02f6"
     },
     {
       "path": "Expressions/embarrassed.exp3.json",
-      "sha256": "4f799501c3fb86f56c133abd5959662cd5e2c8513de07267d05cfac441fe21f8"
+      "sha256": "d07cd2810fd9a93d1e4109c87a4c41f2bccac695330471c55063e2366ae58d55"
     },
     {
       "path": "Expressions/happy.exp3.json",
-      "sha256": "385d8f45ba4e13e37647375037e33fb68d86bd9dc2a0b1f0c672b0916335e97a"
+      "sha256": "989d28324cf71b62928c19bf70a214a59adda58d9f9fcdb811cc291404b27a03"
     },
     {
       "path": "Expressions/neutral.exp3.json",
-      "sha256": "d22e891569350f054cdb70ff0fd670b01638a548b03ea6ad196d18fce76812e7"
+      "sha256": "54982a73c948ce1a79485cc6838efa21f9088f847302b9a51ed3b24071c74620"
     },
     {
       "path": "Expressions/relaxed.exp3.json",
-      "sha256": "c88b999811d6720a8c5605f39bd4390e73b1272d6580588af6b3f1a6cae5277b"
+      "sha256": "8fadca0ca7786ef0cf8343aa1299112bcdf4da1773f02b6be5ff66c7af3cdc32"
     },
     {
       "path": "Expressions/sad.exp3.json",
-      "sha256": "1e252bde27f6d433062e8947e2b4acfd0f7eccd53252df6ef57c7c0787ab502b"
+      "sha256": "fc7d9657def18ed6b5c725f19c3a483089b59cc51debfe51cb2fe5d3c7cff3a8"
     },
     {
       "path": "Expressions/surprised.exp3.json",
-      "sha256": "a0928b199531fe496ade3ca7628d74db8287be3f9e0f60d2490d35eab601e513"
+      "sha256": "87c7cc49e8dbf14fd2c7c72a1aac8f896e6678d07ede0afaf0f10fd6bf8d6c76"
+    },
+    {
+      "path": "Expressions/teary.exp3.json",
+      "sha256": "62610763749a600962548495ded96f28aa91f2ad3ca7fa7598468c93d4fb9ab8"
     },
     {
       "path": "Expressions/troubled.exp3.json",
-      "sha256": "4495dad171aa9f8a93ca56484fed8d0227bd215b1a682d599f94812014a6ab4c"
+      "sha256": "60e9422078f165dcfc8f716987307d809874e811086051efdd6be024c6d00fba"
     },
     {
       "path": "Motions/Ciel_Nod.motion3.json",
@@ -349,11 +354,11 @@
     },
     {
       "path": "assets/ciel/current/layers/Ear_R_Folded.png",
-      "sha256": "958c9487e13ea421ef7cbafdd402d888c4756cc2bef9266e3b5dded1f18e17d8"
+      "sha256": "301b5654309b028f927d5f187e76fcf934dc146b09bca48c253a017e7fa8aec1"
     },
     {
       "path": "assets/ciel/current/layers/Ear_L_Folded.png",
-      "sha256": "26e1c633b4178003c4edfc57a7e3b6e33b6cc29be66885d051250735050564d9"
+      "sha256": "2b72942e5c7ed0cbeb012bbf8ea80a168cc1c1359ac5e64358be2d31e350a646"
     },
     {
       "path": "assets/ciel/current/layers/Mouth_Sad.png",
@@ -386,6 +391,22 @@
     {
       "path": "assets/ciel/current/layers/Cheek_Embarrassed.png",
       "sha256": "12c85deeb4390f55aa4afdc518c41b9e815bc83ba67f90be69262dcff6c00e70"
+    },
+    {
+      "path": "assets/ciel/current/layers/Mouth_Teary.png",
+      "sha256": "4c512ce5763fcb00cd21a02a8ede24e11b9bfb7e50683b02ba3af48c827a6d0c"
+    },
+    {
+      "path": "assets/ciel/current/layers/Brow_Teary.png",
+      "sha256": "c81b897d9043791896a6c6813f36efcdfea5ea078af0d7a5461968084597b39b"
+    },
+    {
+      "path": "assets/ciel/current/layers/Tears_R_Teary.png",
+      "sha256": "557d8646519551db0ae41ed193345a96739bd7c1eca5c0464c07163b9faea48c"
+    },
+    {
+      "path": "assets/ciel/current/layers/Tears_L_Teary.png",
+      "sha256": "23a7a8441c70e3d15e84517d426cfee07efbc4a3f7d4ec3a8eacf165dc06c163"
     }
   ]
 }

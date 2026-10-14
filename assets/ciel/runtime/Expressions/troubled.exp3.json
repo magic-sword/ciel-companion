@@ -77,6 +77,16 @@
       "Id": "ParamEmbarrassed",
       "Value": 0,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamTeary",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamTear",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

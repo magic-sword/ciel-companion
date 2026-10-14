@@ -200,10 +200,19 @@
 			"Id": "ParamEmbarrassed",
 			"GroupId": "",
 			"Name": "照れ"
+		},
+		{
+			"Id": "ParamTeary",
+			"GroupId": "",
+			"Name": "半泣き"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part11",
+			"Name": "teary-additions.psd"
+		},
 		{
 			"Id": "Part10",
 			"Name": "embarrassed-additions.psd"

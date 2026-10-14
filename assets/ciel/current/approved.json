@@ -7,28 +7,29 @@
     "angry",
     "sad",
     "troubled",
-    "embarrassed"
+    "embarrassed",
+    "teary"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "d2e3fb0d67213c118bd3a81d4ad91f8a64174297fd8ebdea907382366e71ce9a",
+  "rig_sha256": "811004188a3c154c820c0bf18295047e134e02bb8b2497a1c6929ff9a31bd1a9",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 79,
+  "material_count": 83,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/embarrassed-v39",
+  "latest_proofs": "assets/ciel/rig/proofs/teary-v42",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "5554c7a1513e866a1052e5970b501c181fb1a0153834b7f0350c4d6d5bb8f656"
+      "sha256": "d4ea42afe653b2840558001487a37217db8b3b95d7b3958c53c4cd46a997c3b9"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "c43e464971bcdd83869587799a7fbf89f458d0de7e2a11fff9c08afe8a535182"
+      "sha256": "cef6c6b826bcf2c586fdee8a8ebfeeeb0e25c95f9f6065d16726fa12a1a0b543"
     },
     {
       "path": "Ciel.model3.json",
@@ -36,7 +37,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "c9a444f817c1f57406660ef98602ca49851b13530c91bdb9915dddc79a5a77ea"
+      "sha256": "c740ca67a4fc7c2bae93ad2e8bad98d10b79aec60b7d7d6b64bfb7f3c91fe386"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -50,5 +51,10 @@
   "troubled_revision": "v37-white-eye-boundary-lower-line",
   "latest_embarrassed_proofs": "assets/ciel/rig/proofs/embarrassed-v39",
   "embarrassed_control": "ParamEmbarrassed",
-  "embarrassed_revision": "v39-eye-corners-and-soft-blush"
+  "embarrassed_revision": "v39-eye-corners-and-soft-blush",
+  "latest_teary_proofs": "assets/ciel/rig/proofs/teary-v42",
+  "teary_control": "ParamTeary",
+  "teary_revision": "v40-tears-and-lid-profile-with-v42-samoyed-ears",
+  "folded_ear_revision": "v42",
+  "latest_folded_ear_proofs": "assets/ciel/rig/proofs/teary-v42"
 }

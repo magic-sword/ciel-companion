@@ -19,7 +19,7 @@ def main():
     assert len(layers)==len({e['name'] for e in layers})==approved['material_count']
     assert {Path(e['path']).name for e in layers}=={p.name for p in (ROOT/'assets/ciel/current/layers').glob('*.png')}
     model=cc.Model(source/'Ciel.model3.json')
-    controls={'happy':'ParamHappy','relaxed':'ParamRelaxed','surprised':'ParamSurprised','angry':'ParamAngry','sad':'ParamSad','troubled':'ParamTroubled','embarrassed':'ParamEmbarrassed'}
+    controls={'happy':'ParamHappy','relaxed':'ParamRelaxed','surprised':'ParamSurprised','angry':'ParamAngry','sad':'ParamSad','troubled':'ParamTroubled','embarrassed':'ParamEmbarrassed','teary':'ParamTeary'}
     assert all(controls[n] in model.param_range for n in approved['approved_expressions'])
     for entry in approved['export_files']:
         assert sha(safe(source,entry['path']))==entry['sha256'],entry['path']

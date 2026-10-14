@@ -1,5 +1,7 @@
 # 素材生成の原本と検証履歴
 
+現行採用の折れ耳は **v42**、半泣きの顔は **v40**。[最新の実モデル比較](../rig/proofs/teary-v42/reference-comparison.png)。通常時の耳の量感を参考に見える面積を増やし、既存の折れ耳2層を差し替えた。正式モデル83層とUnity更新パッケージへ反映済み。Unity本体への適用はまだ行っていない。v41は不採用で、画像素材は `.local/archive/codex-generated/v41/` へ退避した。
+
 現行の素材は`../current/`、正式なCubismモデルは`../rig/ciel.cmo3`。
 ここは生成原本・依頼記録・配置・比較の履歴であり、候補をそのまま現行素材として使わない。
 現在採用しているニッコリ顔はv30の輪郭付き一体抽出を画像編集で分離したv31。
@@ -31,3 +33,5 @@ v34の驚きは瞳位置補正後を採用済み。丸口を現行素材へ追�
 困り顔の採用版は **v37（下まぶた調整済み）**。[最新比較](../rig/proofs/troubled-v37-lower-lid/reference-comparison.png)を参照。眉・口・汗の原本・分離素材・配置情報はv37に保持する。現行素材は `../current/`、正式モデルは `../rig/ciel.cmo3`、Unity更新パッケージは `../runtime/`。76層の正式モデルへ採用し、候補の重複は `.local/troubled-adoption/adopted-draft/` へ退避した。
 
 照れ顔の採用版は **v39（目尻・赤みの最終調整済み）**。[最新比較](../rig/proofs/embarrassed-v39/reference-comparison.png)。v38は口・眉・赤みの初回抽出と配置の記録、v39は赤みの修正素材と目尻の調整記録。現在の素材は `../current/layers.json`、正式モデルは `../rig/ciel.cmo3`、Unity更新は `../runtime/`。候補モデル・旧書き出しは `.local/embarrassed-adoption/adopted-draft/` へ退避した。
+
+半泣きの採用素材は **v40**。[採用モデルの案内](../rig/drafts/teary/README.md)と[最新の見本比較](../rig/proofs/teary-v42/reference-comparison.png)を参照。見本から口・左右の涙を分離し、眉・目元を合わせた。涙は目線についていかず、左右のまばたきに連動する。顔の素材は新規生成せず、折れ耳は文脈付き生成のv42へ更新。正式モデルとUnity更新パッケージへ反映し、候補CMO・SDKの重複はローカルへ退避した。

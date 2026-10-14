@@ -1,0 +1,26 @@
+{
+  "previous_poses_preserved": 9,
+  "drawables": 83,
+  "iris_highlight_base_transform": {
+    "y_scale": 0.98,
+    "pivot_y": 1070,
+    "y_offset": 16,
+    "highlight_y_offset": 32,
+    "x_preserved": true,
+    "iris_top_extension_px": 18
+  },
+  "folded_ear_revision": "v42",
+  "previous_pose_geometry_exceptions": [
+    "Ear_R_Folded",
+    "Ear_L_Folded"
+  ],
+  "blink_preserved": true,
+  "speaking_mouth_preserved": true,
+  "tears_independent_of_gaze": true,
+  "legacy_tears_hidden": true,
+  "independent_blinks_preserved": true,
+  "finite_combined_poses": 81,
+  "reset_passed": true,
+  "unity_current_package_validated": true,
+  "unity_new_and_legacy_12_expression_targets_verified": true
+}
