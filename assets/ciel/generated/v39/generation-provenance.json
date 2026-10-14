@@ -1,0 +1,18 @@
+{
+  "new_generation": false,
+  "base_revision": "v38",
+  "source_material": "assets/ciel/generated/v38/layers/Cheek_Embarrassed.png",
+  "source_material_sha256": "02c65fcfd58b8bcde716a0f78ecca525af1f9fa39548e9a64d2c0b60e56f3878",
+  "method": "non-generative alpha/color editing; localized upper-lash tail deformation",
+  "blush_adjustment": "blush-adjustment.json",
+  "eye_corner_strength": 0.45,
+  "reused_parts": [
+    "v38 mouth and brows",
+    "existing irises and highlights",
+    "existing sclera and lower lines",
+    "folded ears"
+  ],
+  "approved": true,
+  "approved_date": "2026-10-14",
+  "current_materials": "assets/ciel/current/layers.json"
+}

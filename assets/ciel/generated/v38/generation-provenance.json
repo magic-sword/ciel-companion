@@ -1,0 +1,28 @@
+{
+  "method": "non-generative extraction and color/alpha separation from full-face reference",
+  "reference": "assets/ciel/generated/v22/expressions/embarrassed.png",
+  "new_generation": false,
+  "extracted_parts": [
+    "Mouth_Embarrassed",
+    "Cheek_Embarrassed"
+  ],
+  "brow_cleanup": "Reference outlines traced to remove intersecting hair lines",
+  "blush_separation": "Reference red/green difference converted into translucent blush, retaining diagonal strokes and removing the reference nose dot",
+  "eye_adjustment": "Reference upper lash profile fit; existing iris and highlights narrowed and moved together sideways",
+  "placement": "placement.json",
+  "lower_lid": "existing relaxed lower line fitted to sclera boundary; redundant lower skin hidden only in embarrassed",
+  "existing_materials_reused": [
+    "folded ears",
+    "eyes and highlights",
+    "face base",
+    "relaxed lower eyelid lines"
+  ],
+  "approved": false,
+  "blush_edge_feather_source_px": 25,
+  "nose_cleanup": "reference nose ink replaced with surrounding blush alpha; original model nose retained",
+  "superseded_by": "v39",
+  "reused_in_adopted_revision": [
+    "Mouth_Embarrassed",
+    "Brow_Embarrassed"
+  ]
+}

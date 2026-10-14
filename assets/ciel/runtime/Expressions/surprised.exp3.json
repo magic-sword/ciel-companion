@@ -67,6 +67,11 @@
       "Id": "ParamTroubled",
       "Value": 0,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEmbarrassed",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

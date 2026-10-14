@@ -195,10 +195,19 @@
 			"Id": "ParamTroubled",
 			"GroupId": "",
 			"Name": "困り"
+		},
+		{
+			"Id": "ParamEmbarrassed",
+			"GroupId": "",
+			"Name": "照れ"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part10",
+			"Name": "embarrassed-additions.psd"
+		},
 		{
 			"Id": "Part9",
 			"Name": "troubled-additions.psd"

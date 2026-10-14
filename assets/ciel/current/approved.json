@@ -6,28 +6,29 @@
     "surprised",
     "angry",
     "sad",
-    "troubled"
+    "troubled",
+    "embarrassed"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "651007e20e61fb0e075babd14dc90a6b4eb53ffd3abb554626615d521c692f58",
+  "rig_sha256": "d2e3fb0d67213c118bd3a81d4ad91f8a64174297fd8ebdea907382366e71ce9a",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 76,
+  "material_count": 79,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/troubled-v37-lower-lid",
+  "latest_proofs": "assets/ciel/rig/proofs/embarrassed-v39",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "ab527825358faa8c984e759c1c0d72da95d7d03727cf4fea27951577c56f7a36"
+      "sha256": "5554c7a1513e866a1052e5970b501c181fb1a0153834b7f0350c4d6d5bb8f656"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "8c4bb5d46badf6a06bb8765c0a5ca6c9a0e1f32b6ecd857994276827a8888704"
+      "sha256": "c43e464971bcdd83869587799a7fbf89f458d0de7e2a11fff9c08afe8a535182"
     },
     {
       "path": "Ciel.model3.json",
@@ -35,7 +36,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "0a7283b3f2dd09e7e937f06fad764a40141732e7626c78c02850bfc089634228"
+      "sha256": "c9a444f817c1f57406660ef98602ca49851b13530c91bdb9915dddc79a5a77ea"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -46,5 +47,8 @@
   "sad_revision": "v36-reference-lid-profile",
   "latest_troubled_proofs": "assets/ciel/rig/proofs/troubled-v37-lower-lid",
   "troubled_control": "ParamTroubled",
-  "troubled_revision": "v37-white-eye-boundary-lower-line"
+  "troubled_revision": "v37-white-eye-boundary-lower-line",
+  "latest_embarrassed_proofs": "assets/ciel/rig/proofs/embarrassed-v39",
+  "embarrassed_control": "ParamEmbarrassed",
+  "embarrassed_revision": "v39-eye-corners-and-soft-blush"
 }

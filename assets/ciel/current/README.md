@@ -2,16 +2,17 @@
 
 **現行モデルに使う素材はこのフォルダだけ。** 同じ役割の旧版を混在させない。`generated/`の候補・比較図は検証履歴であり、現行素材ではない。さらに過去の版は Git のタグ `archive/pre-current-cleanup` で参照できる。
 
-**2026-10-14：嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困りは採用済み。** 困りはv37の下まぶた調整後を反映。他の表情は調整予定。
+**2026-10-14：嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れは採用済み。** 照れはv39の目尻・赤みの最終調整を反映。他の表情は調整予定。
 採用状態は[approved.json](approved.json)、最新の見た目は[にこにこの比較](../rig/proofs/relaxed-eye-corners/reference-comparison.png)。
 正式なCubismモデルへ反映済み。[Unity更新用パッケージ](../runtime/README.md)を用意した。
-Unityのモデル自体はまだ更新していない。素材一覧とPNG76枚に過不足・名前の重複はない。
+Unityのモデル自体はまだ更新していない。素材一覧とPNG79枚に過不足・名前の重複はない。
+照れの最新比較は[こちら](../rig/proofs/embarrassed-v39/reference-comparison.png)。`ParamEmbarrassed=1`・`ParamEarFold=1`で切り替え、旧赤み・旧目線は重ねない。
 困りの最新比較は[こちら](../rig/proofs/troubled-v37-lower-lid/reference-comparison.png)。`ParamTroubled=1`・`ParamEarFold=1`で切り替える。
 驚きの最新比較は[こちら](../rig/proofs/surprised-v34/reference-comparison.png)。`ParamSurprised=1`で目と丸口を切り替える。
 
 | 場所 | 内容 |
 | --- | --- |
-| `layers/*.png` | リグに使う76層（キャンバス2172×2896の透明PNG）。採用済み6表情を含み、v37の困り眉・口・汗を追加 |
+| `layers/*.png` | リグに使う79層（キャンバス2172×2896の透明PNG）。採用済み7表情を含む。照れの眉・口はv38、赤みはv39を反映 |
 | `layers.json` | 下から上の重なり順と、通常の表示（`visible: false` は差分：閉じ目・開いた口・表情素材）。PSD 作成の一覧を兼ねる |
 | `proofs/` | 現在のモデルの確認画像：向き 3×3（`angles-3x3.png`）、目と口（`eyes-mouth.png`）、上下と体の傾き（`angle-y.png`）、頷き（`nod.gif`）、横向きの頬（`cheek-compare.png`・`cheek-sweep.gif`）、待機（`idle.gif`）、揺れの形（`sway-shapes.gif`・`bust-sway.gif`）、Unity の描画（`unity-check.png`） |
 | `../rig/ciel.cmo3` | 現在の作業モデル（Cubism Editor 5.3、Git LFS） |

@@ -384,6 +384,21 @@
       "name": "Sweat_Troubled",
       "path": "assets/ciel/current/layers/Sweat_Troubled.png",
       "visible": false
+    },
+    {
+      "name": "Mouth_Embarrassed",
+      "path": "assets/ciel/current/layers/Mouth_Embarrassed.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Embarrassed",
+      "path": "assets/ciel/current/layers/Brow_Embarrassed.png",
+      "visible": false
+    },
+    {
+      "name": "Cheek_Embarrassed",
+      "path": "assets/ciel/current/layers/Cheek_Embarrassed.png",
+      "visible": false
     }
   ]
 }

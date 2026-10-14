@@ -1,0 +1,137 @@
+{
+  "reference": "assets/ciel/generated/v22/expressions/embarrassed.png",
+  "reference_sha256": "864d96ae62a3ca41984ceb3430a7528065af188f848f2cae984e2ea711f02883",
+  "shared_scale": 0.9661016949152542,
+  "offset": [
+    288.4745762711865,
+    53.949152542372985
+  ],
+  "parts": {
+    "Mouth_Embarrassed": {
+      "source_bbox": [
+        815,
+        1246,
+        883,
+        1262
+      ],
+      "target_bbox": [
+        1075,
+        1256,
+        1143,
+        1274
+      ]
+    },
+    "Brow_Embarrassed": {
+      "source_bbox": [
+        547,
+        841,
+        1149,
+        915
+      ],
+      "target_bbox": [
+        816,
+        866,
+        1400,
+        939
+      ]
+    },
+    "Cheek_Embarrassed": {
+      "source_bbox": [
+        548,
+        1091,
+        1143,
+        1236
+      ],
+      "target_bbox": [
+        818,
+        1108,
+        1393,
+        1247
+      ]
+    }
+  },
+  "eye_profiles": {
+    "R": {
+      "samples_x": [
+        820,
+        845,
+        870,
+        895,
+        920,
+        945,
+        970
+      ],
+      "reference_y": [
+        1031,
+        1016,
+        1006,
+        1002,
+        999,
+        1002,
+        1008
+      ],
+      "normal_y": [
+        972,
+        966,
+        958,
+        955,
+        957,
+        964,
+        975
+      ],
+      "coefficients": [
+        0.8009523809524199,
+        -22.095238095238084,
+        41.35714285714285
+      ]
+    },
+    "L": {
+      "samples_x": [
+        1235,
+        1260,
+        1285,
+        1310,
+        1335,
+        1360,
+        1385
+      ],
+      "reference_y": [
+        1001,
+        993,
+        988,
+        986,
+        988,
+        993,
+        1004
+      ],
+      "normal_y": [
+        971,
+        957,
+        948,
+        945,
+        948,
+        955,
+        959
+      ],
+      "coefficients": [
+        -11.6138095238096,
+        14.154761904761893,
+        37.857142857142875
+      ]
+    }
+  },
+  "new_generation": false,
+  "iris_y_scale": 0.95,
+  "iris_y_offset": 20,
+  "iris_top_extension": 18,
+  "highlight_y_offset": 35,
+  "iris_x_scale": {
+    "R": 0.82,
+    "L": 0.9
+  },
+  "iris_x_offset": {
+    "R": 24,
+    "L": 40
+  },
+  "blush_edge_feather_source_px": 25
+}
