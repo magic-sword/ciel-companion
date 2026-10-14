@@ -27,3 +27,5 @@ v34の驚きは瞳位置補正後を採用済み。丸口を現行素材へ追�
 しょんぼりの採用版は **v36**。[Cubism候補](../rig/drafts/sad/README.md)と[見本との比較](../rig/proofs/sad-v36/reference-comparison.png)を参照する。新規生成はせず、口・眉を見本から画像編集で用意し、目は専用の変形キーで伏せ目にした。v35の折れ耳を共用する。モデルは73層で、ぷんすかも含む。
 
 両表情は正式モデルへ採用済み。最新の素材は `../current/`、モデルは `../rig/ciel.cmo3`、Unity更新は `../runtime/`。候補モデル・旧書き出しは `.local/sad-adoption/adopted-drafts/` に退避した。
+
+困り顔の採用版は **v37（下まぶた調整済み）**。[最新比較](../rig/proofs/troubled-v37-lower-lid/reference-comparison.png)を参照。眉・口・汗の原本・分離素材・配置情報はv37に保持する。現行素材は `../current/`、正式モデルは `../rig/ciel.cmo3`、Unity更新パッケージは `../runtime/`。76層の正式モデルへ採用し、候補の重複は `.local/troubled-adoption/adopted-draft/` へ退避した。

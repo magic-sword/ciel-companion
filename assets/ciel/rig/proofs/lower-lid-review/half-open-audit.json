@@ -1,0 +1,352 @@
+{
+  "normal": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  },
+  "happy": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 0.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 0.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  },
+  "relaxed": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 1.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 0.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 1.0,
+        "masks": []
+      }
+    }
+  },
+  "surprised": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  },
+  "angry": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  },
+  "sad": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  },
+  "troubled": {
+    "L": {
+      "Eye_L_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_L_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_L_Sclera"
+        ]
+      },
+      "Eye_L_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    },
+    "R": {
+      "Eye_R_Sclera": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LidSkin_Lower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_LashLower": {
+        "opacity": 1.0,
+        "masks": []
+      },
+      "Eye_R_Iris": {
+        "opacity": 1.0,
+        "masks": [
+          "Eye_R_Sclera"
+        ]
+      },
+      "Eye_R_RelaxedLowerLine": {
+        "opacity": 0.0,
+        "masks": []
+      }
+    }
+  }
+}

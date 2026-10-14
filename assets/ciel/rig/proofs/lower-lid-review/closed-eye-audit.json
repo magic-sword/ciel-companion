@@ -1,0 +1,114 @@
+{
+  "normal": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  },
+  "happy": {
+    "L": {
+      "Sclera": 0.0,
+      "Iris": 0.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 0.0
+    },
+    "R": {
+      "Sclera": 0.0,
+      "Iris": 0.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 0.0
+    }
+  },
+  "relaxed": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  },
+  "surprised": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  },
+  "angry": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  },
+  "sad": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  },
+  "troubled": {
+    "L": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    },
+    "R": {
+      "Sclera": 1.0,
+      "Iris": 1.0,
+      "LidSkin_Lower": 0.0,
+      "LashLower": 0.0,
+      "Closed": 1.0
+    }
+  }
+}

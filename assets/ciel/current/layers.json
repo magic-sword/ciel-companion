@@ -369,6 +369,21 @@
       "name": "Brow_Sad",
       "path": "assets/ciel/current/layers/Brow_Sad.png",
       "visible": false
+    },
+    {
+      "name": "Mouth_Troubled",
+      "path": "assets/ciel/current/layers/Mouth_Troubled.png",
+      "visible": false
+    },
+    {
+      "name": "Brow_Troubled",
+      "path": "assets/ciel/current/layers/Brow_Troubled.png",
+      "visible": false
+    },
+    {
+      "name": "Sweat_Troubled",
+      "path": "assets/ciel/current/layers/Sweat_Troubled.png",
+      "visible": false
     }
   ]
 }

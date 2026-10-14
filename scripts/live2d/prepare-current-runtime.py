@@ -19,7 +19,7 @@ def main():
     assert len(layers)==len({e['name'] for e in layers})==approved['material_count']
     assert {Path(e['path']).name for e in layers}=={p.name for p in (ROOT/'assets/ciel/current/layers').glob('*.png')}
     model=cc.Model(source/'Ciel.model3.json')
-    controls={'happy':'ParamHappy','relaxed':'ParamRelaxed','surprised':'ParamSurprised','angry':'ParamAngry','sad':'ParamSad'}
+    controls={'happy':'ParamHappy','relaxed':'ParamRelaxed','surprised':'ParamSurprised','angry':'ParamAngry','sad':'ParamSad','troubled':'ParamTroubled'}
     assert all(controls[n] in model.param_range for n in approved['approved_expressions'])
     for entry in approved['export_files']:
         assert sha(safe(source,entry['path']))==entry['sha256'],entry['path']
@@ -39,6 +39,8 @@ def main():
         for motion in motions:sources[motion['File']]=safe(unity,motion['File'])
     for name in ['neutral',*approved['approved_expressions']]:
         sources[f'Expressions/{name}.exp3.json']=ROOT/'assets/ciel/rig/expressions'/(name+'.exp3.json')
+    refs['Expressions']=[{'Name':name,'File':f'Expressions/{name}.exp3.json'}
+                         for name in ['neutral',*approved['approved_expressions']]]
     assert all(p.is_file() for p in sources.values())
     out.mkdir(parents=True,exist_ok=True)
     previous=json.loads((out/'manifest.json').read_text()) if (out/'manifest.json').exists() else {'files':[]}

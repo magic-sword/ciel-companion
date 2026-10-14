@@ -1,0 +1,15 @@
+{
+  "previous_poses_preserved": 7,
+  "drawables": 76,
+  "iris_highlight_base_transform": {
+    "y_scale": 0.95,
+    "pivot_y": 1070,
+    "y_offset": 18,
+    "x_preserved": true,
+    "iris_top_extension_px": 18
+  },
+  "folded_ears_reused": true,
+  "blink_preserved": true,
+  "speaking_mouth_preserved": true,
+  "finite_combined_poses": 81
+}

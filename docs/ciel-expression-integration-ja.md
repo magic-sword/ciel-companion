@@ -288,3 +288,17 @@ v35のぷんすか候補に `ParamSad` を追加し、眉・口・目をまと�
 ### しょんぼり・ぷんすかの正式採用
 
 ユーザー承認によりv36の上瞼の最終調整を正式モデルへ採用。v35のぷんすかと折れ耳を含む73層のモデルと現行PNG、PSD・XCF、6表情の切り替えファイル、12ファイルのUnity更新パッケージを整理した。旧候補一式は `.local/sad-adoption/adopted-drafts/` に退避。Unity側はParamSad・ParamAngry・ParamEarFoldをモデルに応じて使用し、旧リグの目・口・耳の変形を重ねず、他の表情では0へ戻す。Unityのモデル自体は未適用で、`CIEL > Model > Apply Current Package` から更新できる。
+
+### 困り顔の候補（v37）
+
+採用済み73層モデルに困り眉・口・汗を追加した76層の候補を別保存する。素材生成は行わず、見本の顔全体の座標を保って口・汗を画像編集で切り出し、眉を清書した。`ParamTroubled` で目・眉・口・汗を切り替え、折れ耳は `ParamEarFold` で共用する。旧Sweatパーツは困り顔中に非表示にする。
+
+上瞼は見本のまつげ上端から左右別の曲線で合わせる。下瞼は初回の通常の形から見直し、困り顔では肌色の下瞼と旧線を非表示にして、白目の境界に合わせた既存のにこにこ用の線を共用する。虹彩・ハイライトは縦0.95倍、下へ18px移動し、虹彩上端を最大18px延長して白い隙間を防ぐ。閉眼・目線・発話は既存のキーを維持する。
+
+[候補モデル](../assets/ciel/rig/drafts/troubled/README.md)、[見本との比較](../assets/ciel/rig/proofs/troubled-v37-lower-lid/reference-comparison.png)、[全表情の下まぶたの検討](../assets/ciel/rig/proofs/lower-lid-review/README.md)を参照。正式モデルと正式なUnity更新パッケージは変更していない。
+
+### 困り顔の正式採用
+
+ユーザー承認によりv37の下まぶた調整後を採用。正式モデル `assets/ciel/rig/ciel.cmo3`、現行PNG76層・PSD/XCF、通常を含む7表情、13ファイルのUnity更新パッケージを整理した。Unity側もParamTroubledを専用キーとして上書きし、折れ耳を共用、旧眉・口・汗・耳の変形を重ねず、通常や他の表情では0へ戻す。旧モデルには従来の値を使用する。
+
+候補モデルと書き出しの重複は `.local/troubled-adoption/adopted-draft/` へ退避。Unityのモデル自体は未適用で、`CIEL > Model > Apply Current Package` から更新する。下まぶたの見直し結果は確認履歴として保持し、今回しょんぼり・驚きの形は変更していない。

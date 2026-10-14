@@ -83,7 +83,8 @@ namespace Ciel.Conversation
             var target = new Dictionary<string, float>();
             // 専用キーがある表情は旧来の目・口・耳の値を重ねない。
             if ((Current == "angry" && _params.ContainsKey("ParamAngry")) ||
-                (Current == "sad" && _params.ContainsKey("ParamSad")))
+                (Current == "sad" && _params.ContainsKey("ParamSad")) ||
+                (Current == "troubled" && _params.ContainsKey("ParamTroubled")))
             {
                 target["ParamCheek"] = 0.2f;
             }
@@ -100,9 +101,11 @@ namespace Ciel.Conversation
             if (_params.ContainsKey("ParamSurprised")) target["ParamSurprised"] = Current == "surprised" ? 1f : 0f;
             if (_params.ContainsKey("ParamAngry")) target["ParamAngry"] = Current == "angry" ? 1f : 0f;
             if (_params.ContainsKey("ParamSad")) target["ParamSad"] = Current == "sad" ? 1f : 0f;
+            if (_params.ContainsKey("ParamTroubled")) target["ParamTroubled"] = Current == "troubled" ? 1f : 0f;
             if (_params.ContainsKey("ParamEarFold"))
                 target["ParamEarFold"] = (Current == "angry" && _params.ContainsKey("ParamAngry")) ||
-                    (Current == "sad" && _params.ContainsKey("ParamSad")) ? 1f : 0f;
+                    (Current == "sad" && _params.ContainsKey("ParamSad")) ||
+                    (Current == "troubled" && _params.ContainsKey("ParamTroubled")) ? 1f : 0f;
             return target;
         }
 
@@ -123,7 +126,7 @@ namespace Ciel.Conversation
                 _weights[id] = w;
                 if (!_params.TryGetValue(id, out var p)) continue;
                 if (id == "ParamHappy" || id == "ParamRelaxed" || id == "ParamSurprised" ||
-                    id == "ParamAngry" || id == "ParamSad" || id == "ParamEarFold")
+                    id == "ParamAngry" || id == "ParamSad" || id == "ParamTroubled" || id == "ParamEarFold")
                     // 専用の切り替え値は毎フレーム上書きし、通常復帰時も0へ戻す。
                     p.Value = Mathf.Clamp(w, p.MinimumValue, p.MaximumValue);
                 else if (Mathf.Abs(w) > 1e-4f)

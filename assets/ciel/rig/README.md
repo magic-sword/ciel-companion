@@ -1,11 +1,13 @@
 # 正式なCubismモデル
 
-現在の編集対象は **ciel.cmo3**、素材は73層。嬉しい・にこにこ・驚き・ぷんすか・しょんぼりを採用済み。
+現在の編集対象は **ciel.cmo3**、素材は76層。嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困りを採用済み。
 しょんぼりは `ParamSad=1`、ぷんすかは `ParamAngry=1`。どちらも `ParamEarFold=1`、`ParamEar=0` を基本とし、他の専用キーは0に戻す。まばたき・目線・口パクは固定しない。
 
-最新のしょんぼりは [上瞼の比較](proofs/sad-v36/lid-shape-comparison.png)、ぷんすかは [比較画像](proofs/angry-v35/reference-comparison.png)。採用状態は [approved.json](../current/approved.json)、Unityへの更新は [runtime/README.md](../runtime/README.md)。expressions/に6表情の切り替えファイルを保存した。
+最新の困りは[下まぶた調整後の比較](proofs/troubled-v37-lower-lid/reference-comparison.png)。`ParamTroubled=1`・`ParamEarFold=1`で表示し、他の専用表情キーは0へ戻す。採用状態は [approved.json](../current/approved.json)、Unityへの更新は [runtime/README.md](../runtime/README.md)。expressions/に通常を含む7表情の切り替えファイルを保存した。
 
 旧候補モデル・書き出しは `.local/sad-adoption/adopted-drafts/` に退避し、正式モデルと重複させない。その他の表情は引き続き調整予定。
+
+困り顔（v37、下まぶた調整済み）は正式採用済み。候補一式は `.local/troubled-adoption/adopted-draft/` へ退避。[全表情の下まぶたの見直し](proofs/lower-lid-review/README.md)は確認履歴として保持する。
 
 ## 過去の記録
 

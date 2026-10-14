@@ -1,0 +1,27 @@
+{
+  "method": "non-generative extraction from the full expression reference",
+  "reference": "assets/ciel/generated/v22/expressions/troubled.png",
+  "new_generation": false,
+  "extracted_parts": [
+    "Mouth_Troubled",
+    "Sweat_Troubled"
+  ],
+  "brow_cleanup": "Reference outlines traced to remove intersecting hair lines",
+  "eye_adjustment": "Reference lash profile measured in the registered canvas",
+  "placement": "placement.json",
+  "existing_materials_reused": [
+    "folded ears",
+    "eyes and highlights",
+    "cheeks",
+    "face base"
+  ],
+  "approved": true,
+  "lower_lid_revision": {
+    "new_generation": false,
+    "method": "hide redundant lower skin and legacy line only in troubled; reuse existing relaxed lower lines fitted to rendered sclera edge at open and half-open keys",
+    "proofs": "assets/ciel/rig/proofs/troubled-v37-lower-lid",
+    "other_expressions_review": "assets/ciel/rig/proofs/lower-lid-review"
+  },
+  "approved_date": "2026-10-14",
+  "current_materials": "assets/ciel/current/layers.json"
+}

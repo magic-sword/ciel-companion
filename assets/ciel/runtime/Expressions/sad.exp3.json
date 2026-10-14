@@ -62,6 +62,11 @@
       "Id": "ParamMouthOpenY",
       "Value": 0,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamTroubled",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

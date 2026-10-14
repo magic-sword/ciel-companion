@@ -5,36 +5,37 @@
     "relaxed",
     "surprised",
     "angry",
-    "sad"
+    "sad",
+    "troubled"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "2de0c50a91f1e34bb3ea5f0208f4be6d2be6ff05285c0df7aee02d1f77a0e38f",
+  "rig_sha256": "651007e20e61fb0e075babd14dc90a6b4eb53ffd3abb554626615d521c692f58",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 73,
+  "material_count": 76,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/sad-v36",
+  "latest_proofs": "assets/ciel/rig/proofs/troubled-v37-lower-lid",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "52ca0c2e5973473a6c72dd6534a51ef401b98cbcac6472ecc2566e3ed09432ea"
+      "sha256": "ab527825358faa8c984e759c1c0d72da95d7d03727cf4fea27951577c56f7a36"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "e8081aeb8388be662d1e64b374283aec59963923be669856a5711b4eee595418"
+      "sha256": "8c4bb5d46badf6a06bb8765c0a5ca6c9a0e1f32b6ecd857994276827a8888704"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "0e4a05590beabb5d07e54e3bc0da51b013f2494fcd87697984c12d4c73c46870"
+      "sha256": "526172a2bba4d438b8ddfebec165d70c148b8911c60425b874fc05d656af4d76"
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "8e760cba86d1ace9b38ef8879662539531bc5d5c9fc204424e92adb291ee2355"
+      "sha256": "0a7283b3f2dd09e7e937f06fad764a40141732e7626c78c02850bfc089634228"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -42,5 +43,8 @@
   "sad_control": "ParamSad",
   "angry_control": "ParamAngry",
   "folded_ear_control": "ParamEarFold",
-  "sad_revision": "v36-reference-lid-profile"
+  "sad_revision": "v36-reference-lid-profile",
+  "latest_troubled_proofs": "assets/ciel/rig/proofs/troubled-v37-lower-lid",
+  "troubled_control": "ParamTroubled",
+  "troubled_revision": "v37-white-eye-boundary-lower-line"
 }

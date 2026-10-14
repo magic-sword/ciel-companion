@@ -190,10 +190,19 @@
 			"Id": "ParamSad",
 			"GroupId": "",
 			"Name": "しょんぼり"
+		},
+		{
+			"Id": "ParamTroubled",
+			"GroupId": "",
+			"Name": "困り"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part9",
+			"Name": "troubled-additions.psd"
+		},
 		{
 			"Id": "Part8",
 			"Name": "sad-additions.psd"
