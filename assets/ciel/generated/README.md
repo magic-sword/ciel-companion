@@ -1,6 +1,8 @@
 # 素材生成の原本と検証履歴
 
-顔の肌色の共通修正 **v46** を正式採用。[全表情の最新モデル描画](../rig/proofs/skin-v46/all-expressions.png)。お腹の色味を基準に顔土台・まぶた・口元の肌色7層を画像編集で補正した。現行92層・正式モデル・Unity更新用パッケージへ反映済み。旧素材と作業コピーは`.local/skin-adoption/`へ退避した。Unity本体への適用はまだ行っていない。
+頭頂部の左右補完 **v47** が最新。折れ耳で見える斜めの切り口を丸い輪郭へつなぎ、頭を傾けたときに露出する後ろ髪本体の旧上端も整理した。現行92層・正式モデル・Unity更新用パッケージへ反映済み。[最新の全表情](../rig/proofs/crown-v47/all-expressions.png)、[正式モデルの頭頂部比較](../rig/proofs/crown-v47/native-crown-comparison.png)。旧素材と作業コピーは`.local/crown-completion-adoption/`に保管し、現行素材と混在させない。Unity本体は未更新。
+
+顔の肌色の共通修正 **v46** を正式採用。[肌色採用時のモデル描画](../rig/proofs/skin-v46/all-expressions.png)。お腹の色味を基準に顔土台・まぶた・口元の肌色7層を画像編集で補正した。現行92層・正式モデル・Unity更新用パッケージへ反映済み。旧素材と作業コピーは`.local/skin-adoption/`へ退避した。Unity本体への適用はまだ行っていない。
 
 頭頂部の共通素材 **v45** とジト目 **v44** を正式採用。[全表情の実モデル描画](../rig/proofs/crown-v45/all-expressions.png)。現行92層とUnity更新パッケージへ反映済み。頭頂部は全表情で共用し、頭・後ろ髪の動きに追従する。旧メッシュ引き伸ばし案は採用しない。途中のCMO・SDKは`.local/crown-adoption/`へ退避した。Unity本体への適用はまだ行っていない。
 

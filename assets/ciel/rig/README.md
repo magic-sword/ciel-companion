@@ -1,6 +1,8 @@
 # 正式なCubismモデル
 
-肌色の共通修正v46を反映した現行92層が最新。顔土台・まぶた・口元の7素材を差し替え、既存の表情と動作を維持した。[最新の全表情](proofs/skin-v46/all-expressions.png)。
+頭頂部と後ろ髪の共通修正v47が最新。正式モデル92層で既存2素材を差し替え、補完範囲まで頭頂部を再メッシュした。[最新の全表情](proofs/crown-v47/all-expressions.png)、[頭の傾きの比較](proofs/crown-v47/native-head-roll.png)。肌色v46と採用済み表情の設定を含む。
+
+肌色の共通修正v46も反映済み。顔土台・まぶた・口元の7素材を差し替え、既存の表情と動作を維持した。[肌色採用時の全表情](proofs/skin-v46/all-expressions.png)。
 
 ジト目v44と頭頂部の共通修正v45を正式採用。[全表情の描画](proofs/crown-v45/all-expressions.png)。`Hair_Crown`は全表情で使い、頭に追従する前髪側のデフォーマに接続した。ジト目は`ParamJitome=1`・`ParamEar=-0.35`・`ParamCheek=0.15`で表示する。
 

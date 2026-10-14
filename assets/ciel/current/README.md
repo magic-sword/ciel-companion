@@ -1,22 +1,22 @@
 # シエル Live2D：現在の素材（シングルソース）
 
-肌色の共通修正v46を反映した現行92層が最新。顔土台・まぶた・口元の7素材を差し替え、既存の表情と動作を維持した。[最新の全表情](../rig/proofs/skin-v46/all-expressions.png)。
+頭頂部の左右補完v47を反映した現行92層が最新。`Hair_Crown`と`Hair_Back`を同じ名前で差し替え、耳に隠れていた髪の補完と旧上端の整理を全表情へ適用した。肌色の共通修正v46と既存の表情設定も含む。[最新の全表情](../rig/proofs/crown-v47/all-expressions.png)。
 
 **現行モデルに使う素材はこのフォルダだけ。** 同じ役割の旧版を混在させない。`generated/`の候補・比較図は検証履歴であり、現行素材ではない。さらに過去の版は Git のタグ `archive/pre-current-cleanup` で参照できる。
 
 **2026-10-14：嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れ・半泣き・わくわくは採用済み。** 半泣きv40と大きめのサモエド折れ耳v42を反映。折れ耳はぷんすか・しょんぼり・困り・照れ・半泣きで共用する。他の表情は調整予定。
-ジト目v44と頭頂部の共通素材v45も採用済み。現行92層に整理した。頭頂部は全表情で使い、頭の向き・後ろ髪の揺れに追従する。
-採用状態は[approved.json](approved.json)、最新の見た目は[全表情の描画](../rig/proofs/skin-v46/all-expressions.png)。
+ジト目v44と頭頂部の共通素材v45も採用済み。現行92層に整理した。頭頂部は全表情で使い、頭の向きに追従する。下側の後ろ髪の揺れからは独立する。
+採用状態は[approved.json](approved.json)、最新の見た目は[全表情の描画](../rig/proofs/crown-v47/all-expressions.png)。
 わくわくv43の笑い口・赤み・左右のキラキラ入り虹彩を反映。`ParamExcited=1`・`ParamEar=1`で表示。[最新比較](../rig/proofs/excited-v43/reference-comparison.png)。
 正式なCubismモデルへ反映済み。[Unity更新用パッケージ](../runtime/README.md)を用意した。
-Unityのモデル自体はまだ更新していない。素材一覧とPNG87枚に過不足・名前の重複はない。半泣きは`ParamTeary=1`・`ParamEarFold=1`で表示。[半泣きのモデル描画](../rig/proofs/teary-v42/teary.png)。
+Unityのモデル自体はまだ更新していない。素材一覧とPNG92枚に過不足・名前の重複はない。半泣きは`ParamTeary=1`・`ParamEarFold=1`で表示。[半泣きのモデル描画](../rig/proofs/teary-v42/teary.png)。
 照れの最新比較は[こちら](../rig/proofs/embarrassed-v39/reference-comparison.png)。`ParamEmbarrassed=1`・`ParamEarFold=1`で切り替え、旧赤み・旧目線は重ねない。
 困りの最新比較は[こちら](../rig/proofs/troubled-v37-lower-lid/reference-comparison.png)。`ParamTroubled=1`・`ParamEarFold=1`で切り替える。
 驚きの最新比較は[こちら](../rig/proofs/surprised-v34/reference-comparison.png)。`ParamSurprised=1`で目と丸口を切り替える。
 
 | 場所 | 内容 |
 | --- | --- |
-| `layers/*.png` | リグに使う87層（キャンバス2172×2896の透明PNG）。採用済み9表情を含む。半泣きの4層を追加し、折れ耳2層をv42へ差し替えた |
+| `layers/*.png` | リグに使う92層（キャンバス2172×2896の透明PNG）。採用済み10表情を含む。半泣きの4層を追加し、折れ耳2層をv42へ差し替えた |
 | `layers.json` | 下から上の重なり順と、通常の表示（`visible: false` は差分：閉じ目・開いた口・表情素材）。PSD 作成の一覧を兼ねる |
 | `proofs/` | 現在のモデルの確認画像：向き 3×3（`angles-3x3.png`）、目と口（`eyes-mouth.png`）、上下と体の傾き（`angle-y.png`）、頷き（`nod.gif`）、横向きの頬（`cheek-compare.png`・`cheek-sweep.gif`）、待機（`idle.gif`）、揺れの形（`sway-shapes.gif`・`bust-sway.gif`）、Unity の描画（`unity-check.png`） |
 | `../rig/ciel.cmo3` | 現在の作業モデル（Cubism Editor 5.3、Git LFS） |

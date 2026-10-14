@@ -1,7 +1,7 @@
 {
   "approved_date": "2026-10-14",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "f843a2a69821811f8987f97c9d6cd043e40311df820728806dff516c02595896",
+  "source_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
   "material_count": 92,
   "approved_expressions": [
     "happy",
@@ -18,7 +18,7 @@
   "files": [
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "f1f4dfa809cdab767e6d872b75dcef68a47f65428eaec50d83c8455f70646809"
+      "sha256": "37b494ecab221e0d218a7b4cd821ed659f8af442c1358c5d5f4a351cd099498a"
     },
     {
       "path": "Ciel.cdi3.json",
@@ -26,7 +26,7 @@
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "15821feb95e74f26b9b16d617873194e02f20b7138fff2d18a89fdc44cfac4e1"
+      "sha256": "10d6bfff14bab7869f3106cc0bf9f6f05fa25dbc194ed0d57f76f7c1adb5ab5f"
     },
     {
       "path": "Ciel.model3.json",
@@ -88,11 +88,11 @@
   "materials": [
     {
       "path": "assets/ciel/current/layers/Hair_Back.png",
-      "sha256": "26cf42232da6fd1bfe8e9a0475ecf2b1e11dfe6945b6103a22a1856d9a5e7642"
+      "sha256": "b850384aa141175201520b4cc98f0e5470ee462de7f07624246b76610c77dd25"
     },
     {
       "path": "assets/ciel/current/layers/Hair_Crown.png",
-      "sha256": "3501409d815d82df1bef1773f4694e63adb21e672c9837700b40cd117e7528d2"
+      "sha256": "3a8b496b4c7b10e8bc3c4417fa4b289c7efdf5cea63457927ca413629604dd78"
     },
     {
       "path": "assets/ciel/current/layers/Jacket_Back.png",

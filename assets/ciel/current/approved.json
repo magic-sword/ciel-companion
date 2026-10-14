@@ -14,7 +14,7 @@
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "f843a2a69821811f8987f97c9d6cd043e40311df820728806dff516c02595896",
+  "rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
   "materials": "assets/ciel/current/layers.json",
   "material_count": 92,
   "relaxed_control": "ParamRelaxed",
@@ -22,12 +22,12 @@
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/skin-v46",
+  "latest_proofs": "assets/ciel/rig/proofs/crown-v47",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "15821feb95e74f26b9b16d617873194e02f20b7138fff2d18a89fdc44cfac4e1"
+      "sha256": "10d6bfff14bab7869f3106cc0bf9f6f05fa25dbc194ed0d57f76f7c1adb5ab5f"
     },
     {
       "path": "Ciel.cdi3.json",
@@ -39,7 +39,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "f1f4dfa809cdab767e6d872b75dcef68a47f65428eaec50d83c8455f70646809"
+      "sha256": "37b494ecab221e0d218a7b4cd821ed659f8af442c1358c5d5f4a351cd099498a"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -65,8 +65,10 @@
   "latest_jitome_proofs": "assets/ciel/rig/proofs/crown-v45",
   "jitome_control": "ParamJitome",
   "jitome_revision": "v44",
-  "common_crown_revision": "v45",
-  "latest_crown_proofs": "assets/ciel/rig/proofs/crown-v45",
+  "common_crown_revision": "v47",
+  "latest_crown_proofs": "assets/ciel/rig/proofs/crown-v47",
   "skin_tone_revision": "v46",
-  "latest_skin_tone_proofs": "assets/ciel/rig/proofs/skin-v46"
+  "latest_skin_tone_proofs": "assets/ciel/rig/proofs/skin-v46",
+  "crown_completion_revision": "v47",
+  "crown_original_revision": "v45"
 }
