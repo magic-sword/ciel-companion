@@ -1,0 +1,78 @@
+{
+  "method": "non-generative skin chroma correction",
+  "new_generation": false,
+  "approved": true,
+  "reference": "assets/ciel/master/ciel-upper-body-2x.png",
+  "face_sample_rgb": [
+    254.0,
+    249.0,
+    247.0
+  ],
+  "master_face_sample_rgb": [
+    250.0,
+    249.0,
+    249.0
+  ],
+  "body_abdomen_sample_rgb": [
+    249.0,
+    248.0,
+    249.0
+  ],
+  "chroma_delta_rgb": [
+    -3.366199999999992,
+    0.6338000000000079,
+    3.633800000000008
+  ],
+  "luminance_delta_before_rounding": 7.827072323607354e-15,
+  "layers": [
+    {
+      "name": "Face_Skin",
+      "source_sha256": "5b2a3db39dbc876f3d99f15499905304421fe86478545514e8abe47adcf9a304",
+      "changed_pixels": 459229
+    },
+    {
+      "name": "Mouth_Skin_Upper",
+      "source_sha256": "7c659735a7092245ffd49fd9080d291e5878ff850ad6fb419ee79bbb017adec8",
+      "changed_pixels": 17850
+    },
+    {
+      "name": "Mouth_Skin_Lower",
+      "source_sha256": "f2c0c7a9ae72122086ec79bdbab266597be8ba24c3703adba9cfd943363160e5",
+      "changed_pixels": 28733
+    },
+    {
+      "name": "Eye_R_LidSkin_Upper",
+      "source_sha256": "66061d00aed3aba84217df869c8721f253c191b809bf8b4d39b4d05ab1c13097",
+      "changed_pixels": 7190
+    },
+    {
+      "name": "Eye_R_LidSkin_Lower",
+      "source_sha256": "802edeeb1409c7f1c3e1853ffd60807695e47684916faeded498ad09a798da24",
+      "changed_pixels": 7379
+    },
+    {
+      "name": "Eye_L_LidSkin_Upper",
+      "source_sha256": "a32988289c108ea116056486e9d596aca09bf1e2a3ccd8472fc6e3f0744f57de",
+      "changed_pixels": 7070
+    },
+    {
+      "name": "Eye_L_LidSkin_Lower",
+      "source_sha256": "63614040e10de528ce66a06c4b1c9eb77c46bbedce95b181507216bf9335d955",
+      "changed_pixels": 6727
+    }
+  ],
+  "alpha_unchanged": true,
+  "geometry_unchanged": true,
+  "blush_artwork_unchanged": true,
+  "neck_and_body_unchanged": true,
+  "cmo_updated": false,
+  "unity_updated": false,
+  "adjusted_face_sample_rgb": [
+    251.0,
+    250.0,
+    251.0
+  ],
+  "cubism_integrated": true,
+  "unity_applied": false,
+  "current_materials": "assets/ciel/current/layers.json"
+}

@@ -1,0 +1,22 @@
+{
+  "stage": "texture color preview",
+  "alpha_unchanged": true,
+  "geometry_unchanged": true,
+  "modified_materials": [
+    "Face_Skin",
+    "Mouth_Skin_Upper",
+    "Mouth_Skin_Lower",
+    "Eye_R_LidSkin_Upper",
+    "Eye_R_LidSkin_Lower",
+    "Eye_L_LidSkin_Upper",
+    "Eye_L_LidSkin_Lower"
+  ],
+  "poses_rendered": [
+    "neutral",
+    "happy",
+    "embarrassed",
+    "teary"
+  ],
+  "cmo_updated": false,
+  "unity_updated": false
+}

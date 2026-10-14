@@ -1,0 +1,34 @@
+{
+  "reset_passed": true,
+  "drawables": 92,
+  "expression_poses": 12,
+  "combined_motion_poses": 81,
+  "geometry_triangles_opacity_and_draw_order_preserved": true,
+  "material_alpha_preserved": true,
+  "skin_materials_replaced": [
+    "Face_Skin",
+    "Mouth_Skin_Upper",
+    "Mouth_Skin_Lower",
+    "Eye_R_LidSkin_Upper",
+    "Eye_R_LidSkin_Lower",
+    "Eye_L_LidSkin_Upper",
+    "Eye_L_LidSkin_Lower"
+  ],
+  "native_face_rgb_before": [
+    254.0,
+    249.0,
+    247.0
+  ],
+  "native_face_rgb_after": [
+    251.0,
+    250.0,
+    251.0
+  ],
+  "moc_bytes_unchanged": true,
+  "unity_current_package_validated": true,
+  "unity_modern_and_legacy_expression_targets_verified": true,
+  "unity_package_files": 17,
+  "psd_xcf_layer_names_verified": true,
+  "psd_xcf_layer_count": 92,
+  "rig_sha256": "f843a2a69821811f8987f97c9d6cd043e40311df820728806dff516c02595896"
+}

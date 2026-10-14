@@ -1,7 +1,7 @@
 {
   "approved_date": "2026-10-14",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "5e8a5ed9cff65bb4afed4ec33455872b83bd651e1cc110ba49ff31e584c8a986",
+  "source_rig_sha256": "f843a2a69821811f8987f97c9d6cd043e40311df820728806dff516c02595896",
   "material_count": 92,
   "approved_expressions": [
     "happy",
@@ -18,7 +18,7 @@
   "files": [
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "a191ce67004f0f8fa9f0bcfa53b5e0f55615f15ad4015c1a6d01506b3f7e80ff"
+      "sha256": "f1f4dfa809cdab767e6d872b75dcef68a47f65428eaec50d83c8455f70646809"
     },
     {
       "path": "Ciel.cdi3.json",
@@ -140,7 +140,7 @@
     },
     {
       "path": "assets/ciel/current/layers/Face_Skin.png",
-      "sha256": "5b2a3db39dbc876f3d99f15499905304421fe86478545514e8abe47adcf9a304"
+      "sha256": "22517c6184eabb795e3733a03565724f05d48e86c7c979e75d43903b5546f72f"
     },
     {
       "path": "assets/ciel/current/layers/Face_Shadow_Hair.png",
@@ -168,11 +168,11 @@
     },
     {
       "path": "assets/ciel/current/layers/Mouth_Skin_Upper.png",
-      "sha256": "7c659735a7092245ffd49fd9080d291e5878ff850ad6fb419ee79bbb017adec8"
+      "sha256": "1995f32e55542ad1c668825b594b07265bad7bb18ec38ce33443f7105e1a3940"
     },
     {
       "path": "assets/ciel/current/layers/Mouth_Skin_Lower.png",
-      "sha256": "f2c0c7a9ae72122086ec79bdbab266597be8ba24c3703adba9cfd943363160e5"
+      "sha256": "bec1354356dc15d8afc136aeddcb0c92330b90083e339da57fbbcd4fa6784899"
     },
     {
       "path": "assets/ciel/current/layers/Mouth_Line_Upper.png",
@@ -216,11 +216,11 @@
     },
     {
       "path": "assets/ciel/current/layers/Eye_R_LidSkin_Upper.png",
-      "sha256": "66061d00aed3aba84217df869c8721f253c191b809bf8b4d39b4d05ab1c13097"
+      "sha256": "9593818a7ce38dbe0f22f818e0f870e67cc7e6f1aa28ce0922b46c4102252c39"
     },
     {
       "path": "assets/ciel/current/layers/Eye_R_LidSkin_Lower.png",
-      "sha256": "802edeeb1409c7f1c3e1853ffd60807695e47684916faeded498ad09a798da24"
+      "sha256": "a4eafdb076783c63cc2649d355ee301374c448cfc6f1f74b541257ce36233d56"
     },
     {
       "path": "assets/ciel/current/layers/Eye_R_LashUpper.png",
@@ -268,11 +268,11 @@
     },
     {
       "path": "assets/ciel/current/layers/Eye_L_LidSkin_Upper.png",
-      "sha256": "a32988289c108ea116056486e9d596aca09bf1e2a3ccd8472fc6e3f0744f57de"
+      "sha256": "bd7b8618b197ad0dde1d11561f2b20872c1420e5ce01ed3de3a5ae6b7b48eae8"
     },
     {
       "path": "assets/ciel/current/layers/Eye_L_LidSkin_Lower.png",
-      "sha256": "63614040e10de528ce66a06c4b1c9eb77c46bbedce95b181507216bf9335d955"
+      "sha256": "b39afd8c93a9d66b6385ec68aaa2bc80a5ed3fcc4e052464d38501b49e879287"
     },
     {
       "path": "assets/ciel/current/layers/Eye_L_LashUpper.png",

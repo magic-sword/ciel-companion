@@ -14,7 +14,7 @@
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "5e8a5ed9cff65bb4afed4ec33455872b83bd651e1cc110ba49ff31e584c8a986",
+  "rig_sha256": "f843a2a69821811f8987f97c9d6cd043e40311df820728806dff516c02595896",
   "materials": "assets/ciel/current/layers.json",
   "material_count": 92,
   "relaxed_control": "ParamRelaxed",
@@ -22,7 +22,7 @@
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/crown-v45",
+  "latest_proofs": "assets/ciel/rig/proofs/skin-v46",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
@@ -39,7 +39,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "a191ce67004f0f8fa9f0bcfa53b5e0f55615f15ad4015c1a6d01506b3f7e80ff"
+      "sha256": "f1f4dfa809cdab767e6d872b75dcef68a47f65428eaec50d83c8455f70646809"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -66,5 +66,7 @@
   "jitome_control": "ParamJitome",
   "jitome_revision": "v44",
   "common_crown_revision": "v45",
-  "latest_crown_proofs": "assets/ciel/rig/proofs/crown-v45"
+  "latest_crown_proofs": "assets/ciel/rig/proofs/crown-v45",
+  "skin_tone_revision": "v46",
+  "latest_skin_tone_proofs": "assets/ciel/rig/proofs/skin-v46"
 }
