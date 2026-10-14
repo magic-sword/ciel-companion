@@ -8,28 +8,29 @@
     "sad",
     "troubled",
     "embarrassed",
-    "teary"
+    "teary",
+    "excited"
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "811004188a3c154c820c0bf18295047e134e02bb8b2497a1c6929ff9a31bd1a9",
+  "rig_sha256": "077b19fdc42f7719e5e1f760157ad5a9b0324ec124c3cec503669a52b62a4cf0",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 83,
+  "material_count": 87,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/teary-v42",
+  "latest_proofs": "assets/ciel/rig/proofs/excited-v43",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
       "path": "Ciel.moc3",
-      "sha256": "d4ea42afe653b2840558001487a37217db8b3b95d7b3958c53c4cd46a997c3b9"
+      "sha256": "0b0f21bc60d408d0e9d2e7ceba02b0230583336f711d6f18a15629564b7a2aff"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "cef6c6b826bcf2c586fdee8a8ebfeeeb0e25c95f9f6065d16726fa12a1a0b543"
+      "sha256": "9a0f2068aba68a181fc9bd7b033c3334c1d5c2e699dd834607ae2fe5155069c6"
     },
     {
       "path": "Ciel.model3.json",
@@ -37,7 +38,7 @@
     },
     {
       "path": "Ciel.4096/texture_00.png",
-      "sha256": "c740ca67a4fc7c2bae93ad2e8bad98d10b79aec60b7d7d6b64bfb7f3c91fe386"
+      "sha256": "25d4b159161f24dda1b0a1ea5af03cafe648980d1f001aeaa6e611b7dcfe2bd8"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -56,5 +57,8 @@
   "teary_control": "ParamTeary",
   "teary_revision": "v40-tears-and-lid-profile-with-v42-samoyed-ears",
   "folded_ear_revision": "v42",
-  "latest_folded_ear_proofs": "assets/ciel/rig/proofs/teary-v42"
+  "latest_folded_ear_proofs": "assets/ciel/rig/proofs/teary-v42",
+  "latest_excited_proofs": "assets/ciel/rig/proofs/excited-v43",
+  "excited_control": "ParamExcited",
+  "excited_revision": "v43-reference-sparkling-irises-and-smile"
 }

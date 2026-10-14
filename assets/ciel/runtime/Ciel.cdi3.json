@@ -205,10 +205,19 @@
 			"Id": "ParamTeary",
 			"GroupId": "",
 			"Name": "半泣き"
+		},
+		{
+			"Id": "ParamExcited",
+			"GroupId": "",
+			"Name": "わくわく"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part12",
+			"Name": "excited-additions.psd"
+		},
 		{
 			"Id": "Part11",
 			"Name": "teary-additions.psd"

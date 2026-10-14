@@ -52,6 +52,10 @@
       {
         "Name": "teary",
         "File": "Expressions/teary.exp3.json"
+      },
+      {
+        "Name": "excited",
+        "File": "Expressions/excited.exp3.json"
       }
     ]
   },

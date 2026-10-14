@@ -1,0 +1,17 @@
+{
+  "method": "non-generative separation from registered full-face guide",
+  "reference": "assets/ciel/generated/v22/expressions/excited.png",
+  "new_generation": false,
+  "parts": [
+    "Mouth_Excited",
+    "Eye_R_ExcitedIris",
+    "Eye_L_ExcitedIris",
+    "Cheek_Excited"
+  ],
+  "blush": "skin removed by red-channel difference with feathered region masks",
+  "approved": true,
+  "iris_mask": "Convex outline of the iris retains all internal bright stars and highlights; original RGB retained",
+  "cubism_integrated": true,
+  "current_materials": "assets/ciel/current/layers.json",
+  "unity_applied": false
+}

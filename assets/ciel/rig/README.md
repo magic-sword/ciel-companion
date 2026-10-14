@@ -1,11 +1,13 @@
 # 正式なCubismモデル
 
-半泣きv40とサモエド折れ耳v42を正式採用。[最新の実モデル比較](proofs/teary-v42/reference-comparison.png)。`ParamTeary=1`・`ParamEarFold=1`で切り替える。折れ耳はぷんすか・しょんぼり・困り・照れ・半泣きで共用。旧候補は `.local/teary-adoption/adopted-draft/` へ退避した。
+わくわくv43を正式採用。[最新比較](proofs/excited-v43/reference-comparison.png)。`ParamExcited=1`・`ParamEar=1`で表示し、旧キラキラ・口・赤みの値は重ねない。旧候補は `.local/excited-adoption/adopted-draft/` へ退避した。
 
-現在の編集対象は **ciel.cmo3**、素材は83層。嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れ・半泣きを採用済み。
+半泣きv40とサモエド折れ耳v42を正式採用。[半泣きの実モデル比較](proofs/teary-v42/reference-comparison.png)。`ParamTeary=1`・`ParamEarFold=1`で切り替える。折れ耳はぷんすか・しょんぼり・困り・照れ・半泣きで共用。旧候補は `.local/teary-adoption/adopted-draft/` へ退避した。
+
+現在の編集対象は **ciel.cmo3**、素材は87層。嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れ・半泣き・わくわくを採用済み。
 しょんぼりは `ParamSad=1`、ぷんすかは `ParamAngry=1`。どちらも `ParamEarFold=1`、`ParamEar=0` を基本とし、他の専用キーは0に戻す。まばたき・目線・口パクは固定しない。
 
-最新の困りは[下まぶた調整後の比較](proofs/troubled-v37-lower-lid/reference-comparison.png)。`ParamTroubled=1`・`ParamEarFold=1`で表示し、他の専用表情キーは0へ戻す。採用状態は [approved.json](../current/approved.json)、Unityへの更新は [runtime/README.md](../runtime/README.md)。expressions/に通常を含む8表情の切り替えファイルを保存した。
+最新の困りは[下まぶた調整後の比較](proofs/troubled-v37-lower-lid/reference-comparison.png)。`ParamTroubled=1`・`ParamEarFold=1`で表示し、他の専用表情キーは0へ戻す。採用状態は [approved.json](../current/approved.json)、Unityへの更新は [runtime/README.md](../runtime/README.md)。expressions/に通常を含む10表情の切り替えファイルを保存した。
 
 旧候補モデル・書き出しは `.local/sad-adoption/adopted-drafts/` に退避し、正式モデルと重複させない。その他の表情は引き続き調整予定。
 
@@ -13,7 +15,7 @@
 
 照れ（v39、目尻・赤みの最終調整）は正式採用済み。`ParamEmbarrassed=1`・`ParamEarFold=1`で表示し、旧赤み・旧目線を重ねない。[最新比較](proofs/embarrassed-v39/reference-comparison.png)。候補一式は `.local/embarrassed-adoption/adopted-draft/` へ退避。
 
-半泣き（v40）の眉・口・左右の涙と、折れ耳v42は正式モデルへ反映済み。[採用記録](proofs/teary-v42/adoption.json)を参照。通常を含む9表情の切り替えファイルを用意した。
+半泣き（v40）の眉・口・左右の涙と、折れ耳v42は正式モデルへ反映済み。[採用記録](proofs/teary-v42/adoption.json)を参照。通常を含む10表情の切り替えファイルを用意した。
 
 ## 過去の記録
 

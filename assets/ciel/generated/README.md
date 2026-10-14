@@ -1,5 +1,7 @@
 # 素材生成の原本と検証履歴
 
+わくわくの採用版は **v43**。[見本との比較](../rig/proofs/excited-v43/reference-comparison.png)。見本から笑い口・赤み・左右のキラキラ入り虹彩を画像編集で用意した。新規生成はせず、既存のまばたき・目線・立ち耳とつなぐ。現行87層とUnity更新パッケージへ反映済み。候補CMO・SDKは `.local/excited-adoption/adopted-draft/` へ退避した。Unity本体への適用はまだ行っていない。
+
 現行採用の折れ耳は **v42**、半泣きの顔は **v40**。[最新の実モデル比較](../rig/proofs/teary-v42/reference-comparison.png)。通常時の耳の量感を参考に見える面積を増やし、既存の折れ耳2層を差し替えた。正式モデル83層とUnity更新パッケージへ反映済み。Unity本体への適用はまだ行っていない。v41は不採用で、画像素材は `.local/archive/codex-generated/v41/` へ退避した。
 
 現行の素材は`../current/`、正式なCubismモデルは`../rig/ciel.cmo3`。

@@ -87,6 +87,16 @@
       "Id": "ParamTear",
       "Value": 0,
       "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamExcited",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamSparkle",
+      "Value": 0,
+      "Blend": "Overwrite"
     }
   ]
 }

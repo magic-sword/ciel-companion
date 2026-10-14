@@ -107,15 +107,17 @@ namespace Ciel.EditorTools
                     bool troubled = model.Parameters.Any(p => p.Id == "ParamTroubled");
                     bool embarrassed = model.Parameters.Any(p => p.Id == "ParamEmbarrassed");
                     bool teary = model.Parameters.Any(p => p.Id == "ParamTeary");
+                    bool excited = model.Parameters.Any(p => p.Id == "ParamExcited");
                     if (requireNewRig && !troubled) throw new InvalidDataException("Package has no ParamTroubled.");
                     if (requireNewRig && !embarrassed) throw new InvalidDataException("Package has no ParamEmbarrassed.");
                     if (requireNewRig && !teary) throw new InvalidDataException("Package has no ParamTeary.");
-                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamTeary", "ParamEarFold" })
+                    if (requireNewRig && !excited) throw new InvalidDataException("Package has no ParamExcited.");
+                    foreach (var control in new[] { "ParamAngry", "ParamSad", "ParamTroubled", "ParamEmbarrassed", "ParamTeary", "ParamExcited", "ParamEarFold" })
                     {
                         if (!model.Parameters.Any(p => p.Id == control)) continue;
                         float expected = control == "ParamEarFold" ?
                             ((name == "angry" && angry) || (name == "sad" && sad) || (name == "troubled" && troubled) || (name == "embarrassed" && embarrassed) || (name == "teary" && teary) ? 1 : 0) :
-                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" || control == "ParamTeary" && name == "teary" ? 1 : 0);
+                            (control == "ParamAngry" && name == "angry" || control == "ParamSad" && name == "sad" || control == "ParamTroubled" && name == "troubled" || control == "ParamEmbarrassed" && name == "embarrassed" || control == "ParamTeary" && name == "teary" || control == "ParamExcited" && name == "excited" ? 1 : 0);
                         if (!targets.TryGetValue(control, out var actual) || actual != expected)
                             throw new InvalidDataException("Expression reset failed: " + name + " " + control);
                     }
@@ -130,6 +132,13 @@ namespace Ciel.EditorTools
                     }
                     else if (name == "angry" && targets["ParamEar"] != -0.5f || name == "sad" && targets["ParamEyeLOpen"] != -0.2f || name == "troubled" && targets["ParamSweat"] != 1f || name == "embarrassed" && (targets["ParamEyeBallX"] != 0.6f || targets["ParamCheek"] != 1f) || name == "teary" && targets["ParamTear"] != 1f)
                         throw new InvalidDataException("Legacy sad/angry compatibility failed.");
+                    if (name == "excited" && excited)
+                    {
+                        if (targets.ContainsKey("ParamSparkle") || targets.ContainsKey("ParamEyeLOpen") || targets.ContainsKey("ParamMouthOpenY") || targets.ContainsKey("ParamMouthForm") || targets.ContainsKey("ParamBrowLY") || targets["ParamEar"] != 1f || targets["ParamCheek"] != 0f)
+                            throw new InvalidDataException("Legacy values applied to the new excited pose.");
+                    }
+                    else if (name == "excited" && targets["ParamSparkle"] != 1f)
+                        throw new InvalidDataException("Legacy excited compatibility failed.");
                 }
             }
             finally

@@ -419,6 +419,26 @@
       "name": "Tears_L_Teary",
       "path": "assets/ciel/current/layers/Tears_L_Teary.png",
       "visible": false
+    },
+    {
+      "name": "Mouth_Excited",
+      "path": "assets/ciel/current/layers/Mouth_Excited.png",
+      "visible": false
+    },
+    {
+      "name": "Cheek_Excited",
+      "path": "assets/ciel/current/layers/Cheek_Excited.png",
+      "visible": false
+    },
+    {
+      "name": "Eye_R_ExcitedIris",
+      "path": "assets/ciel/current/layers/Eye_R_ExcitedIris.png",
+      "visible": false
+    },
+    {
+      "name": "Eye_L_ExcitedIris",
+      "path": "assets/ciel/current/layers/Eye_L_ExcitedIris.png",
+      "visible": false
     }
   ]
 }

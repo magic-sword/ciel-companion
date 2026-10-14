@@ -1,0 +1,10 @@
+{
+  "approved_date": "2026-10-14",
+  "rig": "assets/ciel/rig/ciel.cmo3",
+  "rig_sha256": "077b19fdc42f7719e5e1f760157ad5a9b0324ec124c3cec503669a52b62a4cf0",
+  "material_count": 87,
+  "source": "v43",
+  "expression_control": "ParamExcited",
+  "sdk_package": "assets/ciel/runtime",
+  "unity_applied": false
+}
