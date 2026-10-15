@@ -121,7 +121,9 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
 
 会議の発言を議事録にまとめ、下書きを利用者だけが見る Discord のチャンネルへ送れる。参加者に先に伝えてから使う。準備（Webhook の URL を `server/agent/.env` に書く）としくみは [議事録の決定記録](decisions/meeting-minutes-ja.md)。
 
-- 自宅サーバーの `~/work/ciel-companion/server` で、始めるときに `docker compose exec agent python minutes_admin.py start`、終わったら `docker compose exec agent python minutes_admin.py finish`。
+- 始めるとき：アプリの「議事録」のボタン（マイクボタンの左）を押すか、「シエル、議事録とって」と頼む。シエルが「議事録、とり始めますね」のように一言告げ、ボタンが「議事録をとっています」になる。
+- 終わるとき：もう一度ボタンを押すか、「シエル、議事録まとめて」と頼む。シエルが一言告げ、少しあとに下書きが届く。
+- アプリを使えないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose exec agent python minutes_admin.py start`／`finish`。
 - Discord の下書きを確かめて直してから、共有先へ貼る。
 
 ## 困ったとき
