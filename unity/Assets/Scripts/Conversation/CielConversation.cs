@@ -164,6 +164,9 @@ namespace Ciel.Conversation
             Trace("ルームへ接続");
             yield return _room.Connect(serverUrl, token, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
+            // 接続のときに WebRTC が声の出力を OS の既定（通話用の機器）へ戻すので、選んだ機器をかけ直す。
+            // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
+            if (_speakerGuid != null) ApplySpeaker();
             SetStatus(State.Connected);
             SendMode();
         }
