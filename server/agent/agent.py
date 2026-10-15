@@ -17,6 +17,7 @@ LiveKit Cloud のルームにアプリが入ると、このプログラムが呼
 必要な環境変数は .env.example を参照（秘密情報は .env に書き、Git に入れない）。
 """
 import asyncio
+import json
 import logging
 import os
 
@@ -50,6 +51,9 @@ VOICE = os.environ.get('CIEL_VOICE', 'irodori')
 REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API のときだけ
 SPEAKERS = VOICE == 'irodori' and REALTIME
+# 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
+MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
+                 minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]'}
 
 
 def transcription(names: list[str]) -> AudioTranscription:
@@ -95,6 +99,8 @@ class Ciel(Agent):
         if SPEAKERS:
             # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
             instructions = instructions.rstrip('\n') + '\n\n' + p.speaker_instructions
+        # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
+        instructions = instructions.rstrip('\n') + '\n\n' + p.minutes_voice_instructions
         if mode == 'group':
             instructions = instructions.rstrip('\n') + '\n\n' + p.group_instructions
         return instructions
@@ -147,8 +153,16 @@ async def entrypoint(ctx: JobContext) -> None:
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
-    # 会議の議事録（minutes.py。始めと終わりは ciel.minutes のデータのメッセージで知らせる）
+    # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
     minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions)
+    session.userdata.minutes = minute_taker
+
+    def on_minutes(what: str) -> None:
+        # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
+        session.generate_reply(instructions=MINUTES_LINES[what])
+        msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
+        asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
+    minute_taker.on_change = on_minutes
     takers = [t for t in (note_taker, minute_taker) if t is not None]
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
@@ -180,7 +194,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', touch.TouchReactions(session).on_data)
     # 2 人・多人数の会話の切り替え（mode.py。Unity が知らせる）
     ctx.room.on('data_received', switch.on_data)
-    # 議事録の始めと終わり（minutes.py。今は minutes_admin.py が送る）
+    # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 

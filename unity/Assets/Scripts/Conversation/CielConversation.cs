@@ -10,6 +10,7 @@
 // 声を出す機器（スピーカー）も PC では選べる。仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
 // 会話のモード：2 人（Solo）と多人数（Group）。自動のときは、声を仮想オーディオケーブルへ出していれば会議とみなして多人数にする。
 // 会話サーバー（server/agent/mode.py）へ、つないだとき・会話サーバーが入ってきたとき・モードが変わったときに知らせる。
+// 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
 using System;
 using System.Collections;
@@ -56,6 +57,8 @@ namespace Ciel.Conversation
         public State Status { get; private set; } = State.Disconnected;
         public bool MicEnabled => _recording;
         public bool MicBusy => _busy;
+        /// 会話サーバーが会議の議事録をとっているか（会話サーバーの知らせ minutes.state で変わる）
+        public bool MinutesOn { get; private set; }
         /// 状態が変わったとき（画面の表示の更新用）
         public event Action Changed;
 
@@ -174,6 +177,7 @@ namespace Ciel.Conversation
             // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
             if (_speakerGuid != null) ApplySpeaker();
             ApplySpeakerphone();
+            MinutesOn = false;   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
             SendMode();
         }
@@ -434,9 +438,10 @@ namespace Ciel.Conversation
             public string expression;
             public float intensity;
             public int ttl_ms;
+            public bool recording;   // minutes.state
         }
 
-        // 会話サーバーのイベント（仕様書 6 章）。今は表情（character.expression）だけ
+        // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
         void OnDataReceived(byte[] data, Participant participant, DataPacketKind kind, string topic)
         {
             if (topic != "ciel.event") return;
@@ -448,6 +453,27 @@ namespace Ciel.Conversation
                 _expression.Set(e.expression, e.ttl_ms / 1000f);
                 Debug.Log($"[CielConversation] 表情 {e.expression}（{e.ttl_ms} ms）");
             }
+            else if (e.type == "minutes.state")
+            {
+                MinutesOn = e.recording;
+                Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
+                Changed?.Invoke();
+            }
+        }
+
+        /// 会議の議事録をとり始める・まとめる（画面の「議事録」ボタン）。会話サーバー（server/agent/minutes.py）が
+        /// シエルに一言告げさせ、minutes.state で今の状態を返すので、ボタンの表示はその知らせで変わる
+        public void SetMinutes(bool on)
+        {
+            if (_room == null || Status != State.Connected) return;
+            var action = on ? "start" : "finish";
+            var json = $"{{\"v\":1,\"type\":\"minutes.control\",\"action\":\"{action}\"}}";
+            try
+            {
+                _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.minutes");
+                Debug.Log($"[CielConversation] 議事録の {action} を送った");
+            }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 議事録の操作を送れない: {e.Message}"); }
         }
 
         /// シエルに触れたことを会話サーバーへ知らせる（CielTouch から。サーバーの touch.py が声の反応を返す）
@@ -503,6 +529,7 @@ namespace Ciel.Conversation
                 _room = null;
             }
             if (_mouth != null) _mouth.MouthOpening = 0f;
+            MinutesOn = false;
             SetStatus(State.Disconnected);
         }
 

@@ -18,8 +18,9 @@ class State:
     """道具から使う、この会話の状態（AgentSession の userdata）"""
     book: SpeakerBook | None = None
     notes: object | None = None   # notes.NoteTaker（覚えておくメモの記録係）
+    minutes: object | None = None   # minutes.Minutes（会議の議事録の係）
 
 
-from . import memory, people  # noqa: E402  State の後に読む
+from . import memory, minutes, people  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS, *memory.TOOLS]
+TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS]

@@ -1,4 +1,4 @@
-// 会話の画面の操作：マイクボタン（タップで入れる・切る）、状態の表示、会話のモード、PC ではマイクとスピーカーの選択、
+// 会話の画面の操作：マイクボタン（タップで入れる・切る）、議事録のボタン、状態の表示、会話のモード、PC ではマイクとスピーカーの選択、
 // Android では声をスピーカーから出すか受話口から出すかの切り替え。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 using System.Collections.Generic;
@@ -17,8 +17,8 @@ namespace Ciel.Conversation
         static readonly Color MicOn = new Color(0.93f, 0.33f, 0.40f, 0.95f);
         static readonly Color MicBusy = new Color(0.55f, 0.55f, 0.60f, 0.92f);
 
-        Image _micImage;
-        Text _micLabel, _status, _modeLabel, _speakerphoneLabel;
+        Image _micImage, _minutesImage;
+        Text _micLabel, _minutesLabel, _status, _modeLabel, _speakerphoneLabel;
         GameObject _speakerphone;
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
@@ -58,6 +58,13 @@ namespace Ciel.Conversation
             button.onClick.AddListener(() => _conversation.SetMicEnabled(!_conversation.MicEnabled));
             _micLabel = NewText("Label", mic, 40, TextAnchor.MiddleCenter);
             Stretch(_micLabel.rectTransform);
+
+            // 議事録のボタン（マイクボタンの左）。とっているあいだは色を変える
+            var minutes = NewRect("MinutesButton", canvasGo.transform, new Vector2(0f, 0f), new Vector2(190, 170), new Vector2(300, 120));
+            _minutesImage = minutes.gameObject.AddComponent<Image>();
+            minutes.gameObject.AddComponent<Button>().onClick.AddListener(() => _conversation.SetMinutes(!_conversation.MinutesOn));
+            _minutesLabel = NewText("Label", minutes, 28, TextAnchor.MiddleCenter);
+            Stretch(_minutesLabel.rectTransform);
 
             // 状態の表示（ボタンの上）
             _status = NewText("Status", canvasGo.transform, 34, TextAnchor.MiddleCenter);
@@ -109,6 +116,10 @@ namespace Ciel.Conversation
                 CielConversation.State.Disconnected => "接続していません",
                 _ => c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます",
             };
+
+            _minutesImage.color = !connected ? MicBusy : c.MinutesOn ? MicOn : MicOff;
+            _minutesLabel.text = c.MinutesOn ? "議事録をとっています\n（タップでまとめる）" : "議事録\n（タップで始める）";
+            _minutesImage.GetComponent<Button>().interactable = connected;
 
             var current = c.CurrentMode == CielConversation.Mode.Group ? "多人数（呼ばれたら答える）" : "2 人（いつも答える）";
             _modeLabel.text = c.ModeChoice == CielConversation.ModeSetting.Auto ? $"会話：自動 ― いまは {current}" : $"会話：{current}";
