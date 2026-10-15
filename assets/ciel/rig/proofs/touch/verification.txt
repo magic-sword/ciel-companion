@@ -1,8 +1,8 @@
-head-stroke: head/stroke/end expression=relaxed ParamHairSide=0.03 ParamHairFront=0.23 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.70 ParamAngleY=7.89 ParamAngleX=7.50 ParamEyeBallX=0.11
-ear-tap: ear/tap/once expression=neutral ParamHairSide=0.03 ParamHairFront=0.02 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=1.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.33
+head-stroke: head/stroke/end expression=relaxed ParamHairSide=0.09 ParamHairFront=0.23 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.70 ParamAngleY=8.15 ParamAngleX=7.50 ParamEyeBallX=0.10
+ear-tap: ear/tap/once expression=neutral ParamHairSide=0.03 ParamHairFront=0.02 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=1.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.43
 cheek-tap: face/tap/once expression=neutral ParamHairSide=0.14 ParamHairFront=0.11 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=1.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.00
-hair-stroke: hair/stroke/end expression=embarrassed ParamHairSide=0.32 ParamHairFront=0.03 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.51
-shoulder-tap: shoulder/tap/once expression=neutral ParamHairSide=0.12 ParamHairFront=0.10 ParamCielFurSwingR=0.41 ParamCielFurSwingL=0.00 ParamEar=1.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.52
+hair-stroke: hair/stroke/end expression=embarrassed ParamHairSide=0.30 ParamHairFront=0.03 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.53
+shoulder-tap: shoulder/tap/once expression=neutral ParamHairSide=0.12 ParamHairFront=0.10 ParamCielFurSwingR=0.41 ParamCielFurSwingL=0.00 ParamEar=1.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.48
 hand-tap: hand/tap/once expression=neutral ParamHairSide=0.02 ParamHairFront=0.01 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.28
-chest-tap: hand/tap/once expression=neutral ParamHairSide=0.04 ParamHairFront=0.03 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.00
+chest-tap: hand/tap/once expression=neutral ParamHairSide=0.04 ParamHairFront=0.04 ParamCielFurSwingR=0.00 ParamCielFurSwingL=0.00 ParamEar=0.00 ParamAngleY=4.02 ParamAngleX=7.50 ParamEyeBallX=0.00
 touch: 7 cases passed

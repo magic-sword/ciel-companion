@@ -1,7 +1,8 @@
 // シエルに触れる：画面のタップ・なぞりで、頭・耳・ほっぺ・髪・肩・手に触れたことを判定し、その場で体を反応させて、
 // 会話サーバーへ知らせる（CielConversation.SendTouch。サーバーはシエルの声の反応を返す）。
 //
-// 判定：Cubism の当たり判定（CubismRaycaster）で、触れた点でいちばん手前に見えている部品を選ぶ。
+// 判定：Cubism の当たり判定（CubismRaycaster）で触れた点に重なる部品を集め、絵の不透明な部分に触れている
+//       部品のうち、いちばん手前のものを選ぶ（メッシュには透明な余白があり、余白だけでは触れたことにしない）。
 //       胸・おなか・首などの部品は触れても反応せず、その奥の髪にも当たらない。
 // しぐさ：短く触れる（tap）・なぞる（stroke）・長く触れたまま（hold）。なぞりは始まり（start）と終わり（end）、ほかは離したとき（once）に知らせる。
 // 体の反応：目線を触れた点へ向け、頭を撫でられると頭が傾いて耳が下がる。触れた髪は物理演算の粒子を押して揺らし、
@@ -230,6 +231,8 @@ namespace Ciel.Conversation
                 if (d == null) continue;
                 var r = d.GetComponent<CubismRenderer>();
                 if (r == null || !r.MeshRenderer.enabled || (float)OpacityProperty.GetValue(r) < 0.1f) continue;
+                // メッシュは絵より大きい（透明な余白を含む）ので、絵が描かれている点だけを数える
+                if (!Opaque(d, r, _hits[i].WorldPosition)) continue;
                 // 奥から手前へ描く並び（BackToFrontZ）。z が小さいほど手前
                 var z = r.transform.position.z;
                 if (z < frontZ) { frontZ = z; front = d; }
@@ -238,6 +241,68 @@ namespace Ciel.Conversation
             foreach (var (prefix, part) in PartMap)
                 if (front.Id.StartsWith(prefix)) return (part, front.Id);
             return (Part.None, front.Id);   // 胸・おなか・首など：反応しない
+        }
+
+        // ---- 絵の不透明さ ----
+        const int AlphaSize = 1024;      // アトラスを縮小して不透明度だけを持つ
+        const float AlphaThreshold = 0.5f;
+        readonly Dictionary<Texture, byte[]> _alpha = new Dictionary<Texture, byte[]>();
+        readonly Dictionary<CubismDrawable, (Vector2[] uvs, int[] indices)> _meshes = new Dictionary<CubismDrawable, (Vector2[], int[])>();
+
+        bool Opaque(CubismDrawable d, CubismRenderer r, Vector3 world)
+        {
+            var alpha = AlphaOf(r.MainTexture);
+            if (alpha == null) return true;
+            if (!_meshes.TryGetValue(d, out var mesh)) _meshes[d] = mesh = (d.VertexUvs, d.Indices);
+            var v = d.VertexPositions;
+            Vector2 p = d.transform.InverseTransformPoint(world);
+            for (int i = 0; i + 2 < mesh.indices.Length; i += 3)
+            {
+                int a = mesh.indices[i], b = mesh.indices[i + 1], c = mesh.indices[i + 2];
+                if (!Barycentric(p, v[a], v[b], v[c], out var w)) continue;
+                var uv = mesh.uvs[a] * w.x + mesh.uvs[b] * w.y + mesh.uvs[c] * w.z;
+                int x = Mathf.Clamp((int)(uv.x * AlphaSize), 0, AlphaSize - 1), y = Mathf.Clamp((int)(uv.y * AlphaSize), 0, AlphaSize - 1);
+                if (alpha[y * AlphaSize + x] >= AlphaThreshold * 255) return true;
+            }
+            return false;
+        }
+
+        static bool Barycentric(Vector2 p, Vector2 a, Vector2 b, Vector2 c, out Vector3 w)
+        {
+            w = default;
+            var den = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+            if (Mathf.Abs(den) < 1e-12f) return false;
+            var u = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / den;
+            var t = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / den;
+            w = new Vector3(u, t, 1f - u - t);
+            return u >= 0 && t >= 0 && w.z >= 0;
+        }
+
+        // アトラスは CPU から読めない設定なので、初回に GPU で縮小コピーして不透明度だけを取り出す
+        byte[] AlphaOf(Texture texture)
+        {
+            if (texture == null) return null;
+            if (_alpha.TryGetValue(texture, out var a)) return a;
+            var rt = RenderTexture.GetTemporary(AlphaSize, AlphaSize, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            var previous = RenderTexture.active;
+            var copy = new Texture2D(AlphaSize, AlphaSize, TextureFormat.RGBA32, false, true);
+            try
+            {
+                Graphics.Blit(texture, rt);
+                RenderTexture.active = rt;
+                copy.ReadPixels(new Rect(0, 0, AlphaSize, AlphaSize), 0, 0);
+                var pixels = copy.GetPixels32();
+                a = new byte[pixels.Length];
+                for (int i = 0; i < pixels.Length; i++) a[i] = pixels[i].a;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+                Destroy(copy);
+            }
+            _alpha[texture] = a;
+            return a;
         }
 
         float SideOf(Vector2 screen)

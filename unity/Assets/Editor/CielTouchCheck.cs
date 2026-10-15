@@ -47,6 +47,15 @@ namespace Ciel.EditorTools
         static readonly Dictionary<string, float> Peak = new Dictionary<string, float>();
         static StringBuilder _report;
 
+        const string MapKey = "Ciel.TouchCheck.Map";
+
+        /// 画面の各点がどの部位として判定されるかを色分けした画像（partmap.png）だけを作る
+        public static void RunMap()
+        {
+            SessionState.SetBool(MapKey, true);
+            Run();
+        }
+
         public static void Run()
         {
             EditorSceneManager.OpenScene("Assets/Scenes/Conversation.unity");
@@ -131,6 +140,7 @@ namespace Ciel.EditorTools
             {
                 var t = Time.time - _caseStart;
                 if (t < 0) return;
+                if (SessionState.GetBool(MapKey, false)) { SessionState.SetBool(MapKey, false); PartMapShot(); Finish(null); return; }
                 if (_case < 0) { NextCase(); return; }
                 var c = Cases[_case];
                 foreach (var id in new[] { "ParamHairSide", "ParamHairFront", "ParamCielFurSwingR", "ParamCielFurSwingL", "ParamEar", "ParamAngleY", "ParamAngleX", "ParamEyeBallX" })
@@ -196,6 +206,40 @@ namespace Ciel.EditorTools
             _step = 0;
             _caseStart = Time.time + 0.8f;   // 前の揺れが収まるのを少し待つ
             if (_case >= Cases.Length) Finish(null);
+        }
+
+        static readonly Dictionary<CielTouch.Part, Color> PartColors = new Dictionary<CielTouch.Part, Color>
+        {
+            { CielTouch.Part.Head, new Color(1f, 0.2f, 0.2f) }, { CielTouch.Part.Ear, new Color(1f, 0.6f, 0f) },
+            { CielTouch.Part.Face, new Color(1f, 0.3f, 0.8f) }, { CielTouch.Part.Hair, new Color(0.2f, 0.4f, 1f) },
+            { CielTouch.Part.Shoulder, new Color(0.1f, 0.8f, 0.2f) }, { CielTouch.Part.Hand, new Color(0.9f, 0.9f, 0f) },
+        };
+
+        // 部位ごとに色を重ねた画像。判定は 5 画素おき
+        static void PartMapShot()
+        {
+            Shot("partmap");
+            var path = Path.Combine(OutDir, "partmap.png");
+            var tex = new Texture2D(2, 2);
+            tex.LoadImage(File.ReadAllBytes(path));
+            var counts = new Dictionary<CielTouch.Part, int>();
+            const int step = 5;
+            for (int y = 0; y < tex.height; y += step)
+                for (int x = 0; x < tex.width; x += step)
+                {
+                    var part = _touch.PartAt(new Vector2(x, y));
+                    counts[part] = counts.TryGetValue(part, out var n) ? n + 1 : 1;
+                    if (!PartColors.TryGetValue(part, out var c)) continue;
+                    for (int dy = 0; dy < step; dy++)
+                        for (int dx = 0; dx < step; dx++)
+                        {
+                            int px = x + dx, py = y + dy;
+                            if (px >= tex.width || py >= tex.height) continue;
+                            tex.SetPixel(px, py, Color.Lerp(tex.GetPixel(px, py), c, 0.45f));
+                        }
+                }
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            _report.AppendLine("partmap: " + string.Join(" ", counts.Select(kv => $"{kv.Key}={kv.Value}")));
         }
 
         static void Shot(string name)
