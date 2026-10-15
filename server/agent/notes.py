@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-"""その人について覚えておくメモを、会話の裏で書く（会話モデルには書かせない）。
+"""その人について覚えておくメモを、会話の裏で書く（会話を止めない）。
 
-- 会話モデル（Realtime API）に道具で書かせると、そのたびに返事が遅れ、二重に話すこともあるので、
-  書くのは別の文字のモデル（既定 gpt-5.4-mini、CIEL_NOTES_MODEL）に、会話の流れを止めずに任せる。
+- 書くきっかけは 2 つ。
+  1. 会話モデル（Realtime API）が道具 remember_about_speaker で「これを覚えて」と 1 文を預ける
+     （道具はすぐ戻り、返事を作り直さないので、会話は止まらない）。
+  2. 会話の流れから、道具で拾い漏れたことを補う。
+  どちらも、今のメモと突き合わせて足す・書き直す・消すを決めるのは、別の文字のモデル
+  （既定 gpt-5.4-mini、CIEL_NOTES_MODEL）に裏で任せる。
 - 会話の文字起こし（LiveKit が Realtime API で作る）に、話者の判定（speakers.py）を添えてためておく。
   同意した人（声を覚えていて、お話を覚えることにも同意した人）が何回か話すか、しばらく話が途切れたら、
   その人のメモ（DB）と最近の会話を渡して、足す・書き直す・消すを決めてもらう。会話が終わるときにも書く。
@@ -36,6 +40,7 @@ class NoteTaker:
         self.lines: list[tuple[speakers.SessionSpeaker | None, str, str]] = []   # （話した人、呼び名、文）
         self._done: dict[int, int] = {}                       # 人ごとに、どこまでメモにしたか（lines の位置）
         self._count: dict[int, int] = {}
+        self._requested: dict[int, list[str]] = {}         # 会話モデルが道具で預けたメモ（まだ書いていない）
         self._locks: dict[int, asyncio.Lock] = {}
         self._timer: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -86,6 +91,16 @@ class NoteTaker:
                 self.lines[i] = (new, new.name or new.label, text)
                 return
 
+    def request(self, pid: int, note: str) -> None:
+        """会話モデルが道具（remember_about_speaker）で「これを覚えて」と渡した：すぐ裏で書く"""
+        note = note.strip()[:MAX_NOTE_CHARS]
+        if not note:
+            return
+        self._requested.setdefault(pid, []).append(note)
+        self._count.setdefault(pid, 0)
+        log.info('メモ #%d：会話モデルから 1 件預かった', pid)
+        self._start(pid)
+
     def on_consent(self, pid: int) -> None:
         """この会話の途中で、お話を覚えることに同意した：同意の前に話したことも含めて、すぐ書く"""
         self._count.setdefault(pid, 0)
@@ -106,7 +121,8 @@ class NoteTaker:
         lock = self._locks.setdefault(pid, asyncio.Lock())
         async with lock:
             start, end = self._done.get(pid, 0), len(self.lines)
-            if not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end]):
+            requested = self._requested.pop(pid, [])
+            if not requested and not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end]):
                 return
             store = self.book.store
             k = next((k for k in self.book.known if k.person_id == pid), None)
@@ -118,6 +134,7 @@ class NoteTaker:
                 'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
                 'person': k.name,
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
+                'requested_notes': requested,
                 'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                                  for o, who, text in window],
             }
@@ -127,8 +144,9 @@ class NoteTaker:
                     messages=[{'role': 'system', 'content': self.instructions},
                               {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
                 result = json.loads(r.choices[0].message.content or '{}')
-            except Exception as e:   # メモが書けなくても、会話は続ける
+            except Exception as e:   # メモが書けなくても、会話は続ける（頼まれた分は次の機会に回す）
                 log.warning('メモを書けない：%s', type(e).__name__)
+                self._requested.setdefault(pid, [])[:0] = requested
                 return
             valid = {i for i, _ in existing}
             add = [t.strip()[:MAX_NOTE_CHARS] for t in result.get('add', []) if isinstance(t, str) and t.strip()]

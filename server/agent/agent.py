@@ -133,6 +133,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
+    session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
         book.on_split = note_taker.on_split             # 人違いを直したら、その発言を分けた人の発言にする

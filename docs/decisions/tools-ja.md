@@ -23,6 +23,7 @@
 | `forget_speaker` | `tools/people.py` | 本人の依頼で、声の記録を消す |
 | `lookup_person` | `tools/people.py` | その名前の人の声を覚えているか調べる |
 | `people_here` | `tools/people.py` | この会話で声を聞いた人（呼び名） |
+| `remember_about_speaker` | `tools/memory.py` | いま話している本人について覚えておくことを 1 文で記録係に預ける。すぐ戻り、返事を作り直さない（`reply_required=False`） |
 | `recall_about_speaker` | `tools/memory.py` | いま話している本人について覚えていること（メモ）を読む（[メモの決定記録](person-notes-ja.md)） |
 | `forget_about_speaker` | `tools/memory.py` | 本人に頼まれたメモを忘れる |
 | `agree_to_notes` | `tools/memory.py` | 声を覚えている本人が、お話を覚えることに同意した |
@@ -43,3 +44,7 @@
 | Realtime API のリモート MCP | OpenAI のクラウドが MCP サーバーへ直接つなぐ | インターネットから届く MCP サーバー向け。自宅の DB を公開することになるので使わない。今の LiveKit の OpenAI プラグインには指定する口が見当たらない |
 
 外部のサービスをつなぎたくなったら、まず LiveKit の MCP 接続で試す。
+
+## 返事を作り直さない道具（2026-10-16）
+
+道具を呼ぶと、ふつうは結果を受けて会話モデルがもう一度返事を作る。保存を頼むだけの道具など、結果を話す必要がないものは `ToolResult('…', reply_required=False)` を返す（LiveKit Agents の機能）。会話モデルは道具を呼びながら、そのまま話を続けられる（例：`remember_about_speaker`）。時間のかかる処理は道具の中で待たず、裏の処理に預けてすぐ戻る。

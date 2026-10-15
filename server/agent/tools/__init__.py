@@ -17,6 +17,7 @@ from speakers import SpeakerBook
 class State:
     """道具から使う、この会話の状態（AgentSession の userdata）"""
     book: SpeakerBook | None = None
+    notes: object | None = None   # notes.NoteTaker（覚えておくメモの記録係）
 
 
 from . import memory, people  # noqa: E402  State の後に読む
