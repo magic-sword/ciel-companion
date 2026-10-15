@@ -252,12 +252,9 @@ class SpeakerBook:
             return f'「{label}」という発言者は、この会話にいません。[発言者：…] に出た呼び名を使ってください。'
         name = plain_name(name)
         if sp.person_id is not None:
-            # もう覚えている人。同意を聞き直さない。名前が変わったときだけ直す
-            if remember and self.store is not None and name != sp.name:
-                await self.store.rename(sp.person_id, name)
-                next(k for k in self.known if k.person_id == sp.person_id).name = name
-                sp.name = sp.label = name
-            return f'{sp.name}さんの声は、もう覚えています（同意も前にもらっています）。覚え直す必要はありません。'
+            # もう覚えている人。同意を聞き直さない（呼び名を直すのは rename）
+            return (f'{sp.name}さんの声は、もう覚えています（同意も前にもらっています）。覚え直す必要はありません。'
+                    '呼び名を直したいと言われたときは rename_speaker を使ってください。')
         sp.name = sp.label = name
         if not remember:
             return f'この会話の間だけ「{name}」と呼びます（声は保存していません）。'
@@ -275,6 +272,27 @@ class SpeakerBook:
         await self.store.add_voiceprints(sp.person_id, new, None)
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
         return f'「{name}」さんの声を覚えました。次の会話でも分かります。'
+
+    async def rename(self, new_name: str) -> str:
+        """呼び名を直す（聞き間違えたとき、呼び方を変えてほしいとき）。直せるのは、いま話している本人の呼び名だけ"""
+        sp = self.last
+        if sp is None:
+            return '呼び名を直せるのは、ご本人が話しているときだけです。直したい方ご本人に、もう一度言ってもらってください。'
+        if sp.name is None:
+            return 'まだお名前を聞いていない方です。name_speaker で名前を付けてください。'
+        old, new = sp.name, plain_name(new_name)
+        if not new or new == old:
+            return f'呼び名は「{old}」のままです。'
+        sp.name = sp.label = new
+        if sp.person_id is None:
+            return f'呼び名を「{old}」から「{new}」に直しました（この会話の間だけ。声は保存していません）。'
+        if self.store is not None:
+            await self.store.rename(sp.person_id, new)
+        for k in self.known:
+            if k.person_id == sp.person_id:
+                k.name = new
+        log.info('話者：#%d の呼び名を直した', sp.person_id)
+        return f'呼び名を「{old}」から「{new}」に直しました。次の会話からも「{new}」さんです。'
 
     def lookup(self, name: str) -> str:
         """その名前の人を覚えているか。前に話した日は、本人が話しているときだけ教える"""

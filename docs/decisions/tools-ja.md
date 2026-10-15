@@ -18,6 +18,7 @@
 | 道具 | ファイル | 役割 |
 |---|---|---|
 | `name_speaker` | `tools/people.py` | 発言者に名前を付ける。本人が同意したときだけ声を保存（remember） |
+| `rename_speaker` | `tools/people.py` | いま話している本人の呼び名を直す（聞き間違い・呼び方の変更）。覚えている人は DB の名前も直す（2026-10-16） |
 | `forget_speaker` | `tools/people.py` | 本人の依頼で、声の記録を消す |
 | `lookup_person` | `tools/people.py` | その名前の人の声を覚えているか調べる |
 | `people_here` | `tools/people.py` | この会話で声を聞いた人（呼び名） |

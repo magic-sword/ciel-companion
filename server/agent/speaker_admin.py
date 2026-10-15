@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""覚えている人の記録の管理（一覧・削除）。自宅サーバーで、会話サーバーのコンテナの中から使う。
+"""覚えている人の記録の管理（一覧・呼び名を直す・削除）。自宅サーバーで、会話サーバーのコンテナの中から使う。
 
   docker compose exec agent python speaker_admin.py list
+  docker compose exec agent python speaker_admin.py rename <番号> <新しい呼び名>
   docker compose exec agent python speaker_admin.py delete <番号>
   docker compose exec agent python speaker_admin.py delete-all
 
@@ -29,6 +30,9 @@ async def main(args: list[str]) -> int:
             for pid, name, consented, seen, n in rows:
                 print(f'{pid}\t{name}\t{consented:%Y-%m-%d %H:%M}\t{seen:%Y-%m-%d %H:%M}' if seen else
                       f'{pid}\t{name}\t{consented:%Y-%m-%d %H:%M}\t-', f'\t{n}')
+        elif cmd == 'rename' and len(args) == 3:
+            n = (await conn.execute('UPDATE people SET name = %s WHERE id = %s', (args[2], int(args[1])))).rowcount
+            print('直しました' if n else 'その番号の人はいません')
         elif cmd == 'delete' and len(args) == 2:
             n = (await conn.execute('DELETE FROM people WHERE id = %s', (int(args[1]),))).rowcount
             print('消しました' if n else 'その番号の人はいません')

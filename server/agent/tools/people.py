@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""人についての道具：話している人に名前を付ける・覚える・忘れる・覚えているか調べる・この会話にいる人。
+"""人についての道具：話している人に名前を付ける・覚える・呼び名を直す・忘れる・覚えているか調べる・この会話にいる人。
 使い方の決まりは config/prompts/speakers.md。処理は speakers.SpeakerBook。"""
 from livekit.agents import RunContext, function_tool
 
@@ -12,6 +12,13 @@ async def name_speaker(context: RunContext, speaker: str, name: str, remember: b
     remember は、本人が声を覚えることにはっきり同意したときだけ true。"""
     book = context.userdata.book
     return await book.name(speaker, name, remember) if book else NO_SPEAKERS
+
+
+@function_tool
+async def rename_speaker(context: RunContext, name: str) -> str:
+    """いま話している本人の呼び名を直す（聞き間違えたとき、呼び方を変えてほしいと言われたとき）。name は新しい呼び名（敬称なし）。"""
+    book = context.userdata.book
+    return await book.rename(name) if book else NO_SPEAKERS
 
 
 @function_tool
@@ -35,4 +42,4 @@ async def people_here(context: RunContext) -> str:
     return book.here() if book else NO_SPEAKERS
 
 
-TOOLS = [name_speaker, forget_speaker, lookup_person, people_here]
+TOOLS = [name_speaker, rename_speaker, forget_speaker, lookup_person, people_here]
