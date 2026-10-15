@@ -1,6 +1,6 @@
 # システムの構成
 
-更新：2026-10-15（日本時間）。**いま実際に動いている構成**をまとめる。目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
+更新：2026-10-16（日本時間）。**いま実際に動いている構成**をまとめる。目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
 
 ## 全体図
 
@@ -66,6 +66,7 @@ flowchart LR
 | `touch.py` | タッチの知らせを受けて、声の反応を返す |
 | `mode.py` | 2 人・多人数の会話の切り替え。多人数で黙る返事（`[silent]`）を捨てる |
 | `notes.py` | 会話の裏で、同意した人について覚えておくメモを書く（別の文字のモデル `gpt-5.4-mini`）。[メモの決定記録](decisions/person-notes-ja.md) |
+| `minutes.py` ＋ `minutes_admin.py` | 会議の議事録。始めと終わりのあいだの発言をため、別の文字のモデル（`gpt-5.4`）でまとめ、下書きを Discord の Webhook へ送る。始めと終わりは今は管理用のコマンドで知らせる。[議事録の決定記録](decisions/meeting-minutes-ja.md) |
 | `turns.py` | 話し終わりで返事を作らせる。先に話者を判定して「[発言者：…]」を足す（2 人でも多人数でも） |
 | `speakers.py` ＋ `speaker_store.py` | 話者の識別（ECAPA の声の特徴、照合、知らない人A・B）と、覚えている人の記録（DB）。[決定記録](decisions/speaker-identification-ja.md) |
 | `tools/` | 会話モデルが必要なときに呼ぶ道具（function calling）。人についての道具（`people.py`）と、その人のメモの道具（`memory.py`）。[道具の決定記録](decisions/tools-ja.md) |
@@ -117,6 +118,7 @@ sequenceDiagram
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"character.expression","seq":…,"expression":"happy","intensity":1.0,"ttl_ms":…}` | 声に合わせて表情を変える |
 | `ciel.touch` | アプリ → 会話サーバー | `{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
 | `ciel.mode` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.mode","mode":"group"}` | 2 人（solo）・多人数（group）の切り替え |
+| `ciel.minutes` | 管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
 
 ## 会議に参加するとき（多人数）
 
@@ -160,6 +162,8 @@ GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会
 | 設定 | 場所 | Git |
 |---|---|---|
 | OpenAI・LiveKit のキー、会話モデル、声の方式 | `server/agent/.env`（見本は `.env.example`） | 入れない |
+| 議事録の下書きを送る Discord の Webhook の URL | `server/agent/.env` の `CIEL_MINUTES_DISCORD_WEBHOOK` | 入れない |
+| 送れなかった議事録の下書き | 自宅サーバーの `server/agent/data/minutes/` | 入れない |
 | DB のパスワード | `server/.env`（見本は `server/.env.example`。無ければデプロイのときに自宅サーバーで作る） | 入れない |
 | 覚えている人（名前と声の特徴。本人が同意した人だけ） | DB の `people`・`voiceprints`。管理は `speaker_admin.py` | 入れない |
 | シエルの指示（プロンプト） | `server/agent/config/`（`persona.toml` と `prompts/*.md`）。次の会話から反映 | 入れる |

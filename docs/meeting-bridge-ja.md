@@ -117,6 +117,13 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
 - **忘れてもらう**：本人が「シエル、私の声を忘れて」と言う。うまくいかないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose exec agent python speaker_admin.py list` で番号を確かめ、`docker compose exec agent python speaker_admin.py delete <番号>` で消す。
 - 名乗る前の数回の発言や、1 秒未満の短い発言は、うまく判定できないことがある。
 
+## 議事録をとる
+
+会議の発言を議事録にまとめ、下書きを利用者だけが見る Discord のチャンネルへ送れる。参加者に先に伝えてから使う。準備（Webhook の URL を `server/agent/.env` に書く）としくみは [議事録の決定記録](decisions/meeting-minutes-ja.md)。
+
+- 自宅サーバーの `~/work/ciel-companion/server` で、始めるときに `docker compose exec agent python minutes_admin.py start`、終わったら `docker compose exec agent python minutes_admin.py finish`。
+- Discord の下書きを確かめて直してから、共有先へ貼る。
+
 ## 困ったとき
 
 | 症状 | 確かめること |
