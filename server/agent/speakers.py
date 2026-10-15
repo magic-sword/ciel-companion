@@ -138,6 +138,7 @@ class SessionSpeaker:
     embeddings: list[np.ndarray] = field(default_factory=list)
     person_id: int | None = None     # 覚えている人なら DB の番号
     name: str | None = None
+    announced: bool = False          # 前に話した日を、この会話で伝えたか
 
     def add(self, e: np.ndarray) -> None:
         self.embeddings.append(e)
@@ -200,7 +201,13 @@ class SpeakerBook:
                 await self.store.add_voiceprints(k.person_id, [e], seconds)
             if self.store:
                 await self.store.touch(k.person_id)
-            return f'[発言者：{k.name}]' if sure else f'[発言者：たぶん{k.name}]'
+            if not sure:
+                return f'[発言者：たぶん{k.name}（声を覚えている人）]'
+            if not sp.announced and k.last_seen is not None:
+                # この会話で初めて分かったときだけ、前に話した日も添える（本人が話しているときだけ）
+                sp.announced = True
+                return f'[発言者：{k.name}（声を覚えている人。前に話したのは{jst(k.last_seen)}）]'
+            return f'[発言者：{k.name}（声を覚えている人）]'
 
         # 2. この会話で聞いた、まだ覚えていない人
         cands = [(best_score(e, s.embeddings), s) for s in self.speakers if s.person_id is None]
@@ -210,7 +217,7 @@ class SpeakerBook:
             sp.add(e)
             self.last = sp
             log.info('話者：この会話の %s（%.2f）', '名前を聞いた人' if sp.name else sp.label, score)
-            return f'[発言者：{sp.label}]'
+            return self._session_tag(sp)
 
         # 3. 初めての人
         sp = SessionSpeaker(label=self._new_unknown_label())
@@ -218,10 +225,18 @@ class SpeakerBook:
         self.speakers.append(sp)
         self.last = sp
         log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max([s for s, _ in scored + cands], default=-1))
-        return f'[発言者：{sp.label}]'
+        return self._session_tag(sp)
+
+    @staticmethod
+    def _session_tag(sp: 'SessionSpeaker') -> str:
+        """まだ声を覚えていない人。名前を聞いたかどうかも伝える（覚えている人と区別できるように）"""
+        if sp.name:
+            return f'[発言者：{sp.name}（名前はこの会話の間だけ。声は覚えていない）]'
+        return f'[発言者：{sp.label}（まだ名前を知らない人）]'
 
     def find(self, label: str) -> SessionSpeaker | None:
-        label = plain_name(label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん'))
+        label = label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん').split('（')[0]
+        label = plain_name(label)
         for s in self.speakers:
             if label in (s.label, s.name):
                 return s
@@ -232,6 +247,13 @@ class SpeakerBook:
         if sp is None:
             return f'「{label}」という発言者は、この会話にいません。[発言者：…] に出た呼び名を使ってください。'
         name = plain_name(name)
+        if sp.person_id is not None:
+            # もう覚えている人。同意を聞き直さない。名前が変わったときだけ直す
+            if remember and self.store is not None and name != sp.name:
+                await self.store.rename(sp.person_id, name)
+                next(k for k in self.known if k.person_id == sp.person_id).name = name
+                sp.name = sp.label = name
+            return f'{sp.name}さんの声は、もう覚えています（同意も前にもらっています）。覚え直す必要はありません。'
         sp.name = sp.label = name
         if not remember:
             return f'この会話の間だけ「{name}」と呼びます（声は保存していません）。'
