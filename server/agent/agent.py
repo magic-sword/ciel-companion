@@ -124,7 +124,7 @@ async def entrypoint(ctx: JobContext) -> None:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
     switch = mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori')
-    replies = turns.TurnReplies(session, book, tap)
+    replies = turns.TurnReplies(session, book, tap, switch)
     if REALTIME:
         session.on('user_state_changed', replies.on_user_state)
     if SPEAKERS:

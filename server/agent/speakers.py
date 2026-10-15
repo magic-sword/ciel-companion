@@ -175,10 +175,14 @@ class SpeakerBook:
         letters = string.ascii_uppercase
         return '知らない人' + (letters[i] if i < 26 else str(i + 1))
 
-    async def identify(self, e: np.ndarray | None, seconds: float) -> str:
-        """発言の声の特徴から、会話モデルに渡す 1 行を作る"""
+    async def identify(self, e: np.ndarray | None, seconds: float, solo: bool = False) -> str | None:
+        """発言の声の特徴から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
+        solo（2 人）のとき、短くて判定できない発言は、直前の人のままとみなして何も足さない
+        （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。"""
         if e is None or seconds < MIN_VOICED:
-            log.info('話者：不明（声 %.1f 秒）', seconds)
+            log.info('話者：%s（声 %.1f 秒）', '短い発言（直前の人のまま）' if solo else '不明', seconds)
+            if solo:
+                return None
             self.last = None
             return '[発言者：不明]'
 

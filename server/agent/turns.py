@@ -20,10 +20,11 @@ log = logging.getLogger('ciel-agent.turns')
 
 
 class TurnReplies:
-    def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap) -> None:
+    def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, switch) -> None:
         self.session = session
         self.book = book
         self.tap = tap
+        self.switch = switch          # mode.ModeSwitch（2 人か多人数か）
         self.encoder: speakers.Encoder | None = None
         self._started_at: float | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -54,6 +55,9 @@ class TurnReplies:
         e = None
         if self.encoder is not None and seconds >= speakers.MIN_VOICED:
             e = await asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
-        line = await self.book.identify(e, seconds)
+        line = await self.book.identify(e, seconds, solo=self.switch.mode != 'group')
         log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, seconds)
-        self.session.generate_reply(user_input=line)
+        if line is None:
+            self.session.generate_reply()
+        else:
+            self.session.generate_reply(user_input=line)
