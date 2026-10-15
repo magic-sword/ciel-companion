@@ -35,6 +35,8 @@ MAYBE = float(os.environ.get('CIEL_SPK_MAYBE', '0.35'))   # これ以上なら�
 ADAPT = float(os.environ.get('CIEL_SPK_ADAPT', '0.60'))   # これ以上なら、覚えている人の見本に足す
 MAX_SESSION_EMBEDDINGS = 20
 MAX_ADAPT_PER_SESSION = 3
+SPLIT_BONUS = 0.05          # 人違いだと言われて分けた人を、元の人より少し優先する
+MARGIN = float(os.environ.get('CIEL_SPK_MARGIN', '0.05'))   # 次に近い人との差がこれ未満なら「たぶん」
 MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
 MODEL_REVISION = '0f99f2d0ebe89ac095bcc5903c4dd8f72b367286'   # Dockerfile と同じ版
 MODEL_DIR = os.environ.get('CIEL_ECAPA_DIR', '/opt/ecapa')
@@ -116,6 +118,7 @@ class Known:
     name: str
     embeddings: list[np.ndarray]
     last_seen: datetime | None = None   # この会話より前に、最後に話した日時
+    disputed: bool = False              # この会話で人違いだと言われた（見本を足さない）
 
 
 def jst(t: datetime) -> str:
@@ -139,6 +142,7 @@ class SessionSpeaker:
     person_id: int | None = None     # 覚えている人なら DB の番号
     name: str | None = None
     announced: bool = False          # 前に話した日を、この会話で伝えたか
+    split: bool = False              # 人違いだと言われて、ほかの人から分けた人
 
     def add(self, e: np.ndarray) -> None:
         self.embeddings.append(e)
@@ -163,6 +167,8 @@ class SpeakerBook:
         self.last: SessionSpeaker | None = None
         self._unknown_count = 0
         self._adapted = 0
+        self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
+        self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
 
     async def load(self) -> None:
         if self.store is not None:
@@ -186,23 +192,43 @@ class SpeakerBook:
             self.last = None
             return '[発言者：不明]'
 
-        # 1. 覚えている人
-        scored = sorted(((best_score(e, k.embeddings), k) for k in self.known), key=lambda x: -x[0])
-        if scored and scored[0][0] >= MAYBE:
-            score, k = scored[0]
+        self.last_embedding, self.last_rows = e, []
+        # 覚えている人と、この会話で聞いた（まだ覚えていない）人を、まとめて比べて一番近い人にする。
+        # 人違いだと言われて分けた人（split）は、声が似ているので、元の人より少し優先する
+        known = sorted(((best_score(e, k.embeddings), k) for k in self.known), key=lambda x: -x[0])
+        session = sorted(((best_score(e, s.embeddings) + (SPLIT_BONUS if s.split else 0.0), s)
+                          for s in self.speakers if s.person_id is None), key=lambda x: -x[0])
+        k_score, k = known[0] if known else (-1.0, None)
+        s_score, s = session[0] if session else (-1.0, None)
+
+        # 1. この会話で聞いた、まだ覚えていない人
+        if s is not None and s_score >= MATCH and s_score >= k_score:
+            s.add(e)
+            self.last = s
+            log.info('話者：この会話の %s（%.2f）', '名前を聞いた人' if s.name else s.label, s_score)
+            return self._session_tag(s)
+
+        # 2. 覚えている人
+        if k is not None and k_score >= MAYBE:
+            score = k_score
             sp = next((s for s in self.speakers if s.person_id == k.person_id), None)
             if sp is None:
                 sp = SessionSpeaker(label=k.name, person_id=k.person_id, name=k.name)
                 self.speakers.append(sp)
             sp.add(e)
             self.last = sp
-            sure = score >= MATCH
-            log.info('話者：覚えている人 #%d（%.2f%s）', k.person_id, score, '' if sure else '、たぶん')
-            if sure and score >= ADAPT and seconds >= 2.0 and self._adapted < MAX_ADAPT_PER_SESSION and self.store:
+            # 似た声の人（2 番目に近い人）との差が小さいときも、断定しない
+            runner_up = max(known[1][0] if len(known) > 1 else -1.0, s_score)
+            sure = score >= MATCH and score - runner_up >= MARGIN
+            log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s）', k.person_id, score, score - runner_up,
+                     '' if sure else '、たぶん')
+            if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
+                    and self._adapted < MAX_ADAPT_PER_SESSION and self.store):
                 # よく当たった声を見本に足して、マイクや部屋が変わっても当たるようにしていく
+                # （人違いだと言われたら、split で消せるように、足した行を覚えておく）
                 self._adapted += 1
                 k.embeddings.append(e)
-                await self.store.add_voiceprints(k.person_id, [e], seconds)
+                self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds)
             if self.store:
                 await self.store.touch(k.person_id)
             if not sure:
@@ -213,23 +239,41 @@ class SpeakerBook:
                 return f'[発言者：{k.name}（声を覚えている人。前に話したのは{jst(k.last_seen)}）]'
             return f'[発言者：{k.name}（声を覚えている人）]'
 
-        # 2. この会話で聞いた、まだ覚えていない人
-        cands = [(best_score(e, s.embeddings), s) for s in self.speakers if s.person_id is None]
-        cands.sort(key=lambda x: -x[0])
-        if cands and cands[0][0] >= MATCH:
-            score, sp = cands[0]
-            sp.add(e)
-            self.last = sp
-            log.info('話者：この会話の %s（%.2f）', '名前を聞いた人' if sp.name else sp.label, score)
-            return self._session_tag(sp)
-
         # 3. 初めての人
         sp = SessionSpeaker(label=self._new_unknown_label())
         sp.add(e)
         self.speakers.append(sp)
         self.last = sp
-        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max([s for s, _ in scored + cands], default=-1))
+        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
         return self._session_tag(sp)
+
+    async def split(self, name: str = '') -> str:
+        """人違いを直す：直前の発言を、判定された人から外し、別の人としてこの会話で区別する。
+        以後、その人の発言は分けた人の見本に入っていく（split の人は少し優先して照合する）。"""
+        sp, e = self.last, self.last_embedding
+        if sp is None or e is None:
+            return '直前の発言の声が分からないので、分けられません。もう一度、少し長めに話してもらってください。'
+        if sp.person_id is None and sp.name is None:
+            return f'直前の発言は、まだ誰とも判定していません（{sp.label}）。お名前を聞いて name_speaker を使ってください。'
+        old = sp.name or sp.label
+        sp.embeddings = [x for x in sp.embeddings if x is not e]
+        if sp.person_id is not None:
+            k = next((k for k in self.known if k.person_id == sp.person_id), None)
+            if k is not None:
+                k.embeddings = [x for x in k.embeddings if x is not e]
+                k.disputed = True   # この会話では、この人の見本を足さない（似た声が混ざらないように）
+            if self.last_rows and self.store is not None:
+                await self.store.delete_voiceprints(self.last_rows)   # 間違って足した見本を消す
+        new_name = plain_name(name) if name.strip() else None
+        new = SessionSpeaker(label=new_name or self._new_unknown_label(), name=new_name, split=True)
+        new.add(e)
+        self.speakers.append(new)
+        self.last, self.last_rows = new, []
+        log.info('話者：人違いを直した（%s から分けた）', '覚えている人 #%d' % sp.person_id if sp.person_id else 'この会話の人')
+        if new_name:
+            return (f'わかりました。直前の発言は{old}さんではなく、{new_name}さんとして区別します'
+                    '（この会話の間。声はまだ保存していません）。声を覚えてよいか聞いてください。')
+        return f'わかりました。直前の発言は{old}さんではない、別の方として区別します（呼び名：{new.label}）。お名前を聞いてください。'
 
     @staticmethod
     def _session_tag(sp: 'SessionSpeaker') -> str:

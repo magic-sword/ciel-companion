@@ -79,15 +79,22 @@ class Store:
     async def rename(self, person_id: int, name: str) -> None:
         await self.conn.execute('UPDATE people SET name = %s WHERE id = %s', (name, person_id))
 
-    async def add_voiceprints(self, person_id: int, embeddings: list[np.ndarray], seconds: float | None) -> None:
+    async def add_voiceprints(self, person_id: int, embeddings: list[np.ndarray], seconds: float | None) -> list[int]:
+        """見本を足し、足した行の番号を返す（人違いだと分かったときに消せるように）"""
+        ids = []
         async with self.conn.cursor() as cur:
             for e in embeddings:
-                await cur.execute('INSERT INTO voiceprints (person_id, embedding, seconds) VALUES (%s, %s, %s)',
+                await cur.execute('INSERT INTO voiceprints (person_id, embedding, seconds) VALUES (%s, %s, %s) RETURNING id',
                                   (person_id, e, seconds))
+                ids.append((await cur.fetchone())[0])
             await cur.execute(
                 'DELETE FROM voiceprints WHERE person_id = %s AND id NOT IN '
                 '(SELECT id FROM voiceprints WHERE person_id = %s ORDER BY id DESC LIMIT %s)',
                 (person_id, person_id, MAX_VOICEPRINTS))
+        return ids
+
+    async def delete_voiceprints(self, ids: list[int]) -> None:
+        await self.conn.execute('DELETE FROM voiceprints WHERE id = ANY(%s)', (ids,))
 
     async def touch(self, person_id: int) -> None:
         await self.conn.execute('UPDATE people SET last_seen_at = now() WHERE id = %s', (person_id,))
