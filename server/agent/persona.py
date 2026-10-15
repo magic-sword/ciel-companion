@@ -20,13 +20,14 @@ class Persona:
     group_instructions: str
     speaker_instructions: str
     notes_instructions: str
+    minutes_instructions: str
 
     @property
     def fingerprint(self) -> str:
         """本文をログに残さず、読み込んだプロンプト一式を識別する。"""
         content = json.dumps(
             [self.instructions, self.emotion_instructions, self.greeting, self.touch_instructions,
-             self.group_instructions, self.speaker_instructions, self.notes_instructions],
+             self.group_instructions, self.speaker_instructions, self.notes_instructions, self.minutes_instructions],
             ensure_ascii=False,
         )
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -45,7 +46,7 @@ def load_persona() -> Persona:
 
     values = {}
     for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions', 'group_instructions',
-                'speaker_instructions', 'notes_instructions'):
+                'speaker_instructions', 'notes_instructions', 'minutes_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)
         if not isinstance(value, str) or not value.strip():

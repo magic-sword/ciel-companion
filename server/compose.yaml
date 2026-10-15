@@ -24,6 +24,8 @@ services:
     volumes:
       # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
       - ./agent/config:/app/config:ro
+      # 議事録の下書きを Discord へ送れなかったときの保存先（Git・デプロイの外）
+      - ./agent/data/minutes:/app/data/minutes
     depends_on:
       db:
         condition: service_healthy

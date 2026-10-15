@@ -29,6 +29,7 @@ from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVa
 
 import emotion
 import irodori_tts
+import minutes
 import mode
 import notes
 import speaker_store
@@ -146,16 +147,24 @@ async def entrypoint(ctx: JobContext) -> None:
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
+    # 会議の議事録（minutes.py。始めと終わりは ciel.minutes のデータのメッセージで知らせる）
+    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions)
+    takers = [t for t in (note_taker, minute_taker) if t is not None]
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
-        book.on_split = note_taker.on_split             # 人違いを直したら、その発言を分けた人の発言にする
-        session.on('user_input_transcribed',
-                   lambda ev: note_taker.on_user_text(ev.transcript) if ev.is_final else None)
-        session.on('conversation_item_added',
-                   lambda ev: note_taker.on_ciel_text(ev.item.text_content or '')
-                   if getattr(ev.item, 'role', None) == 'assistant' else None)
+    if book is not None:
+        def on_split(old, new) -> None:   # 人違いを直したら、その発言を分けた人の発言にする
+            for t in takers:
+                t.on_split(old, new)
+        book.on_split = on_split
+    session.on('user_input_transcribed',
+               lambda ev: [t.on_user_text(ev.transcript) for t in takers] if ev.is_final else None)
+    session.on('conversation_item_added',
+               lambda ev: [t.on_ciel_text(ev.item.text_content or '') for t in takers]
+               if getattr(ev.item, 'role', None) == 'assistant' else None)
 
     async def close_store() -> None:
+        await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
         if note_taker is not None:
             await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
         if store is not None:
@@ -171,6 +180,8 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', touch.TouchReactions(session).on_data)
     # 2 人・多人数の会話の切り替え（mode.py。Unity が知らせる）
     ctx.room.on('data_received', switch.on_data)
+    # 議事録の始めと終わり（minutes.py。今は minutes_admin.py が送る）
+    ctx.room.on('data_received', minute_taker.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 
 

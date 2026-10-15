@@ -51,3 +51,6 @@ __pycache__/
 /assets/ciel/generated/v23/qa/
 /assets/ciel/generated/v24/qa/
 /unity/.utmp/
+
+# 会話サーバーが自宅サーバーで書くもの（議事録の下書きなど）
+/server/agent/data/
