@@ -2,6 +2,7 @@
 # 会話サーバー（server/agent）を自宅の GPU サーバーへ送り、Docker で起動し直す。
 # リポジトリ全体は送らない。サーバー側の .env（秘密情報）は送らず、上書きもしない。
 # 使い方（Git Bash）：scripts/server/deploy-agent.sh [ホスト=prog@192.168.1.15]
+# PowerShell からは同じ処理の deploy-agent.ps1 を使う（Git Bash は不要）。
 set -euo pipefail
 HOST="${1:-prog@192.168.1.15}"
 DEST='~/work/ciel-companion/server'
