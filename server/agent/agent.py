@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext
 from livekit.plugins import openai
+from openai.types.realtime.audio_transcription import AudioTranscription
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import emotion
@@ -50,7 +51,15 @@ REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
 SPEAKERS = VOICE == 'irodori' and REALTIME
 
 
-def make_model():
+def transcription(names: list[str]) -> AudioTranscription:
+    """相手の発言の文字起こし（メモの元になる）。日本語と、よく出る名前のヒントを渡す。
+    ヒントが無いと「シエル」が「CL」「チエル」「スチール」などになった（2026-10-16、合成音声で 3 文中 2 文。ヒントありは 3 文とも正しい）"""
+    hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
+    return AudioTranscription(model='gpt-4o-mini-transcribe', language='ja',
+                              prompt=f'AI キャラクター「シエル」との会話。出てくる名前：{hint}')
+
+
+def make_model(names: list[str] | None = None):
     kind = os.environ.get('CIEL_MODEL', 'realtime')
     voice = os.environ.get('CIEL_OPENAI_VOICE', 'marin')
     if kind == 'gpt-live':
@@ -63,6 +72,8 @@ def make_model():
         # 話し終わりの判定と割り込みは今までどおり会話モデルの側（LiveKit の既定と同じ semantic_vad）。
         # 返事は自動で作らせず、turns.py が作らせる（多人数のとき、話者の 1 行を先に足すため）
         turn_detection=SemanticVad(type='semantic_vad', eagerness='medium', create_response=False, interrupt_response=True),
+        # 相手の発言の文字起こし：日本語と、シエル・覚えている人の名前をヒントにする
+        input_audio_transcription=transcription(names or []),
     )
 
 
@@ -114,7 +125,8 @@ async def entrypoint(ctx: JobContext) -> None:
     book = speakers.SpeakerBook(store) if SPEAKERS else None
     if book is not None:
         await book.load()
-    session = AgentSession(llm=make_model(), tts=irodori_tts.make() if VOICE == 'irodori' else None,
+    names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
+    session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
                            turn_detection='manual' if REALTIME else agents.NOT_GIVEN,
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
