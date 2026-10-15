@@ -1,4 +1,4 @@
-// 会話の画面の操作：マイクボタン（タップで入れる・切る）、状態の表示、PC ではマイクの選択。
+// 会話の画面の操作：マイクボタン（タップで入れる・切る）、状態の表示、PC ではマイクとスピーカーの選択。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,9 +17,10 @@ namespace Ciel.Conversation
         static readonly Color MicBusy = new Color(0.55f, 0.55f, 0.60f, 0.92f);
 
         Image _micImage;
-        Text _micLabel, _status;
-        Dropdown _devices;
+        Text _micLabel, _status, _modeLabel;
+        Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
+        readonly List<string> _speakerGuids = new List<string>();
         Font _font;
 
         void Awake()
@@ -68,8 +69,18 @@ namespace Ciel.Conversation
             // 表情の確認用のボタン（画面の右。表情を作りながら確かめる）
             BuildExpressionButtons(canvasGo.transform);
 
-            // マイクの選択（PC だけ。画面の上）
-            _devices = NewDropdown(canvasGo.transform);
+            // 会話のモードの切り替え（タップで 自動 → 2 人 → 多人数 → 自動）。下の欄の一覧より奥に出るよう、先に作る
+            var mode = NewRect("ModeButton", canvasGo.transform, new Vector2(0.5f, 1f), new Vector2(0, -260), new Vector2(900, 70));
+            mode.gameObject.AddComponent<Image>().color = new Color(0.12f, 0.14f, 0.22f, 0.85f);
+            mode.gameObject.AddComponent<Button>().onClick.AddListener(() =>
+                _conversation.SelectMode((CielConversation.ModeSetting)(((int)_conversation.ModeChoice + 1) % 3)));
+            _modeLabel = NewText("Label", mode, 30, TextAnchor.MiddleCenter);
+            Stretch(_modeLabel.rectTransform);
+
+            // マイクとスピーカーの選択（PC だけ。画面の上）。下の欄を先に作り、上の欄の一覧が下の欄より手前に出るようにする
+            _speakers = NewDropdown(canvasGo.transform, "SpeakerDevice", -170);
+            _speakers.onValueChanged.AddListener(i => _conversation.SelectSpeaker(i <= 0 ? null : _speakerGuids[i]));
+            _devices = NewDropdown(canvasGo.transform, "MicDevice", -80);
             _devices.onValueChanged.AddListener(i => _conversation.SelectMic(i <= 0 ? null : _deviceGuids[i]));
         }
 
@@ -89,18 +100,28 @@ namespace Ciel.Conversation
                 _ => c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます",
             };
 
-            _devices.gameObject.SetActive(c.CanSelectMic);
-            if (c.CanSelectMic && _deviceGuids.Count != c.MicDevices.Count + 1)
+            var current = c.CurrentMode == CielConversation.Mode.Group ? "多人数（呼ばれたら答える）" : "2 人（いつも答える）";
+            _modeLabel.text = c.ModeChoice == CielConversation.ModeSetting.Auto ? $"会話：自動 ― いまは {current}" : $"会話：{current}";
+
+            RefreshDevices(_devices, _deviceGuids, c.CanSelectMic, c.MicDevices, c.SelectedMic, "既定のマイク（OS の設定）", "マイク：");
+            RefreshDevices(_speakers, _speakerGuids, c.CanSelectSpeaker, c.SpeakerDevices, c.SelectedSpeaker, "既定のスピーカー（OS の設定）", "声の出力：");
+        }
+
+        static void RefreshDevices(Dropdown dd, List<string> guids, bool can, List<(string name, string guid)> devices,
+            string selected, string defaultName, string prefix)
+        {
+            dd.gameObject.SetActive(can);
+            if (!can) return;
+            if (guids.Count != devices.Count + 1)
             {
-                _deviceGuids.Clear();
-                _devices.ClearOptions();
-                var names = new List<string> { "既定のマイク（OS の設定）" };
-                _deviceGuids.Add(null);
-                foreach (var (name, guid) in c.MicDevices) { names.Add(name); _deviceGuids.Add(guid); }
-                _devices.AddOptions(names);
+                guids.Clear();
+                dd.ClearOptions();
+                var names = new List<string> { prefix + defaultName };
+                guids.Add(null);
+                foreach (var (name, guid) in devices) { names.Add(prefix + name); guids.Add(guid); }
+                dd.AddOptions(names);
             }
-            if (c.CanSelectMic)
-                _devices.SetValueWithoutNotify(Mathf.Max(0, _deviceGuids.IndexOf(c.SelectedMic)));
+            dd.SetValueWithoutNotify(Mathf.Max(0, guids.IndexOf(selected)));
         }
 
         [SerializeField] bool _showExpressionButtons = true;
@@ -157,10 +178,10 @@ namespace Ciel.Conversation
             return t;
         }
 
-        Dropdown NewDropdown(Transform parent)
+        Dropdown NewDropdown(Transform parent, string name, float y)
         {
             // uGUI の標準のドロップダウンと同じ構成を作る
-            var root = NewRect("MicDevice", parent, new Vector2(0.5f, 1f), new Vector2(0, -80), new Vector2(900, 80));
+            var root = NewRect(name, parent, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(900, 80));
             var bg = root.gameObject.AddComponent<Image>();
             bg.color = new Color(0.12f, 0.14f, 0.22f, 0.85f);
             var dd = root.gameObject.AddComponent<Dropdown>();

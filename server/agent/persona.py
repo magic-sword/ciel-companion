@@ -17,12 +17,14 @@ class Persona:
     emotion_instructions: str
     greeting: str
     touch_instructions: str
+    group_instructions: str
 
     @property
     def fingerprint(self) -> str:
         """本文をログに残さず、読み込んだプロンプト一式を識別する。"""
         content = json.dumps(
-            [self.instructions, self.emotion_instructions, self.greeting, self.touch_instructions],
+            [self.instructions, self.emotion_instructions, self.greeting, self.touch_instructions,
+             self.group_instructions],
             ensure_ascii=False,
         )
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -40,7 +42,7 @@ def load_persona() -> Persona:
         raise ValueError(f'キャラクター設定を読み込めません: {path}: {exc}') from exc
 
     values = {}
-    for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions'):
+    for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions', 'group_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)
         if not isinstance(value, str) or not value.strip():

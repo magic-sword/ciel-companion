@@ -26,6 +26,7 @@ from livekit.plugins import openai
 
 import emotion
 import irodori_tts
+import mode
 import touch
 import voice_conversion
 from persona import load_persona
@@ -54,21 +55,30 @@ def make_model():
 class Ciel(Agent):
     def __init__(self) -> None:
         persona = load_persona()
-        instructions = persona.instructions + (persona.emotion_instructions if VOICE == 'irodori' else '')
-        # 画面のタッチへの反応（touch.py）
-        super().__init__(instructions=instructions.rstrip('\n') + '\n\n' + persona.touch_instructions)
         self.persona = persona
+        super().__init__(instructions=self.instructions_for('solo'))
         self.events = emotion.ExpressionEvents()
 
+    def instructions_for(self, mode: str) -> str:
+        """モード（mode.py）ごとの指示。group は多人数での答え方（config/prompts/group.md）を最後に足す。"""
+        p = self.persona
+        instructions = p.instructions + (p.emotion_instructions if VOICE == 'irodori' else '')
+        # 画面のタッチへの反応（touch.py）
+        instructions = instructions.rstrip('\n') + '\n\n' + p.touch_instructions
+        if mode == 'group':
+            instructions = instructions.rstrip('\n') + '\n\n' + p.group_instructions
+        return instructions
+
     def tts_node(self, text, model_settings):
-        # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）
+        # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）。
+        # 多人数で黙ると決めた返事（[silent]）は読み上げない（mode.py）
         if VOICE == 'irodori':
-            return emotion.tts_node(text, self.events)
+            return emotion.tts_node(mode.drop_silent(text), self.events)
         return Agent.default.tts_node(self, text, model_settings)
 
     def transcription_node(self, text, model_settings):
         if VOICE == 'irodori':
-            return emotion.transcription_node(text)
+            return emotion.transcription_node(mode.drop_silent(text))
         return Agent.default.transcription_node(self, text, model_settings)
 
     def realtime_audio_output_node(self, audio, model_settings):
@@ -90,6 +100,8 @@ async def entrypoint(ctx: JobContext) -> None:
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）
     ctx.room.on('data_received', touch.TouchReactions(session).on_data)
+    # 2 人・多人数の会話の切り替え（mode.py。Unity が知らせる）
+    ctx.room.on('data_received', mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori').on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 
 

@@ -13,6 +13,7 @@
 | `server/agent/config/prompts/greeting.md` | 初回あいさつを生成するための指示 |
 | `server/agent/config/prompts/emotion.md` | Irodori 用の感情タグの指示 |
 | `server/agent/config/prompts/touch.md` | 画面のタッチの知らせ（`[タッチ]` の行）への反応の仕方 |
+| `server/agent/config/prompts/group.md` | 多人数（会議）のモードで足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py` |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
 | `server/agent/agent.py` | 声の方式に応じた指示の組み合わせと会話への適用 |
 
@@ -23,9 +24,9 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 ## 読み込みと反映
 
 - `CIEL_PERSONA_CONFIG` が未指定または空の場合、`server/agent/config/persona.toml` を使う。環境変数の相対パスは `server/agent/` 基準。
-- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
-- 会話開始時に四つのファイルを読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
-- 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも最後に追加する。
+- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`group_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
+- 会話開始時に五つのファイルを読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
+- 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。多人数の指示は、Unity が多人数のモードを知らせたときだけ最後に追加する（`CIEL_VOICE=irodori` のときだけ）。
 - 設定・本文の欠落、不正な TOML、不正な UTF-8、空の本文はエラーにする。別のキャラクターへ自動で切り替えない。
 - Docker は `config/` をイメージへコピーする。Compose は同じディレクトリを読み取り専用でマウントする。ホスト側の編集は次の会話から反映される。
 
@@ -41,7 +42,7 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 
 現在の会話ケースは手動確認用であり、自動のモデル評価は未導入。開発時の即時反映は許容する。本番でも直接編集が技術的に可能だが、運用上は確認済みの一式を配布する。
 
-会話開始ログには `persona_sha256`、会話モデルの選択、Realtime のモデル名、声の方式を記録する。ハッシュは読み込んだ四つの本文を順序固定で JSON 化し、UTF-8 の SHA-256 を求める。適用しない感情指示も含む、設定一式の識別子である。履歴の保存・復元は Git が担う。ハッシュだけで本文は復元できず、モデル出力の完全な再現を保証するものでもない。プロンプト本文や会話内容はこの識別用ログへ出さない。
+会話開始ログには `persona_sha256`、会話モデルの選択、Realtime のモデル名、声の方式を記録する。ハッシュは読み込んだ五つの本文を順序固定で JSON 化し、UTF-8 の SHA-256 を求める。適用しない感情指示も含む、設定一式の識別子である。履歴の保存・復元は Git が担う。ハッシュだけで本文は復元できず、モデル出力の完全な再現を保証するものでもない。プロンプト本文や会話内容はこの識別用ログへ出さない。
 
 ## 将来拡張する条件
 
