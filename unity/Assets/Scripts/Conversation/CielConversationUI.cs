@@ -1,4 +1,5 @@
-// 会話の画面の操作：マイクボタン（タップで入れる・切る）、状態の表示、PC ではマイクとスピーカーの選択。
+// 会話の画面の操作：マイクボタン（タップで入れる・切る）、状態の表示、会話のモード、PC ではマイクとスピーカーの選択、
+// Android では声をスピーカーから出すか受話口から出すかの切り替え。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,7 +18,8 @@ namespace Ciel.Conversation
         static readonly Color MicBusy = new Color(0.55f, 0.55f, 0.60f, 0.92f);
 
         Image _micImage;
-        Text _micLabel, _status, _modeLabel;
+        Text _micLabel, _status, _modeLabel, _speakerphoneLabel;
+        GameObject _speakerphone;
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
@@ -77,6 +79,14 @@ namespace Ciel.Conversation
             _modeLabel = NewText("Label", mode, 30, TextAnchor.MiddleCenter);
             Stretch(_modeLabel.rectTransform);
 
+            // Android：声を本体のスピーカーから出すか（PC の機器の選択欄の場所。Android では選択欄は出ない）
+            var sp = NewRect("SpeakerphoneButton", canvasGo.transform, new Vector2(0.5f, 1f), new Vector2(0, -170), new Vector2(900, 70));
+            sp.gameObject.AddComponent<Image>().color = new Color(0.12f, 0.14f, 0.22f, 0.85f);
+            sp.gameObject.AddComponent<Button>().onClick.AddListener(() => _conversation.SetSpeakerphone(!_conversation.SpeakerphoneOn));
+            _speakerphoneLabel = NewText("Label", sp, 30, TextAnchor.MiddleCenter);
+            Stretch(_speakerphoneLabel.rectTransform);
+            _speakerphone = sp.gameObject;
+
             // マイクとスピーカーの選択（PC だけ。画面の上）。下の欄を先に作り、上の欄の一覧が下の欄より手前に出るようにする
             _speakers = NewDropdown(canvasGo.transform, "SpeakerDevice", -170);
             _speakers.onValueChanged.AddListener(i => _conversation.SelectSpeaker(i <= 0 ? null : _speakerGuids[i]));
@@ -102,6 +112,8 @@ namespace Ciel.Conversation
 
             var current = c.CurrentMode == CielConversation.Mode.Group ? "多人数（呼ばれたら答える）" : "2 人（いつも答える）";
             _modeLabel.text = c.ModeChoice == CielConversation.ModeSetting.Auto ? $"会話：自動 ― いまは {current}" : $"会話：{current}";
+            _speakerphone.SetActive(c.CanUseSpeakerphone);
+            _speakerphoneLabel.text = c.SpeakerphoneOn ? "声：スピーカー（みんなに聞こえる）" : "声：受話口（耳に当てて聞く）";
 
             RefreshDevices(_devices, _deviceGuids, c.CanSelectMic, c.MicDevices, c.SelectedMic, "既定のマイク（OS の設定）", "マイク：");
             RefreshDevices(_speakers, _speakerGuids, c.CanSelectSpeaker, c.SpeakerDevices, c.SelectedSpeaker, "既定のスピーカー（OS の設定）", "声の出力：");

@@ -37,6 +37,7 @@ namespace Ciel.Conversation
         const string MicPrefKey = "ciel.micDevice";
         const string SpeakerPrefKey = "ciel.speakerDevice";
         const string ModePrefKey = "ciel.conversationMode";
+        const string SpeakerphonePrefKey = "ciel.speakerphone";
 
         [Tooltip("この文字を名前に含む「声の出力」は会議へつなぐ仮想オーディオケーブルとみなす（自動のとき多人数にする）")]
         [SerializeField] string[] _meetingOutputKeywords = { "CABLE", "VB-Audio", "Voicemeeter" };
@@ -66,6 +67,10 @@ namespace Ciel.Conversation
         /// PC ならスピーカーの一覧（名前、ID）。スマホは空（OS に任せる）
         public List<(string name, string guid)> SpeakerDevices { get; } = new List<(string, string)>();
         public bool CanSelectSpeaker => Application.isMobilePlatform == false && SpeakerDevices.Count > 0;
+
+        /// Android：声を本体のスピーカーから出すか（オフは受話口。耳に当てて聞く）。既定はオン（画面のシエルを見ながら話すので）
+        public bool CanUseSpeakerphone => Application.platform == RuntimePlatform.Android;
+        public bool SpeakerphoneOn { get; private set; } = true;
         public string SelectedSpeaker => _speakerGuid;
 
         public enum ModeSetting { Auto, Solo, Group }
@@ -95,6 +100,7 @@ namespace Ciel.Conversation
             _micGuid = PlayerPrefs.HasKey(MicPrefKey) ? PlayerPrefs.GetString(MicPrefKey) : null;
             _speakerGuid = PlayerPrefs.HasKey(SpeakerPrefKey) ? PlayerPrefs.GetString(SpeakerPrefKey) : null;
             ModeChoice = (ModeSetting)Mathf.Clamp(PlayerPrefs.GetInt(ModePrefKey, 0), 0, 2);
+            SpeakerphoneOn = PlayerPrefs.GetInt(SpeakerphonePrefKey, 1) == 1;
             if (_connectOnStart) StartConversation();
         }
 
@@ -167,6 +173,7 @@ namespace Ciel.Conversation
             // 接続のときに WebRTC が声の出力を OS の既定（通話用の機器）へ戻すので、選んだ機器をかけ直す。
             // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
             if (_speakerGuid != null) ApplySpeaker();
+            ApplySpeakerphone();
             SetStatus(State.Connected);
             SendMode();
         }
@@ -251,6 +258,23 @@ namespace Ciel.Conversation
             if (_platformAudio != null) ApplySpeaker();
             SendMode();   // 自動のときは、声の出力でモードが変わる
             Changed?.Invoke();
+        }
+
+        /// Android：声を本体のスピーカーから出す・受話口から出す
+        public void SetSpeakerphone(bool on)
+        {
+            SpeakerphoneOn = on;
+            PlayerPrefs.SetInt(SpeakerphonePrefKey, on ? 1 : 0);
+            ApplySpeakerphone();
+            Changed?.Invoke();
+        }
+
+        // LiveKit が通話用の音声の設定にしたあと（接続・録音の開始・声の受信の開始）にも、かけ直す
+        void ApplySpeakerphone()
+        {
+            if (!CanUseSpeakerphone) return;
+            var ok = AndroidSpeaker.Set(SpeakerphoneOn);
+            Debug.Log($"[CielConversation] 声の出力：{(SpeakerphoneOn ? "スピーカー" : "受話口")}{(ok ? "" : "（切り替えられなかった）")}");
         }
 
         /// 会話のモードを選ぶ（自動・2 人・多人数）
@@ -379,6 +403,7 @@ namespace Ciel.Conversation
                 if (ok)
                 {
                     _recording = true;
+                    ApplySpeakerphone();   // 録音を始めると、通話の設定で受話口へ戻ることがある
                     Debug.Log($"[CielConversation] マイク '{name}' で録音中");
                     yield break;
                 }
@@ -396,6 +421,7 @@ namespace Ciel.Conversation
             _voiceStream = new AudioStream(audio, source);
             _meter = go.AddComponent<AgentVoiceMeter>();   // AudioStream の後に付けて、届いた音を読む
             Trace("声の受信を始めた");
+            ApplySpeakerphone();
             Debug.Log($"[CielConversation] {participant.Identity} の声を受信");
         }
 
