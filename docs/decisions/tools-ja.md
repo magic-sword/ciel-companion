@@ -23,6 +23,9 @@
 | `forget_speaker` | `tools/people.py` | 本人の依頼で、声の記録を消す |
 | `lookup_person` | `tools/people.py` | その名前の人の声を覚えているか調べる |
 | `people_here` | `tools/people.py` | この会話で声を聞いた人（呼び名） |
+| `recall_about_speaker` | `tools/memory.py` | いま話している本人について覚えていること（メモ）を読む（[メモの決定記録](person-notes-ja.md)） |
+| `forget_about_speaker` | `tools/memory.py` | 本人に頼まれたメモを忘れる |
+| `agree_to_notes` | `tools/memory.py` | 声を覚えている本人が、お話を覚えることに同意した |
 
 ## 道具の足し方
 

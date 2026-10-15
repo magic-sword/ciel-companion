@@ -119,6 +119,8 @@ class Known:
     embeddings: list[np.ndarray]
     last_seen: datetime | None = None   # この会話より前に、最後に話した日時
     disputed: bool = False              # この会話で人違いだと言われた（見本を足さない）
+    notes_ok: bool = False              # お話（メモ）を覚える同意があるか
+    note_count: int = 0                 # メモの数
 
 
 def jst(t: datetime) -> str:
@@ -168,11 +170,15 @@ class SpeakerBook:
         self._unknown_count = 0
         self._adapted = 0
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
+        self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
+        self._note_ids: list[int] = []                   # 直前に読んだメモの番号 → DB の行（忘れるときに使う）
+        self._note_owner: int | None = None
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
 
     async def load(self) -> None:
         if self.store is not None:
-            self.known = [Known(pid, name, embs, seen) for pid, name, embs, seen in await self.store.load_all()]
+            self.known = [Known(pid, name, embs, seen, disputed=False, notes_ok=ok, note_count=n)
+                          for pid, name, embs, seen, ok, n in await self.store.load_all()]
         log.info('覚えている人：%d 人', len(self.known))
 
     def _new_unknown_label(self) -> str:
@@ -192,7 +198,7 @@ class SpeakerBook:
             self.last = None
             return '[発言者：不明]'
 
-        self.last_embedding, self.last_rows = e, []
+        self.last_embedding, self.last_rows, self.last_sure = e, [], False
         # 覚えている人と、この会話で聞いた（まだ覚えていない）人を、まとめて比べて一番近い人にする。
         # 人違いだと言われて分けた人（split）は、声が似ているので、元の人より少し優先する
         known = sorted(((best_score(e, k.embeddings), k) for k in self.known), key=lambda x: -x[0])
@@ -231,13 +237,20 @@ class SpeakerBook:
                 self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds)
             if self.store:
                 await self.store.touch(k.person_id)
+            self.last_sure = sure
             if not sure:
                 return f'[発言者：たぶん{k.name}（声を覚えている人）]'
-            if not sp.announced and k.last_seen is not None:
-                # この会話で初めて分かったときだけ、前に話した日も添える（本人が話しているときだけ）
+            extra = ''
+            if not sp.announced:
+                # この会話で初めて分かったときだけ、前に話した日と、メモのことを添える（本人が話しているときだけ）
                 sp.announced = True
-                return f'[発言者：{k.name}（声を覚えている人。前に話したのは{jst(k.last_seen)}）]'
-            return f'[発言者：{k.name}（声を覚えている人）]'
+                if k.last_seen is not None:
+                    extra += f'。前に話したのは{jst(k.last_seen)}'
+                if not k.notes_ok:
+                    extra += '。お話を覚える同意はまだ'
+                elif k.note_count:
+                    extra += '。この人について覚えていることがある'
+            return f'[発言者：{k.name}（声を覚えている人{extra}）]'
 
         # 3. 初めての人
         sp = SessionSpeaker(label=self._new_unknown_label())
@@ -314,8 +327,56 @@ class SpeakerBook:
         new = [e for e in sp.embeddings if not any(e is x for x in k.embeddings)]
         k.embeddings.extend(new)
         await self.store.add_voiceprints(sp.person_id, new, None)
+        # 覚えてよいかの質問は「お名前と声、それからお話も少し」なので、メモを残す同意も一緒にもらっている
+        await self.store.set_notes_consent(sp.person_id)
+        k.notes_ok = True
+        if self.last is sp:
+            self.last_sure = True   # 本人が同意したので、この会話ではメモを読み書きしてよい
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
-        return f'「{name}」さんの声を覚えました。次の会話でも分かります。'
+        return f'「{name}」さんのお名前と声を覚えました。次の会話でも分かります。お話も少しずつ覚えていきます。'
+
+    # ---- その人について覚えておくメモ（読むのは本人が話しているときだけ。書くのは notes.py が裏で） ----
+
+    def current_person(self) -> 'Known | None':
+        """いま話している人が、自信を持って判定した「覚えている人」なら、その人"""
+        sp = self.last
+        if sp is None or sp.person_id is None or not self.last_sure:
+            return None
+        return next((k for k in self.known if k.person_id == sp.person_id), None)
+
+    async def agree_notes(self) -> str:
+        k = self.current_person()
+        if k is None or self.store is None:
+            return 'いま話している方が、声を覚えている方だと確かではないので、受け付けられません。'
+        await self.store.set_notes_consent(k.person_id)
+        k.notes_ok = True
+        log.info('話者：#%d がお話を覚えることに同意した', k.person_id)
+        return f'{k.name}さんのお話を、少しずつ覚えていきます。'
+
+    async def recall(self) -> str:
+        k = self.current_person()
+        if k is None or self.store is None:
+            return 'いま話している方が誰か確かではないので、覚えていることは読めません。'
+        if not k.notes_ok:
+            return f'{k.name}さんからは、お話を覚える同意をまだもらっていません。'
+        rows = await self.store.notes(k.person_id)
+        self._note_ids, self._note_owner = [i for i, _ in rows], k.person_id
+        if not rows:
+            return f'{k.name}さんについて、まだ覚えていることはありません。'
+        return f'{k.name}さんについて覚えていること：\n' + '\n'.join(f'{n}. {t}' for n, (_, t) in enumerate(rows, 1))
+
+    async def forget_notes(self, numbers: list[int]) -> str:
+        k = self.current_person()
+        if k is None or self.store is None or self._note_owner != k.person_id:
+            return '先に recall_about_speaker で、いま話している方のメモを読んでください。'
+        ids = [self._note_ids[n - 1] for n in numbers if 1 <= n <= len(self._note_ids)]
+        if not ids:
+            return 'その番号のメモはありません。'
+        await self.store.change_notes(k.person_id, [], {}, ids)
+        k.note_count = await self.store.count_notes(k.person_id)
+        self._note_ids, self._note_owner = [], None
+        log.info('話者：#%d のメモを %d 件消した', k.person_id, len(ids))
+        return f'{len(ids)} 件、忘れました。'
 
     async def rename(self, new_name: str) -> str:
         """呼び名を直す（聞き間違えたとき、呼び方を変えてほしいとき）。直せるのは、いま話している本人の呼び名だけ"""

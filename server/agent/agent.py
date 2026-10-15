@@ -29,6 +29,7 @@ from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVa
 import emotion
 import irodori_tts
 import mode
+import notes
 import speaker_store
 import speakers
 import tools
@@ -130,7 +131,18 @@ async def entrypoint(ctx: JobContext) -> None:
     if SPEAKERS:
         asyncio.create_task(replies.load_encoder())
 
+    # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
+    note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
+    if note_taker is not None:
+        session.on('user_input_transcribed',
+                   lambda ev: note_taker.on_user_text(ev.transcript) if ev.is_final else None)
+        session.on('conversation_item_added',
+                   lambda ev: note_taker.on_ciel_text(ev.item.text_content or '')
+                   if getattr(ev.item, 'role', None) == 'assistant' else None)
+
     async def close_store() -> None:
+        if note_taker is not None:
+            await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
         if store is not None:
             await store.close()
     ctx.add_shutdown_callback(close_store)

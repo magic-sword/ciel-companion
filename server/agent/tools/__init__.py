@@ -19,6 +19,6 @@ class State:
     book: SpeakerBook | None = None
 
 
-from . import people  # noqa: E402  State の後に読む
+from . import memory, people  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS]
+TOOLS = [*people.TOOLS, *memory.TOOLS]

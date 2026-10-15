@@ -65,9 +65,10 @@ flowchart LR
 | `irodori_tts.py` | 読み上げサービスへの接続 |
 | `touch.py` | タッチの知らせを受けて、声の反応を返す |
 | `mode.py` | 2 人・多人数の会話の切り替え。多人数で黙る返事（`[silent]`）を捨てる |
+| `notes.py` | 会話の裏で、同意した人について覚えておくメモを書く（別の文字のモデル `gpt-5.4-mini`）。[メモの決定記録](decisions/person-notes-ja.md) |
 | `turns.py` | 話し終わりで返事を作らせる。先に話者を判定して「[発言者：…]」を足す（2 人でも多人数でも） |
 | `speakers.py` ＋ `speaker_store.py` | 話者の識別（ECAPA の声の特徴、照合、知らない人A・B）と、覚えている人の記録（DB）。[決定記録](decisions/speaker-identification-ja.md) |
-| `tools/` | 会話モデルが必要なときに呼ぶ道具（function calling）。今は人についての道具（`people.py`）。[道具の決定記録](decisions/tools-ja.md) |
+| `tools/` | 会話モデルが必要なときに呼ぶ道具（function calling）。人についての道具（`people.py`）と、その人のメモの道具（`memory.py`）。[道具の決定記録](decisions/tools-ja.md) |
 | `voice_conversion.py` | 声質変換サービスへの接続（`CIEL_VOICE=ciel` のとき） |
 
 ## 会話の流れ（既定：CIEL_VOICE=irodori）

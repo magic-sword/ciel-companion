@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""覚えている人の記録の管理（一覧・呼び名を直す・削除）。自宅サーバーで、会話サーバーのコンテナの中から使う。
+"""覚えている人の記録の管理（一覧・メモを見る・呼び名を直す・削除）。自宅サーバーで、会話サーバーのコンテナの中から使う。
 
   docker compose exec agent python speaker_admin.py list
+  docker compose exec agent python speaker_admin.py notes <番号>
   docker compose exec agent python speaker_admin.py rename <番号> <新しい呼び名>
   docker compose exec agent python speaker_admin.py delete <番号>
   docker compose exec agent python speaker_admin.py delete-all
 
-声の特徴そのものは表示しない。
+声の特徴そのものは表示しない。メモは本人の情報なので、見るのは管理のときだけにする。
 """
 import asyncio
 import os
@@ -24,12 +25,17 @@ async def main(args: list[str]) -> int:
         cmd = args[0] if args else 'list'
         if cmd == 'list':
             rows = await (await conn.execute(
-                'SELECT p.id, p.name, p.consented_at, p.last_seen_at, count(v.id) FROM people p '
+                'SELECT p.id, p.name, p.consented_at, p.last_seen_at, count(v.id), '
+                '(SELECT count(*) FROM person_notes n WHERE n.person_id = p.id) FROM people p '
                 'LEFT JOIN voiceprints v ON v.person_id = p.id GROUP BY p.id ORDER BY p.id')).fetchall()
-            print('番号\t名前\t同意した日時\t最後に話した日時\t見本の数')
-            for pid, name, consented, seen, n in rows:
-                print(f'{pid}\t{name}\t{consented:%Y-%m-%d %H:%M}\t{seen:%Y-%m-%d %H:%M}' if seen else
-                      f'{pid}\t{name}\t{consented:%Y-%m-%d %H:%M}\t-', f'\t{n}')
+            print('番号\t名前\t同意した日時\t最後に話した日時\t見本の数\tメモの数')
+            for pid, name, consented, seen, n, n_notes in rows:
+                seen_text = f'{seen:%Y-%m-%d %H:%M}' if seen else '-'
+                print(f'{pid}\t{name}\t{consented:%Y-%m-%d %H:%M}\t{seen_text}\t{n}\t{n_notes}')
+        elif cmd == 'notes' and len(args) == 2:
+            for (text,) in await (await conn.execute(
+                    'SELECT text FROM person_notes WHERE person_id = %s ORDER BY id', (int(args[1]),))).fetchall():
+                print('-', text)
         elif cmd == 'rename' and len(args) == 3:
             n = (await conn.execute('UPDATE people SET name = %s WHERE id = %s', (args[2], int(args[1])))).rowcount
             print('直しました' if n else 'その番号の人はいません')

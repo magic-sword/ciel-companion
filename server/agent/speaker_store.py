@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""覚えている人の記録（PostgreSQL＋pgvector）。本人が同意した人の名前と声の特徴だけを置く。
+"""覚えている人の記録（PostgreSQL＋pgvector）。本人が同意した人の名前・声の特徴・メモだけを置く。
 
-- people：人（名前、同意した日時、最後に話した日時）
+- people：人（名前、声を覚える同意の日時、メモを残す同意の日時、最後に話した日時）
 - voiceprints：声の特徴（192 次元、人ごとに複数、多すぎたら古いものから消す）
+- person_notes：その人について覚えておくメモ（短い文、人ごとに上限あり。notes.py が書く）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
-管理（一覧・削除）は speaker_admin.py。
+人を消すと、声の特徴もメモも一緒に消える。管理（一覧・削除）は speaker_admin.py。
 """
 import logging
 import os
@@ -35,7 +36,17 @@ CREATE TABLE IF NOT EXISTS voiceprints (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS voiceprints_person ON voiceprints(person_id);
+ALTER TABLE people ADD COLUMN IF NOT EXISTS notes_consented_at timestamptz;
+CREATE TABLE IF NOT EXISTS person_notes (
+    id bigserial PRIMARY KEY,
+    person_id bigint NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    text text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS person_notes_person ON person_notes(person_id);
 """
+MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
 
 
 class Store:
@@ -61,16 +72,43 @@ class Store:
     async def close(self) -> None:
         await self.conn.close()
 
-    async def load_all(self) -> list[tuple[int, str, list[np.ndarray], datetime | None]]:
-        """（番号、名前、声の特徴の一覧、最後に話した日時）"""
+    async def load_all(self) -> list[tuple[int, str, list[np.ndarray], datetime | None, bool, int]]:
+        """（番号、名前、声の特徴の一覧、最後に話した日時、メモを残す同意の有無、メモの数）"""
         rows = await (await self.conn.execute(
-            'SELECT p.id, p.name, p.last_seen_at, v.embedding FROM people p JOIN voiceprints v ON v.person_id = p.id '
-            'ORDER BY p.id, v.id'
+            'SELECT p.id, p.name, p.last_seen_at, p.notes_consented_at IS NOT NULL, '
+            '(SELECT count(*) FROM person_notes n WHERE n.person_id = p.id), v.embedding '
+            'FROM people p JOIN voiceprints v ON v.person_id = p.id ORDER BY p.id, v.id'
         )).fetchall()
-        people: dict[int, tuple[str, datetime | None, list[np.ndarray]]] = {}
-        for pid, name, seen, emb in rows:
-            people.setdefault(pid, (name, seen, []))[2].append(np.asarray(emb, dtype=np.float32))
-        return [(pid, name, embs, seen) for pid, (name, seen, embs) in people.items()]
+        people: dict[int, tuple] = {}
+        for pid, name, seen, notes_ok, n_notes, emb in rows:
+            people.setdefault(pid, (name, seen, notes_ok, n_notes, []))[4].append(np.asarray(emb, dtype=np.float32))
+        return [(pid, name, embs, seen, notes_ok, n) for pid, (name, seen, notes_ok, n, embs) in people.items()]
+
+    async def set_notes_consent(self, person_id: int) -> None:
+        await self.conn.execute('UPDATE people SET notes_consented_at = now() WHERE id = %s', (person_id,))
+
+    async def notes(self, person_id: int) -> list[tuple[int, str]]:
+        return await (await self.conn.execute(
+            'SELECT id, text FROM person_notes WHERE person_id = %s ORDER BY id', (person_id,))).fetchall()
+
+    async def change_notes(self, person_id: int, add: list[str], update: dict[int, str], delete: list[int]) -> None:
+        """メモを足す・書き直す・消す（その人のメモだけ）。上限を超えたら古いものから消す"""
+        async with self.conn.cursor() as cur:
+            for i in delete:
+                await cur.execute('DELETE FROM person_notes WHERE id = %s AND person_id = %s', (i, person_id))
+            for i, text in update.items():
+                await cur.execute('UPDATE person_notes SET text = %s, updated_at = now() WHERE id = %s AND person_id = %s',
+                                  (text, i, person_id))
+            for text in add:
+                await cur.execute('INSERT INTO person_notes (person_id, text) VALUES (%s, %s)', (person_id, text))
+            await cur.execute(
+                'DELETE FROM person_notes WHERE person_id = %s AND id NOT IN '
+                '(SELECT id FROM person_notes WHERE person_id = %s ORDER BY updated_at DESC, id DESC LIMIT %s)',
+                (person_id, person_id, MAX_NOTES))
+
+    async def count_notes(self, person_id: int) -> int:
+        return (await (await self.conn.execute(
+            'SELECT count(*) FROM person_notes WHERE person_id = %s', (person_id,))).fetchone())[0]
 
     async def add_person(self, name: str) -> int:
         row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()
