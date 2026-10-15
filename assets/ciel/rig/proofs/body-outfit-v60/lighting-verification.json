@@ -1,0 +1,62 @@
+{
+  "passed": true,
+  "stage": "actual exported SDK",
+  "torso_translation_px": [
+    28.5,
+    0
+  ],
+  "fixed_reference_axis_x": 1115,
+  "body_centers": [
+    {
+      "y": 2200,
+      "center_x": 1115.0
+    },
+    {
+      "y": 2300,
+      "center_x": 1115.0
+    },
+    {
+      "y": 2400,
+      "center_x": 1115.0
+    },
+    {
+      "y": 2450,
+      "center_x": 1115.5
+    }
+  ],
+  "collar_buckle_center_x": 1116.4742547425474,
+  "chest_gem_center_x": 1116.5476724621424,
+  "gem_collar_difference_px": 0.07341771959499965,
+  "unchanged_material_count": 18,
+  "fur_source_rgba_and_position_unchanged": true,
+  "back_alpha_unchanged": true,
+  "interior_luminance_ratio_to_v59": 0.3472735557994932,
+  "front_dark_band_correction": [
+    {
+      "side": "R",
+      "prior_dark_band_luminance": 0.5057176391369997,
+      "new_same_area_luminance": 0.6046178554187401,
+      "non_painted_rgba_unchanged": true
+    },
+    {
+      "side": "L",
+      "prior_dark_band_luminance": 0.5167377343867717,
+      "new_same_area_luminance": 0.5997031782656264,
+      "non_painted_rgba_unchanged": true
+    }
+  ],
+  "actual_inside_outside_samples": [
+    {
+      "side": "screen_left",
+      "inside_luminance": 0.20038493111741537,
+      "exterior_luminance": 0.6412095421108603
+    },
+    {
+      "side": "screen_right",
+      "inside_luminance": 0.20292656207662824,
+      "exterior_luminance": 0.6366829976239203
+    }
+  ],
+  "native_torso_visible_atlas_rgba_unchanged": true,
+  "fully_transparent_atlas_rgb_bleed_pixels": 24539
+}

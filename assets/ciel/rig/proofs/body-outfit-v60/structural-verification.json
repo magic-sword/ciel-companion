@@ -1,0 +1,14 @@
+{
+  "stage": "structural checks only",
+  "passed": true,
+  "new_material_count": 22,
+  "mesh_count": 118,
+  "retained_meshes_checked": 89,
+  "references_resolve": true,
+  "source_sets_complete": true,
+  "formal_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
+  "draft_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "editor_load_verified": false,
+  "sdk_export_verified": false,
+  "unity_applied": false
+}

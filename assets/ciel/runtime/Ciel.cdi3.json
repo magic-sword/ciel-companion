@@ -215,10 +215,89 @@
 			"Id": "ParamJitome",
 			"GroupId": "",
 			"Name": "ジト目"
+		},
+		{
+			"Id": "ParamCielJacketVisible",
+			"GroupId": "",
+			"Name": "上着 表示"
+		},
+		{
+			"Id": "ParamCielArmL",
+			"GroupId": "",
+			"Name": "左 Arm"
+		},
+		{
+			"Id": "ParamCielElbowL",
+			"GroupId": "",
+			"Name": "左 Elbow"
+		},
+		{
+			"Id": "ParamCielWristL",
+			"GroupId": "",
+			"Name": "左 Wrist"
+		},
+		{
+			"Id": "ParamCielHandPoseL",
+			"GroupId": "",
+			"Name": "左 手ポーズ"
+		},
+		{
+			"Id": "ParamCielSleeveSwingL",
+			"GroupId": "",
+			"Name": "左 SleeveSwing"
+		},
+		{
+			"Id": "ParamCielFurSwingL",
+			"GroupId": "",
+			"Name": "左 FurSwing"
+		},
+		{
+			"Id": "ParamCielJacketHemL",
+			"GroupId": "",
+			"Name": "左 JacketHem"
+		},
+		{
+			"Id": "ParamCielArmR",
+			"GroupId": "",
+			"Name": "右 Arm"
+		},
+		{
+			"Id": "ParamCielElbowR",
+			"GroupId": "",
+			"Name": "右 Elbow"
+		},
+		{
+			"Id": "ParamCielWristR",
+			"GroupId": "",
+			"Name": "右 Wrist"
+		},
+		{
+			"Id": "ParamCielHandPoseR",
+			"GroupId": "",
+			"Name": "右 手ポーズ"
+		},
+		{
+			"Id": "ParamCielSleeveSwingR",
+			"GroupId": "",
+			"Name": "右 SleeveSwing"
+		},
+		{
+			"Id": "ParamCielFurSwingR",
+			"GroupId": "",
+			"Name": "右 FurSwing"
+		},
+		{
+			"Id": "ParamCielJacketHemR",
+			"GroupId": "",
+			"Name": "右 JacketHem"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part15",
+			"Name": "body-outfit-materials.psd"
+		},
 		{
 			"Id": "Part14",
 			"Name": "crown-addition.psd"

@@ -1,0 +1,21 @@
+{
+  "method": "move the fur depth split above the visible shoulder; restore complete pre-trim fur alpha; register blue backing behind the armpits",
+  "new_generation": false,
+  "source_version": "v56",
+  "material_count": 22,
+  "fur_split": "y = 1650 - .35*x in canonical per-side master coordinates",
+  "v56_arm_mask_alpha_trimming_removed": true,
+  "lining_world_box": [
+    690,
+    1900,
+    1540,
+    2750
+  ],
+  "white_flank_actual_owner": "Hair_Back",
+  "body_and_arm_materials_unchanged": true,
+  "source_hashes": {
+    "back-blue-completion.png": "1d85de4c783d7b67f85d43c54653113081634cca9221ab7f91f6cc26f81987a8",
+    "fur-completed-L.png": "afff8191b86d2ee1631b3e21d510ec1482811b5e294686bbcaad835c0fb83421",
+    "fur-completed-R.png": "82efb5e80bacf3ac983f39fed53ef3b2b99c97fe4d84acc4ffc66ed53b4fa001"
+  }
+}

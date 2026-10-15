@@ -1,5 +1,5 @@
 {
-  "approved_date": "2026-10-14",
+  "approved_date": "2026-10-15",
   "approved_expressions": [
     "happy",
     "relaxed",
@@ -14,32 +14,88 @@
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
+  "rig_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 92,
+  "material_count": 111,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/crown-v47",
+  "latest_proofs": "assets/ciel/rig/proofs/body-outfit-v60",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
-      "path": "Ciel.moc3",
-      "sha256": "10d6bfff14bab7869f3106cc0bf9f6f05fa25dbc194ed0d57f76f7c1adb5ab5f"
+      "path": "Ciel.4096/texture_00.png",
+      "sha256": "37b494ecab221e0d218a7b4cd821ed659f8af442c1358c5d5f4a351cd099498a"
+    },
+    {
+      "path": "Ciel.4096/texture_01.png",
+      "sha256": "cce6384b181083c756cd4bff8400cbfc6ad1f7baf87de18b4ec8e8de3f1d0051"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "7e46afa6bf9847d63c826179ed5a33ea60e9fd7c8ada360d4e169cb737c9e093"
+      "sha256": "328ef8e883ca2c88cb606ef883cfaf5459b5a42060b6e8aace7d8cf07f9382bd"
+    },
+    {
+      "path": "Ciel.moc3",
+      "sha256": "7018c54b025cf25bcd5c32dee1e2ae6b95001d6b01b555e48ef5b94b04698715"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "526172a2bba4d438b8ddfebec165d70c148b8911c60425b874fc05d656af4d76"
+      "sha256": "03ca0211f74f5451ad24506dd23116d39d2d78c129ab15298330d15e5ffa81cd"
     },
     {
-      "path": "Ciel.4096/texture_00.png",
-      "sha256": "37b494ecab221e0d218a7b4cd821ed659f8af442c1358c5d5f4a351cd099498a"
+      "path": "Ciel.physics3.json",
+      "sha256": "fb5124bb37abdd65acfe65215c2be50cae4aef36e69d65e4961681824f09aa1d"
+    },
+    {
+      "path": "Expressions/angry.exp3.json",
+      "sha256": "42dc14247b7d4cabf14a33c36670158dd515bda6c58dfdda8cb80222b7c641cb"
+    },
+    {
+      "path": "Expressions/embarrassed.exp3.json",
+      "sha256": "e70d2a7dd54e58c42e87f8e17ba7dae20049e369651d8a5a3b201a2249cb6e98"
+    },
+    {
+      "path": "Expressions/excited.exp3.json",
+      "sha256": "2e979d0eb70aeaa0bb2f9fb36060ff05785306a44f3592d8d6d70e8161b5fab7"
+    },
+    {
+      "path": "Expressions/happy.exp3.json",
+      "sha256": "eec3e973069c064b08ca1f2fb35d238c9c1a925fe69be1bafa1e221cca40c0f7"
+    },
+    {
+      "path": "Expressions/jitome.exp3.json",
+      "sha256": "bc84b99be5a8f1073e55e664af0c0706443827bd871d167e9c8bdbd299396c68"
+    },
+    {
+      "path": "Expressions/neutral.exp3.json",
+      "sha256": "8a0d069717891350cbb9be72f916b2b8dd6f49c772326fc98c09363326e67d09"
+    },
+    {
+      "path": "Expressions/relaxed.exp3.json",
+      "sha256": "b274ec38e5f15836338cc8a88ef96c14c740bb38ede2e11d09adc7f29303a57e"
+    },
+    {
+      "path": "Expressions/sad.exp3.json",
+      "sha256": "9e5868f4850387d8d25d5e8e7c423bb1ade6e9510b06cd1e882c53ac5cc60fab"
+    },
+    {
+      "path": "Expressions/surprised.exp3.json",
+      "sha256": "5616cc9f53c6d2087fb24124376ed84292d0b2985956fb9930c75c6f05ce89f2"
+    },
+    {
+      "path": "Expressions/teary.exp3.json",
+      "sha256": "9c6b4a5ee9d55c7935192ef7d9e0c591688bec9d4689cad67bb42083fd10f5da"
+    },
+    {
+      "path": "Expressions/troubled.exp3.json",
+      "sha256": "39b54aa4ab5dd0d8cfdedad3b904c72ccde775fa87686870f37b7fd81dbb449e"
+    },
+    {
+      "path": "Motions/Ciel_Nod.motion3.json",
+      "sha256": "8dcd3d5569fd799df4ae55c493560566fb4595dbfe5636d342633a9f802aa57a"
     }
   ],
   "latest_sad_proofs": "assets/ciel/rig/proofs/sad-v36",
@@ -70,5 +126,8 @@
   "skin_tone_revision": "v46",
   "latest_skin_tone_proofs": "assets/ciel/rig/proofs/skin-v46",
   "crown_completion_revision": "v47",
-  "crown_original_revision": "v45"
+  "crown_original_revision": "v45",
+  "body_outfit_revision": "v60",
+  "latest_body_outfit_proofs": "assets/ciel/rig/proofs/body-outfit-v60",
+  "body_outfit_controls": "assets/ciel/rig/body-outfit/controls.json"
 }

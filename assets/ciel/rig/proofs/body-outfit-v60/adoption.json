@@ -1,0 +1,17 @@
+{
+  "approved_date": "2026-10-15",
+  "source_revision": "v60",
+  "rig": "assets/ciel/rig/ciel.cmo3",
+  "rig_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "previous_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
+  "material_count": 111,
+  "new_material_count": 22,
+  "retired_materials": [
+    "Body",
+    "Jacket_Back",
+    "Jacket_Front"
+  ],
+  "sdk_package": "assets/ciel/runtime",
+  "unity_applied": true,
+  "head_materials_preserved": 89
+}

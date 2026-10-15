@@ -1,0 +1,120 @@
+{
+  "passed": true,
+  "editor_load_verified": true,
+  "sdk_export_verified": true,
+  "drawable_count": 111,
+  "parameter_count": 58,
+  "texture_count": 2,
+  "poses": [
+    {
+      "pose": "coat-neutral",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": false
+    },
+    {
+      "pose": "off-neutral",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": true
+    },
+    {
+      "pose": "coat-open",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": false
+    },
+    {
+      "pose": "off-open",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": true
+    },
+    {
+      "pose": "coat-fist",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": false
+    },
+    {
+      "pose": "off-fist",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": true
+    },
+    {
+      "pose": "bend-coat",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": false
+    },
+    {
+      "pose": "bend-off",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": true
+    },
+    {
+      "pose": "swing",
+      "finite": true,
+      "hands_exclusive": true,
+      "jacket_hidden": false
+    }
+  ],
+  "expression_regression": [
+    {
+      "expression": "neutral",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "happy",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "relaxed",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "surprised",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "angry",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "sad",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "troubled",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "embarrassed",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "teary",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "excited",
+      "max_vertex_error_px": 0.0
+    },
+    {
+      "expression": "jitome",
+      "max_vertex_error_px": 0.0
+    }
+  ],
+  "head_meshes_checked": 89,
+  "head_angle_regression": true,
+  "performance": {
+    "base_update_ms": 0.4215205000946298,
+    "draft_update_ms": 0.46947650000220165,
+    "scope": "CPU Cubism Core update only; excludes rendering and Unity"
+  },
+  "physics_scope": "Existing hair physics copied; garment swing keys ready, additional garment physics not yet tuned",
+  "unity_applied": false,
+  "formal_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b"
+}

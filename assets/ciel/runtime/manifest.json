@@ -1,8 +1,8 @@
 {
-  "approved_date": "2026-10-14",
+  "approved_date": "2026-10-15",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
-  "material_count": 92,
+  "source_rig_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "material_count": 111,
   "approved_expressions": [
     "happy",
     "relaxed",
@@ -21,16 +21,20 @@
       "sha256": "37b494ecab221e0d218a7b4cd821ed659f8af442c1358c5d5f4a351cd099498a"
     },
     {
+      "path": "Ciel.4096/texture_01.png",
+      "sha256": "cce6384b181083c756cd4bff8400cbfc6ad1f7baf87de18b4ec8e8de3f1d0051"
+    },
+    {
       "path": "Ciel.cdi3.json",
-      "sha256": "7e46afa6bf9847d63c826179ed5a33ea60e9fd7c8ada360d4e169cb737c9e093"
+      "sha256": "328ef8e883ca2c88cb606ef883cfaf5459b5a42060b6e8aace7d8cf07f9382bd"
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "10d6bfff14bab7869f3106cc0bf9f6f05fa25dbc194ed0d57f76f7c1adb5ab5f"
+      "sha256": "7018c54b025cf25bcd5c32dee1e2ae6b95001d6b01b555e48ef5b94b04698715"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "3b77d4c11099a198fca4c7ca642234016745f2e51a1f012e96307fe6ec0cb100"
+      "sha256": "bfc947016496af9746f22e8c21dd455ebf05c6f8bfe372965363963df1e4712f"
     },
     {
       "path": "Ciel.physics3.json",
@@ -95,12 +99,36 @@
       "sha256": "3a8b496b4c7b10e8bc3c4417fa4b289c7efdf5cea63457927ca413629604dd78"
     },
     {
-      "path": "assets/ciel/current/layers/Jacket_Back.png",
-      "sha256": "59fb87c160a058fed549b77e6bd52ceb871fc65d31103f59b28c321d3c27d960"
+      "path": "assets/ciel/current/layers/Jacket48_Back.png",
+      "sha256": "a8f6f9a0d4a0ff4d8b26f42381616206954628a0bc7b4d05a1d4ec38d3a2cfdf"
     },
     {
-      "path": "assets/ciel/current/layers/Body.png",
-      "sha256": "45a27cb1d91136894ce4417f34ae660f8c6695ce77d57d825192625e7f28a572"
+      "path": "assets/ciel/current/layers/Jacket52_FurBack_R.png",
+      "sha256": "7798fa783c44b12476fb350a34f73b64964bdeded3406edb2a38f847e378804d"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket52_FurBack_L.png",
+      "sha256": "99de141d51c2c42ae26dbb6dfdee6cbc51b324f3aefd0d753d5ab9138fb00c40"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_Torso.png",
+      "sha256": "cb5cbe87e2009f9fa003dc71ed77066512395eb98cdabe17ccc507627d2b5408"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_UpperArm_R.png",
+      "sha256": "31acf0153a8a222f98e6f8f6c58e65d80e1bf4d66b94bce6a7f9155d123ac90a"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_UpperArm_L.png",
+      "sha256": "b7746ea8204c5ede24674547a6873bdf086e51b74e8725ad28cb424f9c15aaf7"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_Forearm_R.png",
+      "sha256": "159c9d89675eaf698451a97c02f3e3c03a15a7ea3b115ab65c5b3e2f17e34b9e"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_Forearm_L.png",
+      "sha256": "a44e2b496abf0a77ee3883497eb048ae8f04799b005a59cb5bf0c7eb9188f612"
     },
     {
       "path": "assets/ciel/current/layers/Choker_Back.png",
@@ -115,8 +143,60 @@
       "sha256": "70182343d2ac71e2ffb6773cedff018f17c11d7edd4791b7ca33ff0474240698"
     },
     {
-      "path": "assets/ciel/current/layers/Jacket_Front.png",
-      "sha256": "7b333cfc0e240c585408c3e50f886369eec3275d18452eee22e8d11a12503e91"
+      "path": "assets/ciel/current/layers/Jacket48_SleeveUpper_R.png",
+      "sha256": "ca44c32ed09f7dfafee86b51bedc53b23153c9f8ca704dbf3c56db9eb53807cc"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_SleeveUpper_L.png",
+      "sha256": "eca1a0c214262b297c38ae2a600612debe933751b6b5c77f9b335aa8b85007fe"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_SleeveLower_R.png",
+      "sha256": "6f90a8997a136faf5c450b525879fc6027d2ea0ae218f6962aba140aa9b6543b"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_SleeveLower_L.png",
+      "sha256": "2f768f764aede87193dd27d50ee721687999d42ef2c807891ceafe3f484ea1ac"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandRelaxed_R.png",
+      "sha256": "69b67f9477703e484780ca13235933359600e24056ecf486d4cd2b158504b007"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandOpen_R.png",
+      "sha256": "7383fea9949ee3b81b8326fcc1d504174c93fe69079f54354dfde07dbdc521e1"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandFist_R.png",
+      "sha256": "35e28dbfeb0eb74f4bd25701887fee1e2a4614407b3f4bcebc846673bbd61f3e"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandRelaxed_L.png",
+      "sha256": "cd533ae5a4471f95efdb74a276e14a87c63c704e60e7ac90fc6eda6f3f675772"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandOpen_L.png",
+      "sha256": "e91fe5d1b7391d0a94983aaf88ab606c977070201bb953557ab762f20cfdda77"
+    },
+    {
+      "path": "assets/ciel/current/layers/Body48_HandFist_L.png",
+      "sha256": "8392f472762af9e1eed5b41cb1e36035790efb517b5fd7a1722bff1dbb380986"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_Cuff_R.png",
+      "sha256": "f80ba70ffe43bfa9bb83395cd9d5d07c41aed5f2da3a0c63fcc2dda16a5c6722"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_Cuff_L.png",
+      "sha256": "d9288f78a8207587a8bfe9e4f41142cf6c4a71fd2f7be7fe26464f83d75892e1"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_Fur_R.png",
+      "sha256": "37208266fde5748aa2fbdb9ef70676e2ec1ab0d03ef748d156c2216dd93bd513"
+    },
+    {
+      "path": "assets/ciel/current/layers/Jacket48_Fur_L.png",
+      "sha256": "22fd53813988e60f9021f00be486c1303090d722e6a4c67fea7e13e679ce3799"
     },
     {
       "path": "assets/ciel/current/layers/Choker_Front.png",

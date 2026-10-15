@@ -160,10 +160,192 @@
 			"Id": "ParamSparkle",
 			"GroupId": "",
 			"Name": "キラキラ"
+		},
+		{
+			"Id": "ParamHappy",
+			"GroupId": "",
+			"Name": "嬉しい 顔（口・頬・鼻）"
+		},
+		{
+			"Id": "ParamRelaxed",
+			"GroupId": "",
+			"Name": "にこにこ"
+		},
+		{
+			"Id": "ParamSurprised",
+			"GroupId": "",
+			"Name": "驚き"
+		},
+		{
+			"Id": "ParamAngry",
+			"GroupId": "",
+			"Name": "ぷんすか"
+		},
+		{
+			"Id": "ParamEarFold",
+			"GroupId": "",
+			"Name": "折れ耳"
+		},
+		{
+			"Id": "ParamSad",
+			"GroupId": "",
+			"Name": "しょんぼり"
+		},
+		{
+			"Id": "ParamTroubled",
+			"GroupId": "",
+			"Name": "困り"
+		},
+		{
+			"Id": "ParamEmbarrassed",
+			"GroupId": "",
+			"Name": "照れ"
+		},
+		{
+			"Id": "ParamTeary",
+			"GroupId": "",
+			"Name": "半泣き"
+		},
+		{
+			"Id": "ParamExcited",
+			"GroupId": "",
+			"Name": "わくわく"
+		},
+		{
+			"Id": "ParamJitome",
+			"GroupId": "",
+			"Name": "ジト目"
+		},
+		{
+			"Id": "ParamCielJacketVisible",
+			"GroupId": "",
+			"Name": "上着 表示"
+		},
+		{
+			"Id": "ParamCielArmL",
+			"GroupId": "",
+			"Name": "左 Arm"
+		},
+		{
+			"Id": "ParamCielElbowL",
+			"GroupId": "",
+			"Name": "左 Elbow"
+		},
+		{
+			"Id": "ParamCielWristL",
+			"GroupId": "",
+			"Name": "左 Wrist"
+		},
+		{
+			"Id": "ParamCielHandPoseL",
+			"GroupId": "",
+			"Name": "左 手ポーズ"
+		},
+		{
+			"Id": "ParamCielSleeveSwingL",
+			"GroupId": "",
+			"Name": "左 SleeveSwing"
+		},
+		{
+			"Id": "ParamCielFurSwingL",
+			"GroupId": "",
+			"Name": "左 FurSwing"
+		},
+		{
+			"Id": "ParamCielJacketHemL",
+			"GroupId": "",
+			"Name": "左 JacketHem"
+		},
+		{
+			"Id": "ParamCielArmR",
+			"GroupId": "",
+			"Name": "右 Arm"
+		},
+		{
+			"Id": "ParamCielElbowR",
+			"GroupId": "",
+			"Name": "右 Elbow"
+		},
+		{
+			"Id": "ParamCielWristR",
+			"GroupId": "",
+			"Name": "右 Wrist"
+		},
+		{
+			"Id": "ParamCielHandPoseR",
+			"GroupId": "",
+			"Name": "右 手ポーズ"
+		},
+		{
+			"Id": "ParamCielSleeveSwingR",
+			"GroupId": "",
+			"Name": "右 SleeveSwing"
+		},
+		{
+			"Id": "ParamCielFurSwingR",
+			"GroupId": "",
+			"Name": "右 FurSwing"
+		},
+		{
+			"Id": "ParamCielJacketHemR",
+			"GroupId": "",
+			"Name": "右 JacketHem"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part15",
+			"Name": "body-outfit-materials.psd"
+		},
+		{
+			"Id": "Part14",
+			"Name": "crown-addition.psd"
+		},
+		{
+			"Id": "Part13",
+			"Name": "jitome-additions.psd"
+		},
+		{
+			"Id": "Part12",
+			"Name": "excited-additions.psd"
+		},
+		{
+			"Id": "Part11",
+			"Name": "teary-additions.psd"
+		},
+		{
+			"Id": "Part10",
+			"Name": "embarrassed-additions.psd"
+		},
+		{
+			"Id": "Part9",
+			"Name": "troubled-additions.psd"
+		},
+		{
+			"Id": "Part8",
+			"Name": "sad-additions.psd"
+		},
+		{
+			"Id": "Part7",
+			"Name": "angry-additions.psd"
+		},
+		{
+			"Id": "Part6",
+			"Name": "surprised-mouth.psd"
+		},
+		{
+			"Id": "Part5",
+			"Name": "lid-lines.psd"
+		},
+		{
+			"Id": "Part4",
+			"Name": "relaxed-additions.psd"
+		},
+		{
+			"Id": "Part3",
+			"Name": "happy-additions.psd"
+		},
 		{
 			"Id": "Part2",
 			"Name": "ciel-expression-additions.psd"

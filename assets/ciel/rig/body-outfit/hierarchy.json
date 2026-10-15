@@ -1,0 +1,212 @@
+{
+  "Body48_TorsoWarp": {
+    "parent": "#28350",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      400,
+      1300,
+      1772,
+      2896
+    ],
+    "torso_mesh_registration": {
+      "reference": "collar buckle axis",
+      "reference_x": 1115,
+      "translation_px": [
+        28.5,
+        0.0
+      ],
+      "purpose": "center the torso mesh independently of coat overlap; parent warp, coat and arms unchanged"
+    }
+  },
+  "Body48_Shoulder_R": {
+    "parent": "#28350",
+    "kind": "rot",
+    "pivot": [
+      644.7037037037037,
+      1597.0
+    ],
+    "bbox": null
+  },
+  "Body48_Elbow_R": {
+    "parent": "#75717",
+    "kind": "rot",
+    "pivot": [
+      454.70370370370364,
+      2452.7037037037035
+    ],
+    "bbox": null
+  },
+  "Body48_Wrist_R": {
+    "parent": "#75725",
+    "kind": "rot",
+    "pivot": [
+      233.7407407407407,
+      3069.148148148148
+    ],
+    "bbox": null
+  },
+  "Jacket48_SleeveUpperWarp_R": {
+    "parent": "#75717",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      107.0,
+      1765.0,
+      837.0,
+      2596.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v56"
+  },
+  "Jacket48_SleeveLowerWarp_R": {
+    "parent": "#75725",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      -6.0,
+      2544.0,
+      805.0,
+      3047.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v56"
+  },
+  "Jacket48_FurWarp_R": {
+    "parent": "#75717",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      100.0,
+      1344.0,
+      814.0,
+      2175.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v57"
+  },
+  "Jacket48_FrontWarp_R": {
+    "parent": "#28350",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      345.6142034499969,
+      1698.964876658773,
+      990.925925925926,
+      2843.962962962963
+    ]
+  },
+  "Body48_Shoulder_L": {
+    "parent": "#28350",
+    "kind": "rot",
+    "pivot": [
+      1528.6962962962966,
+      1597.0
+    ],
+    "bbox": null
+  },
+  "Body48_Elbow_L": {
+    "parent": "#75773",
+    "kind": "rot",
+    "pivot": [
+      1718.6962962962966,
+      2452.7037037037035
+    ],
+    "bbox": null
+  },
+  "Body48_Wrist_L": {
+    "parent": "#75781",
+    "kind": "rot",
+    "pivot": [
+      1939.6592592592592,
+      3069.148148148148
+    ],
+    "bbox": null
+  },
+  "Jacket48_SleeveUpperWarp_L": {
+    "parent": "#75773",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      1394.0,
+      1760.0,
+      2116.0,
+      2596.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v56"
+  },
+  "Jacket48_SleeveLowerWarp_L": {
+    "parent": "#75781",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      1426.0,
+      2544.0,
+      2178.0,
+      3047.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v56"
+  },
+  "Jacket48_FurWarp_L": {
+    "parent": "#75773",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      1386.0,
+      1344.0,
+      2137.0,
+      2176.0
+    ],
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v57"
+  },
+  "Jacket48_FrontWarp_L": {
+    "parent": "#28350",
+    "kind": "warp",
+    "pivot": null,
+    "bbox": [
+      1182.474074074074,
+      1698.928642899516,
+      1827.6746368550002,
+      2843.962962962963
+    ]
+  },
+  "Jacket52_FurBackWarp_R": {
+    "parent": "#28350",
+    "kind": "warp",
+    "bbox": [
+      100.0,
+      1344.0,
+      814.0,
+      2175.0
+    ],
+    "note": "body anchor with shoulder seam blend",
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v57"
+  },
+  "Jacket52_FurBackWarp_L": {
+    "parent": "#28350",
+    "kind": "warp",
+    "bbox": [
+      1386.0,
+      1344.0,
+      2137.0,
+      2176.0
+    ],
+    "note": "body anchor with shoulder seam blend",
+    "bbox_space": "neutral SDK canvas; calibrated into parent coordinates in the keyforms",
+    "source": "master v57"
+  },
+  "Jacket48_Back": {
+    "bbox": [
+      274,
+      1270,
+      1946,
+      2800
+    ],
+    "bbox_space": "neutral SDK canvas",
+    "source": "v59 generated complete rear garment underlay"
+  }
+}

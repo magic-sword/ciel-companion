@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58229d41c24a7fb4aafd097ab43bcc2a, type: 3}
+  m_Name: jitome.exp3
+  m_EditorClassIdentifier: Live2D.Cubism::Live2D.Cubism.Framework.Expression.CubismExpressionData
+  Type: Live2D Expression
+  FadeInTime: 0.2
+  FadeOutTime: 0.2
+  Parameters:
+  - Id: ParamJitome
+    Value: 1
+    Blend: 0
+  - Id: ParamEar
+    Value: -0.35
+    Blend: 0
+  - Id: ParamEarFold
+    Value: 0
+    Blend: 0
+  - Id: ParamTeary
+    Value: 0
+    Blend: 0
+  - Id: ParamExcited
+    Value: 0
+    Blend: 0
+  - Id: ParamAngry
+    Value: 0
+    Blend: 0
+  - Id: ParamSad
+    Value: 0
+    Blend: 0
+  - Id: ParamTroubled
+    Value: 0
+    Blend: 0
+  - Id: ParamEmbarrassed
+    Value: 0
+    Blend: 0
+  - Id: ParamTear
+    Value: 0
+    Blend: 0
+  - Id: ParamHappy
+    Value: 0
+    Blend: 0
+  - Id: ParamRelaxed
+    Value: 0
+    Blend: 0
+  - Id: ParamSurprised
+    Value: 0
+    Blend: 0
+  - Id: ParamSweat
+    Value: 0
+    Blend: 0
+  - Id: ParamSparkle
+    Value: 0
+    Blend: 0
+  - Id: ParamCheek
+    Value: 0.15
+    Blend: 0
+  - Id: ParamEyeLSmile
+    Value: 0
+    Blend: 0
+  - Id: ParamEyeRSmile
+    Value: 0
+    Blend: 0
+  - Id: ParamMouthForm
+    Value: 0
+    Blend: 0
+  - Id: ParamMouthOpenY
+    Value: 0
+    Blend: 0

@@ -1,0 +1,13 @@
+{
+  "approved": false,
+  "method": "image generation followed by alpha masks and uniform per-component placement",
+  "sources": {
+    "assets/ciel/generated/v48/inputs/body-with-hands.png": "12933e44668111675c943187bc4a50672092919c3a584720990e94dd23f4c884",
+    "assets/ciel/generated/v48/inputs/hand-poses.png": "9f5527f880c27a83fd67c0e467e7758032054b9e2465480d8e026f797fe7c369",
+    "assets/ciel/generated/v48/inputs/jacket-complete.png": "d5871344318cead38176064f3f4a328419379ea13a95b095ae55eff599668486"
+  },
+  "formal_rig_sha256": "cffe409e024aa0dfff14cd4d6ba470f8ee647e0fe8e3807e677d1ebfd034769b",
+  "material_count": 26,
+  "fur_depth_split": true,
+  "source_artwork": "v51 unchanged RGB; alpha partition with overlap"
+}

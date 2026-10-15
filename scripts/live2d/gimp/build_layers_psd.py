@@ -36,10 +36,12 @@ def run_proc(name, **values):
 doc = Gimp.Image.new(W, H, Gimp.ImageBaseType.RGB)
 for name, path in stack:
     item = Gimp.file_load_layer(Gimp.RunMode.NONINTERACTIVE, doc, Gio.File.new_for_path(str(path)))
-    assert (item.get_width(), item.get_height()) == (W, H), f'{name}: size {item.get_width()}x{item.get_height()}'
+    entry = next(l for l in manifest['layers'] if l['name'] == name)
+    assert (item.get_width(), item.get_height()) == tuple(entry.get('canvas', [W, H])), f'{name}: size {item.get_width()}x{item.get_height()}'
     item.set_name(name)
     item.set_visible(visible[name])
     doc.insert_layer(item, None, 0)
+    item.set_offsets(*entry.get('offset', [0, 0]))
 expect = [n for n, _ in reversed(stack)]
 assert [l.get_name() for l in doc.get_layers()] == expect
 
@@ -50,7 +52,10 @@ for suffix, proc in [('xcf', 'gimp-xcf-save'), ('psd', 'file-psd-export')]:
     loaded = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(str(target)))
     got = [l.get_name() for l in loaded.get_layers()]
     assert got == expect, got
-    checks[suffix] = dict(layers=len(got), names_equal=True)
+    for layer in loaded.get_layers():
+        entry = next(l for l in manifest['layers'] if l['name'] == layer.get_name())
+        assert tuple(layer.get_offsets())[-2:] == tuple(entry.get('offset', [0, 0])), layer.get_name()
+    checks[suffix] = dict(layers=len(got), names_equal=True, offsets_equal=True)
     loaded.delete()
 doc.delete()
 

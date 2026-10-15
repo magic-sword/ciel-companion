@@ -1,0 +1,128 @@
+[
+  {
+    "path": "assets/ciel/generated/v60/source-history/v48/body-with-hands.png",
+    "sha256": "12933e44668111675c943187bc4a50672092919c3a584720990e94dd23f4c884",
+    "original_path": "assets/ciel/generated/v48/inputs/body-with-hands.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v48/hand-poses.png",
+    "sha256": "9f5527f880c27a83fd67c0e467e7758032054b9e2465480d8e026f797fe7c369",
+    "original_path": "assets/ciel/generated/v48/inputs/hand-poses.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v48/jacket-complete.png",
+    "sha256": "d5871344318cead38176064f3f4a328419379ea13a95b095ae55eff599668486",
+    "original_path": "assets/ciel/generated/v48/inputs/jacket-complete.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v54/jacket-corrected.png",
+    "sha256": "bc74f85514ef7fee6fa4150a2d233f8fc5a8ab50c1bcf02929295c55feab9a6c",
+    "original_path": "assets/ciel/generated/v54/inputs/jacket-corrected.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v55/lower-outpaint-source.png",
+    "sha256": "cad881342eb7d07702dd5e86b528a289e2d0be195a8f32ecce2f91c41e5dc7ee",
+    "original_path": "assets/ciel/generated/v55/inputs/lower-outpaint-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v55/occluded-cloth-source.png",
+    "sha256": "b25d9c994a6a1a5e7d9fe9e8e94605638c84f845a262cd1aa02b8751c2eb480b",
+    "original_path": "assets/ciel/generated/v55/inputs/occluded-cloth-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v55/supplement-source.png",
+    "sha256": "bd61207ba0d285afaa3ab77733b544984e31e43d99587ee68921de1cc884062c",
+    "original_path": "assets/ciel/generated/v55/inputs/supplement-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v56/back-blue-completion.png",
+    "sha256": "1d85de4c783d7b67f85d43c54653113081634cca9221ab7f91f6cc26f81987a8",
+    "original_path": "assets/ciel/generated/v56/inputs/back-blue-completion.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v56/fur-inner-completion.png",
+    "sha256": "9648235aef2960d10a855d01103e950898f73df08528bcd268faaa249f85f967",
+    "original_path": "assets/ciel/generated/v56/inputs/fur-inner-completion.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v56/lower-outpaint-source.png",
+    "sha256": "cad881342eb7d07702dd5e86b528a289e2d0be195a8f32ecce2f91c41e5dc7ee",
+    "original_path": "assets/ciel/generated/v56/inputs/lower-outpaint-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v56/occluded-cloth-source.png",
+    "sha256": "b25d9c994a6a1a5e7d9fe9e8e94605638c84f845a262cd1aa02b8751c2eb480b",
+    "original_path": "assets/ciel/generated/v56/inputs/occluded-cloth-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v56/supplement-source.png",
+    "sha256": "bd61207ba0d285afaa3ab77733b544984e31e43d99587ee68921de1cc884062c",
+    "original_path": "assets/ciel/generated/v56/inputs/supplement-source.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v57/back-blue-completion.png",
+    "sha256": "1d85de4c783d7b67f85d43c54653113081634cca9221ab7f91f6cc26f81987a8",
+    "original_path": "assets/ciel/generated/v57/inputs/back-blue-completion.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v57/fur-completed-L.png",
+    "sha256": "afff8191b86d2ee1631b3e21d510ec1482811b5e294686bbcaad835c0fb83421",
+    "original_path": "assets/ciel/generated/v57/inputs/fur-completed-L.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v57/fur-completed-R.png",
+    "sha256": "82efb5e80bacf3ac983f39fed53ef3b2b99c97fe4d84acc4ffc66ed53b4fa001",
+    "original_path": "assets/ciel/generated/v57/inputs/fur-completed-R.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v58/generation-notes.md",
+    "sha256": "cea6054258ee867b653660bb3a61d111ffc03993f278f7a5dbc04c598868a62b",
+    "original_path": "assets/ciel/generated/v58/inputs/generation-notes.md",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v58/rear-garment-clean.png",
+    "sha256": "7485ada267cc9b6a23ac65168c7666171b2488a3a985d1fe7c618e54b4ba5c53",
+    "original_path": "assets/ciel/generated/v58/inputs/rear-garment-clean.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v58/rear-garment-generated.png",
+    "sha256": "a8a11cd0b16e7af09c5bf3f3c0a0538869b920aa4cf53bc639531865cf7e7ce9",
+    "original_path": "assets/ciel/generated/v58/inputs/rear-garment-generated.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v59/cloth-registered.png",
+    "sha256": "723f8255fd995c238d14bd972ad1171879cdca5342863bcab2929351fb91f65e",
+    "original_path": "assets/ciel/generated/v59/inputs/cloth-registered.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v59/continuous-cloth-generated.png",
+    "sha256": "30f4d000af49fb4b250654015c52ced8ef85a31b33e45e3310330302e1ba9431",
+    "original_path": "assets/ciel/generated/v59/inputs/continuous-cloth-generated.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  },
+  {
+    "path": "assets/ciel/generated/v60/source-history/v59/fur-protection-mask.png",
+    "sha256": "e545729a5376f18e8f7f9c0ae4aa0da9060e79c9e1b4ea1f42fa98962df98e33",
+    "original_path": "assets/ciel/generated/v59/inputs/fur-protection-mask.png",
+    "role": "historical generation source; final accepted pixels are in current/layers"
+  }
+]

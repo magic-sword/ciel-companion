@@ -1,0 +1,92 @@
+{
+  "ParamCielJacketVisible": {
+    "label": "上着 表示",
+    "min": 0,
+    "max": 1,
+    "default": 1
+  },
+  "ParamCielArmL": {
+    "label": "左 Arm",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielElbowL": {
+    "label": "左 Elbow",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielWristL": {
+    "label": "左 Wrist",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielHandPoseL": {
+    "label": "左 手ポーズ",
+    "min": 0,
+    "max": 2,
+    "default": 0
+  },
+  "ParamCielSleeveSwingL": {
+    "label": "左 SleeveSwing",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielFurSwingL": {
+    "label": "左 FurSwing",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielJacketHemL": {
+    "label": "左 JacketHem",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielArmR": {
+    "label": "右 Arm",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielElbowR": {
+    "label": "右 Elbow",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielWristR": {
+    "label": "右 Wrist",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielHandPoseR": {
+    "label": "右 手ポーズ",
+    "min": 0,
+    "max": 2,
+    "default": 0
+  },
+  "ParamCielSleeveSwingR": {
+    "label": "右 SleeveSwing",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielFurSwingR": {
+    "label": "右 FurSwing",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  },
+  "ParamCielJacketHemR": {
+    "label": "右 JacketHem",
+    "min": -1,
+    "max": 1,
+    "default": 0
+  }
+}

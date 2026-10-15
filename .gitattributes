@@ -8,9 +8,13 @@
 *.ora binary
 # Unity emits a space after empty YAML values in generated prefabs.
 *.prefab whitespace=-blank-at-eol
+unity/**/*.meta whitespace=-blank-at-eol
+unity/**/*.asset whitespace=-blank-at-eol
 *.cmo3 filter=lfs diff=lfs merge=lfs -text
 *.can3 filter=lfs diff=lfs merge=lfs -text
 *.moc3 binary
 *.exe binary
 # Runtime package checksums refer to exact exported bytes, including JSON line endings.
 assets/ciel/runtime/**/*.json -text whitespace=cr-at-eol
+unity/Assets/Characters/Ciel/**/*.json -text whitespace=cr-at-eol
+unity/Assets/Characters/Ciel/Ciel.asset filter=lfs diff=lfs merge=lfs -text

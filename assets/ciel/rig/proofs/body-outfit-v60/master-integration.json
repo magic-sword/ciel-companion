@@ -1,0 +1,40 @@
+{
+  "stage": "native candidate and actual SDK torso registration, center, interior/exterior lighting and regressions verified",
+  "version": "v60",
+  "retargeted_meshes": 1,
+  "torso_translation_px": [
+    28.5,
+    0.0
+  ],
+  "reference_axis_x": 1115,
+  "changed_texture_slots": [
+    {
+      "name": "Jacket48_Back",
+      "prior_slot_mean_error": 0.0,
+      "prior_slot_max_error": 0,
+      "alpha_unchanged": true
+    },
+    {
+      "name": "Jacket48_SleeveUpper_R",
+      "prior_slot_mean_error": 0.0,
+      "prior_slot_max_error": 0,
+      "alpha_unchanged": true
+    },
+    {
+      "name": "Jacket48_SleeveUpper_L",
+      "prior_slot_mean_error": 0.0,
+      "prior_slot_max_error": 0,
+      "alpha_unchanged": true
+    }
+  ],
+  "coat_arm_fur_geometry_unchanged": true,
+  "candidate_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "sdk_export_verified": true,
+  "unchanged_meshes": 110,
+  "final_draft_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "final_moc_sha256": "7018c54b025cf25bcd5c32dee1e2ae6b95001d6b01b555e48ef5b94b04698715",
+  "post_export_texture_updates": false,
+  "source_fur_preserved": true,
+  "native_torso_visible_atlas_rgba_unchanged": true,
+  "fully_transparent_atlas_rgb_bleed_pixels": 24539
+}

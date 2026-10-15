@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "unity_applied": true,
+  "unity_version": "6000.6.4f1",
+  "apply_current_completed": true,
+  "validate_current_completed": true,
+  "existing_materials_byte_identical": 89,
+  "existing_unity_meta_files_preserved": 14,
+  "existing_physics_and_motions_preserved": true,
+  "scope": "Editor import, package hashes and expression-target validation; no play-mode or GPU rendering validation"
+}

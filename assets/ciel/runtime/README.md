@@ -1,41 +1,12 @@
-# Unityへ更新するための確定版パッケージ
+# シエルの確定版SDKパッケージ
 
-最新は頭頂部・後ろ髪の共通修正v47を反映したパッケージ。92層・17ファイル・通常を含む11表情。全表情で頭頂部の補完を共有し、既存の表情と動作を維持する。肌色v46も含む。
+2026-10-15に身体・上着v60を採用し、Unityモデルへ反映済み。現行111素材、SDK18ファイル、通常を含む11表情、4096pxアトラス2枚。正式編集モデルは `../rig/ciel.cmo3`、現行素材は `../current/layers.json`。
 
-肌色の共通修正v46も反映済み。92層・17ファイル・通常を含む11表情。全12表情（未調整の考え中を含む）で肌色を確認した。形状と切り替え制御は既存のものを維持する。
+身体を首輪の中央へ合わせ、上着の内側と表側で明るさを分担した。着脱と手3種の切り替えを確認し、既存の頭部・表情・髪の物理・うなずきを維持した。[採用・検証](../rig/proofs/body-outfit-v60/README.md)。
 
-ジト目v44と頭頂部共通修正v45も含む。92層、通常を含む11表情、SDK17ファイルを保存した。頭頂部は全表情で使い、頭の向きに追従する。下側の後ろ髪の揺れからは独立する。ジト目は`ParamJitome`で切り替え、旧目の開き・口の変形値を重ねない。わくわくは`ParamExcited`で切り替え、旧キラキラ・目の開き・口の値を重ねない。折れ耳v42はぷんすか・しょんぼり・困り・照れ・半泣きで共用する。Unityのモデル本体への適用はまだ行っていない。
+`manifest.json` に正式モデル・全素材・SDK全ファイルのSHA-256を記録する。Unityの `Assets/Characters/Ciel/runtime-manifest.json` と一致する。`CIEL > Model > Validate Current Package` で検証し、次回更新時は `CIEL > Model > Apply Current Package` を使う。既存の.metaとシーン参照を引き継ぎ、更新前は `.local/unity-model-update/` に退避する。
 
-2026-10-14に採用した照れ（v39・目尻と赤みの最終調整済み）、困り（v37・下まぶた調整済み）、しょんぼり（v36）、ぷんすか（v35）、驚き（v34）、にこにこ、嬉しいを含む。
-Cubismの正式モデルは`../rig/ciel.cmo3`。このフォルダはその検証済み書き出し。
-現在Unityに入っているモデルはまだ更新していない。
+着脱は `ParamCielJacketVisible` の0/1、左右の手は `ParamCielHandPoseL/R` の0=自然手・1=開き手・2=握り手。既存11表情は `Expressions/`。新しい衣服の物理出力接続と大きな肘曲げ・腕上げの補正は今後の作業。
 
-**Unityのメニュー `CIEL > Model > Apply Current Package` で反映できる。**
-
-実行すると素材・モデル・書き出しのハッシュを確認し、既存Unity素材を`.local/unity-model-update/`へ退避する。
-moc3・アトラス・表示情報・モデル設定・表情ファイルをコピーし、再取り込みと待機設定を行う。
-既存の`.meta`・うなずき・物理演算・まばたき・口パクの設定は引き継ぐ。シーンは作り直さない。
-`CIEL > Model > Validate Current Package`なら検証だけを実行できる。
-
-Unity側の`CielExpression`も準備済み。新モデルではにこにこを`ParamRelaxed`で切り替え、
-古い目の細め方や口角の値を重ねない。嬉しいは`ParamHappy`も有効にする。
-驚きは`ParamSurprised`で切り替え、従来の目の開きや口の開き値を重ねない。
-ぷんすかはParamAngry、しょんぼりはParamSad、困りはParamTroubled、照れはParamEmbarrassedを使い、ParamEarFoldで折れ耳を表示する。困りでは旧汗、照れでは旧赤み・目線・口・耳の変形値を重ねない。通常や他の表情へ戻ると11個の専用キー（折れ耳を含む）を0へ戻し、旧モデルには以前の設定を使用する。
-
-| ファイル | 内容 |
-| --- | --- |
-| `manifest.json` | 正式モデル・現行素材87層・パッケージ16ファイルのSHA-256 |
-| `Ciel.model3.json` / `Ciel.moc3` / `Ciel.cdi3.json` | 検証済みモデルと表示情報 |
-| `Ciel.4096/texture_00.png` | 現行87層を配置したアトラス |
-| `Ciel.physics3.json` / `Motions/` | 既存の物理演算とうなずき |
-| `Expressions/` | 通常・嬉しい・にこにこ・驚き・ぷんすか・しょんぼり・困り・照れ・半泣き・わくわくの切り替えファイル。model3にも登録済み |
-
-再作成は、正式モデルをCubismで保存・書き出して検証した後に行う。
-
-```powershell
-python -B scripts/live2d/prepare-current-runtime.py <書き出しフォルダ>
-```
-
-`current/approved.json`と正式モデルのハッシュが異なる場合は再作成・適用を止める。
-表情を改修したら、採用状態と比較・検証記録も更新する。
-最新の見た目は[わくわくの比較](../rig/proofs/excited-v43/reference-comparison.png)を参照。
+再検証: `python -B scripts/live2d/adopt-body-outfit.py`。
+再書き出し時はCubismで正式モデルを保存し、SDKを検証・採用してから `prepare-current-runtime.py <書き出しフォルダ>` を使う。モデルや素材のハッシュが異なる場合は更新を止める。

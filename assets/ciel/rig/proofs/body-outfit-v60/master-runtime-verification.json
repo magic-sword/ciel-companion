@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "new_drawables": 111,
+  "retired_duplicate_front_layers": [
+    "Jacket48_Front_L",
+    "Jacket48_Lining_L",
+    "Jacket48_Front_R",
+    "Jacket48_Lining_R"
+  ],
+  "unchanged_meshes": 110,
+  "regression_poses": 6,
+  "max_registration_error_px": 0.00012946128845214844,
+  "registration_errors_px": {
+    "Body48_Torso": 0.00012946128845214844
+  },
+  "max_uv_error": 0.0,
+  "rear_front_occlusion_order": true,
+  "jacket_off_hides_all_coat": true,
+  "active_swing_and_hem_states": 12,
+  "swing_shifts_px": {
+    "ParamCielSleeveSwingL=-1": 10.000107765197754,
+    "ParamCielSleeveSwingL=1": 10.000043034553528,
+    "ParamCielSleeveSwingR=-1": 10.000107765197754,
+    "ParamCielSleeveSwingR=1": 10.000043035391535,
+    "ParamCielFurSwingL=-1": 8.000060320162389,
+    "ParamCielFurSwingL=1": 8.000060319900513,
+    "ParamCielFurSwingR=-1": 8.000060320162389,
+    "ParamCielFurSwingR=1": 8.000060319900513,
+    "ParamCielJacketHemL=-1": 8.000125050544739,
+    "ParamCielJacketHemL=1": 8.00006032094802,
+    "ParamCielJacketHemR=-1": 8.00006032094802,
+    "ParamCielJacketHemR=1": 8.000060319900513
+  },
+  "face_atlas_byte_identical": true,
+  "material_count": 22,
+  "psd_xcf_roundtrip": true,
+  "psd_matches_final_layers": true,
+  "registration_limit_px": 0.03
+}

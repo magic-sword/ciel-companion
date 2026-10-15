@@ -1,0 +1,3 @@
+CIEL_IDLE_SETUP_DONE
+CIEL_CURRENT_PACKAGE_APPLIED backup=D:\CIEL\apps\ciel-companion\.local/unity-model-update\20261015-153149-8660cd25eb89417fb045fa81d846d391
+Exiting batchmode successfully now!
