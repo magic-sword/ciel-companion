@@ -40,7 +40,7 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
   ```sh
   "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 1800 --log-file ./Logs/build-windows.log -- -executeMethod Ciel.Companion.Editor.CielBuild.Windows
   ```
-- 出力：`unity/Builds/Windows/CIEL Companion.exe`（Git 管理外）。処理は `Assets/Editor/CielBuild.cs`。
+- 出力：`unity/Builds/Windows/CIEL Companion.exe`（Git 管理外）。処理は `Assets/Editor/CielBuild.cs`。詳しくは [アプリのビルド](build-ja.md)。
 - ビルドの設定：前面でなくても動き続ける（Run In Background）、ウィンドウで開く、大きさを変えられる。会議中に OBS やブラウザを操作しても会話が止まらないようにするため。
 - ビルドには LiveKit の接続の設定（`Assets/Settings/LiveKitTokenSource.asset`）が入る。**ほかの人に配らない。** `..._BackUpThisFolder_ButDontShipItWithYourGame` も配らない。
 - アプリのログ：`%USERPROFILE%\AppData\LocalLow\CIEL\CIEL Companion\Player.log`

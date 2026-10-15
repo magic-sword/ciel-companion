@@ -61,6 +61,8 @@ Editorを閉じて以下を実行してください。アプリ名、画面方�
 
 会話サーバーのプロンプト本文は Markdown、参照先は TOML で管理します。編集方法は [会話サーバーの README](server/agent/README.md)、他のセッション・AI エージェントへの引き継ぎは [プロンプト管理方針](docs/decisions/prompt-management-ja.md) を参照してください。
 
+Windows・Android のアプリのビルドと起動・端末への入れ方は [アプリのビルド](docs/build-ja.md) にまとめています。
+
 全体の構成（アプリ・LiveKit・会話サーバー・読み上げ・OpenAI のつながり、データのメッセージ、動かす場所）は [システムの構成](docs/architecture-ja.md) にまとめています。
 
 シエルを Zoom・Google Meet の会議に参加させて多人数で話す方法（仮想オーディオ・OBS の配線、Windows 用のビルド、会話のモード）は [会議への参加](docs/meeting-bridge-ja.md) を参照してください。

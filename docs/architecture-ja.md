@@ -51,7 +51,7 @@ flowchart LR
 | `Conversation/AgentVoiceMeter.cs` | シエルの声の大きさを測る（口パク用。音は鳴らさない） |
 | `Conversation/CielExpression.cs` | 表情の切り替え（Cubism の表情ファイル） |
 | `Conversation/CielTouch.cs` | 画面のタッチ（頭を撫でる、ほっぺをつつく など）。その場の動きを出し、会話サーバーへ知らせる |
-| `Editor/CielBuild.cs` | Windows 用のビルド（CIEL ＞ Build ＞ Windows） |
+| `Editor/CielBuild.cs` | Windows・Android のビルド（CIEL ＞ Build ＞ Windows／Android）。[アプリのビルド](build-ja.md) |
 
 ### 会話サーバーの中
 
@@ -141,7 +141,7 @@ flowchart LR
 
 | 部品 | 動かす場所 | 起動・反映 |
 |---|---|---|
-| Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`） | ビルドは CIEL ＞ Build ＞ Windows |
+| Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`）、Android（開発用の APK、実機は未確認） | [アプリのビルド](build-ja.md) |
 | 会話サーバー | chris_local の `~/work/ciel-companion/server/agent`（Docker Compose、ホストのネットワーク） | リポジトリのルートで `.\scripts\server\deploy-agent.ps1`（`.env` は送らない・上書きしない） |
 | 読み上げサービス | chris_local（Docker、GPU） | `server/tts-irodori` で `docker compose up -d --build` |
 | 声質変換サービス | chris_local（Docker、GPU） | 使うときだけ起動（読み上げサービスと GPU を分け合う） |
