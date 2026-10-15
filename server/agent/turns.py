@@ -2,9 +2,10 @@
 """発言が終わったら、返事を作らせる（会話モデルの自動の返事は止めてある。agent.py の make_model）。
 
 - 話し始め・話し終わりは、Realtime API の声の区切り（semantic_vad）が知らせる。割り込み（シエルの話を止める）も今までどおり。
-- 2 人のとき：すぐに返事を作らせる（今までと同じ動き）。
-- 多人数のとき：その発言の声で話者を判定し（speakers.py）、「[発言者：…]」を足してから返事を作らせる。
-  答えるか黙るか（[silent]）は、会話モデルが決める（config/prompts/group.md）。
+- その発言の声で話者を判定し（speakers.py）、「[発言者：…]」を足してから返事を作らせる（2 人でも多人数でも）。
+  2 人のときは、知らない声なら名前を聞く。多人数のときは、答えるか黙るか（[silent]）を会話モデルが決める
+  （config/prompts/speakers.md、group.md）。
+- 話者の識別が使えないとき（ECAPA の読み込み前・失敗、CIEL_VOICE が irodori 以外）は、すぐに返事を作らせる。
 """
 import asyncio
 import logging
@@ -19,9 +20,8 @@ log = logging.getLogger('ciel-agent.turns')
 
 
 class TurnReplies:
-    def __init__(self, session: AgentSession, switch, book: speakers.SpeakerBook, tap: speakers.AudioTap) -> None:
+    def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap) -> None:
         self.session = session
-        self.switch = switch          # mode.ModeSwitch（今のモード）
         self.book = book
         self.tap = tap
         self.encoder: speakers.Encoder | None = None
@@ -45,7 +45,7 @@ class TurnReplies:
             t.add_done_callback(self._tasks.discard)
 
     async def _reply(self, start: float, end: float) -> None:
-        if self.switch.mode != 'group':
+        if self.book is None or self.encoder is None:
             self.session.generate_reply()
             return
         t0 = time.perf_counter()

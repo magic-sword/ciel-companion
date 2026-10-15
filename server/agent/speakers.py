@@ -17,6 +17,7 @@ import os
 import string
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 from livekit import rtc
@@ -114,6 +115,21 @@ class Known:
     person_id: int
     name: str
     embeddings: list[np.ndarray]
+    last_seen: datetime | None = None   # この会話より前に、最後に話した日時
+
+
+def jst(t: datetime) -> str:
+    t = t.astimezone(timezone(timedelta(hours=9)))
+    return f'{t.month}月{t.day}日'
+
+
+def plain_name(name: str) -> str:
+    """敬称を外した名前（「ハカセさん」→「ハカセ」）"""
+    name = name.strip()
+    for s in ('さん', 'ちゃん', 'くん', '君', '様'):
+        if name.endswith(s) and len(name) > len(s):
+            return name[: -len(s)].strip()
+    return name
 
 
 @dataclass
@@ -149,7 +165,7 @@ class SpeakerBook:
 
     async def load(self) -> None:
         if self.store is not None:
-            self.known = [Known(pid, name, embs) for pid, name, embs in await self.store.load_all()]
+            self.known = [Known(pid, name, embs, seen) for pid, name, embs, seen in await self.store.load_all()]
         log.info('覚えている人：%d 人', len(self.known))
 
     def _new_unknown_label(self) -> str:
@@ -205,7 +221,7 @@ class SpeakerBook:
         return f'[発言者：{sp.label}]'
 
     def find(self, label: str) -> SessionSpeaker | None:
-        label = label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん')
+        label = plain_name(label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん'))
         for s in self.speakers:
             if label in (s.label, s.name):
                 return s
@@ -215,7 +231,7 @@ class SpeakerBook:
         sp = self.find(label)
         if sp is None:
             return f'「{label}」という発言者は、この会話にいません。[発言者：…] に出た呼び名を使ってください。'
-        name = name.strip().removesuffix('さん').removesuffix('ちゃん').removesuffix('くん').strip() or name
+        name = plain_name(name)
         sp.name = sp.label = name
         if not remember:
             return f'この会話の間だけ「{name}」と呼びます（声は保存していません）。'
@@ -234,10 +250,29 @@ class SpeakerBook:
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
         return f'「{name}」さんの声を覚えました。次の会話でも分かります。'
 
+    def lookup(self, name: str) -> str:
+        """その名前の人を覚えているか。前に話した日は、本人が話しているときだけ教える"""
+        name = plain_name(name)
+        k = next((k for k in self.known if k.name == name), None)
+        if k is not None:
+            if self.last is not None and self.last.person_id == k.person_id and k.last_seen is not None:
+                return f'{name}さんの声を覚えています（いま話しているのは{name}さん）。前に話したのは {jst(k.last_seen)}。'
+            return f'{name}さんの声を覚えています。'
+        if any(s.name == name for s in self.speakers):
+            return f'{name}さんは、この会話の間だけ名前を聞いている人です（声は保存していません）。'
+        return f'{name}さんの声は覚えていません。'
+
+    def here(self) -> str:
+        """この会話で声を聞いた人の呼び名"""
+        if not self.speakers:
+            return 'この会話では、まだ誰の声も区別していません。'
+        parts = [s.label + ('（声を覚えている人）' if s.person_id is not None else '') for s in self.speakers]
+        return 'この会話で声を聞いた人：' + '、'.join(parts)
+
     async def forget(self, name: str) -> str:
         """本人の依頼のときだけ：直前の発言者が、その名前の覚えている人であること"""
         sp = self.last
-        if sp is None or sp.person_id is None or name.strip().removesuffix('さん') not in (sp.name, sp.label):
+        if sp is None or sp.person_id is None or plain_name(name) not in (sp.name, sp.label):
             return 'ご本人からの依頼のときだけ消せます。消したい方ご本人に、もう一度お願いしてもらってください。'
         pid = sp.person_id
         if self.store is not None:

@@ -8,6 +8,7 @@
 """
 import logging
 import os
+from datetime import datetime
 
 import numpy as np
 import psycopg
@@ -60,14 +61,16 @@ class Store:
     async def close(self) -> None:
         await self.conn.close()
 
-    async def load_all(self) -> list[tuple[int, str, list[np.ndarray]]]:
+    async def load_all(self) -> list[tuple[int, str, list[np.ndarray], datetime | None]]:
+        """（番号、名前、声の特徴の一覧、最後に話した日時）"""
         rows = await (await self.conn.execute(
-            'SELECT p.id, p.name, v.embedding FROM people p JOIN voiceprints v ON v.person_id = p.id ORDER BY p.id, v.id'
+            'SELECT p.id, p.name, p.last_seen_at, v.embedding FROM people p JOIN voiceprints v ON v.person_id = p.id '
+            'ORDER BY p.id, v.id'
         )).fetchall()
-        people: dict[int, tuple[str, list[np.ndarray]]] = {}
-        for pid, name, emb in rows:
-            people.setdefault(pid, (name, []))[1].append(np.asarray(emb, dtype=np.float32))
-        return [(pid, name, embs) for pid, (name, embs) in people.items()]
+        people: dict[int, tuple[str, datetime | None, list[np.ndarray]]] = {}
+        for pid, name, seen, emb in rows:
+            people.setdefault(pid, (name, seen, []))[2].append(np.asarray(emb, dtype=np.float32))
+        return [(pid, name, embs, seen) for pid, (name, seen, embs) in people.items()]
 
     async def add_person(self, name: str) -> int:
         row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()

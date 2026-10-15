@@ -22,7 +22,7 @@ import os
 
 from dotenv import load_dotenv
 from livekit import agents, rtc
-from livekit.agents import Agent, AgentServer, AgentSession, JobContext, function_tool
+from livekit.agents import Agent, AgentServer, AgentSession, JobContext
 from livekit.plugins import openai
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
@@ -31,6 +31,7 @@ import irodori_tts
 import mode
 import speaker_store
 import speakers
+import tools
 import touch
 import turns
 import voice_conversion
@@ -44,6 +45,8 @@ server = AgentServer(num_idle_processes=2)
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
 # GPT-Live は聞きながら話す全二重なので、返事の作らせ方を変えない（話者の識別も使わない）
 REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
+# 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API のときだけ
+SPEAKERS = VOICE == 'irodori' and REALTIME
 
 
 def make_model():
@@ -66,25 +69,9 @@ class Ciel(Agent):
     def __init__(self) -> None:
         persona = load_persona()
         self.persona = persona
-        super().__init__(instructions=self.instructions_for('solo'))
+        # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
+        super().__init__(instructions=self.instructions_for('solo'), tools=tools.TOOLS)
         self.events = emotion.ExpressionEvents()
-        self.book: speakers.SpeakerBook | None = None   # 多人数の話者（entrypoint で作る）
-
-    # 多人数の会話で使う道具。いつ使うかは config/prompts/group.md で教える
-    @function_tool
-    async def name_speaker(self, speaker: str, name: str, remember: bool) -> str:
-        """発言者に名前を付ける。speaker は [発言者：…] に出た呼び名（例：知らない人A）。name は敬称なしの名前。
-        remember は、本人が声を覚えることにはっきり同意したときだけ true。"""
-        if self.book is None:
-            return '今は話者を区別していません。'
-        return await self.book.name(speaker, name, remember)
-
-    @function_tool
-    async def forget_speaker(self, name: str) -> str:
-        """本人に頼まれたときだけ、その人の声の記録を消す。name は敬称なしの名前。"""
-        if self.book is None:
-            return '今は話者を区別していません。'
-        return await self.book.forget(name)
 
     def instructions_for(self, mode: str) -> str:
         """モード（mode.py）ごとの指示。group は多人数での答え方（config/prompts/group.md）を最後に足す。"""
@@ -92,6 +79,9 @@ class Ciel(Agent):
         instructions = p.instructions + (p.emotion_instructions if VOICE == 'irodori' else '')
         # 画面のタッチへの反応（touch.py）
         instructions = instructions.rstrip('\n') + '\n\n' + p.touch_instructions
+        if SPEAKERS:
+            # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
+            instructions = instructions.rstrip('\n') + '\n\n' + p.speaker_instructions
         if mode == 'group':
             instructions = instructions.rstrip('\n') + '\n\n' + p.group_instructions
         return instructions
@@ -118,13 +108,15 @@ class Ciel(Agent):
 async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
     # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
+    # 話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
+    store = await speaker_store.Store.open() if SPEAKERS else None
+    book = speakers.SpeakerBook(store) if SPEAKERS else None
+    if book is not None:
+        await book.load()
     session = AgentSession(llm=make_model(), tts=irodori_tts.make() if VOICE == 'irodori' else None,
-                           turn_detection='manual' if REALTIME else agents.NOT_GIVEN)
+                           turn_detection='manual' if REALTIME else agents.NOT_GIVEN,
+                           userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
-    # 多人数の話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
-    store = await speaker_store.Store.open() if VOICE == 'irodori' and REALTIME else None
-    agent.book = speakers.SpeakerBook(store)
-    await agent.book.load()
     tap = speakers.AudioTap()
 
     def on_track(track: rtc.Track, publication, participant: rtc.RemoteParticipant) -> None:
@@ -132,10 +124,10 @@ async def entrypoint(ctx: JobContext) -> None:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
     switch = mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori')
-    replies = turns.TurnReplies(session, switch, agent.book, tap)
+    replies = turns.TurnReplies(session, book, tap)
     if REALTIME:
         session.on('user_state_changed', replies.on_user_state)
-    if VOICE == 'irodori' and REALTIME:
+    if SPEAKERS:
         asyncio.create_task(replies.load_encoder())
 
     async def close_store() -> None:
