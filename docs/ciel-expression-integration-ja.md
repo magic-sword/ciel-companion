@@ -371,3 +371,18 @@ UnityはParamTearyとParamEarFoldを毎フレーム上書きし、通常へ戻�
 共通の頭頂部を561頂点へ再メッシュし、頭に追従する既存の親デフォーマを維持する。新しい表情パラメーターや重複パーツは追加せず、通常と全表情で共用する。正式モデル、現行素材92層、PSD/XCF、Unity更新用SDK17ファイルを同じ版へそろえた。12表情と81通りの頭・耳・まばたき・口・髪の組み合わせで、他91パーツの形状と全パーツの透明度・表示順が旧SDKと一致することを確認した。
 
 正式版の比較・採用記録は`assets/ciel/rig/proofs/crown-v47/`。承認時の素材プレビューは別の検証記録として保持する。旧素材と作業コピーは`.local/crown-completion-adoption/`へ保管し、最新素材の入口は`assets/ciel/current/`に統一する。Unity本体は未適用で、`CIEL > Model > Apply Current Package`から更新できる。
+
+### Unity：会話の表情を表情ファイルで切り替え（2026-10-15）
+
+`CielExpression` を、コードに書いた仮の値の表から、Cubism で作った表情ファイル（`Expressions/*.exp3.json`）へ切り替えた。
+会話サーバーが送る表情のイベント（`character.expression`）の名前で、モデルの `CubismExpressionController` に表情の番号を渡す。フェード（0.2秒）と値の適用は Cubism に任せる。
+表情はまばたき・口パクより前に適用されるため、話している間も口は動く。専用の口の素材への切り替えはリグが行う。
+表情ファイルの無い「考え中（thinking）」は、通常の表情ファイルに目線（`ParamEyeBallX` -0.5、`ParamEyeBallY` 0.6）だけを重ねる。寿命（ttl）が切れると通常へ戻る。
+
+以前の仮の表は、嬉しいで口を開いたまま・耳を立てたままにするなど、採用した表情ファイルと値が違っていた。旧リグ用の値の分岐は削除した。
+
+確認：`CielExpressionPlayCheck.Run`（バッチモードでは再生モードに入らないため、`-batchmode` なしで Unity.exe から実行）で12表情を順に再生した。各表情ファイルの値が出ること、1つおきに口を開いて口パクが表情中も効くこと、TTL で通常に戻ることを確認した。[描画の一覧](../assets/ciel/rig/proofs/expressions/unity-exp3/expressions-12.png)、[記録](../assets/ciel/rig/proofs/expressions/unity-exp3/verification.txt)。
+`CIEL > Model > Validate Current Package` は、会話で使う11表情の表情ファイルが揃い、使うパラメーターがすべてモデルにあることを確かめる。
+
+アプリの会話シーン（`Conversation.unity`、ビルドの最初のシーン）でも確認した。`CielConversationExpressionCheck.Run` は再生中に会話サーバーと同じ形の表情のイベント（topic `ciel.event`）を `CielConversation` へ渡し、12表情の切り替え・寿命での通常復帰・違う topic と知らない表情の無視を確かめる。ネットワークには接続しない。[会話シーンでの表示](../assets/ciel/rig/proofs/expressions/unity-conversation/conversation-scene.png)、[記録](../assets/ciel/rig/proofs/expressions/unity-conversation/verification.txt)。
+会話サーバーが表情を送るのは、声が `irodori`（既定）のときだけ。

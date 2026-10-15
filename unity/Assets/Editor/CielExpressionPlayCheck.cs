@@ -5,6 +5,8 @@ using System.IO;
 using System.Text;
 using Ciel.Conversation;
 using Live2D.Cubism.Core;
+using Live2D.Cubism.Framework.Expression;
+using Live2D.Cubism.Framework.MouthMovement;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -19,6 +21,8 @@ namespace Ciel.EditorTools
         static string OutDir => Path.GetFullPath(Path.Combine(Application.dataPath, "../../.local/expression-integration/unity-play"));
         static CubismModel _model;
         static CielExpression _expression;
+        static CubismExpressionController _controller;
+        static CubismMouthController _mouth;
         static Camera _camera;
         static int _index;
         static float _started;
@@ -55,6 +59,9 @@ namespace Ciel.EditorTools
                 var instance = UnityEngine.Object.Instantiate(prefab);
                 _model = instance.GetComponent<CubismModel>();
                 _expression = instance.GetComponent<CielExpression>() ?? instance.AddComponent<CielExpression>();
+                _controller = instance.GetComponent<CubismExpressionController>();
+                _mouth = instance.GetComponent<CubismMouthController>();
+                _mouth.BlendMode = Live2D.Cubism.Framework.CubismParameterBlendMode.Override;
                 _camera = new GameObject("Expression Check Camera", typeof(Camera)).GetComponent<Camera>();
                 _camera.orthographic = true;
                 _camera.backgroundColor = new Color(0.25f, 0.29f, 0.42f);
@@ -97,18 +104,22 @@ namespace Ciel.EditorTools
                         if (float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsInfinity(p.x) || float.IsInfinity(p.y))
                             throw new InvalidOperationException("Invalid drawable: " + d.Id);
                 var current = _expression.Current;
-                Near("ParamTear", current == "teary" ? 1 : 0);
-                Near("ParamSweat", current == "troubled" ? 1 : 0);
-                Near("ParamSparkle", current == "excited" ? 1 : 0);
-                Near("ParamEyeLSmile", current == "happy" ? 1 : 0);
-                Near("ParamEyeRSmile", current == "happy" ? 1 : 0);
-                if (current == "embarrassed") Near("ParamCheek", 1);
+                // 表情ファイルの値がそのまま出ているか（考え中は通常の値＋目線）。口は口パクが上書きするので別に確かめる
+                var file = current == "thinking" ? "neutral" : current;
+                var data = Array.Find(_controller.ExpressionsList.CubismExpressionObjects, d => d.name == file + ".exp3");
+                if (data == null) throw new InvalidOperationException("Missing expression data: " + file);
+                foreach (var p in data.Parameters)
+                    if (p.Id != "ParamMouthOpenY") Near(p.Id, p.Value);
+                if (current == "thinking") Near("ParamEyeBallX", -0.5f);
+                // 表情の最中でも口パクで口が開く
+                Near("ParamMouthOpenY", _mouth.MouthOpening);
                 if (_index == CielExpression.Names.Length && current != "neutral") throw new InvalidOperationException("TTL did not reset to neutral");
-                _report.AppendLine($"{_index}: {current} OK tear={Value("ParamTear")} sweat={Value("ParamSweat")} sparkle={Value("ParamSparkle")}");
+                _report.AppendLine($"{_index}: {current} OK mouth={Value("ParamMouthOpenY"):0.00}");
                 Shot(_index == CielExpression.Names.Length ? "ttl-neutral" : current);
                 _index++;
                 if (_index > CielExpression.Names.Length) { Finish(null); return; }
                 _started = Time.time;
+                _mouth.MouthOpening = _index % 2 == 1 ? 0.8f : 0f;   // 半分は話している最中として確かめる
                 if (_index == CielExpression.Names.Length) _expression.Set("happy", 0.1f);
                 else _expression.Set(CielExpression.Names[_index]);
             }

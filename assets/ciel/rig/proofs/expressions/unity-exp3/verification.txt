@@ -1,0 +1,27 @@
+0: neutral OK mouth=1.00
+render neutral: 198347 foreground pixels
+1: happy OK mouth=0.80
+render happy: 197834 foreground pixels
+2: relaxed OK mouth=0.00
+render relaxed: 197832 foreground pixels
+3: surprised OK mouth=0.80
+render surprised: 200544 foreground pixels
+4: angry OK mouth=0.00
+render angry: 195209 foreground pixels
+5: sad OK mouth=0.80
+render sad: 194847 foreground pixels
+6: troubled OK mouth=0.00
+render troubled: 194306 foreground pixels
+7: embarrassed OK mouth=0.80
+render embarrassed: 194576 foreground pixels
+8: teary OK mouth=0.00
+render teary: 195124 foreground pixels
+9: excited OK mouth=0.80
+render excited: 200526 foreground pixels
+10: jitome OK mouth=0.00
+render jitome: 196674 foreground pixels
+11: thinking OK mouth=0.80
+render thinking: 198058 foreground pixels
+12: neutral OK mouth=0.00
+render ttl-neutral: 198525 foreground pixels
+12 expressions + TTL passed
