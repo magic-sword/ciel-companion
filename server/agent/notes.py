@@ -33,7 +33,7 @@ class NoteTaker:
     def __init__(self, book: speakers.SpeakerBook, instructions: str) -> None:
         self.book = book
         self.instructions = instructions
-        self.lines: list[tuple[int | None, str, str]] = []   # （同意した人の番号 または None、話者、文）
+        self.lines: list[tuple[speakers.SessionSpeaker | None, str, str]] = []   # （話した人、呼び名、文）
         self._done: dict[int, int] = {}                       # 人ごとに、どこまでメモにしたか（lines の位置）
         self._count: dict[int, int] = {}
         self._locks: dict[int, asyncio.Lock] = {}
@@ -45,13 +45,18 @@ class NoteTaker:
         """相手の発言の文字起こし（確定したもの）。直前に判定した話者の発言とみなす"""
         if not text.strip():
             return
-        k = self.book.current_person()
         sp = self.book.last
         label = (sp.name or sp.label) if sp else '不明'
-        pid = k.person_id if k is not None and k.notes_ok else None
-        self.lines.append((pid, label, text.strip()))
-        if pid is None:
+        # 発言した人（この会話の話者）を、同意の前でも付けておく（メモリーの中だけ）。
+        # この会話の途中で名乗って同意した人も、同意の前に話したこと（「ミルクティーが好き」など）を
+        # メモにできるように（覚えたあとは sp.person_id が付く）。書くのは同意してから（_write が確かめる）。
+        # 「たぶん」と判定した発言は、誰の発言か確かでないので、本人の発言にしない
+        owner = sp if sp is not None and (sp.person_id is None or self.book.last_sure) else None
+        self.lines.append((owner, label, text.strip()))
+        k = self.book.current_person()
+        if k is None or not k.notes_ok:
             return
+        pid = k.person_id
         self._count[pid] = self._count.get(pid, 0) + 1
         if self._count[pid] >= TURNS:
             self._start(pid)
@@ -73,6 +78,19 @@ class NoteTaker:
         for pid in list(self._count):
             self._start(pid)
 
+    def on_split(self, old: 'speakers.SessionSpeaker', new: 'speakers.SessionSpeaker') -> None:
+        """人違いを直した：直前の発言（「私はハカセじゃない」など）を、分けた人の発言にする"""
+        for i in range(len(self.lines) - 1, -1, -1):
+            o, label, text = self.lines[i]
+            if o is old:
+                self.lines[i] = (new, new.name or new.label, text)
+                return
+
+    def on_consent(self, pid: int) -> None:
+        """この会話の途中で、お話を覚えることに同意した：同意の前に話したことも含めて、すぐ書く"""
+        self._count.setdefault(pid, 0)
+        self._start(pid)
+
     def _start(self, pid: int) -> None:
         t = asyncio.create_task(self._write(pid))
         self._tasks.add(t)
@@ -88,7 +106,7 @@ class NoteTaker:
         lock = self._locks.setdefault(pid, asyncio.Lock())
         async with lock:
             start, end = self._done.get(pid, 0), len(self.lines)
-            if not any(p == pid for p, _, _ in self.lines[start:end]):
+            if not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end]):
                 return
             store = self.book.store
             k = next((k for k in self.book.known if k.person_id == pid), None)
@@ -100,7 +118,8 @@ class NoteTaker:
                 'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
                 'person': k.name,
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
-                'conversation': [{'speaker': who, 'is_person': p == pid, 'text': text} for p, who, text in window],
+                'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
+                                 for o, who, text in window],
             }
             try:
                 r = await self._client.chat.completions.create(

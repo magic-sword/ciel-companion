@@ -173,6 +173,8 @@ class SpeakerBook:
         self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
         self._note_ids: list[int] = []                   # 直前に読んだメモの番号 → DB の行（忘れるときに使う）
         self._note_owner: int | None = None
+        self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
+        self.on_split = None           # 人違いを直したとき呼ぶ（notes.NoteTaker.on_split）
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
 
     async def load(self) -> None:
@@ -282,6 +284,8 @@ class SpeakerBook:
         new.add(e)
         self.speakers.append(new)
         self.last, self.last_rows = new, []
+        if self.on_split:
+            self.on_split(sp, new)
         log.info('話者：人違いを直した（%s から分けた）', '覚えている人 #%d' % sp.person_id if sp.person_id else 'この会話の人')
         if new_name:
             return (f'わかりました。直前の発言は{old}さんではなく、{new_name}さんとして区別します'
@@ -330,6 +334,8 @@ class SpeakerBook:
         # 覚えてよいかの質問は「お名前と声、それからお話も少し」なので、メモを残す同意も一緒にもらっている
         await self.store.set_notes_consent(sp.person_id)
         k.notes_ok = True
+        if self.on_notes_consent:
+            self.on_notes_consent(sp.person_id)
         if self.last is sp:
             self.last_sure = True   # 本人が同意したので、この会話ではメモを読み書きしてよい
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
@@ -350,6 +356,8 @@ class SpeakerBook:
             return 'いま話している方が、声を覚えている方だと確かではないので、受け付けられません。'
         await self.store.set_notes_consent(k.person_id)
         k.notes_ok = True
+        if self.on_notes_consent:
+            self.on_notes_consent(k.person_id)
         log.info('話者：#%d がお話を覚えることに同意した', k.person_id)
         return f'{k.name}さんのお話を、少しずつ覚えていきます。'
 

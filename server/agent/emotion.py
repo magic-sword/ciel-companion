@@ -41,7 +41,8 @@ CAPTIONS = {
     'thinking': '柔らかくナチュラルなトーンの10代前半の少女。うーんと考えながら話す、ゆっくりとした落ち着いた声。',
 }
 TAG = re.compile(r'\[([a-z]+)\]')
-PARTIAL_TAG = re.compile(r'\[[a-z]*$')   # 最後に残った書きかけの印
+# 崩れた印（閉じていない「[happ」や、残った「]」）。会話モデルがまれに崩した印を出すので、読み上げないように外す
+BROKEN_TAG = re.compile(r'\[[a-z]*(?![a-z\]])|\]')
 SENTENCE_END = re.compile(r'[。！？!?\n]+|……')
 MIN_SENTENCE = 4   # これより短い文は、次の文とまとめて読む
 
@@ -66,8 +67,8 @@ class ExpressionEvents:
 
 
 def strip_tags(text: str) -> str:
-    """印を外す。返事の最後に書きかけの印（例「[happy」）が残っていても外す（そのまま読み上げないように）"""
-    return PARTIAL_TAG.sub('', TAG.sub('', text))
+    """印を外す。崩れた印（最後に残った書きかけの「[happy」、閉じていない「[happ博士…」、残った「]」）も外す"""
+    return BROKEN_TAG.sub('', TAG.sub('', text))
 
 
 def split_sentences(buf: str) -> tuple[list[str], str]:
