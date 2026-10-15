@@ -326,6 +326,15 @@ namespace Ciel.Conversation
             }
         }
 
+        /// シエルに触れたことを会話サーバーへ知らせる（CielTouch から。サーバーの touch.py が声の反応を返す）
+        public void SendTouch(string part, string gesture, string phase, int durationMs)
+        {
+            if (_room == null || Status != State.Connected) return;
+            var json = $"{{\"v\":1,\"type\":\"user.touch\",\"part\":\"{part}\",\"gesture\":\"{gesture}\",\"phase\":\"{phase}\",\"duration_ms\":{durationMs}}}";
+            try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.touch"); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] タッチを送れない: {e.Message}"); }
+        }
+
         void OnTrackUnsubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
             if (track is RemoteAudioTrack) DisposeVoice();

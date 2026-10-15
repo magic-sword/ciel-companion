@@ -1,4 +1,5 @@
-// 会話の確認用シーン（Assets/Scenes/Conversation.unity）を作る：カメラ、シエル、会話の部品（CielConversation）と画面の操作（CielConversationUI）。
+// 会話の確認用シーン（Assets/Scenes/Conversation.unity）を作る：カメラ、シエル、会話の部品（CielConversation）と画面の操作（CielConversationUI）、
+// シエルに触れる部品（CielTouch）。
 // 接続先は Assets/Settings/LiveKitTokenSource.asset（Git 管理外）。LiveKit Cloud の開発用トークンサーバーの ID を
 // インスペクターで入れる（種類 DevelopmentTokenServer）。秘密の API キーはアプリに入れない。
 // 実行：メニュー CIEL ＞ Conversation ＞ Create Scene、または
@@ -62,6 +63,7 @@ namespace Ciel.EditorTools
             var expression = model.GetComponent<CielExpression>() ?? model.AddComponent<CielExpression>();
             c.FindProperty("_expression").objectReferenceValue = expression;
             c.ApplyModifiedPropertiesWithoutUndo();
+            AttachTouch(model, conv.GetComponent<CielConversation>(), camera);
             var ui = conv.AddComponent<CielConversationUI>();
             var u = new SerializedObject(ui);
             u.FindProperty("_conversation").objectReferenceValue = conv.GetComponent<CielConversation>();
@@ -71,6 +73,31 @@ namespace Ciel.EditorTools
                 throw new InvalidOperationException("Could not save conversation scene.");
             AssetDatabase.SaveAssets();
             Debug.Log("CIEL_CONVERSATION_SCENE_DONE " + ScenePath);
+        }
+
+        // シエルに触れる（CielTouch）をモデルに付ける。表情と同じく、Cubism の更新の順番に入れるためモデルの GameObject に付ける
+        static void AttachTouch(GameObject model, CielConversation conversation, Camera camera)
+        {
+            var touch = model.GetComponent<CielTouch>() ?? model.AddComponent<CielTouch>();
+            var t = new SerializedObject(touch);
+            t.FindProperty("_model").objectReferenceValue = model.GetComponent<Live2D.Cubism.Core.CubismModel>();
+            t.FindProperty("_expression").objectReferenceValue = model.GetComponent<CielExpression>();
+            t.FindProperty("_conversation").objectReferenceValue = conversation;
+            t.FindProperty("_camera").objectReferenceValue = camera;
+            t.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// 作成済みの会話シーンに、シエルに触れる部品を足す（シーンを作り直さない。接続の設定はそのまま）
+        [MenuItem("CIEL/Conversation/Add Touch")]
+        public static void AddTouch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            var conversation = UnityEngine.Object.FindAnyObjectByType<CielConversation>();
+            var expression = UnityEngine.Object.FindAnyObjectByType<CielExpression>();
+            if (conversation == null || expression == null) throw new InvalidOperationException("Conversation scene is incomplete.");
+            AttachTouch(expression.gameObject, conversation, Camera.main);
+            if (!EditorSceneManager.SaveScene(scene)) throw new InvalidOperationException("Could not save conversation scene.");
+            Debug.Log("CIEL_CONVERSATION_TOUCH_ADDED " + ScenePath);
         }
     }
 }

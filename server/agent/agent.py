@@ -26,6 +26,7 @@ from livekit.plugins import openai
 
 import emotion
 import irodori_tts
+import touch
 import voice_conversion
 from persona import load_persona
 
@@ -53,7 +54,9 @@ def make_model():
 class Ciel(Agent):
     def __init__(self) -> None:
         persona = load_persona()
-        super().__init__(instructions=persona.instructions + (persona.emotion_instructions if VOICE == 'irodori' else ''))
+        instructions = persona.instructions + (persona.emotion_instructions if VOICE == 'irodori' else '')
+        # 画面のタッチへの反応（touch.py）
+        super().__init__(instructions=instructions.rstrip('\n') + '\n\n' + persona.touch_instructions)
         self.persona = persona
         self.events = emotion.ExpressionEvents()
 
@@ -85,6 +88,8 @@ async def entrypoint(ctx: JobContext) -> None:
                 os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
                 if os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live' else 'n/a', VOICE)
     await session.start(room=ctx.room, agent=agent, record=False)
+    # Unity で相手がシエルに触れたら、反応を話す（touch.py）
+    ctx.room.on('data_received', touch.TouchReactions(session).on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 
 

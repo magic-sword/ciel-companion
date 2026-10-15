@@ -7,6 +7,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [character.md](config/prompts/character.md) | 人物像、話し方、会話上のルール |
 | [greeting.md](config/prompts/greeting.md) | 初回のあいさつを生成するための指示 |
 | [emotion.md](config/prompts/emotion.md) | Irodori-TTS 用の感情タグの指示 |
+| [touch.md](config/prompts/touch.md) | 画面のタッチ（`[タッチ]` の知らせ）への反応の仕方。処理は `touch.py` |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 
 本文は Markdown のソースをそのままモデルへ渡します。見出しや箇条書きを使えます。編集者向けのメモはこの README や管理方針に置いてください。`emotion.md` のタグ名は声・表情の処理が使うため維持してください。

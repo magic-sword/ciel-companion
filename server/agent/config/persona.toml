@@ -4,3 +4,4 @@
 instructions_file = "prompts/character.md"
 greeting_file = "prompts/greeting.md"
 emotion_instructions_file = "prompts/emotion.md"
+touch_instructions_file = "prompts/touch.md"
