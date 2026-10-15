@@ -36,6 +36,7 @@ ADAPT = float(os.environ.get('CIEL_SPK_ADAPT', '0.60'))   # これ以上なら�
 MAX_SESSION_EMBEDDINGS = 20
 MAX_ADAPT_PER_SESSION = 3
 SPLIT_BONUS = 0.05          # 人違いだと言われて分けた人を、元の人より少し優先する
+PUSH_NOTES = 15             # 2 人のとき、本人だと分かったら渡すメモの数（最近の分）
 MARGIN = float(os.environ.get('CIEL_SPK_MARGIN', '0.05'))   # 次に近い人との差がこれ未満なら「たぶん」
 MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
 MODEL_REVISION = '0f99f2d0ebe89ac095bcc5903c4dd8f72b367286'   # Dockerfile と同じ版
@@ -242,7 +243,7 @@ class SpeakerBook:
             self.last_sure = sure
             if not sure:
                 return f'[発言者：たぶん{k.name}（声を覚えている人）]'
-            extra = ''
+            extra, memory = '', ''
             if not sp.announced:
                 # この会話で初めて分かったときだけ、前に話した日と、メモのことを添える（本人が話しているときだけ）
                 sp.announced = True
@@ -250,9 +251,17 @@ class SpeakerBook:
                     extra += f'。前に話したのは{jst(k.last_seen)}'
                 if not k.notes_ok:
                     extra += '。お話を覚える同意はまだ'
+                elif k.note_count and solo and self.store is not None:
+                    # 2 人のときは、本人のメモを渡して、シエルが自分から話題にできるようにする（最近の分だけ）。
+                    # 多人数のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
+                    rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
+                    today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+                    memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
+                              + '／'.join(t for _, t in rows) + ']')
+                    log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
                 elif k.note_count:
                     extra += '。この人について覚えていることがある'
-            return f'[発言者：{k.name}（声を覚えている人{extra}）]'
+            return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
 
         # 3. 初めての人
         sp = SessionSpeaker(label=self._new_unknown_label())

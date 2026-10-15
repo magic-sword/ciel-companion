@@ -89,7 +89,7 @@ class Store:
 
     async def notes(self, person_id: int) -> list[tuple[int, str]]:
         return await (await self.conn.execute(
-            'SELECT id, text FROM person_notes WHERE person_id = %s ORDER BY id', (person_id,))).fetchall()
+            'SELECT id, text FROM person_notes WHERE person_id = %s ORDER BY updated_at, id', (person_id,))).fetchall()
 
     async def change_notes(self, person_id: int, add: list[str], update: dict[int, str], delete: list[int]) -> None:
         """メモを足す・書き直す・消す（その人のメモだけ）。上限を超えたら古いものから消す"""
