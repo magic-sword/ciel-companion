@@ -17,6 +17,7 @@ flowchart LR
         A["会話サーバー<br>server/agent"]
         I["読み上げサービス<br>server/tts-irodori<br>127.0.0.1:8766"]
         V["声質変換サービス<br>server/voice-conversion<br>127.0.0.1:8765（予備）"]
+        D["記録の場所（DB）<br>PostgreSQL＋pgvector<br>127.0.0.1:5433"]
     end
     O["OpenAI<br>Realtime API"]
 
@@ -26,6 +27,7 @@ flowchart LR
     A <-- "④ 声を送り、返事の文字を受け取る" --> O
     A -- "⑤ 1 文ずつ読み上げ" --> I
     A -. "CIEL_VOICE=ciel のとき" .-> V
+    A -- "覚えている人の照合・保存" --> D
 ```
 
 - 自宅サーバーは LiveKit Cloud と OpenAI へ**外向きにつなぐだけ**。ルーターのポート開放・ドメイン・証明書は要らない。読み上げと声質変換のサービスは同じマシンの中（127.0.0.1）でだけ待ち受ける。
@@ -63,6 +65,8 @@ flowchart LR
 | `irodori_tts.py` | 読み上げサービスへの接続 |
 | `touch.py` | タッチの知らせを受けて、声の反応を返す |
 | `mode.py` | 2 人・多人数の会話の切り替え。多人数で黙る返事（`[silent]`）を捨てる |
+| `turns.py` | 話し終わりで返事を作らせる。多人数のときは、先に話者を判定して「[発言者：…]」を足す |
+| `speakers.py` ＋ `speaker_store.py` | 話者の識別（ECAPA の声の特徴、照合、知らない人A・B）と、覚えている人の記録（DB）。[決定記録](decisions/speaker-identification-ja.md) |
 | `voice_conversion.py` | 声質変換サービスへの接続（`CIEL_VOICE=ciel` のとき） |
 
 ## 会話の流れ（既定：CIEL_VOICE=irodori）
@@ -142,9 +146,10 @@ flowchart LR
 | 部品 | 動かす場所 | 起動・反映 |
 |---|---|---|
 | Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`）、Android（開発用の APK、実機は未確認） | [アプリのビルド](build-ja.md) |
-| 会話サーバー | chris_local の `~/work/ciel-companion/server/agent`（Docker Compose、ホストのネットワーク） | リポジトリのルートで `.\scripts\server\deploy-agent.ps1`（`.env` は送らない・上書きしない） |
-| 読み上げサービス | chris_local（Docker、GPU） | `server/tts-irodori` で `docker compose up -d --build` |
-| 声質変換サービス | chris_local（Docker、GPU） | 使うときだけ起動（読み上げサービスと GPU を分け合う） |
+| 会話サーバー（`agent`） | chris_local の `~/work/ciel-companion/server`（Docker Compose の一式 `ciel`、ホストのネットワーク） | リポジトリのルートで `.\scripts\server\deploy-server.ps1`（Git Bash は `scripts/server/deploy-server.sh`）。`server/` 一式を送り、`docker compose up -d --build`。`.env` と `data/` は送らない・上書きしない |
+| 読み上げサービス（`tts`） | chris_local（Docker、GPU） | 同じ一式で起動する |
+| 声質変換サービス（`vc`） | chris_local（Docker、GPU） | 使うときだけ `docker compose --profile vc up -d`（読み上げサービスと GPU を分け合う） |
+| 記録の場所（`db`、PostgreSQL＋pgvector） | chris_local（Docker、127.0.0.1:5433） | 同じ一式で起動する。データは Docker のボリューム `ciel_db-data` |
 
 GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会話を試すあいだは vLLM を止めている（[決定記録](decisions/voice-pipeline-ja.md)）。
 
@@ -153,6 +158,8 @@ GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会
 | 設定 | 場所 | Git |
 |---|---|---|
 | OpenAI・LiveKit のキー、会話モデル、声の方式 | `server/agent/.env`（見本は `.env.example`） | 入れない |
+| DB のパスワード | `server/.env`（見本は `server/.env.example`。無ければデプロイのときに自宅サーバーで作る） | 入れない |
+| 覚えている人（名前と声の特徴。本人が同意した人だけ） | DB の `people`・`voiceprints`。管理は `speaker_admin.py` | 入れない |
 | シエルの指示（プロンプト） | `server/agent/config/`（`persona.toml` と `prompts/*.md`）。次の会話から反映 | 入れる |
 | アプリの接続の設定（開発用トークンサーバーの ID） | `unity/Assets/Settings/LiveKitTokenSource.asset` | 入れない |
 | アプリで選んだマイク・声の出力・会話のモード | 端末ごと（Unity の PlayerPrefs） | — |

@@ -22,7 +22,7 @@
 
 1. LiveKit Cloud でプロジェクトを作り、Settings → Keys で URL・API キー・API シークレットを得る。Settings → Options で開発用トークンサーバー（Development token server）を有効にし、その ID を控える。
 2. `chris_local` の `~/work/ciel-companion/server/agent/.env` に、`.env.example` をもとに LiveKit と OpenAI のキーを書く（利用者が書く。Git に入れない）。
-3. `docker compose up -d --build`（同じフォルダ）で会話サーバーを起動する。
+3. リポジトリのルートで `scripts/server/deploy-server.sh`（PowerShell は `.scriptsserverdeploy-server.ps1`）を実行する。`server/` 一式を送り、`~/work/ciel-companion/server` で `docker compose up -d --build` する（会話サーバー・読み上げ・DB。2026-10-15 に 1 つの `server/compose.yaml` にまとめた）。
 4. Unity：`Assets/Settings/LiveKitTokenSource.asset`（Git 管理外）の Token Server Id に、1 の ID を入れる。`Assets/Scenes/Conversation.unity` を開いて再生する（メニュー CIEL ＞ Conversation ＞ Create Scene で作り直せる）。
 
 開発用トークンサーバーは誰でもトークンを取れるので、開発中だけ使う。公開前に、認証つきのトークン発行（仕様書の `server/session-api/`）へ切り替える。

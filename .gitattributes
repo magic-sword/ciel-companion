@@ -18,3 +18,5 @@ unity/**/*.asset whitespace=-blank-at-eol
 assets/ciel/runtime/**/*.json -text whitespace=cr-at-eol
 unity/Assets/Characters/Ciel/**/*.json -text whitespace=cr-at-eol
 unity/Assets/Characters/Ciel/Ciel.asset filter=lfs diff=lfs merge=lfs -text
+# シェルのスクリプトは自宅サーバーの bash で動かすので、Windows でも LF のまま
+*.sh text eol=lf

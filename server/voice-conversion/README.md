@@ -9,7 +9,7 @@
 ## 使い方
 
 ```
-docker compose up -d --build      # 初回はモデルを data/hf へダウンロードする
+docker compose --profile vc up -d --build   # server/ で。初回はモデルを data/hf へダウンロードする
 python bench.py 入力.wav 出力.wav  # 確認（遅れと処理の速さ）
 ```
 

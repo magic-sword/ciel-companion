@@ -16,18 +16,23 @@ LiveKit Cloud のルームにアプリが入ると、このプログラムが呼
 実行（開発）  python -m livekit.agents start agent.py --dev
 必要な環境変数は .env.example を参照（秘密情報は .env に書き、Git に入れない）。
 """
+import asyncio
 import logging
 import os
 
 from dotenv import load_dotenv
-from livekit import agents
-from livekit.agents import Agent, AgentServer, AgentSession, JobContext
+from livekit import agents, rtc
+from livekit.agents import Agent, AgentServer, AgentSession, JobContext, function_tool
 from livekit.plugins import openai
+from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import emotion
 import irodori_tts
 import mode
+import speaker_store
+import speakers
 import touch
+import turns
 import voice_conversion
 from persona import load_persona
 
@@ -37,6 +42,8 @@ logger = logging.getLogger('ciel-agent')
 # 待機させておく子プロセスの数（既定は CPU の数 = 24 で多すぎる。会話は 1 人ずつなので 2 で足りる）
 server = AgentServer(num_idle_processes=2)
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
+# GPT-Live は聞きながら話す全二重なので、返事の作らせ方を変えない（話者の識別も使わない）
+REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
 
 
 def make_model():
@@ -49,6 +56,9 @@ def make_model():
         voice=voice,
         # irodori：声は Irodori-TTS で作るので、会話モデルには文字だけを作らせる（音声の出力の料金もかからない）
         modalities=['text'] if VOICE == 'irodori' else ['text', 'audio'],
+        # 話し終わりの判定と割り込みは今までどおり会話モデルの側（LiveKit の既定と同じ semantic_vad）。
+        # 返事は自動で作らせず、turns.py が作らせる（多人数のとき、話者の 1 行を先に足すため）
+        turn_detection=SemanticVad(type='semantic_vad', eagerness='medium', create_response=False, interrupt_response=True),
     )
 
 
@@ -58,6 +68,23 @@ class Ciel(Agent):
         self.persona = persona
         super().__init__(instructions=self.instructions_for('solo'))
         self.events = emotion.ExpressionEvents()
+        self.book: speakers.SpeakerBook | None = None   # 多人数の話者（entrypoint で作る）
+
+    # 多人数の会話で使う道具。いつ使うかは config/prompts/group.md で教える
+    @function_tool
+    async def name_speaker(self, speaker: str, name: str, remember: bool) -> str:
+        """発言者に名前を付ける。speaker は [発言者：…] に出た呼び名（例：知らない人A）。name は敬称なしの名前。
+        remember は、本人が声を覚えることにはっきり同意したときだけ true。"""
+        if self.book is None:
+            return '今は話者を区別していません。'
+        return await self.book.name(speaker, name, remember)
+
+    @function_tool
+    async def forget_speaker(self, name: str) -> str:
+        """本人に頼まれたときだけ、その人の声の記録を消す。name は敬称なしの名前。"""
+        if self.book is None:
+            return '今は話者を区別していません。'
+        return await self.book.forget(name)
 
     def instructions_for(self, mode: str) -> str:
         """モード（mode.py）ごとの指示。group は多人数での答え方（config/prompts/group.md）を最後に足す。"""
@@ -90,18 +117,41 @@ class Ciel(Agent):
 @server.rtc_session()
 async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
-    session = AgentSession(llm=make_model(), tts=irodori_tts.make() if VOICE == 'irodori' else None)
-    # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
+    # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
+    session = AgentSession(llm=make_model(), tts=irodori_tts.make() if VOICE == 'irodori' else None,
+                           turn_detection='manual' if REALTIME else agents.NOT_GIVEN)
     agent = Ciel()
+    # 多人数の話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
+    store = await speaker_store.Store.open() if VOICE == 'irodori' and REALTIME else None
+    agent.book = speakers.SpeakerBook(store)
+    await agent.book.load()
+    tap = speakers.AudioTap()
+
+    def on_track(track: rtc.Track, publication, participant: rtc.RemoteParticipant) -> None:
+        if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
+            tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
+    ctx.room.on('track_subscribed', on_track)
+    switch = mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori')
+    replies = turns.TurnReplies(session, switch, agent.book, tap)
+    if REALTIME:
+        session.on('user_state_changed', replies.on_user_state)
+    if VOICE == 'irodori' and REALTIME:
+        asyncio.create_task(replies.load_encoder())
+
+    async def close_store() -> None:
+        if store is not None:
+            await store.close()
+    ctx.add_shutdown_callback(close_store)
     logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
                 agent.persona.fingerprint, os.environ.get('CIEL_MODEL', 'realtime'),
                 os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
                 if os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live' else 'n/a', VOICE)
+    # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）
     ctx.room.on('data_received', touch.TouchReactions(session).on_data)
     # 2 人・多人数の会話の切り替え（mode.py。Unity が知らせる）
-    ctx.room.on('data_received', mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori').on_data)
+    ctx.room.on('data_received', switch.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 
 

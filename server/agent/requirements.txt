@@ -4,3 +4,9 @@ livekit-plugins-openai==1.8.3
 python-dotenv==1.1.1
 websockets==13.1
 numpy==1.26.4
+# 話者の識別（speakers.py、speaker_store.py。2026-10-15 追加）。PyTorch（CPU 版）は Dockerfile で先に入れる
+speechbrain==1.0.3
+huggingface_hub==0.25.2   # speechbrain 1.0.3 は、これより新しい版の use_auth_token の廃止に対応していない
+requests==2.32.4
+psycopg[binary]==3.2.9
+pgvector==0.4.1

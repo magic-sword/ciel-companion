@@ -44,3 +44,16 @@ Unity SDK 2.1.0は[Apache License 2.0](https://github.com/livekit/client-sdk-uni
 .gitignoreを追加しても過去のコミットからは消えません。
 `git status --short` とステージ済み差分を確認し、除外物を `git add -f` しないでください。
 プロジェクト自身のLICENSEを選定し、その対象から第三者SDK・キャラクター素材を区別してください。
+
+## 会話サーバーの話者の識別（2026-10-15 追加）
+
+自宅サーバーの Docker イメージの中で使い、Git には含めない（`server/agent/requirements.txt`・`Dockerfile`・`server/compose.yaml` で版を固定）。
+
+| 対象 | ライセンス | 使い方 |
+|---|---|---|
+| [SpeechBrain](https://github.com/speechbrain/speechbrain) 1.0.3 | Apache-2.0 | ECAPA の読み込みと計算 |
+| [speechbrain/spkrec-ecapa-voxceleb](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)（版 `0f99f2d`） | Apache-2.0 | 声の特徴のモデル。イメージを作るときに取得する |
+| PyTorch 2.5.1（CPU 版） | BSD-3-Clause | SpeechBrain が使う |
+| [psycopg](https://www.psycopg.org/) 3.2.9 | LGPL-3.0 | DB への接続（ライブラリとして使うだけで、改変しない） |
+| [pgvector-python](https://github.com/pgvector/pgvector-python) 0.4.1 | MIT | ベクトルの受け渡し |
+| [pgvector/pgvector](https://hub.docker.com/r/pgvector/pgvector) 0.8.0-pg17（PostgreSQL 17 ＋ pgvector） | PostgreSQL License | 記録の場所のコンテナ |

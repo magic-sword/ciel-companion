@@ -19,9 +19,9 @@ VS Code では `Alt+Z` で行を折り返し、Markdown の `Ctrl+K` → `V` で
 
 保存した内容は**次に開始する会話から反映**されます。進行中の会話は開始時の内容を使い続けます。Docker Compose はホストの `config/` を読み取り専用でマウントするため、本文や TOML の変更だけなら再起動・再ビルドは不要です。
 
-今回のローダー変更を初めて導入するときは、`server/agent/` で `docker compose up -d --build` を実行してください。以前の本文を埋め込む TOML は使えないため、コード・TOML・Markdown を一式で更新します。
+今回のローダー変更を初めて導入するときは、リポジトリのルートで `scripts/server/deploy-server.sh` を実行してください（`server/compose.yaml` の一式を `docker compose up -d --build` します）。以前の本文を埋め込む TOML は使えないため、コード・TOML・Markdown を一式で更新します。
 
-別の設定を使う場合は TOML と本文を用意し、`.env` の `CIEL_PERSONA_CONFIG=config/別の設定.toml` で選びます。環境変数の相対パスは `server/agent/` 基準、TOML 内の相対パスはその TOML のディレクトリ基準です。絶対パスも指定できます。Docker Compose ではマウントされる `config/` 内に配置してください。`.env` の変更後はサーバーの再起動が必要です（Docker Compose は `docker compose up -d`）。
+別の設定を使う場合は TOML と本文を用意し、`.env` の `CIEL_PERSONA_CONFIG=config/別の設定.toml` で選びます。環境変数の相対パスは `server/agent/` 基準、TOML 内の相対パスはその TOML のディレクトリ基準です。絶対パスも指定できます。Docker Compose ではマウントされる `config/` 内に配置してください。`.env` の変更後はサーバーの再起動が必要です（自宅サーバーの `~/work/ciel-companion/server` で `docker compose up -d`）。
 
 ## ローカルで読み込みを確認する
 

@@ -1,0 +1,89 @@
+# 自宅の GPU サーバー（chris_local）で動かすもの一式。このフォルダ（~/work/ciel-companion/server）で：
+#   docker compose up -d --build          会話サーバー・読み上げ・記録の場所（DB）を起動する
+#   docker compose --profile vc up -d     声質変換も起動する（読み上げと GPU を分け合うので、ふだんは止めておく）
+#   docker compose logs -f agent          会話サーバーのログ
+# 秘密情報：agent/.env（OpenAI・LiveKit のキー）と、このフォルダの .env（DB のパスワード CIEL_DB_PASSWORD）。どちらも Git に入れない。
+# 会話サーバー・読み上げ・声質変換はホストのネットワークを使う（Docker の既定のネットワークでは名前解決ができなかった）。
+# 外から入る口は開かない：読み上げ（8766）・声質変換（8765）・DB（5433）は 127.0.0.1 でだけ待ち受ける。
+# Docker Compose 2.18 で動かすため、include は使わずにここへまとめて書く。
+name: ciel
+
+services:
+  # 会話サーバー（server/agent）
+  agent:
+    build:
+      context: ./agent
+      network: host
+    network_mode: host
+    env_file: ./agent/.env
+    environment:
+      # シエルの声：Irodori-TTS で読み上げる（tts が同じマシンで動いていること）
+      - CIEL_VOICE=irodori
+      # 覚えている人の記録（speaker_store.py）
+      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
+    volumes:
+      # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
+      - ./agent/config:/app/config:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 読み上げ（server/tts-irodori）。/data に参照音声とモデルのキャッシュ（Git の外）
+  tts:
+    build:
+      context: ./tts-irodori
+      network: host
+    network_mode: host
+    volumes:
+      - ./tts-irodori/data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # 声質変換（server/voice-conversion、CIEL_VOICE=ciel のとき）。ふだんは起動しない
+  vc:
+    profiles: [vc]
+    build:
+      context: ./voice-conversion
+      network: host
+    network_mode: host
+    volumes:
+      - ./voice-conversion/data:/data
+      - ./voice-conversion/data/checkpoints:/opt/seed-vc/checkpoints   # Seed-VC がモデルを置く場所（hf_utils.py の ./checkpoints）
+    environment:
+      - VC_REFERENCE=/data/reference.wav
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # 記録の場所（PostgreSQL＋pgvector）。いまは「覚えている人」の名前と声の特徴だけを置く
+  db:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      - POSTGRES_USER=ciel
+      - POSTGRES_DB=ciel
+      - POSTGRES_PASSWORD=${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}
+    ports:
+      - 127.0.0.1:5433:5432
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U ciel -d ciel]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db-data:
