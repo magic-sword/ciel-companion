@@ -19,7 +19,8 @@ flowchart LR
         V["声質変換サービス<br>server/voice-conversion<br>127.0.0.1:8765（予備）"]
         D["記録の場所（DB）<br>PostgreSQL＋pgvector<br>127.0.0.1:5433"]
     end
-    O["OpenAI<br>Realtime API"]
+    O["OpenAI<br>Realtime API（会話・文字起こし）<br>文字のモデル（メモ・議事録）"]
+    X["Discord<br>（利用者だけのチャンネル）"]
 
     U -- "① 接続のトークン" --> T
     U <-- "② マイクの声・シエルの声<br>データのメッセージ" --> R
@@ -27,7 +28,8 @@ flowchart LR
     A <-- "④ 声を送り、返事の文字を受け取る" --> O
     A -- "⑤ 1 文ずつ読み上げ" --> I
     A -. "CIEL_VOICE=ciel のとき" .-> V
-    A -- "覚えている人の照合・保存" --> D
+    A -- "覚えている人の照合・保存、メモ" --> D
+    A -. "議事録の下書き（とったときだけ）" .-> X
 ```
 
 - 自宅サーバーは LiveKit Cloud と OpenAI へ**外向きにつなぐだけ**。ルーターのポート開放・ドメイン・証明書は要らない。読み上げと声質変換のサービスは同じマシンの中（127.0.0.1）でだけ待ち受ける。
@@ -42,14 +44,17 @@ flowchart LR
 | 会話サーバー | `server/agent/`（LiveKit Agents 1.8） | 部屋に入り、利用者の声を OpenAI へ送り、返事の文字から声を作ってアプリへ返す。表情・タッチ・会話のモードを扱う |
 | 読み上げサービス | `server/tts-irodori/` | Irodori-TTS で、文をシエルの声で読み上げる（GPU、16 ステップ） |
 | 声質変換サービス | `server/voice-conversion/` | Seed-VC で OpenAI の声をシエルの声へ変える。今は使っていない（品質を上げる候補） |
-| OpenAI Realtime API | 外部サービス | 声を聞いて返事を考える。既定は `gpt-realtime-2.1-mini`、返事は**文字だけ**作らせる |
+| OpenAI Realtime API | 外部サービス | 声を聞いて返事を考える。既定は `gpt-realtime-2.1-mini`、返事は**文字だけ**作らせる。相手の発言の文字起こし（`gpt-4o-mini-transcribe`、日本語＋「シエル」と覚えている人の名前をヒントに）も同じ接続で作る |
+| OpenAI の文字のモデル | 外部サービス | 会話の裏の作業：その人について覚えておくメモ（`gpt-5.4-mini`）、議事録のまとめ（`gpt-5.4`） |
+| Discord | 外部サービス | 議事録の下書きを、利用者だけが見るチャンネルへ Webhook で送る（とったときだけ） |
 
 ### Unity アプリの中
 
 | スクリプト | 役割 |
 |---|---|
 | `Conversation/CielConversation.cs` | トークンの取得、部屋への接続、マイク・声の出力の機器の選択、マイクのオン・オフ、口パクの音量、データのメッセージの送受信、会話のモード |
-| `Conversation/CielConversationUI.cs` | マイクボタン、状態の表示、機器の選択欄、会話のモードのボタン、表情の確認ボタン（画面の部品はコードで作る） |
+| `Conversation/CielConversationUI.cs` | マイクボタン、状態の表示、機器の選択欄（PC）、声の出力の切り替えボタン（Android）、会話のモードのボタン、表情の確認ボタン（画面の部品はコードで作る） |
+| `Conversation/AndroidSpeaker.cs` | Android で、声を本体のスピーカーか受話口から出すかを OS（AudioManager）に頼む |
 | `Conversation/AgentVoiceMeter.cs` | シエルの声の大きさを測る（口パク用。音は鳴らさない） |
 | `Conversation/CielExpression.cs` | 表情の切り替え（Cubism の表情ファイル） |
 | `Conversation/CielTouch.cs` | 画面のタッチ（頭を撫でる、ほっぺをつつく など）。その場の動きを出し、会話サーバーへ知らせる |
@@ -60,7 +65,7 @@ flowchart LR
 | ファイル | 役割 |
 |---|---|
 | `agent.py` | 入口。会話モデル・声の方式を選び、会話を始め、各部品をつなぐ |
-| `persona.py` ＋ `config/` | シエルの指示（人物像・あいさつ・感情の印・タッチ・多人数）を Markdown から読む。[プロンプト管理方針](decisions/prompt-management-ja.md) |
+| `persona.py` ＋ `config/` | シエルの指示（人物像・あいさつ・感情の印・タッチ・多人数・話者・メモの記録係・議事録）を Markdown から読む。[プロンプト管理方針](decisions/prompt-management-ja.md) |
 | `emotion.py` | 返事の文の頭の感情の印（`[happy]` など）を読み、その感情の声で 1 文ずつ読み上げ、表情のイベントを送る |
 | `irodori_tts.py` | 読み上げサービスへの接続 |
 | `touch.py` | タッチの知らせを受けて、声の反応を返す |
@@ -82,11 +87,17 @@ sequenceDiagram
     participant O as OpenAI Realtime
     participant I as 読み上げサービス
 
+    participant D as DB
+
     U->>L: 利用者の声（マイクの音声トラック）
     L->>A: 利用者の声
-    A->>O: 声をそのまま流す
-    Note over O: 話し終わりを見つけて返事を考える
-    O-->>A: 返事の文字（[happy]わあ！… のように感情の印つき）
+    A->>O: 声をそのまま流す（会話サーバーも、話者の判定用に直近 30 秒をメモリーにためる）
+    O-->>A: 話し始め・話し終わりの知らせ（semantic_vad。返事は自動では作らない）
+    Note over A: 話者を判定（ECAPA、約 0.1 秒）。覚えている人・この会話の人と照合
+    A->>O: 「[発言者：博士（声を覚えている人）]」（2 人のときは、本人の初回だけメモも添える）
+    A->>O: 返事を作らせる
+    O-->>A: 返事の文字（[happy]わあ！… のように感情の印つき）。必要なら道具を呼ぶ（tools/）
+    A-->>D: 道具：名前を付ける・覚える・メモを預ける など
     loop 1 文ずつ
         A->>I: 文と、感情に合わせた声の説明
         I-->>A: シエルの声（PCM）
@@ -97,8 +108,11 @@ sequenceDiagram
     L->>U: 声 → 再生し、その大きさで口を動かす
 ```
 
-- 返事の出だしの遅れ ≒「最初の 1 文の文字が届くまで」＋「その文の読み上げ（0.4〜0.7 秒）」。
-- 利用者がシエルの話の途中で話し始めると、シエルの話は止まる（割り込み）。
+- 返事の出だしの遅れ ≒「話者の判定（約 0.1 秒）」＋「最初の 1 文の文字が届くまで」＋「その文の読み上げ（0.4〜0.7 秒）」。
+- 返事は、会話サーバー（`turns.py`）が話し終わりごとに作らせる。LiveKit も会話モデルも自動では作らない（話者の 1 行を先に足すため）。
+- 利用者がシエルの話の途中で話し始めると、シエルの話は止まる（割り込み。会話モデルの側で判定）。
+- 会話の裏で：同意した人について覚えておくメモを書く（`notes.py`）。議事録をとっているときは、発言をためておき、終わりにまとめる（`minutes.py`）。どちらも別の文字のモデルで、会話を止めない。
+- 人を覚えるしくみ（声・同意・メモ）の使い方は [人を覚える機能の使い方](people-memory-ja.md)。
 - 会話の録音・文字起こしは LiveKit Cloud に残さない（`record=False`）。
 
 ### 声の方式（`CIEL_VOICE`）
@@ -165,14 +179,15 @@ GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会
 | 議事録の下書きを送る Discord の Webhook の URL | `server/agent/.env` の `CIEL_MINUTES_DISCORD_WEBHOOK` | 入れない |
 | 送れなかった議事録の下書き | 自宅サーバーの `server/agent/data/minutes/` | 入れない |
 | DB のパスワード | `server/.env`（見本は `server/.env.example`。無ければデプロイのときに自宅サーバーで作る） | 入れない |
-| 覚えている人（名前と声の特徴。本人が同意した人だけ） | DB の `people`・`voiceprints`。管理は `speaker_admin.py` | 入れない |
+| 覚えている人（名前・声の特徴・その人のメモ。本人が同意した人だけ） | DB の `people`・`voiceprints`・`person_notes`。管理は `speaker_admin.py`（一覧・メモを見る・呼び名を直す・削除） | 入れない |
+| 会話の裏の文字のモデル、話者の判定の基準 | `server/agent/.env` の `CIEL_NOTES_MODEL`・`CIEL_MINUTES_MODEL`・`CIEL_SPK_*`（見本は `.env.example`） | 入れない |
 | シエルの指示（プロンプト） | `server/agent/config/`（`persona.toml` と `prompts/*.md`）。次の会話から反映 | 入れる |
 | アプリの接続の設定（開発用トークンサーバーの ID） | `unity/Assets/Settings/LiveKitTokenSource.asset` | 入れない |
-| アプリで選んだマイク・声の出力・会話のモード | 端末ごと（Unity の PlayerPrefs） | — |
+| アプリで選んだマイク・声の出力・会話のモード・スピーカー（Android） | 端末ごと（Unity の PlayerPrefs） | — |
 
 ## 今の制限と、これから
 
 - 接続のトークンは、LiveKit の**開発用トークンサーバー**から取っている（誰でも取れる）。公開する前に、認証つきのトークン発行（仕様書の `server/session-api/`）へ切り替える。
 - ビルドしたアプリには接続の設定が入るので、ほかの人に配らない。
-- 会議（多人数）では話者を区別しない。会議の全員の声が 1 本に混ざって届く。
-- スマホ版は未確認。マイク・声の出力の選択はスマホでは OS に任せる作りにしてある。
+- 話者は声だけで判定する。会議では全員の声が 1 本に混ざって届くので、1 つの発言に 2 人の声が混ざると主な話者しか付けられない。ほとんど同じ声の 2 人は区別しきれない（「たぶん」として扱う）。
+- Android：会話・話者の識別・メモ・スピーカーの切り替えを実機で確認済み（2026-10-16）。マイクの選択は OS に任せる。iOS は未確認。
