@@ -144,9 +144,11 @@ async def entrypoint(ctx: JobContext) -> None:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
     switch = mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori')
-    replies = turns.TurnReplies(session, book, tap, switch)
+    replies = turns.TurnReplies(session, book, tap, switch, agent.persona.group_turn_instructions)
     if REALTIME:
         session.on('user_state_changed', replies.on_user_state)
+        session.on('user_input_transcribed', replies.on_transcribed)   # 文字起こしの確定で返事を作らせる
+        session.on('conversation_item_added', replies.on_item)   # 多人数で、シエルの質問への答えを待つ
     if SPEAKERS:
         asyncio.create_task(replies.load_encoder())
 

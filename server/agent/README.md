@@ -9,6 +9,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [emotion.md](config/prompts/emotion.md) | Irodori-TTS 用の感情タグの指示 |
 | [touch.md](config/prompts/touch.md) | 画面のタッチ（`[タッチ]` の知らせ）への反応の仕方。処理は `touch.py` |
 | [group.md](config/prompts/group.md) | 多人数（会議）のモードで、呼ばれたときだけ答え、それ以外は `[silent]` で黙る決まり。処理は `mode.py` |
+| [group_turn.md](config/prompts/group_turn.md) | 多人数のモードで、返事を作らせるたびに添える短い念押し。処理は `turns.py` |
 | [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前を聞く・同意を取る流れ、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |

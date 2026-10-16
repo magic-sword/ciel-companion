@@ -14,6 +14,7 @@
 | `server/agent/config/prompts/emotion.md` | Irodori 用の感情タグの指示 |
 | `server/agent/config/prompts/touch.md` | 画面のタッチの知らせ（`[タッチ]` の行）への反応の仕方 |
 | `server/agent/config/prompts/group.md` | 多人数（会議）のモードで足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py` |
+| `server/agent/config/prompts/group_turn.md` | 多人数のモードで、返事を作らせるたびに `generate_reply` の instructions として添える短い念押し。処理は `turns.py`（2026-10-16） |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、人についての道具の使い方（2 人でも多人数でも。`CIEL_VOICE=irodori` で Realtime API のとき）。処理は `speakers.py`・`tools/people.py` |
 | `server/agent/config/prompts/notes.md` | 会話の裏でメモを書く記録係（別の文字のモデル）への指示。処理は `notes.py`。[メモの決定記録](person-notes-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
@@ -26,7 +27,7 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 ## 読み込みと反映
 
 - `CIEL_PERSONA_CONFIG` が未指定または空の場合、`server/agent/config/persona.toml` を使う。環境変数の相対パスは `server/agent/` 基準。
-- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`group_instructions_file`、`speaker_instructions_file`、`notes_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
+- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`group_instructions_file`、`group_turn_instructions_file`、`speaker_instructions_file`、`notes_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
 - 会話開始時に七つのファイルを読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
 - 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。多人数の指示は、Unity が多人数のモードを知らせたときだけ最後に追加する（`CIEL_VOICE=irodori` のときだけ）。
 - 設定・本文の欠落、不正な TOML、不正な UTF-8、空の本文はエラーにする。別のキャラクターへ自動で切り替えない。
