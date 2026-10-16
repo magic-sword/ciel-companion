@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "neutral": 0,
+  "wag_min": -0.9998629,
+  "wag_max": 0.999617,
+  "follow_max": 0.2082651,
+  "tip_max": 0.2325678,
+  "settled": 0,
+  "happy_max": 0.899936,
+  "screen": "540x1170",
+  "capture": "Unity Conversation scene in Play mode; live SDK physics",
+  "portrait_camera": {
+    "orthographic_size": 0.7003115,
+    "position": [
+      0.0009338856,
+      0.06658649
+    ]
+  },
+  "moc_sha256": "557b69ccb637b54779acf6edabe53c3b88b41cde2fd9a9c660276448d08a3d8a",
+  "physics_sha256": "a403b5ee9d6f4a945e4175e0d05f9e42c3d56c47131bd2ed796bf7b067a94f9f"
+}

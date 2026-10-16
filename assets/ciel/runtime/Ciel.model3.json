@@ -4,7 +4,8 @@
     "Moc": "Ciel.moc3",
     "Textures": [
       "Ciel.4096/texture_00.png",
-      "Ciel.4096/texture_01.png"
+      "Ciel.4096/texture_01.png",
+      "Ciel.4096/texture_02.png"
     ],
     "DisplayInfo": "Ciel.cdi3.json",
     "Physics": "Ciel.physics3.json",

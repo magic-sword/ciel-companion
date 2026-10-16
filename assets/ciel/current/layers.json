@@ -1447,6 +1447,34 @@
         414,
         0
       ]
+    },
+    {
+      "name": "Tail_Left",
+      "path": "assets/ciel/current/layers/Tail_Left.png",
+      "canvas": [
+        1254,
+        1254
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "placement": "native-rig",
+      "visible": false
+    },
+    {
+      "name": "Tail_Right",
+      "path": "assets/ciel/current/layers/Tail_Right.png",
+      "canvas": [
+        1254,
+        1254
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "placement": "native-rig",
+      "visible": false
     }
   ],
   "model_canvas": [

@@ -32,9 +32,12 @@ def main():
         refs[key]=newrefs[key];sources[refs[key]]=safe(source,refs[key])
     refs['Textures']=newrefs['Textures']
     for name in refs['Textures']:sources[name]=safe(source,name)
-    # Keep the existing physics, nod motion, blink and lip-sync groups.
+    # Keep existing controls by default; a reviewed physics update can opt in
+    # to the source package so a newly added model part retains its simulation.
     for key in ('Physics','Pose','UserData'):
-        if key in refs:sources[refs[key]]=safe(unity,refs[key])
+        if key=='Physics' and '--use-source-physics' in sys.argv:
+            refs[key]=newrefs[key];sources[refs[key]]=safe(source,refs[key])
+        elif key in refs:sources[refs[key]]=safe(unity,refs[key])
     for motions in refs.get('Motions',{}).values():
         for motion in motions:sources[motion['File']]=safe(unity,motion['File'])
     for name in ['neutral',*approved['approved_expressions']]:

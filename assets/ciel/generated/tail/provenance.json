@@ -1,0 +1,21 @@
+{
+  "revision": "v63",
+  "motif": "Samoyed",
+  "generated_source": {
+    "path": "assets/ciel/generated/tail/source.png",
+    "sha256": "f4c9e213aa9901d7404280f7001bb4133dd86ba9c8a3001ab2a41360790df85d"
+  },
+  "adopted_materials": [
+    {
+      "path": "assets/ciel/current/layers/Tail_Left.png",
+      "sha256": "216afe62d179d218365e46ac2957baf4e4302f6218d347ad31defee3e3ae6dd6"
+    },
+    {
+      "path": "assets/ciel/current/layers/Tail_Right.png",
+      "sha256": "216afe62d179d218365e46ac2957baf4e4302f6218d347ad31defee3e3ae6dd6"
+    }
+  ],
+  "processing": "Retain the largest connected alpha component; preserve retained RGBA. Both views share the same texture; left geometry is reflected in the native CMO.",
+  "placement_and_deformation": "assets/ciel/rig/ciel.cmo3",
+  "controls": "assets/ciel/rig/tail/controls.json"
+}

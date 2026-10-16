@@ -1,5 +1,5 @@
 {
-  "approved_date": "2026-10-15",
+  "approved_date": "2026-10-16",
   "approved_expressions": [
     "happy",
     "relaxed",
@@ -14,15 +14,15 @@
   ],
   "relaxed_revision": "v33-with-eye-corner-adjustment",
   "rig": "assets/ciel/rig/ciel.cmo3",
-  "rig_sha256": "c47bec98801a07f322c3b3a14f0dec99c916a4940869569b2bb1e8716af4c88e",
+  "rig_sha256": "f689cf0a40b63d5fb26beeffe31b3b8f6d8ed99bca1f8eab4ed2d7d8cb016e50",
   "materials": "assets/ciel/current/layers.json",
-  "material_count": 111,
+  "material_count": 113,
   "relaxed_control": "ParamRelaxed",
   "latest_relaxed_proofs": "assets/ciel/rig/proofs/relaxed-eye-corners",
   "other_expressions": "pending_visual_adjustment",
   "surprised_revision": "v34-with-iris-position-adjustment",
   "surprised_control": "ParamSurprised",
-  "latest_proofs": "assets/ciel/rig/proofs/body-outfit-v60",
+  "latest_proofs": "assets/ciel/rig/proofs/tail-v63",
   "latest_surprised_proofs": "assets/ciel/rig/proofs/surprised-v34",
   "export_files": [
     {
@@ -34,20 +34,24 @@
       "sha256": "cce6384b181083c756cd4bff8400cbfc6ad1f7baf87de18b4ec8e8de3f1d0051"
     },
     {
+      "path": "Ciel.4096/texture_02.png",
+      "sha256": "8898674604c461e71b0402fb7b3c76579e181d38cc2c85bfb210429828f4cdaa"
+    },
+    {
       "path": "Ciel.cdi3.json",
-      "sha256": "328ef8e883ca2c88cb606ef883cfaf5459b5a42060b6e8aace7d8cf07f9382bd"
+      "sha256": "ff86b04d6b642785bf4fcf58e4ca1f020c611d7f69c2db106956991f7191d348"
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "7018c54b025cf25bcd5c32dee1e2ae6b95001d6b01b555e48ef5b94b04698715"
+      "sha256": "557b69ccb637b54779acf6edabe53c3b88b41cde2fd9a9c660276448d08a3d8a"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "03ca0211f74f5451ad24506dd23116d39d2d78c129ab15298330d15e5ffa81cd"
+      "sha256": "c05d703e098539ae38ed42907d3aaa1fea88a2998e8801a584ba6adc625cf5a5"
     },
     {
       "path": "Ciel.physics3.json",
-      "sha256": "fb5124bb37abdd65acfe65215c2be50cae4aef36e69d65e4961681824f09aa1d"
+      "sha256": "a403b5ee9d6f4a945e4175e0d05f9e42c3d56c47131bd2ed796bf7b067a94f9f"
     },
     {
       "path": "Expressions/angry.exp3.json",
@@ -129,5 +133,8 @@
   "crown_original_revision": "v45",
   "body_outfit_revision": "v60",
   "latest_body_outfit_proofs": "assets/ciel/rig/proofs/body-outfit-v60",
-  "body_outfit_controls": "assets/ciel/rig/body-outfit/controls.json"
+  "body_outfit_controls": "assets/ciel/rig/body-outfit/controls.json",
+  "tail_revision": "v63",
+  "tail_controls": "assets/ciel/rig/tail/controls.json",
+  "latest_tail_proofs": "assets/ciel/rig/proofs/tail-v63"
 }

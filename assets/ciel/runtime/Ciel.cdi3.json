@@ -290,10 +290,29 @@
 			"Id": "ParamCielJacketHemR",
 			"GroupId": "",
 			"Name": "右 JacketHem"
+		},
+		{
+			"Id": "ParamCielTailWag",
+			"GroupId": "",
+			"Name": "尻尾 左右"
+		},
+		{
+			"Id": "ParamCielTailFollow",
+			"GroupId": "",
+			"Name": "尻尾 中ほどの追従"
+		},
+		{
+			"Id": "ParamCielTailTip",
+			"GroupId": "",
+			"Name": "尻尾 毛先の追従"
 		}
 	],
 	"ParameterGroups": [],
 	"Parts": [
+		{
+			"Id": "Part16",
+			"Name": "tail-additions.psd"
+		},
 		{
 			"Id": "Part15",
 			"Name": "body-outfit-materials.psd"

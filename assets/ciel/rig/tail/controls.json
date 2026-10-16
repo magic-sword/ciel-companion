@@ -1,0 +1,26 @@
+{
+  "parameters": [
+    "ParamCielTailWag",
+    "ParamCielTailFollow",
+    "ParamCielTailTip"
+  ],
+  "default": [
+    0,
+    0,
+    0
+  ],
+  "range": [
+    -1,
+    1
+  ],
+  "root_model": [
+    1115.0,
+    2650.0
+  ],
+  "parent": "呼吸",
+  "left_source_is_shared_and_geometry_reflected": true,
+  "vertices_per_mesh": 441,
+  "keyforms_per_mesh": 7,
+  "follow_tip_warps": 4,
+  "additional_atlas_size": 2048
+}

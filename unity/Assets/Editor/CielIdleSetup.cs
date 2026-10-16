@@ -3,6 +3,7 @@
 // 実行：Unity.exe -batchmode -projectPath unity -executeMethod Ciel.EditorTools.CielIdleSetup.Run -quit -logFile <log>
 using Live2D.Cubism.Core;
 using Live2D.Cubism.Framework.HarmonicMotion;
+using Ciel.Conversation;
 using UnityEditor;
 using UnityEngine;
 
@@ -45,6 +46,8 @@ namespace Ciel.EditorTools
                     h.Duration = m.duration;
                 }
                 controller.Refresh();
+                if (System.Array.Exists(model.Parameters, p => p.Id == "ParamCielTailWag") && root.GetComponent<CielTail>() == null)
+                    root.AddComponent<CielTail>();
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
                 Debug.Log("CIEL_IDLE_SETUP_DONE");
             }
