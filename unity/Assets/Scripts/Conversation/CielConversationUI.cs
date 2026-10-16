@@ -74,6 +74,7 @@ namespace Ciel.Conversation
             if (_conversation == null) _conversation = FindAnyObjectByType<CielConversation>();
             if (_background == null) _background = FindAnyObjectByType<CielBackground>();
             if (_background == null) _background = gameObject.AddComponent<CielBackground>();
+            if (FindAnyObjectByType<CielResizeGuard>() == null) gameObject.AddComponent<CielResizeGuard>();   // 画面の大きさが変わってもシエルを描く
             _font = Font.CreateDynamicFontFromOSFont(
                 new[] { "Yu Gothic UI", "Meiryo UI", "Meiryo", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP" }, 32);
             Build();

@@ -43,7 +43,8 @@ namespace Ciel.EditorTools
                     so.ApplyModifiedPropertiesWithoutUndo();
                 }
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
-                if (File.ReadAllText(RequestPath).Contains("ui"))
+                var request = File.ReadAllText(RequestPath);
+                if (request.Contains("ui") || request.Contains("resize"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -55,6 +56,11 @@ namespace Ciel.EditorTools
                 var grab = new GameObject("CielScreenGrab").AddComponent<Ciel.Diagnostics.CielScreenGrab>();
                 grab.gameObject.AddComponent<Ciel.Diagnostics.CielFrameTrace>();
                 grab.OutDir = OutDir;
+                return;
+            }
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("resize"))
+            {
+                ResizeShots(step);
                 return;
             }
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
@@ -137,6 +143,44 @@ namespace Ciel.EditorTools
                 ui.GetType().GetMethod("ShowVolumePop", flags).Invoke(ui, new object[] { true });
             }
             Next(step + 1);
+        }
+
+        // 再生中に Game ビューの大きさを変えても、シエルが描かれ続けるかを確かめる。
+        // resize-0.png（縦長）→ 横長へ変える → resize-1.png（1 秒後）→ "fix:…" があれば試す → resize-2.png（1.5 秒後）
+        // 撮影は次の描画で書き出されるので、撮る段と大きさ・状態を変える段を分ける
+        static void ResizeShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            if (step == 2) { if (now - _t0 < 2.0) return; Shot("resize-0"); Next(3); return; }
+            if (step == 3) { if (now - _mark < 0.5) return; SessionState.SetInt(SizeKey + ".2", SetGameViewSize(1110, 620)); Next(4); return; }
+            if (step == 4) { if (now - _mark < 1.0) return; Shot("resize-1"); Next(5); return; }
+            if (step == 5)
+            {
+                if (now - _mark < 0.5) return;
+                // 試し："fix:release" は Live2D の作業用の絵を全部手放す、"fix:toggle" は描画の部品を止めて動かし直す
+                var req = File.ReadAllText(RequestPath);
+                if (req.Contains("fix:release")) Live2D.Cubism.Rendering.CubismOffscreenRenderTextureManager.GetInstance().Release();
+                if (req.Contains("fix:toggle"))
+                    foreach (var rc in Object.FindObjectsByType<Live2D.Cubism.Rendering.CubismRenderController>())
+                    {
+                        rc.enabled = false;
+                        var c = rc;
+                        EditorApplication.delayCall += () => c.enabled = true;
+                    }
+                Next(6);
+                return;
+            }
+            if (step == 6) { if (now - _mark < 1.5) return; Shot("resize-2"); Next(7); return; }
+            if (now - _mark < 1.0) return;
+            RemoveGameViewSize(SessionState.GetInt(SizeKey + ".2", -1));
+            FinishUiShots();
+
+            static void Shot(string name)
+            {
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                File.AppendAllText(Path.Combine(OutDir, "resize.txt"),
+                    $"{name} t={EditorApplication.timeSinceStartup - _t0:0.0} screen={Screen.width}x{Screen.height} frame={Time.frameCount}\n");
+            }
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える
