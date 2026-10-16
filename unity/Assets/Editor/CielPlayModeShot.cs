@@ -2,7 +2,8 @@
 // 使い方：.local/render-check/playmode-request を置いて、エディタを起動する（-batchmode は付けない）。
 // 出力：.local/render-check/playmode-*.png と playmode.txt。終わるとエディタを終了する。
 // 要求の文字に "ui" を含めると、代わりに会話の画面を縦長（540×1170）で撮る：
-// ui-main.png（ふだん）、ui-settings.png（設定）、ui-settings-bottom.png（設定の一番下）、ui-volume.png（その場の声の大きさ）。
+// ui-main.png（ふだん）、ui-settings.png・ui-settings-bg.png・ui-settings-other.png（設定のタブ）、ui-volume.png（その場の声の大きさ）。
+// 設定画面の中を押しても閉じないかを、押す操作を真似して確かめ、ui.txt に書く。
 // "touch" を含めると、縦長の画面でシエルに触れる操作を再現し、触れた点の表示（CielTouchVisual）を撮る：
 // touch-converge.png（触れ始め）、touch-hold.png（長く触れる）、touch-stroke-start.png（撫で始め）、touch-stroke.png（頭を撫で続ける）、touch-tap.png（ほっぺをつつく）、touch-none.png（反応しない胸）。
 using System.IO;
@@ -60,6 +61,11 @@ namespace Ciel.EditorTools
                 grab.OutDir = OutDir;
                 return;
             }
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("speakerswitch"))
+            {
+                SpeakerSwitch(step);
+                return;
+            }
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("resize"))
             {
                 ResizeShots(step);
@@ -70,9 +76,9 @@ namespace Ciel.EditorTools
                 TouchShots(step);
                 return;
             }
-            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
+            if (step >= 2 && step < Done && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
             {
-                if (step < 7) UiShots(step);
+                if (step < 8) UiShots(step);
                 else if (EditorApplication.timeSinceStartup - _mark > 1.0) FinishUiShots();
                 return;
             }
@@ -107,6 +113,7 @@ namespace Ciel.EditorTools
 
         static double _mark;
         static bool _captured;
+        const int Done = 99;   // 撮り終えた段（どの撮り方の分岐にも当たらない）
         const string SizeKey = "CielPlayModeShot.size";
 
         // Game ビューを縦長（スマホの大きさ）にして、画面の状態を変えながら撮る。
@@ -131,7 +138,7 @@ namespace Ciel.EditorTools
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = step == 3 ? "ui-main" : step == 4 ? "ui-settings" : step == 5 ? "ui-settings-bottom" : "ui-volume";
+                var name = new[] { "ui-main", "ui-settings", "ui-settings-bg", "ui-settings-other", "ui-volume" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 _captured = true;
                 _mark = now;
@@ -141,10 +148,19 @@ namespace Ciel.EditorTools
             _captured = false;
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             if (step == 3) ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-            if (step == 4)   // 設定を一番下まですべらせる
-                foreach (var sr in ui.GetComponentsInChildren<UnityEngine.UI.ScrollRect>())
-                    if (sr.name == "View") sr.verticalNormalizedPosition = 0;
-            if (step == 5)
+            if (step == 4)
+            {
+                // 設定画面の中（何もない所）を押したことにして、閉じないかを確かめる
+                var sheet = ui.transform.Find("ConversationCanvas/Settings/Sheet");
+                var es = UnityEngine.EventSystems.EventSystem.current;
+                UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(sheet.gameObject,
+                    new UnityEngine.EventSystems.PointerEventData(es), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                var open = (bool)ui.GetType().GetField("_sheetOpen", flags).GetValue(ui);
+                File.AppendAllText(Path.Combine(OutDir, "ui.txt"), $"設定の中を押したあと：{(open ? "開いたまま" : "閉じた")}\n");
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 1 });
+            }
+            if (step == 5) ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 2 });
+            if (step == 6)
             {
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { false });
                 ui.GetType().GetMethod("ShowVolumePop", flags).Invoke(ui, new object[] { true });
@@ -265,6 +281,30 @@ namespace Ciel.EditorTools
                 }
             }
             if (_touchIndex >= TouchScript.Length && t > 5.5f) FinishUiShots();
+        }
+
+        // "speakerswitch connect"：会話につなぎ、シエルの声が流れているあいだに、声の出力を別の機器 → 既定へ切り替える。
+        // 結果はエディタのログ（[CielConversation] の行）で見る。PC のスピーカーからシエルの声が出る
+        static void SpeakerSwitch(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var voice = c != null && c.GetType().GetField("_voiceStream", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(c) != null;
+            if (step == 2) { if (!voice && now - _t0 < 30) return; Next(3); return; }
+            if (step == 3)
+            {
+                if (now - _mark < 1.0) return;
+                var other = c.SpeakerDevices.Find(d => d.guid != Ciel.Conversation.WindowsDefaultAudio.Speaker() && !d.name.Contains("CABLE") && !d.name.Contains("Cable"));   // いまの既定と違う機器
+                if (other.guid == null && c.SpeakerDevices.Count > 0) other = c.SpeakerDevices[0];
+                Debug.Log($"[SpeakerSwitch] 声の受信中={voice}、'{other.name}' へ切り替える");
+                c.SelectSpeaker(other.guid);
+                Next(4);
+                return;
+            }
+            if (step == 4) { if (now - _mark < 4.0) return; Debug.Log("[SpeakerSwitch] 既定へ切り替える"); c.SelectSpeaker(null); Next(5); return; }
+            if (step == 5) { if (now - _mark < 4.0) return; Next(6); return; }
+            if (now - _mark < 0.5) return;
+            FinishUiShots();
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える

@@ -7,7 +7,9 @@
 // 声の再生は端末の音声（PlatformAudio）が自動で行う。口パク用には同じトラックを Unity の AudioSource でも受け、
 // 音量だけ測って音は消す（二重に鳴らさない）。
 // マイクの機器：PC は OS の一覧から選べる（既定は OS の既定のマイク）。スマホは OS が切り替えを管理するので選ばない。
-// 声を出す機器（スピーカー）も PC では選べる。仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
+// 声を出す機器（スピーカー）も PC では選べる。「既定」は、Windows に OS の既定の機器を問い合わせて、その機器を選ぶ（WindowsDefaultAudio）。
+// 再生中は出力の機器を変えられないので、シエルの声の受信をいったん止めてから変え、受け直す（SwitchWhilePlaying）。
+// 仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
 // 会話のモード：2 人（Solo）と多人数（Group）。自動のときは、声を仮想オーディオケーブルへ出していれば会議とみなして多人数にする。
 // 会話サーバー（server/agent/mode.py）へ、つないだとき・会話サーバーが入ってきたとき・モードが変わったときに知らせる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
@@ -50,8 +52,10 @@ namespace Ciel.Conversation
         PlatformAudioSource _micSource;
         LocalAudioTrack _micTrack;
         AudioStream _voiceStream;
+        RemoteTrackPublication _voicePublication;   // シエルの声（受け直すときに使う）
+        bool _restartingPlayout;
         AgentVoiceMeter _meter;
-        bool _recording, _busy, _quitting;
+        bool _recording, _busy, _quitting, _micRestarting;
         string _micGuid;   // 選んだマイク。null は OS の既定
         string _speakerGuid;   // 選んだスピーカー。null は OS の既定
 
@@ -155,19 +159,20 @@ namespace Ciel.Conversation
                 MicDevices.Clear();
                 foreach (var d in rec)
                 {
-                    Debug.Log($"[CielConversation] マイク {d.Index}: {d.Name}");
+                    Debug.Log($"[CielConversation] マイク {d.Index}: {d.Name} [{d.Guid}]");
                     if (!string.IsNullOrEmpty(d.Guid)) MicDevices.Add((d.Name, d.Guid));
                 }
                 SpeakerDevices.Clear();
                 foreach (var d in play)
                 {
-                    Debug.Log($"[CielConversation] スピーカー {d.Index}: {d.Name}");
+                    Debug.Log($"[CielConversation] スピーカー {d.Index}: {d.Name} [{d.Guid}]");
                     if (!string.IsNullOrEmpty(d.Guid)) SpeakerDevices.Add((d.Name, d.Guid));
                 }
                 // 保存していた機器が今は無いなら、既定に戻す
                 if (_micGuid != null && !MicDevices.Exists(m => m.guid == _micGuid)) _micGuid = null;
                 if (_speakerGuid != null && !SpeakerDevices.Exists(m => m.guid == _speakerGuid)) _speakerGuid = null;
-                if (_speakerGuid != null) ApplySpeaker();
+                Debug.Log($"[CielConversation] OS の既定：マイク [{WindowsDefaultAudio.Mic()}]、スピーカー [{WindowsDefaultAudio.Speaker()}]");
+                ApplySpeaker();
             }
             catch (Exception e)
             {
@@ -186,7 +191,7 @@ namespace Ciel.Conversation
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
             // 接続のときに WebRTC が声の出力を OS の既定（通話用の機器）へ戻すので、選んだ機器をかけ直す。
             // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
-            if (_speakerGuid != null) ApplySpeaker();
+            ApplySpeaker();
             ApplySpeakerphone();
             MinutesOn = false;   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
@@ -255,13 +260,18 @@ namespace Ciel.Conversation
             _micGuid = guid;
             if (guid == null) PlayerPrefs.DeleteKey(MicPrefKey);
             else PlayerPrefs.SetString(MicPrefKey, guid);
-            if (_recording && !_busy) StartCoroutine(Restart());
+            if (_recording || _busy) StartCoroutine(Restart());
             Changed?.Invoke();
 
+            // 入れる・切るの途中なら、終わるのを待ってから入れ直す（待たずにやめると、あとで選んだ機器が使われない）
             IEnumerator Restart()
             {
+                while (_busy) yield return null;
+                if (!_recording || _micRestarting) yield break;
+                _micRestarting = true;
                 yield return MicOff();
                 yield return MicOn();
+                _micRestarting = false;
             }
         }
 
@@ -345,16 +355,61 @@ namespace Ciel.Conversation
             catch (Exception e) { Debug.LogWarning($"[CielConversation] 声の大きさを送れない: {e.Message}"); }
         }
 
-        // 既定（null）は空の ID を渡す（SDK の番号指定と同じ扱い）
+        // 既定（null）は OS の既定の機器を選ぶ（空の ID を渡すと、一覧の最初の機器になってしまう）。スマホは OS に任せる
         void ApplySpeaker()
         {
-            var name = _speakerGuid == null ? "OS の既定" : SpeakerDevices.Find(m => m.guid == _speakerGuid).name;
+            if (_platformAudio == null || Application.isMobilePlatform) return;
+            var guid = _speakerGuid ?? DefaultDevice(WindowsDefaultAudio.Speaker(), SpeakerDevices);
+            var name = SpeakerDevices.Find(m => m.guid == guid).name ?? "一覧の最初の機器";
+            if (_voicePublication != null && _voiceStream != null)
+            {
+                _pendingSpeaker = (guid, name);   // 切り替えの途中で選び直したら、最後に選んだ機器にする
+                if (!_restartingPlayout) StartCoroutine(SwitchWhilePlaying(_voicePublication));
+                return;
+            }
+            TrySetSpeaker(guid, name, warn: true);
+        }
+
+        (string guid, string name) _pendingSpeaker;
+
+        bool TrySetSpeaker(string guid, string name, bool warn)
+        {
             try
             {
-                _platformAudio.SetPlayoutDevice(_speakerGuid ?? "");
-                Debug.Log($"[CielConversation] スピーカー '{name}' で再生");
+                _platformAudio.SetPlayoutDevice(guid ?? "");
+                Debug.Log($"[CielConversation] スピーカー '{name}'{(_speakerGuid == null ? "（OS の既定）" : "")} で再生");
+                return true;
             }
-            catch (Exception e) { Debug.LogWarning($"[CielConversation] スピーカー '{name}' を選べない: {e.Message}"); }
+            catch (Exception e)
+            {
+                if (warn) Debug.LogWarning($"[CielConversation] スピーカー '{name}' を選べない: {e.Message}");
+                return false;
+            }
+        }
+
+        // OS の既定の機器が一覧にあれば、その ID（無ければ null）
+        static string DefaultDevice(string id, List<(string name, string guid)> devices) =>
+            id != null && devices.Exists(m => string.Equals(m.guid, id, StringComparison.OrdinalIgnoreCase))
+                ? devices.Find(m => string.Equals(m.guid, id, StringComparison.OrdinalIgnoreCase)).guid : null;
+
+        // Windows の端末の音声（WebRTC）は、再生しているあいだは出力の機器を変えられない（"Device not found" のエラーになる）。
+        // シエルの声の受信をいったん止めて再生を止め、機器を変えてから受け直す（声が一瞬途切れる）
+        IEnumerator SwitchWhilePlaying(RemoteTrackPublication publication)
+        {
+            _restartingPlayout = true;
+            Trace("スピーカーを変えるので、シエルの声の受信をいったん止める");
+            publication.SetSubscribed(false);
+            // 受信が止まる（TrackUnsubscribed で _voiceStream が片付く）のを待つ。来なくても 2 秒で先へ進む
+            var until = Time.realtimeSinceStartup + 2f;
+            while (_voiceStream != null && Time.realtimeSinceStartup < until) yield return null;
+            // 再生が止まるまで少しかかることがあるので、1 秒のあいだ選び直す
+            var ok = false;
+            until = Time.realtimeSinceStartup + 1f;
+            while (!(ok = TrySetSpeaker(_pendingSpeaker.guid, _pendingSpeaker.name, warn: false)) && Time.realtimeSinceStartup < until)
+                yield return null;
+            if (!ok) TrySetSpeaker(_pendingSpeaker.guid, _pendingSpeaker.name, warn: true);
+            publication.SetSubscribed(true);   // 受け直す（OnTrackSubscribed で口パク用の受信も作り直す）
+            _restartingPlayout = false;
         }
 
         IEnumerator MicOn()
@@ -415,7 +470,8 @@ namespace Ciel.Conversation
             _recording = false;
             var tries = new List<(string name, string guid)>();
             if (_micGuid != null) tries.Add((MicDevices.Find(m => m.guid == _micGuid).name, _micGuid));
-            tries.Add(("OS の既定", null));
+            // OS の既定：PC は Windows に問い合わせた機器を選ぶ（選ばないと、前に選んだ機器のまま録音する）
+            tries.Add(("OS の既定", Application.isMobilePlatform ? null : DefaultDevice(WindowsDefaultAudio.Mic(), MicDevices)));
             foreach (var m in MicDevices) if (m.guid != _micGuid) tries.Add(m);
 
             foreach (var (name, guid) in tries)
@@ -456,6 +512,7 @@ namespace Ciel.Conversation
         void OnTrackSubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
             if (!(track is RemoteAudioTrack audio) || _voiceStream != null) return;
+            _voicePublication = publication;
             // 口パク用：音量だけを測る AudioSource（音は AgentVoiceMeter が消す）
             var go = new GameObject("CielVoiceMeter");
             go.transform.SetParent(transform, false);
@@ -525,7 +582,8 @@ namespace Ciel.Conversation
 
         void OnTrackUnsubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
-            if (track is RemoteAudioTrack) DisposeVoice();
+            if (!(track is RemoteAudioTrack)) return;
+            DisposeVoice();
         }
 
         void DisposeVoice()
