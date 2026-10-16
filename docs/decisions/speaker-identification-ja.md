@@ -54,8 +54,8 @@
 | `server/agent/tools/people.py` | 道具 `name_speaker`・`forget_speaker`・`lookup_person`・`people_here` |
 | `server/agent/agent.py` | 各部品をつなぐ |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、道具の使い方（2 人でも多人数でも） |
-| `server/agent/config/prompts/group.md` | 多人数のときの、答える・黙るの決まり |
-| `server/agent/config/prompts/group_turn.md` | 多人数のとき、返事ごとに添える短い念押し |
+| `server/agent/config/prompts/talk_quiet.md` | ひかえめ（以前の多人数）のときの、答える・黙るの決まり（2026-10-17 に `group.md` から） |
+| `server/agent/config/prompts/talk_quiet_turn.md` | ひかえめのとき、返事ごとに添える短い念押し（2026-10-17 に `group_turn.md` から） |
 | `server/compose.yaml` | DB のコンテナ（`db`） |
 
 ## 確かめたこと・まだのこと

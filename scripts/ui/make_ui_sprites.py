@@ -268,6 +268,12 @@ def icons():
     i.line((5, 12), (10, 17), (19, 7))
     i.save()
 
+    i = Icon('talk', width=1.8)   # 会話のしかた：吹き出し
+    i.line((4, 5), (20, 5), (20, 15), (9, 15), (4, 19), closed=True)
+    i.line((8, 9), (16, 9))
+    i.line((8, 12), (13, 12))
+    i.save()
+
     i = Icon('people', width=1.8)
     i.circle(8, 9, 3)
     i.circle(16, 9, 3)

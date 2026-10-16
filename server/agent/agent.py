@@ -29,6 +29,7 @@ from openai.types.realtime.audio_transcription import AudioTranscription
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import emotion
+import initiative
 import irodori_tts
 import minutes
 import mode
@@ -93,12 +94,13 @@ class Ciel(Agent):
         persona = load_persona()
         self.persona = persona
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
-        super().__init__(instructions=self.instructions_for('solo'), tools=tools.TOOLS)
+        super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS)
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
 
-    def instructions_for(self, mode: str) -> str:
-        """モード（mode.py）ごとの指示。group は多人数での答え方（config/prompts/group.md）を最後に足す。"""
+    def instructions_for(self, talk: str, presence: str) -> str:
+        """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
+        おしゃべり度（ひかえめ talk_quiet.md・おしゃべり talk_chatty.md。ふつうは足さない）を最後に足す。"""
         p = self.persona
         instructions = p.instructions + (p.emotion_instructions if VOICE == 'irodori' else '')
         # 画面のタッチへの反応（touch.py）
@@ -108,13 +110,18 @@ class Ciel(Agent):
             instructions = instructions.rstrip('\n') + '\n\n' + p.speaker_instructions
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         instructions = instructions.rstrip('\n') + '\n\n' + p.minutes_voice_instructions
-        if mode == 'group':
-            instructions = instructions.rstrip('\n') + '\n\n' + p.group_instructions
+        if SPEAKERS:
+            presence_text = {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
+                             'public': p.presence_public_instructions}[presence]
+            instructions = instructions.rstrip('\n') + '\n\n' + presence_text
+        talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
+        if talk_text:
+            instructions = instructions.rstrip('\n') + '\n\n' + talk_text
         return instructions
 
     def tts_node(self, text, model_settings):
         # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）。
-        # 多人数で黙ると決めた返事（[silent]）は読み上げない（mode.py）
+        # ひかえめのときに黙ると決めた返事（[silent]）は読み上げない（mode.py）
         if VOICE == 'irodori':
             return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events))
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
@@ -150,8 +157,15 @@ async def entrypoint(ctx: JobContext) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
-    switch = mode.ModeSwitch(agent, agent.instructions_for, can_group=VOICE == 'irodori')
-    replies = turns.TurnReplies(session, book, tap, switch, agent.persona.group_turn_instructions)
+    # 会話のしかた（mode.py）。いまの答え方・覚えていることの出し方は、変わるたびに Unity へ知らせる
+    style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
+    style.publish = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
+        json.dumps(msg), reliable=True, topic='ciel.event'))
+    replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions)
+    # おしゃべりのとき、しばらく静かなら自分から話しかける（initiative.py）
+    talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge)
+    session.on('user_state_changed', talker.on_user_state)
+    session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:
         session.on('user_state_changed', replies.on_user_state)
         session.on('user_input_transcribed', replies.on_transcribed)   # 文字起こしの確定で返事を作らせる
@@ -201,13 +215,14 @@ async def entrypoint(ctx: JobContext) -> None:
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）
     ctx.room.on('data_received', touch.TouchReactions(session).on_data)
-    # 2 人・多人数の会話の切り替え（mode.py。Unity が知らせる）
-    ctx.room.on('data_received', switch.on_data)
+    # 会話のしかたの切り替え（mode.py。Unity が知らせる）
+    ctx.room.on('data_received', style.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
+    talker.start()
 
 
 if __name__ == '__main__':

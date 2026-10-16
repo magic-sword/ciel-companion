@@ -8,14 +8,16 @@
 - 文字起こしが確定したときに、もう次を話し始めていたら（「シエル、……」の読点で区切られたとき）、まだ作らせず、
   続きの文字起こしの確定を待って、まとめて 1 回だけ作らせる。短い発言は、続きを話し始めないか少し待ってから作らせる。
   文字起こしが空（物音など）なら作らせない。
-- その発言の声で話者を判定し（speakers.py）、「[発言者：…]」を足してから返事を作らせる（2 人でも多人数でも）。
-  2 人のときは、知らない声なら名前を聞く（config/prompts/speakers.md）。声は、まとめた発言の最初の話し始めから
-  最後の話し終わりまでを使う。
-- 多人数のときは、次のどちらかのときだけ返事を作らせる。それ以外は作らせない（声は会話に残るので、話の流れは覚えている）。
+- その発言の声で話者を判定し（speakers.py）、「[発言者：…]」を足してから返事を作らせる（どの設定でも）。
+  知らない声なら名前を聞く（config/prompts/speakers.md）。声は、まとめた発言の最初の話し始めから
+  最後の話し終わりまでを使う。判定するたびに、この会話で聞いた声の数を mode.py へ知らせる（その場にいる人の自動）。
+  本人のメモを渡すかは、その場にいる人で決める（ひとり・身近な人なら渡す）。
+- おしゃべり度が「ひかえめ」のとき（mode.py）は、次のどちらかのときだけ返事を作らせる。それ以外は作らせない
+  （声は会話に残るので、話の流れは覚えている）。
   - 文字起こしに「シエル」（や「AI」）がある。
   - シエルが直前に質問で終わる返事をして、まだ FOLLOW_SECONDS たっていない（その答えかもしれない）。
-  作らせるときも、答えるか黙るか（[silent]）は会話モデルが決める。返事ごとに group_turn.md の短い念押しを添える
-  （generate_reply の instructions は、会話の指示の後ろに足される）。会話の指示の group.md だけでは、呼ばれていない
+  作らせるときも、答えるか黙るか（[silent]）は会話モデルが決める。返事ごとに talk_quiet_turn.md の短い念押しを添える
+  （generate_reply の instructions は、会話の指示の後ろに足される）。会話の指示の talk_quiet.md だけでは、呼ばれていない
   発言にも答えることが多く、一度答えると、続く人どうしの話も自分への返事と受け取って答え続けた（2026-10-16）。
 - 話者の識別が使えないとき（ECAPA の読み込み前・失敗、CIEL_VOICE が irodori 以外）は、[発言者] なしで作らせる。
 """
@@ -39,21 +41,21 @@ SHORT_SECONDS = 1.2
 GRACE_SECONDS = 0.6
 # 会話モデルの側が発言を区切ったのに、文字起こしが確定しない（失敗した）ときに、それでも作らせるまでの時間
 NO_TEXT_SECONDS = 5.0
-# 多人数のとき、これが文字起こしにあれば、シエルが呼ばれたかもしれないとして返事を作らせる
+# ひかえめのとき、これが文字起こしにあれば、シエルが呼ばれたかもしれないとして返事を作らせる
 CALL_WORDS = ('シエル', 'しえる', 'AI', 'ＡＩ', 'エーアイ')
-# 多人数のとき、シエルが質問で終わる返事をしてから、その答えを待つ時間
+# ひかえめのとき、シエルが質問で終わる返事をしてから、その答えを待つ時間
 FOLLOW_SECONDS = 20.0
 TAGS = re.compile(r'\[[a-z]+\]')
 
 
 class TurnReplies:
-    def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, switch,
-                 group_turn: str) -> None:
+    def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, style,
+                 quiet_turn: str) -> None:
         self.session = session
         self.book = book
         self.tap = tap
-        self.switch = switch          # mode.ModeSwitch（2 人か多人数か）
-        self.group_turn = group_turn  # 多人数のとき、返事ごとに添える念押し（config/prompts/group_turn.md）
+        self.style = style            # mode.ConversationStyle（おしゃべり度・その場にいる人）
+        self.quiet_turn = quiet_turn  # ひかえめのとき、返事ごとに添える念押し（config/prompts/talk_quiet_turn.md）
         self.encoder: speakers.Encoder | None = None
         self._speaking = False
         self._started_at: float | None = None   # まだ返事を作らせていない発言の、最初の話し始め
@@ -123,7 +125,7 @@ class TurnReplies:
             self._no_text = None
 
     def on_item(self, ev) -> None:
-        """シエルの返事が会話に入ったら、質問で終わったかを覚えておく（多人数で、その答えを待つため）"""
+        """シエルの返事が会話に入ったら、質問で終わったかを覚えておく（ひかえめのとき、その答えを待つため）"""
         if getattr(ev.item, 'role', None) != 'assistant':
             return
         text = TAGS.sub('', ev.item.text_content or '').strip()
@@ -138,8 +140,8 @@ class TurnReplies:
         self._cancel_later()
         start, end, text = self._started_at, self._ended_at, ''.join(self._texts)
         self._forget()
-        if self.switch.mode == 'group' and not self._called(text):
-            log.info('多人数の会話：呼ばれていないので、返事を作らせない')
+        if self.style.talk == 'quiet' and not self._called(text):
+            log.info('ひかえめ：呼ばれていないので、返事を作らせない')
             return
         now = time.time()
         t = asyncio.create_task(self._reply(start or now, end or now))
@@ -157,7 +159,7 @@ class TurnReplies:
             self._later = None
 
     async def _reply(self, start: float, end: float) -> None:
-        extra = {'instructions': self.group_turn} if self.switch.mode == 'group' else {}
+        extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
         if self.book is None or self.encoder is None:
             self.session.generate_reply(**extra)
             return
@@ -167,7 +169,9 @@ class TurnReplies:
         e = None
         if seconds >= speakers.MIN_VOICED:
             e = await asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
-        line = await self.book.identify(e, seconds, solo=self.switch.mode != 'group')
+        presence = self.style.presence
+        line = await self.book.identify(e, seconds, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
+        self.style.on_voices(len(self.book.speakers))
         log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, seconds)
         if line is not None:
             extra['user_input'] = line

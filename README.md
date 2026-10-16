@@ -67,7 +67,7 @@ Windows・Android のアプリのビルドと起動・端末への入れ方は [
 
 シエルを Zoom・Google Meet の会議に参加させて多人数で話す方法（仮想オーディオ・OBS の配線、Windows 用のビルド、会話のモード）は [会議への参加](docs/meeting-bridge-ja.md) を参照してください。
 
-現在は、シエル（Live2D）の表示・タッチ・表情、OpenAI Realtime API と Irodori-TTS による音声会話、会議への参加（2 人・多人数のモード）、声による話者の識別と、本人が同意した人の名前・メモの記憶まで動いています（Windows と Android で確認）。
+現在は、シエル（Live2D）の表示・タッチ・表情、OpenAI Realtime API と Irodori-TTS による音声会話、会議への参加、会話のしかた（おしゃべり度・その場にいる人）、声による話者の識別と、本人が同意した人の名前・メモの記憶まで動いています（Windows と Android で確認）。
 シエルが人を覚えるしくみ（名前の覚え方、呼び名・人違いの直し方、メモの確認と削除、保存するもの）は [人を覚える機能の使い方](docs/people-memory-ja.md) にまとめています。
 会議の議事録（とり方と Discord への下書きの送り方）は [議事録の決定記録](docs/decisions/meeting-minutes-ja.md) を参照してください。
 APIキーはUnityへ入れずサーバー側で管理します。

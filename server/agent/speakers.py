@@ -145,6 +145,7 @@ class SessionSpeaker:
     person_id: int | None = None     # 覚えている人なら DB の番号
     name: str | None = None
     announced: bool = False          # 前に話した日を、この会話で伝えたか
+    notes_pushed: bool = False       # その人のメモを、この会話で会話モデルに渡したか
     split: bool = False              # 人違いだと言われて、ほかの人から分けた人
 
     def add(self, e: np.ndarray) -> None:
@@ -190,10 +191,13 @@ class SpeakerBook:
         letters = string.ascii_uppercase
         return '知らない人' + (letters[i] if i < 26 else str(i + 1))
 
-    async def identify(self, e: np.ndarray | None, seconds: float, solo: bool = False) -> str | None:
+    async def identify(self, e: np.ndarray | None, seconds: float, solo: bool = False,
+                       push_notes: bool = False) -> str | None:
         """発言の声の特徴から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
-        solo（2 人）のとき、短くて判定できない発言は、直前の人のままとみなして何も足さない
-        （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。"""
+        solo（ふたりきり）のとき、短くて判定できない発言は、直前の人のままとみなして何も足さない
+        （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。
+        push_notes のとき、本人のメモを渡す（その場にいる人が、ひとり・身近な人のとき。mode.py）。
+        この会話でまだ渡していなければ、途中で渡せるようになったときにも渡す。"""
         if e is None or seconds < MIN_VOICED:
             log.info('話者：%s（声 %.1f 秒）', '短い発言（直前の人のまま）' if solo else '不明', seconds)
             if solo:
@@ -244,23 +248,25 @@ class SpeakerBook:
             if not sure:
                 return f'[発言者：たぶん{k.name}（声を覚えている人）]'
             extra, memory = '', ''
-            if not sp.announced:
-                # この会話で初めて分かったときだけ、前に話した日と、メモのことを添える（本人が話しているときだけ）
+            first = not sp.announced
+            if first:
+                # この会話で初めて分かったときだけ、前に話した日と、同意のことを添える（本人が話しているときだけ）
                 sp.announced = True
                 if k.last_seen is not None:
                     extra += f'。前に話したのは{jst(k.last_seen)}'
                 if not k.notes_ok:
                     extra += '。お話を覚える同意はまだ'
-                elif k.note_count and solo and self.store is not None:
-                    # 2 人のときは、本人のメモを渡して、シエルが自分から話題にできるようにする（最近の分だけ）。
-                    # 多人数のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
-                    rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
-                    today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
-                    memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
-                              + '／'.join(t for _, t in rows) + ']')
-                    log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
-                elif k.note_count:
-                    extra += '。この人について覚えていることがある'
+            if k.notes_ok and k.note_count and push_notes and not sp.notes_pushed and self.store is not None:
+                # ひとり・身近な人のときは、本人のメモ（最近の分だけ）を渡す。どう使うかは presence_*.md。
+                # 人前のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
+                sp.notes_pushed = True
+                rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
+                today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+                memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
+                          + '／'.join(t for _, t in rows) + ']')
+                log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
+            elif first and k.notes_ok and k.note_count and not push_notes:
+                extra += '。この人について覚えていることがある'
             return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
 
         # 3. 初めての人

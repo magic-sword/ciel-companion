@@ -13,8 +13,11 @@
 | `server/agent/config/prompts/greeting.md` | 初回あいさつを生成するための指示 |
 | `server/agent/config/prompts/emotion.md` | Irodori 用の感情タグの指示 |
 | `server/agent/config/prompts/touch.md` | 画面のタッチの知らせ（`[タッチ]` の行）への反応の仕方 |
-| `server/agent/config/prompts/group.md` | 多人数（会議）のモードで足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py` |
-| `server/agent/config/prompts/group_turn.md` | 多人数のモードで、返事を作らせるたびに `generate_reply` の instructions として添える短い念押し。処理は `turns.py`（2026-10-16） |
+| `server/agent/config/prompts/talk_quiet.md` | おしゃべり度「ひかえめ」で足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py`（2026-10-17 に `group.md` から） |
+| `server/agent/config/prompts/talk_quiet_turn.md` | ひかえめのとき、返事を作らせるたびに `generate_reply` の instructions として添える短い念押し。処理は `turns.py`（2026-10-17 に `group_turn.md` から） |
+| `server/agent/config/prompts/talk_chatty.md` | おしゃべり度「おしゃべり」で足す、自分から話しかけるときの決まり |
+| `server/agent/config/prompts/talk_chatty_nudge.md` | おしゃべりのとき、しばらく静かなら `generate_reply` の instructions として渡す合図。処理は `initiative.py` |
+| `server/agent/config/prompts/presence_solo.md`・`presence_close.md`・`presence_public.md` | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、人についての道具の使い方（2 人でも多人数でも。`CIEL_VOICE=irodori` で Realtime API のとき）。処理は `speakers.py`・`tools/people.py` |
 | `server/agent/config/prompts/notes.md` | 会話の裏でメモを書く記録係（別の文字のモデル）への指示。処理は `notes.py`。[メモの決定記録](person-notes-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
@@ -27,9 +30,9 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 ## 読み込みと反映
 
 - `CIEL_PERSONA_CONFIG` が未指定または空の場合、`server/agent/config/persona.toml` を使う。環境変数の相対パスは `server/agent/` 基準。
-- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`group_instructions_file`、`group_turn_instructions_file`、`speaker_instructions_file`、`notes_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
+- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`talk_quiet_instructions_file`、`talk_quiet_turn_instructions_file`、`talk_chatty_instructions_file`、`talk_chatty_nudge_file`、`presence_solo_instructions_file`、`presence_close_instructions_file`、`presence_public_instructions_file`、`speaker_instructions_file`、`notes_instructions_file`、`minutes_instructions_file`、`minutes_voice_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
 - 会話開始時に七つのファイルを読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
-- 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。多人数の指示は、Unity が多人数のモードを知らせたときだけ最後に追加する（`CIEL_VOICE=irodori` のときだけ）。
+- 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。その場にいる人の指示（話者の識別を使うとき）と、おしゃべり度の指示（ひかえめは `CIEL_VOICE=irodori` のときだけ。ふつうは足さない）を最後に追加する。
 - 設定・本文の欠落、不正な TOML、不正な UTF-8、空の本文はエラーにする。別のキャラクターへ自動で切り替えない。
 - Docker は `config/` をイメージへコピーする。Compose は同じディレクトリを読み取り専用でマウントする。ホスト側の編集は次の会話から反映される。
 
@@ -62,6 +65,17 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
   - 今の版（ふつうの話 4 文と、思い出・好きな季節の理由を頼む 2 文）：ふつうの話は 2〜4 文・52〜82 字、頼まれた話は 6〜7 文・146〜153 字。
 - 多人数（同じ 8 文）でも、呼ばれたときの返事は 3〜4 文・65〜109 字（変える前は 3〜4 文で 1 文が長かった）。
 - 気づいたこと：1 回だけ「ひとつ提案して、次のステップをあなたに任せますね」と、決まりのことを口にした。
+
+## 会話のしかたの作り直し（2026-10-17）
+
+利用者から、「2 人・みんなで」ではなく「どれぐらいおしゃべりか」で選びたい、覚えている人の情報をどれぐらい出すかも考えたい、と言われた。それまでの「2 人・多人数」は、答え方（いつも答える・呼ばれたら答える）と、覚えていることの出し方（話題にする・話題にしない）を 1 つのスイッチで切り替えていた。
+
+- 2 つの設定に分けた。おしゃべり度（ひかえめ・ふつう・おしゃべり）と、その場にいる人（自動・ひとり・身近な人・人前）。
+- ひかえめは以前の多人数の答え方、ふつうは以前の 2 人の答え方。おしゃべりは新しく、しばらく静かならシエルから話しかける（`initiative.py`）。
+- 身近な人は、利用者の考えで「聞かれたら答える」ではなく、本人のメモを事前の情報としてシエルに渡すだけにした。話題にするよう求めず、話の流れで自然に生かす（`presence_close.md`）。
+- 覚えていることの使い方は `speakers.md` から `presence_*.md` へ移した。ひとりの本文は以前の 2 人の本文、人前の本文は以前の多人数の本文を元にした。
+- 自動は、会議につないでいれば人前（おしゃべり度もひかえめ）、この会話で 2 人以上の声を聞いたら身近な人、それ以外はひとり。
+- 確かめたこと：読み込み（`load_persona()`）と、設定の組み合わせから答え方・出し方を決める処理（mode.py を単体で）。実際の会話の品質（おしゃべりの話しかけ方、身近な人でのメモの使われ方）はまだ比べていない。
 
 ## 将来拡張する条件
 

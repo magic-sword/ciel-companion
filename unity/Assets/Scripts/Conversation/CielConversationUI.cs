@@ -61,7 +61,10 @@ namespace Ciel.Conversation
         Slider _sheetSlider;
         Text _sheetValue;
         readonly List<(string key, Image edge, GameObject check, Text label)> _bgCells = new List<(string, Image, GameObject, Text)>();
-        readonly List<(CielConversation.ModeSetting mode, Image fill, Image edge, Text label)> _modeSegs = new List<(CielConversation.ModeSetting, Image, Image, Text)>();
+        readonly List<(Image fill, Image edge, Text label)> _talkSegs = new List<(Image, Image, Text)>();
+        readonly List<(Image fill, Image edge, Text label)> _presenceSegs = new List<(Image, Image, Text)>();
+        Text _talkNote, _presenceNow, _presenceNote;
+        RectTransform _modeChip;
         GameObject _devicesSection;
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
@@ -189,19 +192,20 @@ namespace Ciel.Conversation
             settings.gameObject.AddComponent<Button>().targetGraphic = sb;
             settings.GetComponent<Button>().onClick.AddListener(() => OpenSheet(true));
 
-            // 会話のモード（タップで 自動 → 2 人 → みんなで → 自動）
-            var mode = Rect("ModeButton", root, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -6), new Vector2(118, 36));
+            // 会話のしかた：おしゃべり度・いまのその場にいる人（タップで ひかえめ → ふつう → おしゃべり → ひかえめ）
+            var mode = Rect("ModeButton", root, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -6), new Vector2(150, 36));
+            _modeChip = mode;
             var mb = Pill(mode, Glass, raycast: true);
             Edge(mode, WithAlpha(Cyan, 0.55f));
-            var icon = Icon(mode, "people", 14, Cyan);
+            var icon = Icon(mode, "talk", 14, Cyan);
             Place(icon.rectTransform, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(21, 0), new Vector2(14, 14));
             _modeText = Txt("Text", mode, 12, TextMain, TextAnchor.MiddleLeft);
-            Place(_modeText.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(34, 0), new Vector2(80, 20));
+            Place(_modeText.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(34, 0), new Vector2(140, 20));
             _modeText.horizontalOverflow = HorizontalWrapMode.Overflow;
             var modeButton = mode.gameObject.AddComponent<Button>();
             modeButton.targetGraphic = mb;
             modeButton.onClick.AddListener(() =>
-                _conversation.SelectMode((CielConversation.ModeSetting)(((int)_conversation.ModeChoice + 1) % 3)));
+                _conversation.SelectTalk((CielConversation.Talk)(((int)_conversation.TalkChoice + 1) % 3)));
         }
 
         void BuildVoiceStatus(RectTransform root)
@@ -379,7 +383,7 @@ namespace Ciel.Conversation
 
             var pages = new (string label, Action<RectTransform> build)[]
             {
-                ("声と会話", c => { BuildVolumeSection(c); BuildModeSection(c); }),
+                ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("そのほか", c => { BuildDevicesSection(c); BuildDevSection(c); }),
             };
@@ -528,10 +532,44 @@ namespace Ciel.Conversation
             _bgCells.Add((option.Key, edge, check.gameObject, label));
         }
 
-        void BuildModeSection(RectTransform content)
+        static readonly string[] TalkLabels = { "ひかえめ", "ふつう", "おしゃべり" };
+        static readonly string[] TalkNotes =
+        {
+            "名前を呼ばれたときや、はっきり頼まれたときだけ答えます。",
+            "話しかけられたら、毎回答えます。",
+            "話しかけられたら答え、静かなときは自分からも話しかけます。返事がないときは、だんだん間をあけます。",
+        };
+        static readonly string[] PresenceLabels = { "自動", "ひとり", "身近な人", "人前" };
+        static readonly string[] PresenceNotes =
+        {
+            "",
+            "覚えていることを、シエルから話題にします。",
+            "覚えていることは心に留めておき、話の流れで自然に生かします。",
+            "覚えていることは話題にしません。本人に聞かれたら答えます。",
+        };
+
+        // おしゃべり度
+        void BuildTalkSection(RectTransform content)
         {
             var sec = Section(content);
-            SectionLabel(Row(sec, 20), "会話のしかた");
+            SectionLabel(Row(sec, 20), "おしゃべり度");
+            Segmented(sec, TalkLabels, i => _conversation.SelectTalk((CielConversation.Talk)i), _talkSegs);
+            _talkNote = Txt("Note", sec, 12, TextSub, TextAnchor.UpperLeft);
+        }
+
+        // その場にいる人（覚えていることの出し方）
+        void BuildPresenceSection(RectTransform content)
+        {
+            var sec = Section(content);
+            SectionLabel(Row(sec, 20), "その場にいる人");
+            Segmented(sec, PresenceLabels, i => _conversation.SelectPresence((CielConversation.Presence)i), _presenceSegs);
+            _presenceNow = Txt("Now", sec, 12, TextMain, TextAnchor.UpperLeft, true);
+            _presenceNote = Txt("Note", sec, 12, TextSub, TextAnchor.UpperLeft);
+        }
+
+        // カプセルの中に並べた選択肢（選んだものが光る）
+        void Segmented(RectTransform sec, string[] labels, Action<int> pick, List<(Image, Image, Text)> segs)
+        {
             var bar = Row(sec, 46);
             Pill(bar, new Color(0.047f, 0.157f, 0.235f, 0.45f));
             Edge(bar, WithAlpha(Cyan, 0.3f));
@@ -540,25 +578,36 @@ namespace Ciel.Conversation
             hl.spacing = 4;
             hl.childControlWidth = hl.childControlHeight = true;
             hl.childForceExpandWidth = hl.childForceExpandHeight = true;
-            var items = new[] { (CielConversation.ModeSetting.Auto, "自動"), (CielConversation.ModeSetting.Solo, "2人"), (CielConversation.ModeSetting.Group, "みんなで") };
-            foreach (var (mode, text) in items)
+            for (int i = 0; i < labels.Length; i++)
             {
-                var seg = new GameObject(text, typeof(RectTransform));
+                var seg = new GameObject(labels[i], typeof(RectTransform));
                 seg.transform.SetParent(bar, false);
                 var r = (RectTransform)seg.transform;
                 var fill = Pill(r, WithAlpha(CyanDeep, 0.22f), raycast: true);
                 var edge = Edge(r, Cyan);
-                var label = Txt("Label", r, 13, TextMain, TextAnchor.MiddleCenter);
+                var label = Txt("Label", r, labels[i].Length > 4 ? 12 : 13, TextMain, TextAnchor.MiddleCenter);
                 Stretch(label.rectTransform);
-                label.text = text;
+                label.text = labels[i];
                 var b = seg.AddComponent<Button>();
                 b.targetGraphic = fill;
                 b.transition = Selectable.Transition.None;
-                var m = mode;
-                b.onClick.AddListener(() => _conversation.SelectMode(m));
-                _modeSegs.Add((mode, fill, edge, label));
+                var index = i;
+                b.onClick.AddListener(() => pick(index));
+                segs.Add((fill, edge, label));
             }
-            Note(sec, "みんなで：名前を呼ばれたときだけ答えます\n自動：会議へつないでいるときは、みんなで");
+        }
+
+        static void ShowSelected(List<(Image fill, Image edge, Text label)> segs, int selected)
+        {
+            for (int i = 0; i < segs.Count; i++)
+            {
+                var (fill, edge, label) = segs[i];
+                var sel = i == selected;
+                fill.color = sel ? WithAlpha(CyanDeep, 0.22f) : Color.clear;
+                edge.enabled = sel;
+                label.fontStyle = sel ? FontStyle.Bold : FontStyle.Normal;
+                label.color = sel ? TextMain : TextSub;
+            }
         }
 
         // PC だけ：マイクとスピーカーの選択
@@ -644,14 +693,16 @@ namespace Ciel.Conversation
             (_linkDot.color, _linkText.text) = c.Status switch
             {
                 CielConversation.State.Connecting => (Amber, "つないでいます…"),
-                CielConversation.State.Failed => (Alert, "つながりませんでした（タップでやり直す）"),
-                CielConversation.State.Disconnected => (Idle, "つながっていません（タップでつなぐ）"),
+                CielConversation.State.Failed => (Alert, "つながらない・タップで再試行"),
+                CielConversation.State.Disconnected => (Idle, "未接続・タップでつなぐ"),
                 _ => (Mint, "つながっています"),
             };
             _linkDot.transform.GetChild(0).GetComponent<Image>().color = WithAlpha(_linkDot.color, 0.6f);
 
-            var current = c.CurrentMode == CielConversation.Mode.Group ? "みんなで" : "2人";
-            _modeText.text = c.ModeChoice == CielConversation.ModeSetting.Auto ? $"自動 · {current}" : current;
+            var talk = (int)c.CurrentTalk;
+            var presence = (int)c.CurrentPresence;
+            _modeText.text = $"{TalkLabels[talk]}・{PresenceLabels[presence]}";
+            _modeChip.sizeDelta = new Vector2(34 + _modeText.preferredWidth + 14, 36);
 
             _status.text = c.Status switch
             {
@@ -703,14 +754,16 @@ namespace Ciel.Conversation
                 check.SetActive(sel);
                 label.color = sel ? TextMain : TextSub;
             }
-            foreach (var (mode, fill, edge, label) in _modeSegs)
-            {
-                var sel = c.ModeChoice == mode;
-                fill.color = sel ? WithAlpha(CyanDeep, 0.22f) : Color.clear;
-                edge.enabled = sel;
-                label.fontStyle = sel ? FontStyle.Bold : FontStyle.Normal;
-                label.color = sel ? TextMain : TextSub;
-            }
+            ShowSelected(_talkSegs, (int)c.TalkChoice);
+            _talkNote.text = c.CurrentTalk != c.TalkChoice
+                ? TalkNotes[talk] + "（会議につないでいるあいだは、ひかえめにします）"
+                : TalkNotes[talk];
+            ShowSelected(_presenceSegs, (int)c.PresenceChoice);
+            var why = c.PresenceReason == "meeting" ? "（会議につないでいる）" : c.PresenceReason == "voices" ? "（2人以上の声が聞こえた）" : "";
+            _presenceNow.text = $"いまは：{PresenceLabels[presence]}{why}";
+            _presenceNote.text = PresenceNotes[presence]
+                + (c.PresenceChoice == CielConversation.Presence.Auto
+                    ? "\n自動：会議につなぐと人前に、2人以上の声が聞こえると身近な人にします。" : "");
             _devicesSection.SetActive(c.CanSelectMic || c.CanSelectSpeaker);
             RefreshDevices(_devices, _deviceGuids, c.CanSelectMic, c.MicDevices, c.SelectedMic, "既定のマイク（OS の設定）", "マイク：");
             RefreshDevices(_speakers, _speakerGuids, c.CanSelectSpeaker, c.SpeakerDevices, c.SelectedSpeaker, "既定のスピーカー（OS の設定）", "声の出力：");

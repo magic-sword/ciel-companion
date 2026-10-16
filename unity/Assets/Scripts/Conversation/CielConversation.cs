@@ -10,8 +10,10 @@
 // 声を出す機器（スピーカー）も PC では選べる。「既定」は、Windows に OS の既定の機器を問い合わせて、その機器を選ぶ（WindowsDefaultAudio）。
 // 再生中は出力の機器を変えられないので、シエルの声の受信をいったん止めてから変え、受け直す（SwitchWhilePlaying）。
 // 仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
-// 会話のモード：2 人（Solo）と多人数（Group）。自動のときは、声を仮想オーディオケーブルへ出していれば会議とみなして多人数にする。
-// 会話サーバー（server/agent/mode.py）へ、つないだとき・会話サーバーが入ってきたとき・モードが変わったときに知らせる。
+// 会話のしかた：おしゃべり度（ひかえめ・ふつう・おしゃべり）と、その場にいる人（自動・ひとり・身近な人・人前）。
+// 会話サーバー（server/agent/mode.py）へ、選んだ設定と、声を仮想オーディオケーブル（会議）へ出しているかを、
+// つないだとき・会話サーバーが入ってきたとき・設定や声の出力が変わったときに知らせる（topic ciel.style）。
+// 実際の答え方・出し方は会話サーバーが決め（自動なら、会議・聞こえた声の数で変わる）、conversation.style で返ってくる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
@@ -40,7 +42,9 @@ namespace Ciel.Conversation
 
         const string MicPrefKey = "ciel.micDevice";
         const string SpeakerPrefKey = "ciel.speakerDevice";
-        const string ModePrefKey = "ciel.conversationMode";
+        const string ModePrefKey = "ciel.conversationMode";   // 以前の設定（2 人・多人数）。新しい設定へ移す
+        const string TalkPrefKey = "ciel.talk";
+        const string PresencePrefKey = "ciel.presence";
         const string SpeakerphonePrefKey = "ciel.speakerphone";
         const string VolumePrefKey = "ciel.voiceVolume";
 
@@ -82,10 +86,21 @@ namespace Ciel.Conversation
         public bool SpeakerphoneOn { get; private set; } = true;
         public string SelectedSpeaker => _speakerGuid;
 
-        public enum ModeSetting { Auto, Solo, Group }
-        public enum Mode { Solo, Group }
-        /// 選んだモード（自動・2 人・多人数）
-        public ModeSetting ModeChoice { get; private set; } = ModeSetting.Auto;
+        /// おしゃべり度：ひかえめ（呼ばれたら答える）・ふつう（いつも答える）・おしゃべり（自分からも話しかける）
+        public enum Talk { Quiet, Normal, Chatty }
+        /// その場にいる人（覚えていることの出し方）：自動・ひとり・身近な人・人前
+        public enum Presence { Auto, Solo, Close, Public }
+        public Talk TalkChoice { get; private set; } = Talk.Normal;
+        public Presence PresenceChoice { get; private set; } = Presence.Auto;
+        Talk? _serverTalk;
+        Presence? _serverPresence;
+        /// いまの答え方。会話サーバーが決めたもの（つなぐ前は、選んだ設定と声の出力から決める）
+        public Talk CurrentTalk => _serverTalk ?? (IsMeetingOutput() && PresenceChoice == Presence.Auto ? Talk.Quiet : TalkChoice);
+        /// いまの覚えていることの出し方（Auto にはならない）
+        public Presence CurrentPresence => _serverPresence
+            ?? (PresenceChoice != Presence.Auto ? PresenceChoice : IsMeetingOutput() ? Presence.Public : Presence.Solo);
+        /// 自動で決めた理由（"meeting"：会議につないでいる、"voices"：2 人以上の声が聞こえた、""：なし）
+        public string PresenceReason { get; private set; } = "";
 
         /// シエルの声の大きさ（0〜1。1 がそのまま）。端末の音量とは別
         public float VoiceVolume { get; private set; } = 1f;
@@ -94,14 +109,6 @@ namespace Ciel.Conversation
 
         /// いまのシエルの声の大きさ（0〜1 くらい。画面の波形用）。声の大きさの設定に左右されない
         public float VoiceLevel => _meter != null ? _meter.Level / Mathf.Max(VoiceVolume, 0.05f) : 0f;
-        /// 実際のモード。自動なら声の出力の機器で決める
-        public Mode CurrentMode => ModeChoice switch
-        {
-            ModeSetting.Solo => Mode.Solo,
-            ModeSetting.Group => Mode.Group,
-            _ => IsMeetingOutput() ? Mode.Group : Mode.Solo,
-        };
-
         bool IsMeetingOutput()
         {
             if (_speakerGuid == null) return false;
@@ -116,7 +123,10 @@ namespace Ciel.Conversation
             if (_mouth != null) _mouth.BlendMode = Live2D.Cubism.Framework.CubismParameterBlendMode.Override;
             _micGuid = PlayerPrefs.HasKey(MicPrefKey) ? PlayerPrefs.GetString(MicPrefKey) : null;
             _speakerGuid = PlayerPrefs.HasKey(SpeakerPrefKey) ? PlayerPrefs.GetString(SpeakerPrefKey) : null;
-            ModeChoice = (ModeSetting)Mathf.Clamp(PlayerPrefs.GetInt(ModePrefKey, 0), 0, 2);
+            if (!PlayerPrefs.HasKey(TalkPrefKey) && PlayerPrefs.GetInt(ModePrefKey, 0) == 2)
+                PlayerPrefs.SetInt(TalkPrefKey, (int)Talk.Quiet);   // 以前「多人数」を選んでいた人は、ひかえめから始める
+            TalkChoice = (Talk)Mathf.Clamp(PlayerPrefs.GetInt(TalkPrefKey, (int)Talk.Normal), 0, 2);
+            PresenceChoice = (Presence)Mathf.Clamp(PlayerPrefs.GetInt(PresencePrefKey, (int)Presence.Auto), 0, 3);
             SpeakerphoneOn = PlayerPrefs.GetInt(SpeakerphonePrefKey, 1) == 1;
             VoiceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
             if (_connectOnStart) StartConversation();
@@ -195,7 +205,7 @@ namespace Ciel.Conversation
             ApplySpeakerphone();
             MinutesOn = false;   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
-            SendMode();
+            SendStyle();
             SendVolume();
         }
 
@@ -282,7 +292,7 @@ namespace Ciel.Conversation
             if (guid == null) PlayerPrefs.DeleteKey(SpeakerPrefKey);
             else PlayerPrefs.SetString(SpeakerPrefKey, guid);
             if (_platformAudio != null) ApplySpeaker();
-            SendMode();   // 自動のときは、声の出力でモードが変わる
+            SendStyle();   // 自動のときは、声の出力（会議かどうか）で変わる
             Changed?.Invoke();
         }
 
@@ -303,33 +313,50 @@ namespace Ciel.Conversation
             Debug.Log($"[CielConversation] 声の出力：{(SpeakerphoneOn ? "スピーカー" : "受話口")}{(ok ? "" : "（切り替えられなかった）")}");
         }
 
-        /// 会話のモードを選ぶ（自動・2 人・多人数）
-        public void SelectMode(ModeSetting choice)
+        /// おしゃべり度を選ぶ
+        public void SelectTalk(Talk choice)
         {
-            ModeChoice = choice;
-            PlayerPrefs.SetInt(ModePrefKey, (int)choice);
-            SendMode();
+            TalkChoice = choice;
+            PlayerPrefs.SetInt(TalkPrefKey, (int)choice);
+            _serverTalk = null;   // 会話サーバーの返事が来るまでは、選んだ設定で表示する
+            SendStyle();
             Changed?.Invoke();
         }
 
-        // 同じモードを何度送ってもよい（会話サーバーは変わったときだけ切り替える）
-        void SendMode()
+        /// その場にいる人を選ぶ
+        public void SelectPresence(Presence choice)
+        {
+            PresenceChoice = choice;
+            PlayerPrefs.SetInt(PresencePrefKey, (int)choice);
+            _serverTalk = null;
+            _serverPresence = null;
+            SendStyle();
+            Changed?.Invoke();
+        }
+
+        static readonly string[] TalkNames = { "quiet", "normal", "chatty" };
+        static readonly string[] PresenceNames = { "auto", "solo", "close", "public" };
+
+        // 同じ設定を何度送ってもよい（会話サーバーは変わったときだけ切り替える）
+        void SendStyle()
         {
             if (_room == null || Status != State.Connected) return;
-            var mode = CurrentMode == Mode.Group ? "group" : "solo";
-            var json = $"{{\"v\":1,\"type\":\"conversation.mode\",\"mode\":\"{mode}\"}}";
+            var talk = TalkNames[(int)TalkChoice];
+            var presence = PresenceNames[(int)PresenceChoice];
+            var meeting = IsMeetingOutput() ? "true" : "false";
+            var json = $"{{\"v\":1,\"type\":\"conversation.style\",\"talk\":\"{talk}\",\"presence\":\"{presence}\",\"meeting\":{meeting}}}";
             try
             {
-                _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.mode");
-                Debug.Log($"[CielConversation] 会話のモード {mode} を送った");
+                _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.style");
+                Debug.Log($"[CielConversation] 会話のしかた {talk}・{presence}（会議 {meeting}）を送った");
             }
-            catch (Exception e) { Debug.LogWarning($"[CielConversation] モードを送れない: {e.Message}"); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 会話のしかたを送れない: {e.Message}"); }
         }
 
         // 会話サーバーが後から部屋に入っても、今のモードが伝わるように送り直す
         void OnParticipantConnected(Participant participant)
         {
-            SendMode();
+            SendStyle();
             SendVolume();
         }
 
@@ -534,6 +561,7 @@ namespace Ciel.Conversation
             public float intensity;
             public int ttl_ms;
             public bool recording;   // minutes.state
+            public string talk, presence, reason;   // conversation.style
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -547,6 +575,16 @@ namespace Ciel.Conversation
             {
                 _expression.Set(e.expression, e.ttl_ms / 1000f);
                 Debug.Log($"[CielConversation] 表情 {e.expression}（{e.ttl_ms} ms）");
+            }
+            else if (e.type == "conversation.style")
+            {
+                var t = Array.IndexOf(TalkNames, e.talk);
+                var p = Array.IndexOf(PresenceNames, e.presence);
+                if (t >= 0) _serverTalk = (Talk)t;
+                if (p > 0) _serverPresence = (Presence)p;
+                PresenceReason = e.reason ?? "";
+                Debug.Log($"[CielConversation] いまの会話のしかた：{e.talk}・{e.presence}{(PresenceReason != "" ? $"（{PresenceReason}）" : "")}");
+                Changed?.Invoke();
             }
             else if (e.type == "minutes.state")
             {
@@ -628,6 +666,9 @@ namespace Ciel.Conversation
             }
             if (_mouth != null) _mouth.MouthOpening = 0f;
             MinutesOn = false;
+            _serverTalk = null;
+            _serverPresence = null;
+            PresenceReason = "";
             SetStatus(State.Disconnected);
         }
 

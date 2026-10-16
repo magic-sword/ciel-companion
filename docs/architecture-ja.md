@@ -69,7 +69,8 @@ flowchart LR
 | `emotion.py` | 返事の文の頭の感情の印（`[happy]` など）を読み、その感情の声で 1 文ずつ読み上げ、表情のイベントを送る。崩れた印も拾う（[音声会話の決定記録](decisions/voice-pipeline-ja.md)の「感情の印の崩れ」） |
 | `irodori_tts.py` | 読み上げサービスへの接続 |
 | `touch.py` | タッチの知らせを受けて、声の反応を返す |
-| `mode.py` | 2 人・多人数の会話の切り替え。多人数で黙る返事（`[silent]`）を捨てる |
+| `mode.py` | 会話のしかた（おしゃべり度・その場にいる人）。ひかえめで黙る返事（`[silent]`）を捨てる |
+| `initiative.py` | おしゃべりのとき、しばらく静かなら、シエルから話しかける |
 | `notes.py` | 会話の裏で、同意した人について覚えておくメモを書く（別の文字のモデル `gpt-5.4-mini`）。[メモの決定記録](decisions/person-notes-ja.md) |
 | `minutes.py` ＋ `minutes_admin.py` | 会議の議事録。始めと終わりのあいだの発言をため、別の文字のモデル（`gpt-5.4`）でまとめ、下書きを Discord の Webhook へ送る。始めと終わりは、アプリの議事録のボタン・声（道具）・管理用のコマンドから。長い会議は 10 分ごとに途中までをまとめ直す。[議事録の決定記録](decisions/meeting-minutes-ja.md) |
 | `turns.py` | 話し終わりで返事を作らせる。先に話者を判定して「[発言者：…]」を足す（2 人でも多人数でも） |
@@ -132,7 +133,8 @@ sequenceDiagram
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"character.expression","seq":…,"expression":"happy","intensity":1.0,"ttl_ms":…}` | 声に合わせて表情を変える |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"minutes.state","recording":true}` | 議事録をとっているか（アプリの議事録のボタンの表示） |
 | `ciel.touch` | アプリ → 会話サーバー | `{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
-| `ciel.mode` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.mode","mode":"group"}` | 2 人（solo）・多人数（group）の切り替え |
+| `ciel.style` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.style","talk":"chatty","presence":"auto","meeting":false}` | 会話のしかた。おしゃべり度（quiet・normal・chatty）、その場にいる人（auto・solo・close・public）、会議の機器につないでいるか。以前の `ciel.mode`（solo・group）も受け付ける |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"conversation.style","talk":"quiet","presence":"public","reason":"meeting"}` | いまの答え方と覚えていることの出し方（自動のときは会議・聞こえた声の数で決まる）。設定画面の「いまは：…」 |
 | `ciel.volume` | アプリ → 会話サーバー | `{"v":1,"type":"voice.volume","volume":0.7}` | シエルの声の大きさ（0〜1）。アプリの声の再生には音量を変える手段がないので、会話サーバーが送る前に声を小さくする（`server/agent/volume.py`） |
 | `ciel.minutes` | アプリ・管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
 
@@ -157,8 +159,8 @@ flowchart LR
     U <--> S
 ```
 
-- 声の出力に仮想ケーブルを選ぶと、アプリは自動で多人数のモードにし、会話サーバーへ知らせる。
-- 多人数のモードでは、会話サーバーが多人数の決まり（`config/prompts/group.md`）を指示に足す。シエルは名前を呼ばれたときやシエルへの質問のときだけ答え、それ以外は `[silent]` と出して黙る。
+- 声の出力に仮想ケーブルを選ぶと、アプリは会議につないでいることを会話サーバーへ知らせる。その場にいる人が「自動」なら、会話サーバーは「ひかえめ・人前」にする。
+- ひかえめのときは、会話サーバーがその決まり（`config/prompts/talk_quiet.md`）を指示に足す。シエルは名前を呼ばれたときやシエルへの質問のときだけ答え、それ以外は `[silent]` と出して黙る。
 - 配線・設定・困ったときの手順は [会議への参加](meeting-bridge-ja.md)。
 
 ## どこで動かすか

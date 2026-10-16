@@ -17,8 +17,13 @@ class Persona:
     emotion_instructions: str
     greeting: str
     touch_instructions: str
-    group_instructions: str
-    group_turn_instructions: str
+    talk_quiet_instructions: str
+    talk_quiet_turn_instructions: str
+    talk_chatty_instructions: str
+    talk_chatty_nudge: str
+    presence_solo_instructions: str
+    presence_close_instructions: str
+    presence_public_instructions: str
     speaker_instructions: str
     notes_instructions: str
     minutes_instructions: str
@@ -29,7 +34,9 @@ class Persona:
         """本文をログに残さず、読み込んだプロンプト一式を識別する。"""
         content = json.dumps(
             [self.instructions, self.emotion_instructions, self.greeting, self.touch_instructions,
-             self.group_instructions, self.group_turn_instructions, self.speaker_instructions, self.notes_instructions,
+             self.talk_quiet_instructions, self.talk_quiet_turn_instructions, self.talk_chatty_instructions,
+             self.talk_chatty_nudge, self.presence_solo_instructions, self.presence_close_instructions,
+             self.presence_public_instructions, self.speaker_instructions, self.notes_instructions,
              self.minutes_instructions, self.minutes_voice_instructions],
             ensure_ascii=False,
         )
@@ -48,8 +55,10 @@ def load_persona() -> Persona:
         raise ValueError(f'キャラクター設定を読み込めません: {path}: {exc}') from exc
 
     values = {}
-    for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions', 'group_instructions',
-                'group_turn_instructions', 'speaker_instructions', 'notes_instructions', 'minutes_instructions',
+    for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions',
+                'talk_quiet_instructions', 'talk_quiet_turn_instructions', 'talk_chatty_instructions',
+                'talk_chatty_nudge', 'presence_solo_instructions', 'presence_close_instructions',
+                'presence_public_instructions', 'speaker_instructions', 'notes_instructions', 'minutes_instructions',
                 'minutes_voice_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)
