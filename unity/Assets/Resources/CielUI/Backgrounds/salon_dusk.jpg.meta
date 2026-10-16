@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: fc6b3df4c95e3284a8a7bd8255ad98fb
+guid: a4b6d8ae1451ac14bb52fdb5ff79aa6f
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5839907042296302221
-    second: lounge_0
+      213: 6275999641511444557
+    second: salon_dusk_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -115,7 +115,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: lounge_0
+      name: salon_dusk_0
       rect:
         serializedVersion: 2
         x: 0
@@ -130,8 +130,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 37570a67c7b74fea0800000000000000
-      internalID: -5839907042296302221
+      spriteID: d40c4ca1c64d81750800000000000000
+      internalID: 6275999641511444557
       vertices: []
       indices: 
       edges: []

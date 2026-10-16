@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: f20c98d9d10808f45a6a9c19f07d9f37
+guid: 7d32e90c2a7283a46a06a6920808ea71
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -7724843085047811784
-    second: garage_night_0
+      213: -7635998892647214466
+    second: salon_day_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -115,7 +115,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: garage_night_0
+      name: salon_day_0
       rect:
         serializedVersion: 2
         x: 0
@@ -130,8 +130,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 831b7126428dbc490800000000000000
-      internalID: -7724843085047811784
+      spriteID: e729c72e67b770690800000000000000
+      internalID: -7635998892647214466
       vertices: []
       indices: 
       edges: []

@@ -342,7 +342,7 @@ namespace Ciel.Conversation
             content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);
             var vl = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            vl.padding = new RectOffset(22, 22, 4, 40);
+            vl.padding = new RectOffset(22, 22, 4, 64);   // 下はホームのバーの分も空ける
             vl.spacing = 24;
             vl.childControlWidth = vl.childControlHeight = true;
             vl.childForceExpandWidth = true;

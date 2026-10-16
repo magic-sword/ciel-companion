@@ -2,7 +2,7 @@
 // 使い方：.local/render-check/playmode-request を置いて、エディタを起動する（-batchmode は付けない）。
 // 出力：.local/render-check/playmode-*.png と playmode.txt。終わるとエディタを終了する。
 // 要求の文字に "ui" を含めると、代わりに会話の画面を縦長（540×1170）で撮る：
-// ui-main.png（ふだん）、ui-settings.png（設定）、ui-volume.png（その場の声の大きさ）。
+// ui-main.png（ふだん）、ui-settings.png（設定）、ui-settings-bottom.png（設定の一番下）、ui-volume.png（その場の声の大きさ）。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -57,9 +57,9 @@ namespace Ciel.EditorTools
                 grab.OutDir = OutDir;
                 return;
             }
-            if (step >= 2 && step < 7 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
             {
-                if (step < 6) UiShots(step);
+                if (step < 7) UiShots(step);
                 else if (EditorApplication.timeSinceStartup - _mark > 1.0) FinishUiShots();
                 return;
             }
@@ -108,6 +108,9 @@ namespace Ciel.EditorTools
                 // "nobg" なら背景を消して撮る（シエルの映りと背景の重なりを切り分ける）
                 if (File.ReadAllText(RequestPath).Contains("nobg"))
                     Camera.main.transform.Find("Background")?.gameObject.SetActive(false);
+                // "bg:名前" なら、その背景で撮る（例：bg:salon_night）
+                var bg = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(RequestPath), @"bg:(\w+)");
+                if (bg.Success) Object.FindAnyObjectByType<Ciel.Conversation.CielBackground>()?.Set(bg.Groups[1].Value);
                 Next(3);
                 return;
             }
@@ -115,7 +118,7 @@ namespace Ciel.EditorTools
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = step == 3 ? "ui-main" : step == 4 ? "ui-settings" : "ui-volume";
+                var name = step == 3 ? "ui-main" : step == 4 ? "ui-settings" : step == 5 ? "ui-settings-bottom" : "ui-volume";
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 _captured = true;
                 _mark = now;
@@ -125,7 +128,10 @@ namespace Ciel.EditorTools
             _captured = false;
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             if (step == 3) ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-            if (step == 4)
+            if (step == 4)   // 設定を一番下まですべらせる
+                foreach (var sr in ui.GetComponentsInChildren<UnityEngine.UI.ScrollRect>())
+                    if (sr.name == "View") sr.verticalNormalizedPosition = 0;
+            if (step == 5)
             {
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { false });
                 ui.GetType().GetMethod("ShowVolumePop", flags).Invoke(ui, new object[] { true });
@@ -138,7 +144,7 @@ namespace Ciel.EditorTools
         {
             RemoveGameViewSize(SessionState.GetInt(SizeKey, -1));
             SessionState.EraseInt(SizeKey);
-            SessionState.SetInt(Key, 7);
+            SessionState.SetInt(Key, 8);
             File.Delete(RequestPath);
             EditorApplication.isPlaying = false;
             EditorApplication.delayCall += () => EditorApplication.Exit(0);

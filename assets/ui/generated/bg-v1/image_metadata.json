@@ -1,0 +1,41 @@
+{
+  "day": {
+    "source_size": [
+      941,
+      1672
+    ],
+    "delivery_size": [
+      1080,
+      1920
+    ],
+    "normalization": "center cover, Lanczos",
+    "source_crop_width": 940.5,
+    "source_crop_height": 1672.0
+  },
+  "dusk": {
+    "source_size": [
+      941,
+      1672
+    ],
+    "delivery_size": [
+      1080,
+      1920
+    ],
+    "normalization": "center cover, Lanczos",
+    "source_crop_width": 940.5,
+    "source_crop_height": 1672.0
+  },
+  "night": {
+    "source_size": [
+      941,
+      1672
+    ],
+    "delivery_size": [
+      1080,
+      1920
+    ],
+    "normalization": "center cover, Lanczos",
+    "source_crop_width": 940.5,
+    "source_crop_height": 1672.0
+  }
+}

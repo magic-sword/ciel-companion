@@ -1,5 +1,5 @@
 // シエルの後ろの背景。設定画面で選んだ絵（Assets/Resources/CielUI/Backgrounds）を、画面いっぱいに切り抜いて映す。
-// 選んだ背景は PlayerPrefs に覚える。いまの絵は仮置き（scripts/ui/make_ui_sprites.py が企画設計の絵から作る）。
+// 選んだ背景は PlayerPrefs に覚える。絵は工房 2 階のサロン（scripts/ui/make_ui_sprites.py が assets/ui/generated/bg-v1 からぼかして作る）。
 // 絵は、カメラの前の奥に置いた板（SpriteRenderer）に映す。当たり判定はないので、タッチ（CielTouch）を邪魔しない。
 using System;
 using UnityEngine;
@@ -17,9 +17,9 @@ namespace Ciel.Conversation
 
         public static readonly Option[] Options =
         {
-            new Option("lounge", "テラスラウンジ"),
-            new Option("garage_day", "工房（昼）"),
-            new Option("garage_night", "工房（夜）"),
+            new Option("salon_day", "工房の2階（昼）"),
+            new Option("salon_dusk", "工房の2階（夕方）"),
+            new Option("salon_night", "工房の2階（夜）"),
             new Option("plain", "無地"),
         };
 

@@ -1,0 +1,96 @@
+{
+  "images": {
+    "salon_day.png": {
+      "size": [
+        1080,
+        1920
+      ],
+      "mode": "RGB",
+      "format": "PNG",
+      "bytes": 2534464,
+      "sha256": "c0bcbe7e297e2d9072ca581981f86b1411eb6ecb186f9ed6c250ee54c341e7f1",
+      "mean_luma_bottom_30_percent": 84.16,
+      "mean_luma_center_wall": 162.75
+    },
+    "salon_dusk.png": {
+      "size": [
+        1080,
+        1920
+      ],
+      "mode": "RGB",
+      "format": "PNG",
+      "bytes": 2416453,
+      "sha256": "f0b43ec9d78155a56e77cabae491e393f83813cd3849ebbe2f19090249b9f299",
+      "mean_luma_bottom_30_percent": 53.88,
+      "mean_luma_center_wall": 115.64
+    },
+    "salon_night.png": {
+      "size": [
+        1080,
+        1920
+      ],
+      "mode": "RGB",
+      "format": "PNG",
+      "bytes": 2013988,
+      "sha256": "0254a7d9d63bf8ad48531708473d83db3590fb95079f5d0e670dc828ab6c2029",
+      "mean_luma_bottom_30_percent": 23.98,
+      "mean_luma_center_wall": 47.24
+    }
+  },
+  "previews": {
+    "app_triptych_approx.png": [
+      1152,
+      850
+    ],
+    "ciel_triptych.png": [
+      1152,
+      710
+    ],
+    "day_composition_check.png": [
+      1152,
+      850
+    ],
+    "day_overlay_50.png": [
+      540,
+      1170
+    ],
+    "day_safe_regions.png": [
+      1080,
+      1920
+    ],
+    "salon_day_app_approx.png": [
+      540,
+      1170
+    ],
+    "salon_day_ciel.png": [
+      1080,
+      1920
+    ],
+    "salon_dusk_app_approx.png": [
+      540,
+      1170
+    ],
+    "salon_dusk_ciel.png": [
+      1080,
+      1920
+    ],
+    "salon_night_app_approx.png": [
+      540,
+      1170
+    ],
+    "salon_night_ciel.png": [
+      1080,
+      1920
+    ],
+    "salon_triptych.png": [
+      1152,
+      710
+    ]
+  },
+  "resource_files_verified": 48,
+  "resource_files_changed": [],
+  "resource_files_added": [],
+  "report_links_missing": [],
+  "visual_review": "Primary structural positions match across time-of-day edits; fine generated details can differ. No characters/text/UI in delivery assets.",
+  "scope": "Delivery, sources, scripts, reports, review composites and validation are under assets/ui/generated/bg-v1/."
+}

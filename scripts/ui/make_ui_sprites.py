@@ -3,7 +3,7 @@
 
 形（丸・六角・輪・光）とアイコンは白一色で作り、色は Unity で付ける（Image.color）。
 4 倍の大きさで描いてから縮めて、縁をなめらかにする。
-仮の背景は、企画設計の世界観の絵（D:/CIEL/企画設計）を縦長に切り抜き、ぼかしたもの。本番の背景ができたら差し替える。
+背景は、Codex が描いた工房 2 階のサロンの絵（assets/ui/generated/bg-v1、昼・夕方・夜）をぼかしたもの。
 
 実行（リポジトリのルートで）：python scripts/ui/make_ui_sprites.py
 出力：unity/Assets/Resources/CielUI/ （取り込みの設定は Assets/Editor/CielUIImport.cs）
@@ -12,11 +12,10 @@ import math
 import os
 import sys
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT = os.path.join(ROOT, 'unity', 'Assets', 'Resources', 'CielUI')
-WORLD = os.environ.get('CIEL_WORLD_DIR', 'D:/CIEL/企画設計')
 SS = 4   # 描くときの倍率
 
 
@@ -257,20 +256,20 @@ def icons():
     i.save()
 
 
-# ---- 仮の背景 ----
+# ---- 背景 ----
 
-BACKGROUNDS = [
-    ('lounge', '世界観/舞台/川崎/高層テラス/カワサキの窓辺テラスラウンジ.png', 0.30, 1.0, 1.0),
-    ('garage_day', '世界観/舞台/テクノロジー工房/草薙モータース.png', 0.52, 1.05, 1.0),
-    ('garage_night', '世界観/舞台/テクノロジー工房/草薙モータース.png', 0.45, 0.36, 0.6),
+BACKGROUNDS = [   # （書き出す名前、元の絵、横の位置 0〜1）
+    ('salon_day', 'assets/ui/generated/bg-v1/salon_day.png', 0.5),
+    ('salon_dusk', 'assets/ui/generated/bg-v1/salon_dusk.png', 0.5),
+    ('salon_night', 'assets/ui/generated/bg-v1/salon_night.png', 0.5),
 ]
 
 
 def backgrounds():
     """縦長（1080×1920）に切り抜き、ぼかす。fx は横の位置（0〜1）"""
     W, H = 1080, 1920
-    for name, rel, fx, bright, sat in BACKGROUNDS:
-        src = os.path.join(WORLD, rel)
+    for name, rel, fx in BACKGROUNDS:
+        src = os.path.join(ROOT, rel)
         if not os.path.exists(src):
             print(f'背景の元の絵がない：{src}', file=sys.stderr)
             continue
@@ -278,12 +277,7 @@ def backgrounds():
         cw = im.height * W / H
         x0 = min(max(fx * im.width - cw / 2, 0), im.width - cw)
         im = im.crop((int(x0), 0, int(x0 + cw), im.height)).resize((W, H), Image.LANCZOS)
-        im = im.filter(ImageFilter.GaussianBlur(14))
-        im = ImageEnhance.Brightness(im).enhance(bright)
-        im = ImageEnhance.Color(im).enhance(sat)
-        if name == 'garage_night':   # 夜：青みを足す
-            r, g, b = im.split()
-            im = Image.merge('RGB', (r.point(lambda v: v * 0.8), g.point(lambda v: v * 0.95), b.point(lambda v: min(255, v * 1.15 + 6))))
+        im = im.filter(ImageFilter.GaussianBlur(14))   # シエルと文字が主役になるよう、ぼかす
         os.makedirs(os.path.join(OUT, 'Backgrounds'), exist_ok=True)
         im.save(os.path.join(OUT, 'Backgrounds', f'{name}.jpg'), quality=85)
 
