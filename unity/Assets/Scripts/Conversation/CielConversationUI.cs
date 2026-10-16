@@ -281,7 +281,10 @@ namespace Ciel.Conversation
             var pop = (RectTransform)_volumePop.transform;
             pop.SetParent(root, false);
             Stretch(pop);
-            var blocker = Img(pop, null, Color.clear, raycast: true);   // 外を押したら閉じる
+            // 外を押したら閉じる。つまみの親ではなく兄弟に置く（親に置くと、つまみを触っただけで閉じてしまう）
+            var blockerRect = Rect("Blocker", pop, Center, Center, Vector2.zero, Vector2.zero);
+            Stretch(blockerRect);
+            var blocker = Img(blockerRect, null, Color.clear, raycast: true);
             blocker.gameObject.AddComponent<Button>().onClick.AddListener(() => ShowVolumePop(false));
 
             var area = Rect("Safe", pop, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
@@ -312,7 +315,10 @@ namespace Ciel.Conversation
             sr.SetParent(root, false);
             Stretch(sr);
             _sheetGroup = _sheetRoot.GetComponent<CanvasGroup>();
-            var dim = Img(sr, null, new Color(0.01f, 0.04f, 0.07f, 0.55f), raycast: true);
+            // 外を押したら閉じる。設定画面の親ではなく兄弟に置く（親に置くと、設定画面のどこを押しても閉じてしまう）
+            var dimRect = Rect("Dim", sr, Center, Center, Vector2.zero, Vector2.zero);
+            Stretch(dimRect);
+            var dim = Img(dimRect, null, new Color(0.01f, 0.04f, 0.07f, 0.55f), raycast: true);
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => OpenSheet(false));
 
             _sheet = Rect("Sheet", sr, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
@@ -340,37 +346,97 @@ namespace Ciel.Conversation
             close.gameObject.AddComponent<Button>().targetGraphic = cb;
             close.GetComponent<Button>().onClick.AddListener(() => OpenSheet(false));
 
-            // 中身（縦に並べ、入りきらなければ縦にすべらせる）
+            // タブ（声と会話・背景・そのほか）。1 つのタブの中身は、ほとんどの画面ですべらせずに見える量にする
+            var tabs = Rect("Tabs", _sheet, new Vector2(0, 1), new Vector2(0, 1), Vector2.zero, Vector2.zero);
+            tabs.anchorMin = new Vector2(0, 1);
+            tabs.anchorMax = new Vector2(1, 1);
+            tabs.offsetMin = new Vector2(22, -126);
+            tabs.offsetMax = new Vector2(-22, -80);
+            Pill(tabs, new Color(0.047f, 0.157f, 0.235f, 0.45f));
+            Edge(tabs, WithAlpha(Cyan, 0.3f));
+            var hl = tabs.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hl.padding = new RectOffset(4, 4, 4, 4);
+            hl.spacing = 4;
+            hl.childControlWidth = hl.childControlHeight = true;
+            hl.childForceExpandWidth = hl.childForceExpandHeight = true;
+
+            // 中身（入りきらなければ縦にすべらせる）。何もない所でもすべらせられるよう、見えない板で指を受ける
             var view = Rect("View", _sheet, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             view.anchorMin = Vector2.zero;
             view.anchorMax = Vector2.one;
             view.offsetMin = new Vector2(0, 40);
-            view.offsetMax = new Vector2(0, -76);
+            view.offsetMax = new Vector2(0, -138);
+            Img(view, null, Color.clear, raycast: true);
             view.gameObject.AddComponent<RectMask2D>();
-            var scroll = view.gameObject.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            var content = Rect("Content", view, new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, Vector2.zero);
-            content.anchorMin = new Vector2(0, 1);
-            content.anchorMax = new Vector2(1, 1);
-            content.pivot = new Vector2(0.5f, 1);
-            var vl = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            vl.padding = new RectOffset(22, 22, 4, 64);   // 下はホームのバーの分も空ける
-            vl.spacing = 24;
-            vl.childControlWidth = vl.childControlHeight = true;
-            vl.childForceExpandWidth = true;
-            vl.childForceExpandHeight = false;
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            scroll.viewport = view;
-            scroll.content = content;
+            _sheetScroll = view.gameObject.AddComponent<ScrollRect>();
+            _sheetScroll.horizontal = false;
+            _sheetScroll.movementType = ScrollRect.MovementType.Elastic;   // 端で少し伸びて、すべらせられることが分かる
+            _sheetScroll.elasticity = 0.12f;
+            _sheetScroll.inertia = true;
+            _sheetScroll.decelerationRate = 0.12f;
+            _sheetScroll.scrollSensitivity = 40;   // PC のマウスのホイール
+            _sheetScroll.viewport = view;
 
-            BuildVolumeSection(content);
-            BuildBackgroundSection(content);
-            BuildModeSection(content);
-            BuildDevicesSection(content);
-            BuildDevSection(content);
+            var pages = new (string label, Action<RectTransform> build)[]
+            {
+                ("声と会話", c => { BuildVolumeSection(c); BuildModeSection(c); }),
+                ("背景", BuildBackgroundSection),
+                ("そのほか", c => { BuildDevicesSection(c); BuildDevSection(c); }),
+            };
+            for (int i = 0; i < pages.Length; i++)
+            {
+                var content = Rect("Page_" + pages[i].label, view, new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, Vector2.zero);
+                content.anchorMin = new Vector2(0, 1);
+                content.anchorMax = new Vector2(1, 1);
+                var vl = content.gameObject.AddComponent<VerticalLayoutGroup>();
+                vl.padding = new RectOffset(22, 22, 8, 64);   // 下はホームのバーの分も空ける
+                vl.spacing = 24;
+                vl.childControlWidth = vl.childControlHeight = true;
+                vl.childForceExpandWidth = true;
+                vl.childForceExpandHeight = false;
+                content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                pages[i].build(content);
+                _pages.Add(content);
+
+                var tab = new GameObject(pages[i].label, typeof(RectTransform));
+                tab.transform.SetParent(tabs, false);
+                var r = (RectTransform)tab.transform;
+                var fill = Pill(r, WithAlpha(CyanDeep, 0.22f), raycast: true);
+                var tabEdge = Edge(r, Cyan);
+                var label = Txt("Label", r, 13, TextMain, TextAnchor.MiddleCenter);
+                Stretch(label.rectTransform);
+                label.text = pages[i].label;
+                var b = tab.AddComponent<Button>();
+                b.targetGraphic = fill;
+                b.transition = Selectable.Transition.None;
+                var index = i;
+                b.onClick.AddListener(() => ShowPage(index));
+                _tabs.Add((fill, tabEdge, label));
+            }
+            ShowPage(0);
 
             _sheetRoot.SetActive(false);
+        }
+
+        ScrollRect _sheetScroll;
+        readonly List<RectTransform> _pages = new List<RectTransform>();
+        readonly List<(Image fill, Image edge, Text label)> _tabs = new List<(Image, Image, Text)>();
+
+        void ShowPage(int index)
+        {
+            for (int i = 0; i < _pages.Count; i++)
+            {
+                var sel = i == index;
+                _pages[i].gameObject.SetActive(sel);
+                var (fill, edge, label) = _tabs[i];
+                fill.color = sel ? WithAlpha(CyanDeep, 0.22f) : Color.clear;
+                edge.enabled = sel;
+                label.fontStyle = sel ? FontStyle.Bold : FontStyle.Normal;
+                label.color = sel ? TextMain : TextSub;
+            }
+            _sheetScroll.StopMovement();
+            _sheetScroll.content = _pages[index];
+            _pages[index].anchoredPosition = Vector2.zero;   // 先頭から見せる
         }
 
         void BuildVolumeSection(RectTransform content)
