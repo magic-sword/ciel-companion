@@ -39,6 +39,7 @@ import tools
 import touch
 import turns
 import voice_conversion
+import volume
 from persona import load_persona
 
 load_dotenv()
@@ -89,6 +90,7 @@ class Ciel(Agent):
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
         super().__init__(instructions=self.instructions_for('solo'), tools=tools.TOOLS)
         self.events = emotion.ExpressionEvents()
+        self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
 
     def instructions_for(self, mode: str) -> str:
         """モード（mode.py）ごとの指示。group は多人数での答え方（config/prompts/group.md）を最後に足す。"""
@@ -109,8 +111,8 @@ class Ciel(Agent):
         # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）。
         # 多人数で黙ると決めた返事（[silent]）は読み上げない（mode.py）
         if VOICE == 'irodori':
-            return emotion.tts_node(mode.drop_silent(text), self.events)
-        return Agent.default.tts_node(self, text, model_settings)
+            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events))
+        return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
 
     def transcription_node(self, text, model_settings):
         if VOICE == 'irodori':
@@ -119,8 +121,8 @@ class Ciel(Agent):
 
     def realtime_audio_output_node(self, audio, model_settings):
         if VOICE == 'ciel':
-            return voice_conversion.convert(audio)
-        return Agent.default.realtime_audio_output_node(self, audio, model_settings)
+            return self.volume.apply(voice_conversion.convert(audio))
+        return self.volume.apply(Agent.default.realtime_audio_output_node(self, audio, model_settings))
 
 
 @server.rtc_session()
@@ -198,6 +200,8 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', switch.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
+    # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
+    ctx.room.on('data_received', agent.volume.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
 
 

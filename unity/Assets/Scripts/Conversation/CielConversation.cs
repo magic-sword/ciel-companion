@@ -10,6 +10,7 @@
 // 声を出す機器（スピーカー）も PC では選べる。仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
 // 会話のモード：2 人（Solo）と多人数（Group）。自動のときは、声を仮想オーディオケーブルへ出していれば会議とみなして多人数にする。
 // 会話サーバー（server/agent/mode.py）へ、つないだとき・会話サーバーが入ってきたとき・モードが変わったときに知らせる。
+// シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
 using System;
@@ -39,6 +40,7 @@ namespace Ciel.Conversation
         const string SpeakerPrefKey = "ciel.speakerDevice";
         const string ModePrefKey = "ciel.conversationMode";
         const string SpeakerphonePrefKey = "ciel.speakerphone";
+        const string VolumePrefKey = "ciel.voiceVolume";
 
         [Tooltip("この文字を名前に含む「声の出力」は会議へつなぐ仮想オーディオケーブルとみなす（自動のとき多人数にする）")]
         [SerializeField] string[] _meetingOutputKeywords = { "CABLE", "VB-Audio", "Voicemeeter" };
@@ -80,6 +82,14 @@ namespace Ciel.Conversation
         public enum Mode { Solo, Group }
         /// 選んだモード（自動・2 人・多人数）
         public ModeSetting ModeChoice { get; private set; } = ModeSetting.Auto;
+
+        /// シエルの声の大きさ（0〜1。1 がそのまま）。端末の音量とは別
+        public float VoiceVolume { get; private set; } = 1f;
+        bool _volumeDirty;
+        float _volumeSentAt = -1f;
+
+        /// いまのシエルの声の大きさ（0〜1 くらい。画面の波形用）。声の大きさの設定に左右されない
+        public float VoiceLevel => _meter != null ? _meter.Level / Mathf.Max(VoiceVolume, 0.05f) : 0f;
         /// 実際のモード。自動なら声の出力の機器で決める
         public Mode CurrentMode => ModeChoice switch
         {
@@ -104,6 +114,7 @@ namespace Ciel.Conversation
             _speakerGuid = PlayerPrefs.HasKey(SpeakerPrefKey) ? PlayerPrefs.GetString(SpeakerPrefKey) : null;
             ModeChoice = (ModeSetting)Mathf.Clamp(PlayerPrefs.GetInt(ModePrefKey, 0), 0, 2);
             SpeakerphoneOn = PlayerPrefs.GetInt(SpeakerphonePrefKey, 1) == 1;
+            VoiceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
             if (_connectOnStart) StartConversation();
         }
 
@@ -180,6 +191,7 @@ namespace Ciel.Conversation
             MinutesOn = false;   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
             SendMode();
+            SendVolume();
         }
 
         [System.Serializable]
@@ -305,7 +317,33 @@ namespace Ciel.Conversation
         }
 
         // 会話サーバーが後から部屋に入っても、今のモードが伝わるように送り直す
-        void OnParticipantConnected(Participant participant) => SendMode();
+        void OnParticipantConnected(Participant participant)
+        {
+            SendMode();
+            SendVolume();
+        }
+
+        /// シエルの声の大きさを変える（0〜1）。つまみを動かしているあいだは、送るのを間引く
+        public void SetVoiceVolume(float volume)
+        {
+            volume = Mathf.Clamp01(volume);
+            if (Mathf.Approximately(volume, VoiceVolume)) return;
+            VoiceVolume = volume;
+            PlayerPrefs.SetFloat(VolumePrefKey, volume);
+            _volumeDirty = true;
+            Changed?.Invoke();
+        }
+
+        // 同じ大きさを何度送ってもよい
+        void SendVolume()
+        {
+            _volumeDirty = false;
+            _volumeSentAt = Time.realtimeSinceStartup;
+            if (_room == null || Status != State.Connected) return;
+            var json = $"{{\"v\":1,\"type\":\"voice.volume\",\"volume\":{VoiceVolume.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}}}";
+            try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.volume"); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 声の大きさを送れない: {e.Message}"); }
+        }
 
         // 既定（null）は空の ID を渡す（SDK の番号指定と同じ扱い）
         void ApplySpeaker()
@@ -502,8 +540,10 @@ namespace Ciel.Conversation
 
         void Update()
         {
+            if (_volumeDirty && Time.realtimeSinceStartup - _volumeSentAt > 0.15f) SendVolume();
             if (_mouth == null) return;
-            var target = _meter != null ? Mathf.Clamp01(_meter.Level * _mouthGain) : 0f;
+            // 会話サーバーが声を小さくしても、口の開きは変えない
+            var target = Mathf.Clamp01(VoiceLevel * _mouthGain);
             var t = target > _mouthValue ? _openTime : _closeTime;
             _mouthValue = Mathf.MoveTowards(_mouthValue, target, Time.deltaTime / Mathf.Max(t, 1e-3f));
             _mouth.MouthOpening = _mouthValue;

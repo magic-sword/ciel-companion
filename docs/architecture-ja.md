@@ -133,6 +133,7 @@ sequenceDiagram
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"minutes.state","recording":true}` | 議事録をとっているか（アプリの議事録のボタンの表示） |
 | `ciel.touch` | アプリ → 会話サーバー | `{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
 | `ciel.mode` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.mode","mode":"group"}` | 2 人（solo）・多人数（group）の切り替え |
+| `ciel.volume` | アプリ → 会話サーバー | `{"v":1,"type":"voice.volume","volume":0.7}` | シエルの声の大きさ（0〜1）。アプリの声の再生には音量を変える手段がないので、会話サーバーが送る前に声を小さくする（`server/agent/volume.py`） |
 | `ciel.minutes` | アプリ・管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
 
 ## 会議に参加するとき（多人数）
