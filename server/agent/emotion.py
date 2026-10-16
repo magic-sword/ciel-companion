@@ -6,6 +6,10 @@
   Unity へ表情のイベント（仕様書 6 章の character.expression）を LiveKit のデータのメッセージで送る。
 - transcription_node：文字起こしから印を外す。
 印の無い文は、直前の感情のまま。返事の始まりは通常（neutral）。
+会話モデル（gpt-realtime-2.1-mini）は、まれに印を崩す（2026-10-16 の試験で数十文に 3 回ほど）。read_tags が拾う：
+  かっこの無い印（「happy ところで」）・かっこの中の空白や大文字（「[ Happy ]」）… その感情として読み、外す。
+  一覧に無い印（「[happily]」）・途中で切れた印（「[h]」）… 一覧の名前と頭が合い、1 つに決まればその感情。決まらなければ直前のまま。
+  漏れた話者の 1 行（「[発言者：…]」）… 外す。
 """
 import json
 import logging
@@ -40,9 +44,15 @@ CAPTIONS = {
     'jitome': '柔らかなトーンの10代前半の少女。じとっと疑うような、少し不満げで平たい声。ゆっくりめ。',
     'thinking': '柔らかくナチュラルなトーンの10代前半の少女。うーんと考えながら話す、ゆっくりとした落ち着いた声。',
 }
-TAG = re.compile(r'\[([a-z]+)\]')
+NAMES = '|'.join(CAPTIONS)
+TAG = re.compile(r'\[\s*([A-Za-z]+)\s*\]')
+# かっこの無い印：文の頭（返事の始め・改行・文の終わりのあと）にある感情の名前で、すぐ後が日本語のもの
+BARE_TAG = re.compile(rf'(^|[\n。！？!?])[ \t　]*({NAMES})(?![A-Za-z])[ \t　]*(?=[^\x00-\x7f])', re.IGNORECASE)
+TRAILING_WORD = re.compile(r'(^|[\n。！？!?])([ \t　]*[A-Za-z]+[ \t　]*)$')   # 文字起こしで持ち越す、文の頭の英字
 # 崩れた印（閉じていない「[happ」や、残った「]」）。会話モデルがまれに崩した印を出すので、読み上げないように外す
-BROKEN_TAG = re.compile(r'\[[a-z]*(?![a-z\]])|\]')
+BROKEN_TAG = re.compile(r'\[\s*[A-Za-z]*\s*(?![A-Za-z\]])|\]')
+# 返事に漏れた話者の 1 行（turns.py が足す「[発言者：…]」。かっこが無いこともある）
+SPEAKER_LINE = re.compile(r'\[?発言者：[^\]\n]*?(?:）\]?|\])')
 SENTENCE_END = re.compile(r'[。！？!?\n]+|……')
 MIN_SENTENCE = 4   # これより短い文は、次の文とまとめて読む
 
@@ -67,8 +77,30 @@ class ExpressionEvents:
 
 
 def strip_tags(text: str) -> str:
-    """印を外す。崩れた印（最後に残った書きかけの「[happy」、閉じていない「[happ博士…」、残った「]」）も外す"""
+    """印を外す。崩れた印（最後に残った書きかけの「[happy」、閉じていない「[happ博士…」、残った「]」、
+    かっこの無い「happy ところで」）と、漏れた話者の 1 行も外す"""
+    text = BARE_TAG.sub(lambda m: m.group(1), SPEAKER_LINE.sub('', text))
     return BROKEN_TAG.sub('', TAG.sub('', text))
+
+
+def resolve(word: str) -> str | None:
+    """印の言葉を、一覧の感情にする。一覧に無ければ、頭が合う名前（どちらかがもう一方の頭か、頭の 4 文字が同じ）が
+    1 つだけのときその感情（happily → happy、h → happy、sadness → sad）"""
+    word = word.lower()
+    if word in CAPTIONS:
+        return word
+    hits = [n for n in CAPTIONS if n.startswith(word) or word.startswith(n) or (len(word) >= 4 and n[:4] == word[:4])]
+    return hits[0] if len(hits) == 1 else None
+
+
+def read_tags(sentence: str) -> tuple[str | None, str]:
+    """文の印を読む。（最後に読めた感情、または None, 印を外した本文）"""
+    emotion = None
+    found = [(m.start(2), m.group(2)) for m in BARE_TAG.finditer(sentence)]
+    found += [(m.start(1), m.group(1)) for m in TAG.finditer(sentence)]
+    for _, word in sorted(found):
+        emotion = resolve(word) or emotion
+    return emotion, strip_tags(sentence).strip()
 
 
 def split_sentences(buf: str) -> tuple[list[str], str]:
@@ -104,11 +136,8 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents):
 
     async def speak(sentence: str):
         nonlocal emotion
-        tags = TAG.findall(sentence)
-        for t in tags:
-            if t in CAPTIONS:
-                emotion = t
-        body = strip_tags(sentence).strip()
+        found, body = read_tags(sentence)
+        emotion = found or emotion
         if not body:
             return
         t0 = time.perf_counter()
@@ -132,12 +161,16 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents):
 
 
 async def transcription_node(text: AsyncIterable):
-    """文字起こしから印を外す。印が chunk の境目で切れても外せるよう、[ から ] までは持ち越す。"""
+    """文字起こしから印を外す。印が chunk の境目で切れても外せるよう、[ から ] までと、
+    文の頭の英字（かっこの無い印かもしれない）は持ち越す。"""
     pending = ''
     async for chunk in text:
         s = pending + str(chunk)
         cut = s.rfind('[')
-        if cut != -1 and ']' not in s[cut:]:
+        if cut == -1 or ']' in s[cut:]:
+            m = TRAILING_WORD.search(s)
+            cut = m.start(2) if m else -1
+        if cut != -1:
             s, pending = s[:cut], s[cut:]
         else:
             pending = ''
