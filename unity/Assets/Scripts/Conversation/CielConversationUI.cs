@@ -2,6 +2,7 @@
 // 下の中央に Ciel Prism の形のマイクボタン、左に議事録、右に声の出力（Android はタップでスピーカー・受話口、
 // 長押しで声の大きさ。PC はタップで声の大きさ）。上に接続の状態、会話のモード、設定のボタン。
 // 設定画面：シエルの声の大きさ、背景（CielBackground）、会話のしかた、PC ではマイクとスピーカー、開発用の表情の確認ボタン。
+// シエルに触れている点の表示（CielTouchVisual）は、画面の暗がりとボタンの間の層に描く。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 // 形とアイコンの画像は Assets/Resources/CielUI（scripts/ui/make_ui_sprites.py が作る。白一色で、色はここで付ける）。
 // 寸法はモックアップ（390×844）の値。上下の位置は、端末の切り欠きを除いた範囲（Screen.safeArea）から測る。
@@ -111,6 +112,7 @@ namespace Ciel.Conversation
             _canvasRect = (RectTransform)canvasGo.transform;
 
             BuildScrims(_canvasRect);
+            BuildTouchLayer(_canvasRect);
             _safe = Rect("SafeArea", _canvasRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             Stretch(_safe);
             _safe.gameObject.AddComponent<SafeArea>();
@@ -121,6 +123,16 @@ namespace Ciel.Conversation
             BuildBottomRow(_safe);
             BuildVolumePop(_canvasRect);
             BuildSheet(_canvasRect);
+        }
+
+        // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
+        void BuildTouchLayer(RectTransform root)
+        {
+            var touch = FindAnyObjectByType<CielTouch>();
+            if (touch == null) return;
+            var layer = Rect("Touch", root, Center, Center, Vector2.zero, Vector2.zero);
+            Stretch(layer);
+            gameObject.AddComponent<CielTouchVisual>().Init(touch, layer);
         }
 
         // 画面の上と下を少し暗くして、文字を読みやすくする。左右の上の隅に、シエルの視界の細い弧

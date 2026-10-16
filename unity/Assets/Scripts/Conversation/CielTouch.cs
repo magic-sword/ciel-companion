@@ -8,6 +8,7 @@
 // 体の反応：目線を触れた点へ向け、頭を撫でられると頭が傾いて耳が下がる。触れた髪は物理演算の粒子を押して揺らし、
 //           肩の毛皮はばねで揺らす。頭の傾きは物理演算の入力なので、髪も一緒に揺れる。
 // 表情は CielExpression で短く切り替える（サーバーの返事が来れば、その表情に変わる）。
+// 触れた点の表示は CielTouchVisual（このクラスのイベントを受け取る）。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -88,6 +89,20 @@ namespace Ciel.Conversation
         /// 最後に判定した触れ方（確認用）
         public string LastTouch { get; private set; } = "";
 
+        // 触れた点の表示（CielTouchVisual）へ知らせる。画面のボタンの上で触れたときは知らせない
+        /// 触れ始めた点と部位（None は反応しない部位）
+        public event Action<Vector2, Part> Pressed;
+        /// 反応する部位に触れたまま指が動いた
+        public event Action<Vector2> Dragged;
+        /// なぞりと判定した
+        public event Action StrokeStarted;
+        /// 反応する部位から指を離した（tap・hold・stroke）
+        public event Action<string> Released;
+        /// 撫でられている強さ（0〜1）
+        public float StrokeAmount => _strokeAmount;
+        /// 短く触れた（tap）とみなす長さ（秒）
+        public float TapTime => _tapTime;
+
         void Awake()
         {
             if (_model == null) _model = GetComponent<CubismModel>();
@@ -163,6 +178,7 @@ namespace Ciel.Conversation
             if (_ignored) return;
             (_part, _drawable) = Hit(screen);
             _ignored = _part == Part.None;
+            Pressed?.Invoke(screen, _part);
             if (_ignored) return;
             LookAt(screen);
             _sideX = SideOf(screen);
@@ -175,6 +191,7 @@ namespace Ciel.Conversation
             var delta = (screen - _lastPos) / Screen.height;
             _lastPos = screen;
             _travel += delta.magnitude;
+            Dragged?.Invoke(screen);
             LookAt(screen);
             // なぞった髪を指の動きの方向へ押す
             var (part, drawable) = Hit(screen);
@@ -185,6 +202,7 @@ namespace Ciel.Conversation
                 _stroking = true;
                 Send("stroke", "start", 0);
                 React("stroke");
+                StrokeStarted?.Invoke();
             }
             if (_stroking)
             {
@@ -200,12 +218,13 @@ namespace Ciel.Conversation
             if (_ignored) return;
             var duration = Time.time - _pressTime;
             var ms = Mathf.RoundToInt(duration * 1000);
-            if (_stroking) Send("stroke", "end", ms);
+            if (_stroking) { Send("stroke", "end", ms); Released?.Invoke("stroke"); }
             else
             {
                 var gesture = duration < _tapTime ? "tap" : "hold";
                 Send(gesture, "once", gesture == "hold" ? ms : 0);
                 React(gesture);
+                Released?.Invoke(gesture);
             }
             _stroking = false;
         }

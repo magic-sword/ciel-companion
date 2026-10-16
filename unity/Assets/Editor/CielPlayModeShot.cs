@@ -3,6 +3,8 @@
 // 出力：.local/render-check/playmode-*.png と playmode.txt。終わるとエディタを終了する。
 // 要求の文字に "ui" を含めると、代わりに会話の画面を縦長（540×1170）で撮る：
 // ui-main.png（ふだん）、ui-settings.png（設定）、ui-settings-bottom.png（設定の一番下）、ui-volume.png（その場の声の大きさ）。
+// "touch" を含めると、縦長の画面でシエルに触れる操作を再現し、触れた点の表示（CielTouchVisual）を撮る：
+// touch-converge.png（触れ始め）、touch-hold.png（長く触れる）、touch-stroke-start.png（撫で始め）、touch-stroke.png（頭を撫で続ける）、touch-tap.png（ほっぺをつつく）、touch-none.png（反応しない胸）。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -44,7 +46,7 @@ namespace Ciel.EditorTools
                 }
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
-                if (request.Contains("ui") || request.Contains("resize"))
+                if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -61,6 +63,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("resize"))
             {
                 ResizeShots(step);
+                return;
+            }
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
+            {
+                TouchShots(step);
                 return;
             }
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
@@ -181,6 +188,83 @@ namespace Ciel.EditorTools
                 File.AppendAllText(Path.Combine(OutDir, "resize.txt"),
                     $"{name} t={EditorApplication.timeSinceStartup - _t0:0.0} screen={Screen.width}x{Screen.height} frame={Time.frameCount}\n");
             }
+        }
+
+        // 触れる操作を時間の順に再現して撮る（CielTouchCheck と同じく、CielTouch の Press・Drag・Release を直接呼ぶ）
+        static readonly (float t, string action)[] TouchScript =
+        {
+            (0.00f, "press:head"), (0.10f, "shot:touch-converge"), (0.75f, "shot:touch-hold"),
+            (1.00f, "stroke"), (1.30f, "shot:touch-stroke-start"), (2.30f, "shot:touch-stroke"), (2.60f, "release"),
+            (3.40f, "press:face"), (3.48f, "release"), (3.60f, "shot:touch-tap"),
+            (4.40f, "press:none"), (4.50f, "shot:touch-none"), (4.60f, "release"),
+        };
+        static int _touchIndex;
+        static Vector2 _touchPoint;
+        static readonly System.Collections.Generic.Dictionary<string, Vector2> TouchPoints = new System.Collections.Generic.Dictionary<string, Vector2>();
+
+        static void TouchShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var touch = Object.FindAnyObjectByType<Ciel.Conversation.CielTouch>();
+            if (step == 2)
+            {
+                if (now - _t0 < 2.0 || touch == null) return;
+                // 各部位として判定される点：画面を 8 画素おきに調べ、その部位の点の中央に近い点
+                var found = new System.Collections.Generic.Dictionary<Ciel.Conversation.CielTouch.Part, System.Collections.Generic.List<Vector2>>();
+                for (int y = 0; y < Screen.height; y += 8)
+                    for (int x = 0; x < Screen.width; x += 8)
+                    {
+                        var part = touch.PartAt(new Vector2(x, y));
+                        if (!found.TryGetValue(part, out var list)) found[part] = list = new System.Collections.Generic.List<Vector2>();
+                        list.Add(new Vector2(x, y));
+                    }
+                Vector2 Middle(Ciel.Conversation.CielTouch.Part part)
+                {
+                    var list = found[part];
+                    var mean = Vector2.zero;
+                    foreach (var p in list) mean += p;
+                    mean /= list.Count;
+                    var best = list[0];
+                    foreach (var p in list) if ((p - mean).sqrMagnitude < (best - mean).sqrMagnitude) best = p;
+                    return best;
+                }
+                TouchPoints["head"] = Middle(Ciel.Conversation.CielTouch.Part.Head);
+                TouchPoints["face"] = Middle(Ciel.Conversation.CielTouch.Part.Face);
+                // 反応しない点は、シエルの胸（頭の真下で、髪や首から離れたところ）で探す
+                var head = TouchPoints["head"];
+                var none = head;
+                for (float y = head.y - Screen.height * 0.3f; y > Screen.height * 0.2f; y -= 8)
+                {
+                    none = new Vector2(head.x, y);
+                    if (touch.PartAt(none) == Ciel.Conversation.CielTouch.Part.None && touch.DescribeAt(none).Contains("Body48")) break;
+                }
+                TouchPoints["none"] = none;
+                File.AppendAllText(Path.Combine(OutDir, "touch.txt"), $"screen={Screen.width}x{Screen.height} head={TouchPoints["head"]} face={TouchPoints["face"]} none={none} {touch.DescribeAt(none)}\n");
+                _touchIndex = 0;
+                Next(3);
+                return;
+            }
+            var t = (float)(now - _mark);
+            // なぞる：頭の上を左右に往復する（画面の高さの約 6%）
+            if (step == 4) touch.Drag(_touchPoint + new Vector2(Mathf.Sin((t - 1.0f) * 9f) * Screen.height * 0.03f, 0));
+            while (_touchIndex < TouchScript.Length && t >= TouchScript[_touchIndex].t)
+            {
+                var a = TouchScript[_touchIndex++].action;
+                if (a.StartsWith("press:"))
+                {
+                    _touchPoint = TouchPoints[a.Substring(6)];
+                    touch.Press(_touchPoint);
+                    File.AppendAllText(Path.Combine(OutDir, "touch.txt"), $"{a} part={touch.PartAt(_touchPoint)}\n");
+                }
+                else if (a == "stroke") SessionState.SetInt(Key, 4);
+                else if (a == "release") { touch.Release(); SessionState.SetInt(Key, 3); }
+                else if (a.StartsWith("shot:"))
+                {
+                    ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, a.Substring(5) + ".png"));
+                    File.AppendAllText(Path.Combine(OutDir, "touch.txt"), $"{a.Substring(5)} t={t:0.00} last={touch.LastTouch} stroke={touch.StrokeAmount:0.00}\n");
+                }
+            }
+            if (_touchIndex >= TouchScript.Length && t > 5.5f) FinishUiShots();
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える

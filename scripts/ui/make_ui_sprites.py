@@ -125,6 +125,26 @@ def hex_glow(w=152, h=168, pad=48):
     out.save(os.path.join(OUT, 'hex_glow.png'), optimize=True)
 
 
+def hex_ring(w=152, h=168, stroke=5.0, corner=0.18):
+    """角を丸めた六角の細い輪（タッチの波紋・長押し。Ciel Prism と同じ向き）。corner は角を丸める長さ（辺に対する割合）"""
+    W, H = w * SS, h * SS
+    s = stroke * SS
+    pts = hexagon_points(W - s * 2, H - s * 2)
+    pts = [(x + s, y + s) for x, y in pts]
+    path = []
+    for i, v in enumerate(pts):
+        a, b = pts[i - 1], pts[(i + 1) % len(pts)]
+        p0 = (v[0] + (a[0] - v[0]) * corner, v[1] + (a[1] - v[1]) * corner)
+        p1 = (v[0] + (b[0] - v[0]) * corner, v[1] + (b[1] - v[1]) * corner)
+        for k in range(9):   # 角は二次ベジェ曲線
+            t = k / 8
+            path.append(((1 - t) ** 2 * p0[0] + 2 * t * (1 - t) * v[0] + t * t * p1[0],
+                         (1 - t) ** 2 * p0[1] + 2 * t * (1 - t) * v[1] + t * t * p1[1]))
+    m = canvas(w, h)
+    stroke_path(ImageDraw.Draw(m), path, s, closed=True)
+    save(m, 'hex_ring.png')
+
+
 def vertical_gradient(h=256):
     """上が透明、下が不透明（画面の下の文字を読みやすくする暗がり）"""
     img = Image.new('L', (4, h))
@@ -303,6 +323,8 @@ if __name__ == '__main__':
     hexagon_prism()
     glow()
     hex_glow()
+    hex_ring()
+    ring(n=64, stroke=2.5, name='touch_ring.png')   # タッチの輪（小さく表示しても線がかすれない太さ）
     vertical_gradient()
     corner_arc()
     icons()
