@@ -52,6 +52,8 @@ VOICE = os.environ.get('CIEL_VOICE', 'irodori')
 REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API のときだけ
 SPEAKERS = VOICE == 'irodori' and REALTIME
+# Realtime API の雑音除去（make_model）
+NOISE_REDUCTION = os.environ.get('CIEL_NOISE_REDUCTION', 'far_field')
 # 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
 MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
                  minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]'}
@@ -80,6 +82,9 @@ def make_model(names: list[str] | None = None):
         turn_detection=SemanticVad(type='semantic_vad', eagerness='medium', create_response=False, interrupt_response=True),
         # 相手の発言の文字起こし：日本語と、シエル・覚えている人の名前をヒントにする
         input_audio_transcription=transcription(names or []),
+        # 雑音除去（生活音で「話し始めた」と判定され、シエルの話が止まるのを減らす）。
+        # far_field … 少し離れた PC のマイク（既定）、near_field … ヘッドセット、off … 使わない
+        input_audio_noise_reduction=None if NOISE_REDUCTION == 'off' else NOISE_REDUCTION,
     )
 
 
