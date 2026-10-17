@@ -1,0 +1,124 @@
+[
+  {
+    "Id": "PhysicsSettingCielCheekL",
+    "Input": [
+      {
+        "Source": {
+          "Target": "Parameter",
+          "Id": "ParamCielCheekPokeL"
+        },
+        "Weight": 100,
+        "Type": "X",
+        "Reflect": false
+      }
+    ],
+    "Output": [
+      {
+        "Destination": {
+          "Target": "Parameter",
+          "Id": "ParamCielCheekJiggleL"
+        },
+        "VertexIndex": 1,
+        "Scale": 1.6,
+        "Weight": 100,
+        "Type": "Angle",
+        "Reflect": false
+      }
+    ],
+    "Vertices": [
+      {
+        "Position": {
+          "X": 0,
+          "Y": 0
+        },
+        "Mobility": 1,
+        "Delay": 1,
+        "Acceleration": 1,
+        "Radius": 0
+      },
+      {
+        "Position": {
+          "X": 0,
+          "Y": 3
+        },
+        "Mobility": 0.95,
+        "Delay": 0.9,
+        "Acceleration": 2.0,
+        "Radius": 3
+      }
+    ],
+    "Normalization": {
+      "Position": {
+        "Minimum": -1.5,
+        "Default": 0,
+        "Maximum": 1.5
+      },
+      "Angle": {
+        "Minimum": -25,
+        "Default": 0,
+        "Maximum": 25
+      }
+    }
+  },
+  {
+    "Id": "PhysicsSettingCielCheekR",
+    "Input": [
+      {
+        "Source": {
+          "Target": "Parameter",
+          "Id": "ParamCielCheekPokeR"
+        },
+        "Weight": 100,
+        "Type": "X",
+        "Reflect": false
+      }
+    ],
+    "Output": [
+      {
+        "Destination": {
+          "Target": "Parameter",
+          "Id": "ParamCielCheekJiggleR"
+        },
+        "VertexIndex": 1,
+        "Scale": 1.6,
+        "Weight": 100,
+        "Type": "Angle",
+        "Reflect": false
+      }
+    ],
+    "Vertices": [
+      {
+        "Position": {
+          "X": 0,
+          "Y": 0
+        },
+        "Mobility": 1,
+        "Delay": 1,
+        "Acceleration": 1,
+        "Radius": 0
+      },
+      {
+        "Position": {
+          "X": 0,
+          "Y": 3
+        },
+        "Mobility": 0.95,
+        "Delay": 0.9,
+        "Acceleration": 2.0,
+        "Radius": 3
+      }
+    ],
+    "Normalization": {
+      "Position": {
+        "Minimum": -1.5,
+        "Default": 0,
+        "Maximum": 1.5
+      },
+      "Angle": {
+        "Minimum": -25,
+        "Default": 0,
+        "Maximum": 25
+      }
+    }
+  }
+]

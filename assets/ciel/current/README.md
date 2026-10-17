@@ -1,6 +1,6 @@
 # シエルの現行素材・正式モデル
 
-2026-10-16、身体・上着v60にサモエドの尻尾v63を追加し、現行は113層。通常は体の後ろに隠れ、左右に振ると見える。中央で左右の表示を切り替え、中ほど・毛先の遅れは共通の物理演算で扱う。既存の頭部・身体・11表情を維持する。
+2026-10-17、ほっぺのv64（つつく・つまんで引っ張る・離すとぷるん）を追加し、現行は115層（くぼみの影2層）。頬の赤みは表情用も含めて目の下の部品より上に描く。2026-10-16、身体・上着v60にサモエドの尻尾v63を追加した。通常は体の後ろに隠れ、左右に振ると見える。中央で左右の表示を切り替え、中ほど・毛先の遅れは共通の物理演算で扱う。既存の頭部・身体・11表情を維持する。
 
 - [現行素材一覧](layers.json) と `layers/*.png` が採用素材の単一の参照先。
 - [正式Cubismモデル](../rig/ciel.cmo3)、[制御と階層](../rig/body-outfit/README.md)。
@@ -24,8 +24,10 @@
 
 全素材のPSD/XCFは `CIEL_PSD_MANIFEST=assets/ciel/current/layers.json` として `scripts/live2d/gimp/build_layers_psd.py` で再作成できる（出力はGit対象外）。尻尾2層は1254×1254の素材座標のPNGを保持し、配置・拡大・左向きへの反転はCMO内で行う（`placement: native-rig`）。PSDの初期表示では非表示にする。PNGをそのまま胴体の絵へ重ねない。
 
-再検証: `python -B scripts/live2d/v63/adopt-tail.py`。過去のモデルはGit履歴、尻尾追加前の退避は `.local/tail-adoption/before/` に保持する。
+再検証: `python -B scripts/live2d/v64/adopt-cheek.py`（尻尾は `v63/adopt-tail.py` の記録）。過去のモデルはGit履歴、尻尾追加前の退避は `.local/tail-adoption/before/` に保持する。
 
 尻尾のパラメーターはすべて範囲−1〜1、初期値0。`ParamCielTailWag` は画面左=−1・非表示=0・画面右=1。`ParamCielTailFollow` と `ParamCielTailTip` は物理演算の出力先で、意図した左右の動きとは分ける。Unityでは `CielTail` が「嬉しい」「わくわく」に合わせて振る。任意のタイミングでは `Wag(strength, seconds, cyclesPerSecond)` を呼べる。再生中のコンポーネントメニュー `Wag tail (Play mode)` でも確認できる。
 
 頭部・表情v47までの採用履歴はGit履歴と各版の検証フォルダを参照。Unityモデルへの反映も完了し、既存の.meta・髪の物理・うなずき設定を維持した。
+
+ほっぺのパラメーター（L＝モデルの左＝画面の右）：`ParamCielCheekPoke{L,R}` 押す0〜1（くぼみの影の不透明度は0→0.3）、`ParamCielCheekPullX{L,R}` 外向き＋・`PullY{L,R}` 下向き＋で−1〜1、`ParamCielCheekJiggle{L,R}` は物理演算の出力（押す量を入力にした短い振り子。離すとぷるんと揺れる）。顔の回転の下に `Cheek_Squish_L/R` のワープを挟み、顔・口・鼻の曲面をその子にした。Unityでは `CielTouch` がほっぺのつつき・引っ張りを扱い、引っ張りの強さで困り顔／半泣きにして会話サーバーへ `cheek`・`pull` を知らせる。[確認図と検証](../rig/proofs/cheek-v64/)。

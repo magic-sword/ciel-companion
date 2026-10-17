@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "old_drawables": 113,
+  "new_drawables": 115,
+  "regression_poses": 9,
+  "regression_pixel_max_delta": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "blush_poses_max_delta_outside_cheek_band": [
+    1,
+    1
+  ],
+  "cheek_parameters": [
+    "ParamCielCheekPokeL",
+    "ParamCielCheekPullXL",
+    "ParamCielCheekPullYL",
+    "ParamCielCheekJiggleL",
+    "ParamCielCheekPokeR",
+    "ParamCielCheekPullXR",
+    "ParamCielCheekPullYR",
+    "ParamCielCheekJiggleR"
+  ],
+  "physics_groups": [
+    "PhysicsSetting1",
+    "PhysicsSetting2",
+    "PhysicsSetting3",
+    "PhysicsSetting4",
+    "PhysicsSettingCielTail",
+    "PhysicsSettingCielCheekL",
+    "PhysicsSettingCielCheekR"
+  ],
+  "physics_parameter_ids_valid": true,
+  "moc_sha256": "2e405fb09056058d5242b3338207aabf769299a4e41777e76c8291feda8dce2a"
+}

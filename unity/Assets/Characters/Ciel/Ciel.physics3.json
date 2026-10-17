@@ -1,10 +1,10 @@
 {
   "Version": 3,
   "Meta": {
-    "PhysicsSettingCount": 5,
-    "TotalInputCount": 16,
-    "TotalOutputCount": 6,
-    "VertexCount": 11,
+    "PhysicsSettingCount": 7,
+    "TotalInputCount": 18,
+    "TotalOutputCount": 8,
+    "VertexCount": 15,
     "EffectiveForces": {
       "Gravity": {
         "X": 0,
@@ -35,6 +35,14 @@
       {
         "Id": "PhysicsSettingCielTail",
         "Name": "尻尾の追従"
+      },
+      {
+        "Id": "PhysicsSettingCielCheekL",
+        "Name": "ほっぺの揺れ（左）"
+      },
+      {
+        "Id": "PhysicsSettingCielCheekR",
+        "Name": "ほっぺの揺れ（右）"
       }
     ]
   },
@@ -461,6 +469,128 @@
           "Minimum": -18,
           "Default": 0,
           "Maximum": 18
+        }
+      }
+    },
+    {
+      "Id": "PhysicsSettingCielCheekL",
+      "Input": [
+        {
+          "Source": {
+            "Target": "Parameter",
+            "Id": "ParamCielCheekPokeL"
+          },
+          "Weight": 100,
+          "Type": "X",
+          "Reflect": false
+        }
+      ],
+      "Output": [
+        {
+          "Destination": {
+            "Target": "Parameter",
+            "Id": "ParamCielCheekJiggleL"
+          },
+          "VertexIndex": 1,
+          "Scale": 1.6,
+          "Weight": 100,
+          "Type": "Angle",
+          "Reflect": false
+        }
+      ],
+      "Vertices": [
+        {
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Mobility": 1,
+          "Delay": 1,
+          "Acceleration": 1,
+          "Radius": 0
+        },
+        {
+          "Position": {
+            "X": 0,
+            "Y": 3
+          },
+          "Mobility": 0.95,
+          "Delay": 0.9,
+          "Acceleration": 2.0,
+          "Radius": 3
+        }
+      ],
+      "Normalization": {
+        "Position": {
+          "Minimum": -1.5,
+          "Default": 0,
+          "Maximum": 1.5
+        },
+        "Angle": {
+          "Minimum": -25,
+          "Default": 0,
+          "Maximum": 25
+        }
+      }
+    },
+    {
+      "Id": "PhysicsSettingCielCheekR",
+      "Input": [
+        {
+          "Source": {
+            "Target": "Parameter",
+            "Id": "ParamCielCheekPokeR"
+          },
+          "Weight": 100,
+          "Type": "X",
+          "Reflect": false
+        }
+      ],
+      "Output": [
+        {
+          "Destination": {
+            "Target": "Parameter",
+            "Id": "ParamCielCheekJiggleR"
+          },
+          "VertexIndex": 1,
+          "Scale": 1.6,
+          "Weight": 100,
+          "Type": "Angle",
+          "Reflect": false
+        }
+      ],
+      "Vertices": [
+        {
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Mobility": 1,
+          "Delay": 1,
+          "Acceleration": 1,
+          "Radius": 0
+        },
+        {
+          "Position": {
+            "X": 0,
+            "Y": 3
+          },
+          "Mobility": 0.95,
+          "Delay": 0.9,
+          "Acceleration": 2.0,
+          "Radius": 3
+        }
+      ],
+      "Normalization": {
+        "Position": {
+          "Minimum": -1.5,
+          "Default": 0,
+          "Maximum": 1.5
+        },
+        "Angle": {
+          "Minimum": -25,
+          "Default": 0,
+          "Maximum": 25
         }
       }
     }

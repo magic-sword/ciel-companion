@@ -1475,6 +1475,32 @@
       ],
       "placement": "native-rig",
       "visible": false
+    },
+    {
+      "name": "Cheek_Dimple_L",
+      "path": "assets/ciel/current/layers/Cheek_Dimple_L.png",
+      "visible": false,
+      "canvas": [
+        2172,
+        2896
+      ],
+      "offset": [
+        414,
+        0
+      ]
+    },
+    {
+      "name": "Cheek_Dimple_R",
+      "path": "assets/ciel/current/layers/Cheek_Dimple_R.png",
+      "visible": false,
+      "canvas": [
+        2172,
+        2896
+      ],
+      "offset": [
+        414,
+        0
+      ]
     }
   ],
   "model_canvas": [

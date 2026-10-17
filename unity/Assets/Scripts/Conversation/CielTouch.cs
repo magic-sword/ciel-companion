@@ -7,6 +7,9 @@
 // しぐさ：短く触れる（tap）・なぞる（stroke）・長く触れたまま（hold）。なぞりは始まり（start）と終わり（end）、ほかは離したとき（once）に知らせる。
 // 体の反応：目線を触れた点へ向け、頭を撫でられると頭が傾いて耳が下がる。触れた髪は物理演算の粒子を押して揺らし、
 //           肩の毛皮はばねで揺らす。頭の傾きは物理演算の入力なので、髪も一緒に揺れる。
+// ほっぺ：つつくと「ぷにっ」と押され（くぼみの影・赤み・その側の目を少し細める）、離すと物理演算で「ぷるん」と揺れる。
+//         触れたまま指を動かすと、つまんで引っ張る（指についてくるが、伸びるほど重くなる）。離すと、ばねで揺れながら戻る。
+//         やさしく引くと困り顔、強く・速く引くと半泣きになり、引っ張り（pull）として強さと表情をサーバーへ知らせる。
 // 表情は CielExpression で短く切り替える（サーバーの返事が来れば、その表情に変わる）。
 // 触れた点の表示は CielTouchVisual（このクラスのイベントを受け取る）。
 using System;
@@ -82,6 +85,22 @@ namespace Ciel.Conversation
         readonly Spring _earTwitch = new Spring(), _headDip = new Spring(), _headTurn = new Spring(),
             _furL = new Spring(), _furR = new Spring();
 
+        // ---- ほっぺ ----
+        // くぼみの影の部品（顔と一緒に動く）を、ほっぺの位置の目印にする。L はモデルの左（画面の右）
+        CubismDrawable _dimpleL, _dimpleR;
+        const float DimpleGap = 392f;      // 左右のくぼみの間（キャンバスの画素）。画面の大きさをキャンバスの画素へ直すのに使う
+        const float CheekLift = 46f, CheekRadius = 115f;   // ほっぺの中心（くぼみより少し上）と、ほっぺとみなす範囲（キャンバスの画素）
+        const float PullStart = 0.012f;    // 指がこれだけ動いたら（画面の高さに対する割合）、押すのをやめて引っ張りにする
+        const float PullUpLimit = -0.2f;   // 上向きの引っ張りの限度（ParamCielCheekPullY の負の側）
+        const float PullReach = 110f;    // 指をこれだけ動かすと、引っ張りがほぼいっぱいになる（キャンバスの画素）
+        int _cheek;                        // 触れているほっぺ：1 = L、-1 = R、0 = ほっぺではない
+        bool _pokeHeld, _pulling;
+        int _pokeSide = 1, _pullSide = 1;
+        float _poke, _blush, _pullSpeed, _pullAmount;
+        Vector2 _pullOrigin, _pullTarget, _pull, _pullVel;
+        string _pullLevel = "", _pullFace = "";
+        float _cheekUnit = 1f;             // 画面の 1 画素がキャンバスの何画素か
+
         public int ExecutionOrder => 750;   // 目線・揺れの後、物理演算（800）の前
         public bool NeedsUpdateOnEditing => false;
         public bool HasUpdateController { get; set; }
@@ -117,6 +136,8 @@ namespace Ciel.Conversation
                 if (d.GetComponent<CubismRaycastable>() != null) continue;
                 d.gameObject.AddComponent<CubismRaycastable>().Precision = CubismRaycastablePrecision.Triangles;
                 if (d.Id == "Face_Skin") _face = d;
+                if (d.Id == "Cheek_Dimple_L") _dimpleL = d;
+                if (d.Id == "Cheek_Dimple_R") _dimpleR = d;
             }
         }
 
@@ -183,6 +204,79 @@ namespace Ciel.Conversation
             LookAt(screen);
             _sideX = SideOf(screen);
             if (_part == Part.Hair) PushHair(_drawable, _sideX >= 0 ? 0.6f : -0.6f);   // 触れた髪が少し揺れる
+            _cheek = _part == Part.Face ? CheekAt(screen) : 0;
+            if (_cheek != 0)
+            {
+                // ぷにっと押す。引っ張りが戻りきっていないうちに、反対のほっぺを押しても困らないよう、押す側だけを変える
+                _pokeSide = _cheek;
+                _pokeHeld = true;
+                _pullOrigin = screen;
+                _pullLevel = _pullFace = "";
+            }
+        }
+
+        /// 画面の点が、どちらのほっぺか（1 = L、-1 = R、0 = ほっぺではない）
+        public int CheekAt(Vector2 screen)
+        {
+            if (_dimpleL == null || _dimpleR == null) return 0;
+            Vector2 l = _camera.WorldToScreenPoint(Center(_dimpleL)), r = _camera.WorldToScreenPoint(Center(_dimpleR));
+            var gap = (l - r).magnitude;
+            if (gap < 1f) return 0;
+            _cheekUnit = DimpleGap / gap;
+            // 画面の y は上向き。ほっぺの中心は、くぼみより少し上
+            var lift = new Vector2(0, CheekLift / _cheekUnit);
+            var dl = (screen - (l + lift)).magnitude * _cheekUnit;
+            var dr = (screen - (r + lift)).magnitude * _cheekUnit;
+            if (Mathf.Min(dl, dr) > CheekRadius) return 0;
+            return dl <= dr ? 1 : -1;
+        }
+
+        // つまんで引っ張る：指の動きを、ほっぺの外向き・下向きの量へ直す。遠くへ引くほど重くなる（tanh）
+        void DragCheek(Vector2 screen)
+        {
+            var starting = !_pulling && _travel >= PullStart;
+            if (starting)
+            {
+                _pulling = true;
+                _pokeHeld = false;   // 押していた形は離れ、物理演算で少し揺れる
+                _pullSide = _cheek;
+            }
+            if (!_pulling) return;
+            var d = (screen - _pullOrigin) * _cheekUnit;
+            // 顔の内側へ押し込む向きには変形させない（あごが大きく崩れて見えた。2026-10-17）
+            var raw = new Vector2(Mathf.Max(0f, _cheek > 0 ? d.x : -d.x), -d.y) / PullReach;
+            var mag = raw.magnitude;
+            _pullTarget = mag < 1e-4f ? Vector2.zero : raw * (Tanh(mag) / mag);
+            // 上へはほんの少しだけ（引き上げると、あごの輪郭が持ち上がって欠けて見えた。2026-10-17）
+            _pullTarget.y = Mathf.Max(_pullTarget.y, PullUpLimit);
+            var amount = _pullTarget.magnitude;
+            // 速さは、引き始めてからの増え方で見る（引き始めのコマで、それまでの指の動きを速さに数えない）
+            if (starting) { _pullAmount = amount; _pullSpeed = 0f; }
+            var dt = Mathf.Max(Time.deltaTime, 1e-3f);
+            _pullSpeed = Mathf.Lerp(_pullSpeed, Mathf.Max(0f, amount - _pullAmount) / dt, dt * 10f);
+            _pullAmount = amount;
+
+            // やさしく引けば困り顔、強く・速く引けば半泣き。強くなったときは、もう一度知らせる
+            if (_pullLevel != "hard" && (amount > 0.85f || _pullSpeed > 5f && amount > 0.4f))
+            {
+                _pullLevel = "hard";
+                _pullFace = "teary";
+                ForceExpression("teary", 4f);
+                Send("pull", "start", 0, _pullLevel, _pullFace);
+            }
+            else if (_pullLevel == "" && amount > 0.3f)
+            {
+                _pullLevel = "gentle";
+                _pullFace = "troubled";
+                ForceExpression("troubled", 3f);
+                Send("pull", "start", 0, _pullLevel, _pullFace);
+            }
+        }
+
+        static float Tanh(float x)
+        {
+            var e = Mathf.Exp(2f * x);
+            return (e - 1f) / (e + 1f);
         }
 
         public void Drag(Vector2 screen)
@@ -193,6 +287,7 @@ namespace Ciel.Conversation
             _travel += delta.magnitude;
             Dragged?.Invoke(screen);
             LookAt(screen);
+            if (_cheek != 0) { DragCheek(screen); return; }
             // なぞった髪を指の動きの方向へ押す
             var (part, drawable) = Hit(screen);
             if (part == Part.Hair || drawable != null && drawable.StartsWith("Hair_Front_"))
@@ -218,7 +313,13 @@ namespace Ciel.Conversation
             if (_ignored) return;
             var duration = Time.time - _pressTime;
             var ms = Mathf.RoundToInt(duration * 1000);
-            if (_stroking) { Send("stroke", "end", ms); Released?.Invoke("stroke"); }
+            _pokeHeld = false;   // 離すと押す量が 0 へ戻り、物理演算で「ぷるん」と揺れる
+            if (_pulling && _pullLevel != "")
+            {
+                Send("pull", "end", ms, _pullLevel, _pullFace);
+                Released?.Invoke("pull");
+            }
+            else if (_stroking) { Send("stroke", "end", ms); Released?.Invoke("stroke"); }
             else
             {
                 var gesture = duration < _tapTime ? "tap" : "hold";
@@ -226,7 +327,9 @@ namespace Ciel.Conversation
                 React(gesture);
                 Released?.Invoke(gesture);
             }
-            _stroking = false;
+            _stroking = _pulling = false;
+            _cheek = 0;
+            _pullAmount = _pullSpeed = 0;
         }
 
         readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
@@ -378,6 +481,11 @@ namespace Ciel.Conversation
                     _earTwitch.Kick(gesture == "tap" ? 1.6f : 0.8f);
                     SetExpression(gesture == "stroke" ? "relaxed" : "surprised", gesture == "stroke" ? 3f : 1.2f);
                     break;
+                case Part.Face when _cheek != 0:
+                    // ほっぺをつつく：少しだけ逃げて、照れる（押された形・赤みは OnLateUpdate）
+                    _headTurn.Kick(-side * 0.4f);
+                    SetExpression("embarrassed", 1.5f);
+                    break;
                 case Part.Face:
                     _headTurn.Kick(-side * 0.8f);   // つつかれた側から少し逃げる
                     SetExpression(gesture == "stroke" ? "embarrassed" : "surprised", gesture == "stroke" ? 3f : 1.2f);
@@ -403,10 +511,17 @@ namespace Ciel.Conversation
                 _expression.Set(name, ttl);
         }
 
-        void Send(string gesture, string phase, int durationMs)
+        // 痛いときの表情は、会話サーバーの表情より優先する
+        void ForceExpression(string name, float ttl)
         {
-            LastTouch = $"{PartName(_part)}/{gesture}/{phase}";
-            if (_conversation != null) _conversation.SendTouch(PartName(_part), gesture, phase, durationMs);
+            if (_expression != null) _expression.Set(name, ttl);
+        }
+
+        void Send(string gesture, string phase, int durationMs, string strength = "", string expression = "")
+        {
+            var part = _cheek != 0 ? "cheek" : PartName(_part);
+            LastTouch = $"{part}/{gesture}/{phase}" + (strength != "" ? $"/{strength}/{expression}" : "");
+            if (_conversation != null) _conversation.SendTouch(part, gesture, phase, durationMs, strength, expression);
         }
 
         static string PartName(Part p) => p switch
@@ -441,6 +556,38 @@ namespace Ciel.Conversation
             Add("ParamEar", -0.7f * headPat + 0.5f * _earTwitch.X);
             Add("ParamCielFurSwingL", 0.8f * _furL.X);
             Add("ParamCielFurSwingR", 0.8f * _furR.X);
+            UpdateCheek(dt);
+        }
+
+        void UpdateCheek(float dt)
+        {
+            // 押す：0.08 秒で押しきり、0.05 秒で離れる（急に戻るので、物理演算の揺れが「ぷるん」と出る）
+            _poke = Mathf.MoveTowards(_poke, _pokeHeld ? 1f : 0f, dt * (_pokeHeld ? 12.5f : 20f));
+            // 引っ張る：引いているあいだは指に素早くついていき、離すと、ばねで少し行き過ぎながら戻る
+            if (_pulling) { _pull = Vector2.Lerp(_pull, _pullTarget, Mathf.Min(1f, dt * 25f)); _pullVel = Vector2.zero; }
+            else
+            {
+                var step = Mathf.Min(dt, 1f / 30f) / 4f;
+                for (int i = 0; i < 4; i++)
+                {
+                    _pullVel += (-380f * _pull - 11f * _pullVel) * step;
+                    _pull += _pullVel * step;
+                }
+            }
+            var pull = _pull.magnitude;
+            // 赤み：押す・引くと早く上がり、ゆっくり引く
+            var blush = Mathf.Max(_pokeHeld ? 0.35f : 0f, _pulling ? 0.35f + 0.4f * pull : 0f);
+            _blush = Mathf.MoveTowards(_blush, blush, dt * (blush > _blush ? 4f : 0.5f));
+
+            var poke = _pokeSide > 0 ? "L" : "R";
+            var pulled = _pullSide > 0 ? "L" : "R";
+            Add("ParamCielCheekPoke" + poke, _poke);
+            Add("ParamCielCheekPullX" + pulled, Mathf.Max(_pull.x, -0.1f));   // 戻るときの行き過ぎも、内側へは小さく
+            Add("ParamCielCheekPullY" + pulled, Mathf.Max(_pull.y, PullUpLimit));
+            Add("ParamCheek", _blush);
+            // 押された・引かれた側の目を少し細める（笑い目の途中の値は二重に見えたので、開き具合で）
+            Add(_pokeSide > 0 ? "ParamEyeLOpen" : "ParamEyeROpen", -0.22f * _poke);
+            Add(_pullSide > 0 ? "ParamEyeLOpen" : "ParamEyeROpen", -0.25f * Mathf.Min(pull, 1f));
         }
 
         void Add(string id, float v)

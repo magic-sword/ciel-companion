@@ -1,0 +1,11 @@
+{
+  "approved_date": "2026-10-17",
+  "source_revision": "v64",
+  "rig": "assets/ciel/rig/ciel.cmo3",
+  "rig_sha256": "7a062f97ca945f0331e25659fcaac645c9e69f089aa48e1bc365dbac170927b2",
+  "previous_rig_sha256": "f689cf0a40b63d5fb26beeffe31b3b8f6d8ed99bca1f8eab4ed2d7d8cb016e50",
+  "material_count": 115,
+  "new_material_count": 2,
+  "sdk_package": "assets/ciel/runtime",
+  "unity_applied": true
+}

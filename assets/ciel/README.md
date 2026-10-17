@@ -1,10 +1,10 @@
 # シエルの素材とモデル
 
-2026-10-14：**嬉しい・にこにこ・驚きは採用済み**。驚きはv34の瞳位置補正後を正式モデルへ反映。他の表情は今後調整する。
+2026-10-17：現行は115層（頭部・11表情、身体と上着v60、尻尾v63、ほっぺv64）。最新の状態は [current/README.md](current/README.md) と [current/approved.json](current/approved.json)。
 
 | 用途 | 正式な場所 |
 | --- | --- |
-| 最新の素材67層 | [current/layers.json](current/layers.json)・`current/layers/` |
+| 最新の素材115層 | [current/layers.json](current/layers.json)・`current/layers/` |
 | 採用状態・正式モデルのハッシュ | [current/approved.json](current/approved.json) |
 | Cubism編集 | [rig/ciel.cmo3](rig/ciel.cmo3) |
 | 最新のにこにこ比較 | [見本との比較](rig/proofs/relaxed-eye-corners/reference-comparison.png) |

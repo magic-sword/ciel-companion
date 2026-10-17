@@ -305,6 +305,46 @@
 			"Id": "ParamCielTailTip",
 			"GroupId": "",
 			"Name": "尻尾 毛先の追従"
+		},
+		{
+			"Id": "ParamCielCheekPokeL",
+			"GroupId": "",
+			"Name": "左ほっぺ 押す"
+		},
+		{
+			"Id": "ParamCielCheekPullXL",
+			"GroupId": "",
+			"Name": "左ほっぺ 引く 横"
+		},
+		{
+			"Id": "ParamCielCheekPullYL",
+			"GroupId": "",
+			"Name": "左ほっぺ 引く 縦"
+		},
+		{
+			"Id": "ParamCielCheekJiggleL",
+			"GroupId": "",
+			"Name": "左ほっぺ 揺れ"
+		},
+		{
+			"Id": "ParamCielCheekPokeR",
+			"GroupId": "",
+			"Name": "右ほっぺ 押す"
+		},
+		{
+			"Id": "ParamCielCheekPullXR",
+			"GroupId": "",
+			"Name": "右ほっぺ 引く 横"
+		},
+		{
+			"Id": "ParamCielCheekPullYR",
+			"GroupId": "",
+			"Name": "右ほっぺ 引く 縦"
+		},
+		{
+			"Id": "ParamCielCheekJiggleR",
+			"GroupId": "",
+			"Name": "右ほっぺ 揺れ"
 		}
 	],
 	"ParameterGroups": [],

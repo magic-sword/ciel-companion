@@ -610,10 +610,12 @@ namespace Ciel.Conversation
         }
 
         /// シエルに触れたことを会話サーバーへ知らせる（CielTouch から。サーバーの touch.py が声の反応を返す）
-        public void SendTouch(string part, string gesture, string phase, int durationMs)
+        /// strength（gentle・hard）と expression（そのときアプリが出した表情）は、ほっぺを引っ張ったときだけ付ける
+        public void SendTouch(string part, string gesture, string phase, int durationMs, string strength = "", string expression = "")
         {
             if (_room == null || Status != State.Connected) return;
-            var json = $"{{\"v\":1,\"type\":\"user.touch\",\"part\":\"{part}\",\"gesture\":\"{gesture}\",\"phase\":\"{phase}\",\"duration_ms\":{durationMs}}}";
+            var extra = strength != "" ? $",\"strength\":\"{strength}\",\"expression\":\"{expression}\"" : "";
+            var json = $"{{\"v\":1,\"type\":\"user.touch\",\"part\":\"{part}\",\"gesture\":\"{gesture}\",\"phase\":\"{phase}\",\"duration_ms\":{durationMs}{extra}}}";
             try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.touch"); }
             catch (Exception e) { Debug.LogWarning($"[CielConversation] タッチを送れない: {e.Message}"); }
         }

@@ -28,8 +28,11 @@ log = logging.getLogger('ciel-agent.touch')
 
 TOPIC = 'ciel.touch'
 # Unity（CielTouch）が送る部位・しぐさ。ほかの値は無視する
-PARTS = {'head': '頭', 'ear': '耳', 'face': 'ほっぺ', 'hair': '髪', 'shoulder': '肩', 'hand': '手'}
-GESTURES = {'tap': 'ちょんとつつく', 'stroke': '撫でる', 'hold': 'そっと触れる'}
+PARTS = {'head': '頭', 'ear': '耳', 'face': 'ほっぺ', 'cheek': 'ほっぺ', 'hair': '髪', 'shoulder': '肩', 'hand': '手'}
+GESTURES = {'tap': 'ちょんとつつく', 'stroke': '撫でる', 'hold': 'そっと触れる', 'pull': 'つまんで引っ張る'}
+# 引っ張る強さ（Unity が、引いた量と速さから決める）と、そのときアプリが出した表情
+STRENGTHS = {'gentle': 'やさしく', 'hard': '強く'}
+EXPRESSIONS = {'troubled': '困り顔', 'teary': '半泣きの顔', 'surprised': '驚いた顔', 'embarrassed': '照れた顔'}
 PHASES = {'once', 'start', 'end'}   # once：tap・hold を離したとき。start・end：なぞりの始まりと終わり
 COOLDOWN = 4.0         # 返事の最短の間隔（秒）
 WAIT_SECONDS = 0.0     # 触れてから、話し始めるのを待つ時間（待たない）
@@ -37,13 +40,17 @@ RECENT_SECONDS = 60.0  # これより前に話した人は、触った人とみ�
 GIVE_UP_SECONDS = 10.0 # 話していた人の返事に添えられなかったら（文字にならなかったなど）、これで諦めて単独で返す
 
 
-def describe(part: str, gesture: str, phase: str, duration_ms: int) -> str:
-    line = f'[タッチ] {PARTS[part]}を{GESTURES[gesture]}'
+def describe(part: str, gesture: str, phase: str, duration_ms: int, strength: str = '', expression: str = '') -> str:
+    how = STRENGTHS.get(strength, '')
+    line = f'[タッチ] {PARTS[part]}を{how}{GESTURES[gesture]}'
+    notes = []
     if phase == 'start':
-        return line + '（撫で始めた）'
-    if duration_ms > 0:
-        return line + f'（{duration_ms / 1000:.1f}秒）'
-    return line
+        notes.append('引っ張り始めた' if gesture == 'pull' else '撫で始めた')
+    elif duration_ms > 0:
+        notes.append(f'{duration_ms / 1000:.1f}秒')
+    if expression in EXPRESSIONS:
+        notes.append(f'シエルは{EXPRESSIONS[expression]}になった')
+    return line + (f'（{"。".join(notes)}）' if notes else '')
 
 
 class TouchReactions:
@@ -67,6 +74,7 @@ class TouchReactions:
             e = json.loads(packet.data.decode('utf-8'))
             part, gesture, phase = e['part'], e['gesture'], e['phase']
             duration_ms = int(e.get('duration_ms', 0))
+            strength, expression = str(e.get('strength', '')), str(e.get('expression', ''))
         except (ValueError, KeyError, TypeError) as ex:
             log.warning('タッチのメッセージを読めない: %s', ex)
             return
@@ -74,15 +82,16 @@ class TouchReactions:
             log.warning('知らないタッチ: %s %s %s', part, gesture, phase)
             return
 
+        line = describe(part, gesture, phase, duration_ms, strength, expression)
         if phase == 'start':
-            self.stroke_answered = True   # 撫で始めで知らせる（撫で終わりでは知らせない）
-            self._hold(describe(part, gesture, phase, duration_ms))
+            self.stroke_answered = True   # 撫で始め・引っ張り始めで知らせる（終わりでは知らせない）
+            self._hold(line)
         elif phase == 'end':
             if not self.stroke_answered:
-                self._hold(describe(part, gesture, phase, duration_ms))
+                self._hold(line)
             self.stroke_answered = False
         else:
-            self._hold(describe(part, gesture, phase, duration_ms))
+            self._hold(line)
 
     def on_user_state(self, ev) -> None:
         if ev.new_state == 'speaking':

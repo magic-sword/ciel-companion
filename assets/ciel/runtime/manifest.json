@@ -1,8 +1,8 @@
 {
-  "approved_date": "2026-10-16",
+  "approved_date": "2026-10-17",
   "source_rig": "assets/ciel/rig/ciel.cmo3",
-  "source_rig_sha256": "f689cf0a40b63d5fb26beeffe31b3b8f6d8ed99bca1f8eab4ed2d7d8cb016e50",
-  "material_count": 113,
+  "source_rig_sha256": "7a062f97ca945f0331e25659fcaac645c9e69f089aa48e1bc365dbac170927b2",
+  "material_count": 115,
   "approved_expressions": [
     "happy",
     "relaxed",
@@ -22,27 +22,31 @@
     },
     {
       "path": "Ciel.4096/texture_01.png",
-      "sha256": "cce6384b181083c756cd4bff8400cbfc6ad1f7baf87de18b4ec8e8de3f1d0051"
+      "sha256": "e97191e66c00e2e5f7f9db4164a62e2f2bc8a85ae86b1b5888ff9077449d1476"
     },
     {
       "path": "Ciel.4096/texture_02.png",
-      "sha256": "8898674604c461e71b0402fb7b3c76579e181d38cc2c85bfb210429828f4cdaa"
+      "sha256": "7665292ecdadb25f04bd65ebe9bcca111be7e2385346cc30ac85957eb34503e2"
+    },
+    {
+      "path": "Ciel.4096/texture_03.png",
+      "sha256": "20e20f7e2c860b8e8f26dd25480dd4d6ffa222716c43f8048cfd514614ccca15"
     },
     {
       "path": "Ciel.cdi3.json",
-      "sha256": "ff86b04d6b642785bf4fcf58e4ca1f020c611d7f69c2db106956991f7191d348"
+      "sha256": "cf822f47a8c1eb7373b4e2fbc5a0d77fc0733fe7db1a1166ef212c74679555cd"
     },
     {
       "path": "Ciel.moc3",
-      "sha256": "557b69ccb637b54779acf6edabe53c3b88b41cde2fd9a9c660276448d08a3d8a"
+      "sha256": "2e405fb09056058d5242b3338207aabf769299a4e41777e76c8291feda8dce2a"
     },
     {
       "path": "Ciel.model3.json",
-      "sha256": "5b9fa60df578d2f455d66eadf7e4439937f7bc60fa6d334c415cd5bcc087666b"
+      "sha256": "8d46ad1376518f4ca23f38650878e903db741b97c90b0ae98d73f0b8b3e62d92"
     },
     {
       "path": "Ciel.physics3.json",
-      "sha256": "a403b5ee9d6f4a945e4175e0d05f9e42c3d56c47131bd2ed796bf7b067a94f9f"
+      "sha256": "7552395bad6dcce32faa59dd68c593da0a7d3439bb04e231f565599bb018dfde"
     },
     {
       "path": "Expressions/angry.exp3.json",
@@ -545,6 +549,14 @@
     {
       "path": "assets/ciel/current/layers/Tail_Right.png",
       "sha256": "216afe62d179d218365e46ac2957baf4e4302f6218d347ad31defee3e3ae6dd6"
+    },
+    {
+      "path": "assets/ciel/current/layers/Cheek_Dimple_L.png",
+      "sha256": "6e4fc9c9030b26d81c79efd61a00166711bf6518ff3ecf82ab0c1637fce38431"
+    },
+    {
+      "path": "assets/ciel/current/layers/Cheek_Dimple_R.png",
+      "sha256": "031c11a1bf3a595047c38313f22ac92dedf1d6c1c4dba983127aabb3f7ff7a7d"
     }
   ]
 }

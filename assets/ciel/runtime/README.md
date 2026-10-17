@@ -1,6 +1,6 @@
 # シエルの確定版SDKパッケージ
 
-2026-10-16に尻尾v63を追加。現行113素材、SDK19ファイル、通常を含む11表情、4096pxアトラス2枚と尻尾用2048pxアトラス1枚。正式編集モデルは `../rig/ciel.cmo3`、現行素材は `../current/layers.json`。
+2026-10-17にほっぺv64を追加。現行115素材、SDK20ファイル、通常を含む11表情、4096pxアトラス2枚・尻尾用2048px・くぼみの影用256pxのアトラス各1枚。2026-10-16に尻尾v63を追加。正式編集モデルは `../rig/ciel.cmo3`、現行素材は `../current/layers.json`。
 
 身体を首輪の中央へ合わせ、上着の内側と表側で明るさを分担した。着脱と手3種の切り替えを確認し、既存の頭部・表情・髪の物理・うなずきを維持した。[採用・検証](../rig/proofs/body-outfit-v60/README.md)。
 
@@ -10,5 +10,7 @@
 
 尻尾は `ParamCielTailWag` の−1=画面左、0=体の後ろ、1=画面右。中央で左右のメッシュを切り替える。中ほど・毛先は `ParamCielTailFollow/Tip` に物理出力を接続し、従来の髪など4グループを維持したまま5番目のグループを追加した。物理演算は必ず同梱の `Ciel.physics3.json` と併せて使う。詳細と確認図は [現行モデル](../current/README.md) を参照。
 
-再検証: `python -B scripts/live2d/v63/adopt-tail.py`。
+ほっぺは `ParamCielCheekPoke/PullX/PullY/Jiggle{L,R}`。揺れ（Jiggle）は物理演算の6・7番目のグループ `PhysicsSettingCielCheekL/R` の出力。
+
+再検証: `python -B scripts/live2d/v64/adopt-cheek.py`。
 再書き出し時はCubismで正式モデルを保存し、SDKを検証・採用してから `prepare-current-runtime.py <書き出しフォルダ>` を使う。モデルや素材のハッシュが異なる場合は更新を止める。

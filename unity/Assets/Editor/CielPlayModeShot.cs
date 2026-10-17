@@ -47,7 +47,7 @@ namespace Ciel.EditorTools
                 }
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
-                if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch"))
+                if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -69,6 +69,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("resize"))
             {
                 ResizeShots(step);
+                return;
+            }
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("cheek"))
+            {
+                CheekShots(step);
                 return;
             }
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
@@ -281,6 +286,71 @@ namespace Ciel.EditorTools
                 }
             }
             if (_touchIndex >= TouchScript.Length && t > 5.5f) FinishUiShots();
+        }
+
+        // "cheek"：画面の右（モデルの左）のほっぺを、つつく → 離す（ぷるん）→ やさしく引く → 強く引く → 離す、の順に撮る。
+        // cheek-*.png と、各コマのパラメーターを cheek.txt に書く
+        static readonly (float t, string action)[] CheekScript =
+        {
+            (0.00f, "press"), (0.12f, "shot:cheek-poke"), (0.50f, "release"),
+            (0.53f, "shot:cheek-release-1"), (0.60f, "shot:cheek-release-2"), (0.70f, "shot:cheek-release-3"), (0.85f, "shot:cheek-release-4"),
+            (1.50f, "press"), (1.50f, "pull-gentle"), (2.40f, "shot:cheek-pull-gentle"),
+            (2.50f, "pull-hard"), (2.90f, "shot:cheek-pull-hard"), (3.00f, "release"),
+            (3.05f, "shot:cheek-pull-back-1"), (3.15f, "shot:cheek-pull-back-2"), (3.40f, "shot:cheek-pull-back-3"),
+        };
+        static string _cheekMode = "";
+
+        static void CheekShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var touch = Object.FindAnyObjectByType<Ciel.Conversation.CielTouch>();
+            var log = Path.Combine(OutDir, "cheek.txt");
+            if (step == 2)
+            {
+                if (now - _t0 < 2.0 || touch == null) return;
+                // L のほっぺとみなされる点の真ん中
+                var sum = Vector2.zero;
+                var n = 0;
+                for (int y = 0; y < Screen.height; y += 6)
+                    for (int x = 0; x < Screen.width; x += 6)
+                    {
+                        var p = new Vector2(x, y);
+                        if (touch.PartAt(p) == Ciel.Conversation.CielTouch.Part.Face && touch.CheekAt(p) == 1) { sum += p; n++; }
+                    }
+                if (n == 0) { File.AppendAllText(log, "no cheek point\n"); FinishUiShots(); return; }
+                _touchPoint = sum / n;
+                File.AppendAllText(log, $"screen={Screen.width}x{Screen.height} cheekL={_touchPoint} points={n}\n");
+                _touchIndex = 0;
+                _cheekMode = "";
+                Next(3);
+                return;
+            }
+            var t = (float)(now - _mark);
+            // 引っ張る：やさしく（0.9 秒かけて外・下へ画面の高さの 3%）、強く（0.3 秒で 9% へ）
+            var h = Screen.height;
+            if (_cheekMode == "pull-gentle")
+                touch.Drag(_touchPoint + new Vector2(0.03f, -0.015f) * h * Mathf.Clamp01((t - 1.5f) / 0.9f));
+            else if (_cheekMode == "pull-hard")
+                touch.Drag(_touchPoint + Vector2.Lerp(new Vector2(0.03f, -0.015f), new Vector2(0.09f, -0.04f), Mathf.Clamp01((t - 2.5f) / 0.3f)) * h);
+            while (_touchIndex < CheekScript.Length && t >= CheekScript[_touchIndex].t)
+            {
+                var a = CheekScript[_touchIndex++].action;
+                if (a == "press") { touch.Press(_touchPoint); File.AppendAllText(log, $"press part={touch.PartAt(_touchPoint)} cheek={touch.CheekAt(_touchPoint)}\n"); }
+                else if (a == "release") { _cheekMode = ""; touch.Release(); }
+                else if (a.StartsWith("pull-")) _cheekMode = a;
+                else if (a.StartsWith("shot:"))
+                {
+                    ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, a.Substring(5) + ".png"));
+                    var model = touch.GetComponent<Live2D.Cubism.Core.CubismModel>();
+                    var sb = new System.Text.StringBuilder($"{a.Substring(5)} t={t:0.00} last={touch.LastTouch}");
+                    foreach (var id in new[] { "ParamCielCheekPokeL", "ParamCielCheekJiggleL", "ParamCielCheekPullXL", "ParamCielCheekPullYL", "ParamCheek", "ParamEyeLOpen" })
+                        foreach (var p in model.Parameters) if (p.Id == id) sb.Append($" {id}={p.Value:0.00}");
+                    var expression = touch.GetComponent<Ciel.Conversation.CielExpression>();
+                    if (expression != null) sb.Append($" expression={expression.Current}");
+                    File.AppendAllText(log, sb + "\n");
+                }
+            }
+            if (_touchIndex >= CheekScript.Length && t > 4.5f) FinishUiShots();
         }
 
         // "speakerswitch connect"：会話につなぎ、シエルの声が流れているあいだに、声の出力を別の機器 → 既定へ切り替える。
