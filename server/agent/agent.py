@@ -64,6 +64,8 @@ EAGERNESS = os.environ.get('CIEL_EAGERNESS', 'medium')
 REASONING = os.environ.get('CIEL_REASONING', 'minimal')
 # 返事の声ができるまでの相づち（aizuchi.py）。0 で流さない
 AIZUCHI = VOICE == 'irodori' and os.environ.get('CIEL_AIZUCHI', '1') != '0'
+# 相手が長く話している途中の息つぎにも相づちを打つか（turns.py）。0 で打たない
+NOD = os.environ.get('CIEL_NOD', '1') != '0'
 # 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
 MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
                  minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]'}
@@ -176,6 +178,7 @@ async def entrypoint(ctx: JobContext) -> None:
         json.dumps(msg), reliable=True, topic='ciel.event'))
     replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
                                 agent.aizuchi if AIZUCHI else None)
+    replies.nod = NOD
     # おしゃべりのとき、しばらく静かなら自分から話しかける（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge)
     session.on('user_state_changed', talker.on_user_state)

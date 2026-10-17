@@ -26,6 +26,10 @@
   （generate_reply の instructions は、会話の指示の後ろに足される）。会話の指示の talk_quiet.md だけでは、呼ばれていない
   発言にも答えることが多く、一度答えると、続く人どうしの話も自分への返事と受け取って答え続けた（2026-10-16）。
 - 話者の識別が使えないとき（ECAPA の読み込み前・失敗、CIEL_VOICE が irodori 以外）は、[発言者] なしで作らせる。
+- 相づち（aizuchi.py）：返事を頼むときに 1 つ流す。相手が長く話している途中（会話モデルの側はまだ区切っていない）の
+  息つぎにも打つ（_watch_pauses）。話し始めて（前の相づちから）NOD_AFTER_SECONDS たち、直前の話し声より NOD_QUIET_DB
+  小さい音が NOD_PAUSE_SECONDS 続いたら。相づちのすぐあと（NOD_SKIP_SECONDS 以内）に話し終えたら、返事の前の相づちは流さない。
+  ひかえめのとき・シエルが話しているときは打たない。
 - 話しながらシエルに触れたとき（touch.py が知らせを持っている）は、その発言の [発言者：…] の後ろにタッチの 1 行を添える
   （その声の人が触ったと分かる）。ひかえめで呼ばれていなくても、触れられたら返事を作らせる。
 """
@@ -60,6 +64,11 @@ TAGS = re.compile(r'\[[a-z]+\]')
 # 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る
 SETTLE_SECONDS = 0.25
 SHORT_SETTLE_SECONDS = 0.35
+# 話している途中の相づち（_watch_pauses）
+NOD_AFTER_SECONDS = 3.0    # 話し始めて（前の相づちから）これだけたってから
+NOD_PAUSE_SECONDS = 0.4    # 息つぎ（小さな音）がこれだけ続いたら
+NOD_QUIET_DB = 20.0        # 直前 3 秒の話し声（大きいほうから 1 割の大きさ）より、これだけ小さければ息つぎ
+NOD_SKIP_SECONDS = 2.0     # 相づちからこれ以内に話し終えたら、返事の前の相づちは流さない
 # 大きな声（LOUD_DB 以上の 20 ms）がこれより短い発言は、物音かもしれないので文字起こしを待つ
 LOUD_DB = -40.0
 LOUD_SECONDS = 0.2
@@ -86,6 +95,9 @@ class TurnReplies:
         self._no_text: asyncio.TimerHandle | None = None
         self._early: asyncio.Task | None = None   # 区切りのあと、続きを見てから作らせる（ふつう・おしゃべり）
         self._await_text = False                  # 物音かもしれないので、文字起こしを待っている
+        self.nod = True                           # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
+        self._watch: asyncio.Task | None = None   # 話している途中の息つぎを見る
+        self._nod_at = 0.0                        # 最後に話の途中の相づちを打った時刻
         self._tasks: set[asyncio.Task] = set()
 
     async def load_encoder(self) -> None:
@@ -104,6 +116,8 @@ class TurnReplies:
                 self.backchannel.stop()
             if self._started_at is None:
                 self._started_at = ev.created_at
+            if self.backchannel is not None and self.nod and (self._watch is None or self._watch.done()):
+                self._watch = asyncio.create_task(self._watch_pauses())
         elif ev.new_state == 'listening' and ev.old_state == 'speaking':
             self._speaking = False
             self._ended_at = ev.created_at
@@ -150,6 +164,27 @@ class TurnReplies:
             self._reply_later(GRACE_SECONDS)
             return
         self._reply_now()
+
+    async def _watch_pauses(self) -> None:
+        """話している途中の息つぎを見つけて、相づちを打つ（会話モデルの側が区切るまで）"""
+        n = speakers.SR // 50
+        while self._speaking:
+            await asyncio.sleep(0.05)
+            now = time.time()
+            if (self.style.talk == 'quiet' or self.session.agent_state == 'speaking' or self._started_at is None
+                    or now - max(self._started_at, self._nod_at) < NOD_AFTER_SECONDS):
+                continue
+            raw = self.tap.window(now - 3.0, now)
+            frames = raw[: len(raw) // n * n].reshape(-1, n)
+            pause = int(NOD_PAUSE_SECONDS * 50)
+            if len(frames) < pause + 25:
+                continue
+            db = 20 * np.log10(np.sqrt((frames ** 2).mean(1)) + 1e-9)
+            talk = float(np.percentile(db[:-pause], 90))
+            # 息つぎの前の 0.5 秒に話し声があり、そのあと小さな音が続いている
+            if talk > -45 and db[-pause - 25:-pause].max() > talk - 6 and db[-pause:].max() < talk - NOD_QUIET_DB:
+                if self.backchannel.nod():
+                    self._nod_at = now
 
     def _settle(self) -> None:
         """ふつう・おしゃべり：区切りのあと、続きを話し始めないかを少し見てから作らせる"""
@@ -247,7 +282,8 @@ class TurnReplies:
     async def _reply(self, start: float, end: float, voice: tuple[float, asyncio.Future | None] | None = None) -> None:
         extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
         # 相づち（aizuchi.py）：ひかえめ（黙ると決めることがある）と短い発言には流さない
-        if self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS:
+        if (self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS
+                and not self.backchannel.played_within(NOD_SKIP_SECONDS)):
             latency.mark('相づち')
             self.backchannel.play()
         if self.book is None or self.encoder is None:

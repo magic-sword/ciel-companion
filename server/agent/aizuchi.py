@@ -21,6 +21,7 @@
   返事がその分（約 0.5 秒）遅れる。シエルの声のトラック（RoomIO の音声の出口）へ横から入れると、LiveKit の再生の管理と
   ぶつかり、何回か流すうちに返事の声が途中から届かなくなった（2026-10-17、bench_latency.py）。
   相手が話し始めたら止める（turns.py が stop() を呼ぶ）。
+- 相手が長く話している途中の息つぎにも、聞いたときの相づちを打つ（nod()。息つぎを見つけるのは turns.py）。
 - 相づちを流した返事は、最初の文の頭の同じような相づち（「うん、」「えっと、」）を外して読む（二重にならないように。emotion.py）。
 """
 import asyncio
@@ -136,20 +137,32 @@ class Backchannel:
             return
         self._task = asyncio.create_task(self._play())
 
-    async def _play(self) -> None:
-        try:
-            await asyncio.wait_for(self._heard.wait(), TEXT_WAIT_SECONDS)
-        except asyncio.TimeoutError:
-            pass
+    def nod(self) -> bool:
+        """話している途中の息つぎに、聞いたときの相づちを 1 つ流す（文字起こしは待たない）。流したら True"""
+        if self._source is None or not self._voices or (self._task is not None and not self._task.done()):
+            return False
+        self._task = asyncio.create_task(self._play(nod=True))
+        return True
+
+    def played_within(self, seconds: float) -> bool:
+        """相づちを流してから seconds 以内か"""
+        return self._played_at is not None and time.monotonic() - self._played_at < seconds
+
+    async def _play(self, nod: bool = False) -> None:
+        if not nod:
+            try:
+                await asyncio.wait_for(self._heard.wait(), TEXT_WAIT_SECONDS)
+            except asyncio.TimeoutError:
+                pass
         # 考えるときの相づちが無ければ、聞いたときの相づち
-        voices = self._think if self._question and self._think else self._voices
+        voices = self._think if self._question and self._think and not nod else self._voices
         choices = [k for k in voices if word(k) != self._last] or list(voices)
         if not choices:
             return
         key = random.choice(choices)
         self._last = word(key)
         self._played_at = time.monotonic()
-        log.info('相づち：%s', key)
+        log.info('相づち%s：%s', '（話の途中）' if nod else '', key)
         frames = voices[key]
 
         async def each():

@@ -9,6 +9,7 @@
 測るもの（発言ごと）：
   first … 話し終わり（声の最後のフレームを送った時刻）から、シエルの声（相づちを含む）が始まるまで
   segs  … シエルの声のかたまり（話し終わりからの始まりと終わりの秒。相づちのトラックの分も入る）
+  nods  … 話している途中に始まったシエルの声（話の途中の相づち。話し終わりからの秒なので負になる）
 必要な環境変数：LIVEKIT_URL・LIVEKIT_API_KEY・LIVEKIT_API_SECRET（.env）、CIEL_TTS_URL。
 """
 import argparse
@@ -35,7 +36,10 @@ LINES = [
     'えっとね、明日の予定なんだけど、午前中に買い物に行って、午後は家で映画を見ようと思ってるんだ。',
     'うん。',
     'シエルは何色が好き？',
+    # 途中で息つぎをしながら長く話す（話している途中の相づちを見る。部分のあいだに PAUSE_SECONDS の無音）
+    ['今日はね、朝から散歩に出かけたんだけど', '公園の桜がすごくきれいで', 'それで写真をたくさん撮ってきたんだ。'],
 ]
+PAUSE_SECONDS = 0.6
 ON = 0.01        # シエルの声とみなす大きさ（RMS、最大 1）
 OFF_SECONDS = 0.4   # これだけ静かなら、声のかたまりの終わり
 QUIET_SECONDS = 2.5  # シエルがこれだけ静かなら、話し終えたとみなして次を話す
@@ -114,7 +118,12 @@ async def main() -> None:
              .with_grants(api.VideoGrants(room_join=True, room=room_name)).to_jwt())
 
     async with aiohttp.ClientSession() as http:
-        voices = [await synth(http, t) for t in LINES]
+        voices = []
+        for line in LINES:
+            parts = [line] if isinstance(line, str) else line
+            gap = np.zeros(int(PAUSE_SECONDS * SR), '<i2')
+            pcms = [await synth(http, t) for t in parts]
+            voices.append(np.concatenate([x for p in pcms for x in (p, gap)][:-1]))
     room = rtc.Room()
     listener = Voices()
     tasks = []
@@ -144,9 +153,10 @@ async def main() -> None:
     pump_task = asyncio.create_task(pump())
 
     async def wait_reply(n_before: int, limit: float = 20) -> None:
-        """シエルが話し始め（limit 秒まで待つ）、話し終えて QUIET_SECONDS 静かになるまで待つ"""
+        """シエルが話し始め（limit 秒まで待つ）、話し終えて QUIET_SECONDS 静かになるまで待つ。
+        話している途中の相づち（t0 より前に始まった声）は数えない"""
         t0 = time.time()
-        while len(listener.segs) <= n_before and time.time() - t0 < limit:
+        while not [x for x in listener.segs[n_before:] if x[0] > t0 - 0.1] and time.time() - t0 < limit:
             await asyncio.sleep(0.05)
         while listener.quiet_for() < QUIET_SECONDS and time.time() - t0 < limit + 40:
             await asyncio.sleep(0.05)
@@ -154,8 +164,10 @@ async def main() -> None:
     await wait_reply(0)   # あいさつが終わるまで
     results = []
     for _ in range(args.rounds):
-        for text, pcm in zip(LINES, voices):
+        for line, pcm in zip(LINES, voices):
+            text = line if isinstance(line, str) else '…'.join(line)
             n_before = len(listener.segs)
+            t_start = time.time()
             print(f"{time.strftime('%H:%M:%S')} 話す：{text}", flush=True)
             pad = (-len(pcm)) % FRAME
             pcm = np.concatenate([pcm, np.zeros(pad, '<i2')])
@@ -165,9 +177,11 @@ async def main() -> None:
                 await asyncio.sleep(0.005)
             t_end = time.time()
             await wait_reply(n_before)
-            segs = [s for s in listener.segs[n_before:] if s[0] > t_end - 0.5]
+            nods = [s for s in listener.segs[n_before:] if t_start < s[0] <= t_end - 0.1]
+            segs = [s for s in listener.segs[n_before:] if s[0] > t_end - 0.1]
             first = segs[0][0] - t_end if segs else None
             r = {'text': text, 'first': None if first is None else round(first, 2),
+                 'nods': [round(a - t_end, 2) for a, _ in nods],
                  'segs': [[round(a - t_end, 2), round((b or a) - t_end, 2)] for a, b in segs]}
             results.append(r)
             print(json.dumps(r, ensure_ascii=False), flush=True)
