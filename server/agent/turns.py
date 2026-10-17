@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """発言が終わったら、返事を作らせる（会話モデルの自動の返事は止めてある。agent.py の make_model）。
 
-- 返事を作らせるのは、会話モデルの側（Realtime API の semantic_vad）が発言を区切り、その文字起こしが確定したとき。
-  そのときには、その発言の声が会話に入っているので、「[発言者：…]」の 1 行がその声の後ろに入り、返事がその発言に答える。
+- 返事を作らせるのは、会話モデルの側（Realtime API の semantic_vad）が発言を区切ったとき（speech_stopped。
+  そのときには、その発言の声が会話に入っているので、「[発言者：…]」の 1 行がその声の後ろに入り、返事がその発言に答える）。
+  - ふつう・おしゃべりのとき：文字起こしの確定を待たない。区切りから SETTLE_SECONDS（短い発言は SHORT_SETTLE_SECONDS）
+    だけ、続きを話し始めないかを見てから作らせる。その間に声の特徴を計算しておく。文字起こしを待つと 0.35 秒、
+    短い発言はさらに 0.6 秒遅れていた（2026-10-17、bench_latency.py）。大きな声がほとんど無い発言（物音かもしれない）だけは、
+    文字起こしを待ち、文字になったら作らせる。区切ったあとで続きを話し始めたら、作らせた返事は会話モデルの側が取り消し、
+    続きの区切りでもう一度作らせる。
+  - ひかえめのとき：呼ばれたかを文字起こしで見るので、文字起こしの確定を待つ（以下）。
   話し始め・話し終わり（user_state）だけを見て作らせると、LiveKit の手元の VAD（silero）が読点の 0.5 秒の間でも
   区切るので、発言の声が会話に入る前に返事を作らせてしまい、1 つ前の発言に答えていた（2026-10-16、合成した声の試験）。
 - 文字起こしが確定したときに、もう次を話し始めていたら（「シエル、……」の読点で区切られたとき）、まだ作らせず、
@@ -28,9 +34,11 @@ import logging
 import re
 import time
 
+import numpy as np
 from livekit.agents import AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
+import latency
 import speakers
 
 log = logging.getLogger('ciel-agent.turns')
@@ -48,16 +56,24 @@ CALL_WORDS = ('シエル', 'しえる', 'AI', 'ＡＩ', 'エーアイ')
 # ひかえめのとき、シエルが質問で終わる返事をしてから、その答えを待つ時間
 FOLLOW_SECONDS = 20.0
 TAGS = re.compile(r'\[[a-z]+\]')
+# ふつう・おしゃべりのとき、区切りのあと、続きを話し始めないかを見る時間（会話モデルの側は、読点の間で区切ったあと
+# 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る
+SETTLE_SECONDS = 0.25
+SHORT_SETTLE_SECONDS = 0.35
+# 大きな声（LOUD_DB 以上の 20 ms）がこれより短い発言は、物音かもしれないので文字起こしを待つ
+LOUD_DB = -40.0
+LOUD_SECONDS = 0.2
 
 
 class TurnReplies:
     def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, style,
-                 quiet_turn: str) -> None:
+                 quiet_turn: str, backchannel=None) -> None:
         self.session = session
         self.book = book
         self.tap = tap
         self.style = style            # mode.ConversationStyle（おしゃべり度・その場にいる人）
         self.quiet_turn = quiet_turn  # ひかえめのとき、返事ごとに添える念押し（config/prompts/talk_quiet_turn.md）
+        self.backchannel = backchannel   # 返事の頭の相づち（aizuchi.Backchannel。irodori のときだけ）
         self.encoder: speakers.Encoder | None = None
         self.touch = None             # touch.TouchReactions（話しながら触れたときの知らせ。agent.py がつなぐ）
         self._speaking = False
@@ -68,6 +84,8 @@ class TurnReplies:
         self._asked_at: float | None = None     # シエルが質問で終わる返事をした時刻
         self._later: asyncio.TimerHandle | None = None   # 待たせている返事を作らせる時計
         self._no_text: asyncio.TimerHandle | None = None
+        self._early: asyncio.Task | None = None   # 区切りのあと、続きを見てから作らせる（ふつう・おしゃべり）
+        self._await_text = False                  # 物音かもしれないので、文字起こしを待っている
         self._tasks: set[asyncio.Task] = set()
 
     async def load_encoder(self) -> None:
@@ -81,6 +99,9 @@ class TurnReplies:
         if ev.new_state == 'speaking':
             self._speaking = True
             self._cancel_later()
+            self._cancel_early()   # 続きを話し始めた。続きの区切りで、まとめて作らせる
+            if self.backchannel is not None:
+                self.backchannel.stop()
             if self._started_at is None:
                 self._started_at = ev.created_at
         elif ev.new_state == 'listening' and ev.old_state == 'speaking':
@@ -91,12 +112,30 @@ class TurnReplies:
 
     def on_transcribed(self, ev: UserInputTranscribedEvent) -> None:
         if not ev.is_final:
-            if not ev.transcript and self._no_text is None:
-                # 会話モデルの側が発言を区切った（LiveKit が空の途中経過で知らせる）。文字起こしの確定を待つ
+            if not ev.transcript:
+                # 会話モデルの側が発言を区切った（LiveKit が空の途中経過で知らせる）
+                latency.start()
                 self._cancel_later()
-                self._no_text = asyncio.get_running_loop().call_later(NO_TEXT_SECONDS, self._text_failed)
+                if self.backchannel is not None:
+                    self.backchannel.new_turn()
+                if self.style.talk != 'quiet':
+                    self._settle()
+                elif self._no_text is None:   # ひかえめ：文字起こしの確定を待つ
+                    self._no_text = asyncio.get_running_loop().call_later(NO_TEXT_SECONDS, self._text_failed)
             return
         self._cancel_no_text()
+        latency.mark('文字起こし')
+        if self.backchannel is not None and ev.transcript.strip():
+            self.backchannel.heard(ev.transcript)   # 質問なら、考えるときの相づちにする
+        if self.style.talk != 'quiet':
+            # ふつう・おしゃべり：返事は区切りで作らせている。物音かもしれず待っていた発言だけ、文字になったら作らせる
+            if self._await_text:
+                self._await_text = False
+                if ev.transcript.strip():
+                    self._reply_now()
+                else:
+                    self._forget()
+            return
         if not ev.transcript.strip():
             if not self._pending:
                 self._forget()   # 文字にならない音だった。返事は作らせない
@@ -111,6 +150,39 @@ class TurnReplies:
             self._reply_later(GRACE_SECONDS)
             return
         self._reply_now()
+
+    def _settle(self) -> None:
+        """ふつう・おしゃべり：区切りのあと、続きを話し始めないかを少し見てから作らせる"""
+        now = time.time()
+        start, end = self._started_at or now, self._ended_at or now
+        raw = self.tap.window(start - speakers.LEAD_SECONDS, end)
+        n = speakers.SR // 50
+        frames = raw[: len(raw) // n * n].reshape(-1, n)
+        loud = float((20 * np.log10(np.sqrt((frames ** 2).mean(1)) + 1e-9) > LOUD_DB).sum()) * 0.02 if len(frames) else 0.0
+        if loud < LOUD_SECONDS:
+            log.info('大きな声が %.2f 秒だけ。文字起こしを待つ', loud)
+            self._await_text = True
+            return
+        self._await_text = False
+        self._cancel_early()
+        settle = SHORT_SETTLE_SECONDS if end - start < SHORT_SECONDS else SETTLE_SECONDS
+        self._early = t = asyncio.create_task(self._settle_then_reply(start, end, settle))
+        self._tasks.add(t)
+        t.add_done_callback(self._tasks.discard)
+
+    async def _settle_then_reply(self, start: float, end: float, settle: float) -> None:
+        voice = self._embed(start, end)   # 待つあいだに、声の特徴を計算しておく
+        await asyncio.sleep(settle)
+        if self._speaking:
+            return
+        self._early = None
+        self._forget()
+        await self._reply(start, end, voice)
+
+    def _cancel_early(self) -> None:
+        if self._early is not None:
+            self._early.cancel()
+            self._early = None
 
     def _reply_later(self, seconds: float) -> None:
         self._cancel_later()
@@ -162,20 +234,32 @@ class TurnReplies:
             self._later.cancel()
             self._later = None
 
-    async def _reply(self, start: float, end: float) -> None:
+    def _embed(self, start: float, end: float) -> tuple[float, asyncio.Future | None]:
+        """その発言の声の長さと、声の特徴の計算（裏で始める。短すぎる・ECAPA が無いときは None）"""
+        if self.book is None or self.encoder is None:
+            return 0.0, None
+        audio = speakers.voiced(self.tap.window(start - speakers.LEAD_SECONDS, end))
+        seconds = len(audio) / speakers.SR
+        if seconds < speakers.MIN_VOICED:
+            return seconds, None
+        return seconds, asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
+
+    async def _reply(self, start: float, end: float, voice: tuple[float, asyncio.Future | None] | None = None) -> None:
         extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
+        # 相づち（aizuchi.py）：ひかえめ（黙ると決めることがある）と短い発言には流さない
+        if self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS:
+            latency.mark('相づち')
+            self.backchannel.play()
         if self.book is None or self.encoder is None:
             touch = self.touch.take() if self.touch is not None else None
             if touch is not None:
                 extra['user_input'] = touch
+            latency.mark('返事を頼んだ')
             self.session.generate_reply(**extra)
             return
         t0 = time.perf_counter()
-        audio = speakers.voiced(self.tap.window(start - speakers.LEAD_SECONDS, end))
-        seconds = len(audio) / speakers.SR
-        e = None
-        if seconds >= speakers.MIN_VOICED:
-            e = await asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
+        seconds, pending = voice if voice is not None else self._embed(start, end)
+        e = await pending if pending is not None else None
         presence = self.style.presence
         line = await self.book.identify(e, seconds, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
         self.style.on_voices(len(self.book.speakers))
@@ -187,4 +271,5 @@ class TurnReplies:
             line = (line + '\n' + touch) if line is not None else touch
         if line is not None:
             extra['user_input'] = line
+        latency.mark('返事を頼んだ')
         self.session.generate_reply(**extra)

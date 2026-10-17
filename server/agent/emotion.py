@@ -23,6 +23,7 @@ from livekit import rtc
 from livekit.agents import get_job_context
 
 import irodori_tts
+import latency
 
 log = logging.getLogger('ciel-agent.emotion')
 
@@ -114,8 +115,11 @@ def split_sentences(buf: str) -> tuple[list[str], str]:
     return out, buf[start:]
 
 
-async def synthesize(session: aiohttp.ClientSession, text: str, caption: str) -> tuple[bytes, int]:
-    async with session.post(irodori_tts.URL, json={'text': text, 'caption': caption},
+async def synthesize(session: aiohttp.ClientSession, text: str, caption: str,
+                     seconds: float | None = None) -> tuple[bytes, int]:
+    """読み上げる。seconds を渡すと、その長さの音声にする（省略すると Irodori-TTS が決める）"""
+    body = {'text': text, 'caption': caption} | ({} if seconds is None else {'seconds': seconds})
+    async with session.post(irodori_tts.URL, json=body,
                             timeout=aiohttp.ClientTimeout(total=30)) as r:
         r.raise_for_status()
         return await r.read(), int(r.headers.get('X-Sample-Rate', '48000'))
@@ -129,27 +133,37 @@ def frames(pcm: bytes, sr: int):
         yield rtc.AudioFrame(chunk.tobytes(), sr, 1, len(chunk))
 
 
-async def tts_node(text: AsyncIterable[str], events: ExpressionEvents):
-    """1 文ずつ：印を読み取り、その感情の声で読み上げ、声を流し始めるときに表情を送る。"""
+async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None):
+    """1 文ずつ：印を読み取り、その感情の声で読み上げ、声を流し始めるときに表情を送る。
+    すぐ前に相づち（aizuchi.py）を流していたら、最初の文の頭の相づちを外す。"""
     emotion = 'neutral'
     buf = ''
+    first = True
 
     async def speak(sentence: str):
-        nonlocal emotion
+        nonlocal emotion, first
         found, body = read_tags(sentence)
         emotion = found or emotion
+        if first and backchannel is not None and body:
+            body = backchannel.strip(body)
+        first = first and not body
         if not body:
             return
         t0 = time.perf_counter()
+        latency.mark('最初の文')
         pcm, sr = await synthesize(http, body, CAPTIONS[emotion])
+        latency.mark('最初の声')
         dur_ms = int(len(pcm) / 2 / sr * 1000)
         log.info('[%s] 合成 %.2f 秒：%s', emotion, time.perf_counter() - t0, body[:30])
+        if backchannel is not None:
+            await backchannel.wait()   # 相づちが鳴り終わってから話す
         await events.send(emotion, ttl_ms=dur_ms + 1500)
         for f in frames(pcm, sr):
             yield f
 
     async with aiohttp.ClientSession() as http:
         async for chunk in text:
+            latency.mark('最初の文字')
             buf += chunk
             done, buf = split_sentences(buf)
             for s in done:

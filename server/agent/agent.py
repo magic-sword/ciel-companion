@@ -26,8 +26,10 @@ from livekit import agents, rtc
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext
 from livekit.plugins import openai
 from openai.types.realtime.audio_transcription import AudioTranscription
+from openai.types.realtime.realtime_reasoning import RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
+import aizuchi
 import emotion
 import initiative
 import irodori_tts
@@ -47,7 +49,8 @@ load_dotenv()
 logger = logging.getLogger('ciel-agent')
 
 # 待機させておく子プロセスの数（既定は CPU の数 = 24 で多すぎる。会話は 1 人ずつなので 2 で足りる）
-server = AgentServer(num_idle_processes=2)
+# 状態確認の HTTP の口（既定 8081）。試験用の会話サーバーを同じマシンで動かすときは別の番号にする（bench_latency.py）
+server = AgentServer(num_idle_processes=2, port=int(os.environ.get('CIEL_AGENT_PORT', '8081')))
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
 # GPT-Live は聞きながら話す全二重なので、返事の作らせ方を変えない（話者の識別も使わない）
 REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
@@ -55,6 +58,12 @@ REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
 SPEAKERS = VOICE == 'irodori' and REALTIME
 # Realtime API の雑音除去（make_model）
 NOISE_REDUCTION = os.environ.get('CIEL_NOISE_REDUCTION', 'far_field')
+# 話し終わりの判定の早さ（semantic_vad の eagerness：low・medium・high・auto）
+EAGERNESS = os.environ.get('CIEL_EAGERNESS', 'medium')
+# 返事の前に考える量（minimal・low・medium・high。空ならモデルの既定）
+REASONING = os.environ.get('CIEL_REASONING', 'minimal')
+# 返事の声ができるまでの相づち（aizuchi.py）。0 で流さない
+AIZUCHI = VOICE == 'irodori' and os.environ.get('CIEL_AIZUCHI', '1') != '0'
 # 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
 MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
                  minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]'}
@@ -80,7 +89,9 @@ def make_model(names: list[str] | None = None):
         modalities=['text'] if VOICE == 'irodori' else ['text', 'audio'],
         # 話し終わりの判定と割り込みは今までどおり会話モデルの側（LiveKit の既定と同じ semantic_vad）。
         # 返事は自動で作らせず、turns.py が作らせる（多人数のとき、話者の 1 行を先に足すため）
-        turn_detection=SemanticVad(type='semantic_vad', eagerness='medium', create_response=False, interrupt_response=True),
+        turn_detection=SemanticVad(type='semantic_vad', eagerness=EAGERNESS, create_response=False, interrupt_response=True),
+        # 返事の前に考える量。既定のままだと毎回 70 トークンほど考えてから書き始め、0.6 秒ほど遅れた（2026-10-17）
+        reasoning=RealtimeReasoning(effort=REASONING) if REASONING else None,
         # 相手の発言の文字起こし：日本語と、シエル・覚えている人の名前をヒントにする
         input_audio_transcription=transcription(names or []),
         # 雑音除去（生活音で「話し始めた」と判定され、シエルの話が止まるのを減らす）。
@@ -97,6 +108,7 @@ class Ciel(Agent):
         super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS)
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
+        self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
 
     def instructions_for(self, talk: str, presence: str) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
@@ -123,7 +135,7 @@ class Ciel(Agent):
         # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）。
         # ひかえめのときに黙ると決めた返事（[silent]）は読み上げない（mode.py）
         if VOICE == 'irodori':
-            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events))
+            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi))
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
 
     def transcription_node(self, text, model_settings):
@@ -137,7 +149,8 @@ class Ciel(Agent):
         return self.volume.apply(Agent.default.realtime_audio_output_node(self, audio, model_settings))
 
 
-@server.rtc_session()
+# 名前を付けると、その名前で呼んだ部屋にだけ入る（試験用の会話サーバー。bench_latency.py）。本番は空のまま
+@server.rtc_session(agent_name=os.environ.get('CIEL_AGENT_NAME', ''))
 async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
     # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
@@ -161,7 +174,8 @@ async def entrypoint(ctx: JobContext) -> None:
     style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
     style.publish = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
         json.dumps(msg), reliable=True, topic='ciel.event'))
-    replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions)
+    replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
+                                agent.aizuchi if AIZUCHI else None)
     # おしゃべりのとき、しばらく静かなら自分から話しかける（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge)
     session.on('user_state_changed', talker.on_user_state)
@@ -226,6 +240,8 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', agent.volume.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)
     talker.start()
+    if AIZUCHI:
+        await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく
 
 
 if __name__ == '__main__':

@@ -6,6 +6,8 @@
 //       マイクを入れると、録音を始めて（初回はトラックを公開）、切ると録音を止めてトラックをミュートする。
 // 声の再生は端末の音声（PlatformAudio）が自動で行う。口パク用には同じトラックを Unity の AudioSource でも受け、
 // 音量だけ測って音は消す（二重に鳴らさない）。
+// 相づち（「うん。」など。server/agent/aizuchi.py）は、シエルの声とは別のトラック（ciel-aizuchi）で届く。
+// 同じように音量を測り、口パクは大きいほうに合わせる。
 // マイクの機器：PC は OS の一覧から選べる（既定は OS の既定のマイク）。スマホは OS が切り替えを管理するので選ばない。
 // 声を出す機器（スピーカー）も PC では選べる。「既定」は、Windows に OS の既定の機器を問い合わせて、その機器を選ぶ（WindowsDefaultAudio）。
 // 再生中は出力の機器を変えられないので、シエルの声の受信をいったん止めてから変え、受け直す（SwitchWhilePlaying）。
@@ -47,6 +49,7 @@ namespace Ciel.Conversation
         const string PresencePrefKey = "ciel.presence";
         const string SpeakerphonePrefKey = "ciel.speakerphone";
         const string VolumePrefKey = "ciel.voiceVolume";
+        const string AizuchiTrack = "ciel-aizuchi";   // 相づちのトラックの名前（server/agent/aizuchi.py の TRACK）
 
         [Tooltip("この文字を名前に含む「声の出力」は会議へつなぐ仮想オーディオケーブルとみなす（自動のとき多人数にする）")]
         [SerializeField] string[] _meetingOutputKeywords = { "CABLE", "VB-Audio", "Voicemeeter" };
@@ -59,6 +62,9 @@ namespace Ciel.Conversation
         RemoteTrackPublication _voicePublication;   // シエルの声（受け直すときに使う）
         bool _restartingPlayout;
         AgentVoiceMeter _meter;
+        AudioStream _aizuchiStream;   // 相づちのトラック（口パク用に音量を測る）
+        RemoteTrackPublication _aizuchiPublication;
+        AgentVoiceMeter _aizuchiMeter;
         bool _recording, _busy, _quitting, _micRestarting;
         string _micGuid;   // 選んだマイク。null は OS の既定
         string _speakerGuid;   // 選んだスピーカー。null は OS の既定
@@ -108,7 +114,8 @@ namespace Ciel.Conversation
         float _volumeSentAt = -1f;
 
         /// いまのシエルの声の大きさ（0〜1 くらい。画面の波形用）。声の大きさの設定に左右されない
-        public float VoiceLevel => _meter != null ? _meter.Level / Mathf.Max(VoiceVolume, 0.05f) : 0f;
+        public float VoiceLevel => Mathf.Max(_meter != null ? _meter.Level : 0f, _aizuchiMeter != null ? _aizuchiMeter.Level : 0f)
+                                   / Mathf.Max(VoiceVolume, 0.05f);
         bool IsMeetingOutput()
         {
             if (_speakerGuid == null) return false;
@@ -388,10 +395,10 @@ namespace Ciel.Conversation
             if (_platformAudio == null || Application.isMobilePlatform) return;
             var guid = _speakerGuid ?? DefaultDevice(WindowsDefaultAudio.Speaker(), SpeakerDevices);
             var name = SpeakerDevices.Find(m => m.guid == guid).name ?? "一覧の最初の機器";
-            if (_voicePublication != null && _voiceStream != null)
+            if ((_voicePublication != null && _voiceStream != null) || _aizuchiStream != null)
             {
                 _pendingSpeaker = (guid, name);   // 切り替えの途中で選び直したら、最後に選んだ機器にする
-                if (!_restartingPlayout) StartCoroutine(SwitchWhilePlaying(_voicePublication));
+                if (!_restartingPlayout) StartCoroutine(SwitchWhilePlaying(_voicePublication, _aizuchiPublication));
                 return;
             }
             TrySetSpeaker(guid, name, warn: true);
@@ -421,21 +428,23 @@ namespace Ciel.Conversation
 
         // Windows の端末の音声（WebRTC）は、再生しているあいだは出力の機器を変えられない（"Device not found" のエラーになる）。
         // シエルの声の受信をいったん止めて再生を止め、機器を変えてから受け直す（声が一瞬途切れる）
-        IEnumerator SwitchWhilePlaying(RemoteTrackPublication publication)
+        IEnumerator SwitchWhilePlaying(RemoteTrackPublication publication, RemoteTrackPublication aizuchi)
         {
             _restartingPlayout = true;
             Trace("スピーカーを変えるので、シエルの声の受信をいったん止める");
-            publication.SetSubscribed(false);
+            publication?.SetSubscribed(false);
+            aizuchi?.SetSubscribed(false);   // 相づちのトラックも鳴っていると、機器を変えられない
             // 受信が止まる（TrackUnsubscribed で _voiceStream が片付く）のを待つ。来なくても 2 秒で先へ進む
             var until = Time.realtimeSinceStartup + 2f;
-            while (_voiceStream != null && Time.realtimeSinceStartup < until) yield return null;
+            while ((_voiceStream != null || _aizuchiStream != null) && Time.realtimeSinceStartup < until) yield return null;
             // 再生が止まるまで少しかかることがあるので、1 秒のあいだ選び直す
             var ok = false;
             until = Time.realtimeSinceStartup + 1f;
             while (!(ok = TrySetSpeaker(_pendingSpeaker.guid, _pendingSpeaker.name, warn: false)) && Time.realtimeSinceStartup < until)
                 yield return null;
             if (!ok) TrySetSpeaker(_pendingSpeaker.guid, _pendingSpeaker.name, warn: true);
-            publication.SetSubscribed(true);   // 受け直す（OnTrackSubscribed で口パク用の受信も作り直す）
+            publication?.SetSubscribed(true);   // 受け直す（OnTrackSubscribed で口パク用の受信も作り直す）
+            aizuchi?.SetSubscribed(true);
             _restartingPlayout = false;
         }
 
@@ -538,17 +547,31 @@ namespace Ciel.Conversation
 
         void OnTrackSubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
-            if (!(track is RemoteAudioTrack audio) || _voiceStream != null) return;
+            if (!(track is RemoteAudioTrack audio)) return;
+            if (publication.Name == AizuchiTrack)
+            {
+                if (_aizuchiStream != null) return;
+                _aizuchiPublication = publication;
+                _aizuchiMeter = CreateMeter("CielAizuchiMeter", audio, out _aizuchiStream);
+                Debug.Log($"[CielConversation] {participant.Identity} の相づちを受信");
+                return;
+            }
+            if (_voiceStream != null) return;
             _voicePublication = publication;
-            // 口パク用：音量だけを測る AudioSource（音は AgentVoiceMeter が消す）
-            var go = new GameObject("CielVoiceMeter");
-            go.transform.SetParent(transform, false);
-            var source = go.AddComponent<AudioSource>();
-            _voiceStream = new AudioStream(audio, source);
-            _meter = go.AddComponent<AgentVoiceMeter>();   // AudioStream の後に付けて、届いた音を読む
+            _meter = CreateMeter("CielVoiceMeter", audio, out _voiceStream);
             Trace("声の受信を始めた");
             ApplySpeakerphone();
             Debug.Log($"[CielConversation] {participant.Identity} の声を受信");
+        }
+
+        // 口パク用：音量だけを測る AudioSource（音は AgentVoiceMeter が消す）
+        AgentVoiceMeter CreateMeter(string name, RemoteAudioTrack audio, out AudioStream stream)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            var source = go.AddComponent<AudioSource>();
+            stream = new AudioStream(audio, source);
+            return go.AddComponent<AgentVoiceMeter>();   // AudioStream の後に付けて、届いた音を読む
         }
 
         [Serializable]
@@ -623,7 +646,8 @@ namespace Ciel.Conversation
         void OnTrackUnsubscribed(IRemoteTrack track, RemoteTrackPublication publication, RemoteParticipant participant)
         {
             if (!(track is RemoteAudioTrack)) return;
-            DisposeVoice();
+            if (publication.Name == AizuchiTrack) DisposeAizuchi();
+            else DisposeVoice();
         }
 
         void DisposeVoice()
@@ -632,6 +656,14 @@ namespace Ciel.Conversation
             _voiceStream = null;
             if (_meter != null) Destroy(_meter.gameObject);
             _meter = null;
+        }
+
+        void DisposeAizuchi()
+        {
+            _aizuchiStream?.Dispose();
+            _aizuchiStream = null;
+            if (_aizuchiMeter != null) Destroy(_aizuchiMeter.gameObject);
+            _aizuchiMeter = null;
         }
 
         float _mouthValue;
@@ -650,6 +682,7 @@ namespace Ciel.Conversation
         public void EndConversation()
         {
             DisposeVoice();
+            DisposeAizuchi();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);
             _micTrack = null;
             StopRecording();

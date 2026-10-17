@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Irodori-TTS の読み上げサービス：会話サーバーから文を受け取り、シエルの声で読み上げた音声を返す。
 
-POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）"}
+POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）", "seconds": 0.6（省略可）}
+  seconds … 音声の長さ（秒）。省略すると Irodori-TTS が文から長さを決める。短い相づち（server/agent/aizuchi.py）は
+            決めさせると間延びする（「んー、」が 2 秒など）ので、長さを渡す
   → 200、本文 = PCM（int16、リトルエンディアン、モノラル）、ヘッダー X-Sample-Rate
 GPU は 1 つなので、合成は 1 つのスレッドで 1 文ずつ順に行う。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
 参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込む。
@@ -44,13 +46,16 @@ RT = InferenceRuntime.from_key(RuntimeKey(
 WORKER = ThreadPoolExecutor(max_workers=1)
 
 
-def synthesize(text: str, caption: str | None):
-    return WORKER.submit(_synthesize, text, caption).result()
+def synthesize(text: str, caption: str | None, seconds: float | None = None):
+    return WORKER.submit(_synthesize, text, caption, seconds).result()
 
 
-def _synthesize(text: str, caption: str | None):
+def _synthesize(text: str, caption: str | None, seconds: float | None = None):
     t = time.perf_counter()
-    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_wavs=REFS, num_steps=STEPS), log_fn=None)
+    # 長さを渡すときは、下限（既定 0.5 秒）もそれに合わせて下げる
+    length = {} if seconds is None else {'seconds': seconds, 'min_seconds': min(0.5, seconds)}
+    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_wavs=REFS, num_steps=STEPS, **length),
+                      log_fn=None)
     audio = r.audio.squeeze().float().cpu().numpy()
     dt = time.perf_counter() - t
     log.info('合成 %.2f 秒 / 音声 %.2f 秒：%s', dt, len(audio) / r.sample_rate, text[:30])
@@ -68,8 +73,16 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             self.send_error(400, 'text is empty')
             return
+        seconds = body.get('seconds')
         try:
-            pcm, sr = synthesize(text, body.get('caption'))
+            seconds = None if seconds is None else float(seconds)
+            if seconds is not None and not 0.1 <= seconds <= 30:
+                raise ValueError
+        except (TypeError, ValueError):
+            self.send_error(400, 'seconds must be 0.1-30')
+            return
+        try:
+            pcm, sr = synthesize(text, body.get('caption'), seconds)
         except Exception as e:   # 1 文の失敗でサービスを止めない
             log.exception('合成に失敗')
             self.send_error(500, str(e)[:200])
