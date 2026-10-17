@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import cubism_core as cc  # noqa: E402
+import official  # noqa: E402
 
 spec = importlib.util.spec_from_file_location('render_moc', HERE.parent / 'render-moc.py')
 rm = importlib.util.module_from_spec(spec)
@@ -55,6 +56,7 @@ def frame(model, tex, params):
 
 
 def check():
+    official.require_current_export(DRAFT/'Ciel.model3.json')
     old, new = cc.Model(str(RUNTIME/'Ciel.model3.json')), cc.Model(str(DRAFT/'Ciel.model3.json'))
     ot, nt = rm.load_textures(old), rm.load_textures(new)
     old.update(); new.update()
@@ -84,6 +86,7 @@ def check():
 
 
 def adopt():
+    official.require_current_lineage(EDITED)
     assert read(PROOF/'runtime-verification.json')['moc_sha256'] == sha(DRAFT/'Ciel.moc3'), 'run --check first'
     approved = read(CURRENT/'approved.json')
     previous = approved['rig_sha256']

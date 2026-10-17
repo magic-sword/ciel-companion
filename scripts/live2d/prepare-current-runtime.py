@@ -10,6 +10,7 @@ def safe(base,name):
     return p
 def main():
     source=Path(sys.argv[1]).resolve();out=ROOT/'assets/ciel/runtime'
+    import official;official.require_current_export(source/'Ciel.model3.json')   # 古いモデルからの書き出しなら止める
     approved=json.loads((ROOT/'assets/ciel/current/approved.json').read_text())
     assert sha(ROOT/approved['rig'])==approved['rig_sha256'],'Rig changed since approval'
     proof=ROOT/approved['latest_proofs']

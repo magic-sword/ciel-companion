@@ -20,6 +20,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import cmo3_tool as t
+import official
 
 
 def module(name, path):
@@ -59,6 +60,7 @@ def invert_bilinear(g, p):
 
 def main():
     src, dst = sys.argv[1:3]
+    official.require_current_lineage(src)   # Cubism で保存し直した作業モデルも、最新の正式モデルから作ったもの
     doc = t.Cmo3(src)
     for name, bbox in BBOX.items():
         doc.crop_quad_mesh(name, bbox, margin=4)

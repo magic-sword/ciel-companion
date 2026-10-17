@@ -12,7 +12,7 @@ Git には**今使っている素材とモデルだけ**を置く。2026-10-17 �
 | 承認済みの元の絵 | `master/ciel-upper-body-2x.png` |
 | 表情・姿勢の見本（ユーザー提供） | `reference/` |
 
-新しい部品や表情を作るときは、必ず `rig/ciel.cmo3`（`approved.json` の `rig_sha256` と一致するもの）から始め、採用したら `current/`・`rig/`・`runtime/`・`rig/proofs/current/` を置き換える。版ごとのフォルダは Git に増やさない。
+新しい部品や表情を作るときは、必ず `rig/ciel.cmo3`（`approved.json` の `rig_sha256` と一致するもの）から始め（`python -I scripts/live2d/official.py <モデル>` で確かめられる。手順はスキル `.claude/skills/ciel-live2d-update/`）、採用したら `current/`・`rig/`・`runtime/`・`rig/proofs/current/` を置き換える。版ごとのフォルダは Git に増やさない。
 
 過去の版（生成原本 `generated/vNN`、版ごとの確認図、候補モデル、版ごとの作業スクリプト）は Git に残さない。必要なら Git の履歴（タグ `archive/pre-history-cleanup` 以前）か、ローカルの `.local/history/` を見る。作業中のモデル・PSD・書き出しは `.local/` に置く。
 PSD・XCFは`current/layers.json`から再構築でき、`psd/`に置く（Git管理外）。

@@ -29,6 +29,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import cmo3_tool as t
+import official
 import cubism_core as cc
 import cheek_squish as cs
 
@@ -108,6 +109,7 @@ def bilinear(g, uv):
 
 def main():
     src, model_path, dst = sys.argv[1:4]
+    official.require_official_rig(src)   # 最初の入力は、最新の正式モデルそのもの
     doc = t.Cmo3(src)
     A = local_to_canvas(doc, model_path)
     to_canvas = lambda p: np.c_[p, np.ones(len(p))] @ A
