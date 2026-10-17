@@ -8,7 +8,7 @@
 - 頬の赤み（ParamCheek）：押すと少し上がり、ゆっくり戻る
 - 押された側の目を少し細める（ParamEyeLOpen を少し閉じる。笑い目 ParamEyeLSmile の途中の値は、目が二重に見えた）
 
-実行  python -I scripts/live2d/v64/preview_poke.py 正式モデル.cmo3 書き出したモデル.model3.json 出力の名前（.gif と -strip.png） [--shade 0.3] [--variant A]
+実行  python -I scripts/live2d/v64/preview_poke.py 正式モデル.cmo3 書き出したモデル.model3.json 出力の名前（.gif と -strip.png） [--shade 0.3]
 """
 import importlib.util
 import sys
@@ -48,11 +48,11 @@ def timeline():
 def main():
     cmo3_path, model_path, out = sys.argv[1:4]
     arg = lambda k, d: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d
-    shade, variant = float(arg('--shade', 0.3)), arg('--variant', 'A')
+    shade = float(arg('--shade', 0.3))
     names = pv.members(cmo3_path)
     model = cc.Model(model_path)
     tex = pv.rm.load_textures(model)
-    layer = Image.open(ROOT / f'assets/ciel/generated/v64/Cheek_Dimple_L_{variant}.png').convert('RGBA')
+    layer = Image.open(ROOT / 'assets/ciel/current/layers/Cheek_Dimple_L.png').convert('RGBA')   # 採用した A 案
     layer = layer.crop(CROP).resize((int((CROP[2] - CROP[0]) * SCALE), int((CROP[3] - CROP[1]) * SCALE)), Image.LANCZOS)
     frames = []
     for poke, blush, squint in timeline():

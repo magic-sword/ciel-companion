@@ -6,7 +6,7 @@
 
 今回は画像生成・画像加工・新しい確認図の作成・リグの変更はしていない。既存画像の表示、資料とコードの読解、Python による読み取り専用の寸法・画素検査を行い、この報告だけを書いた。以下の成果物・調整・生成は、すべて**次回以降の提案**である。
 
-確認した主な資料は、[承認済みの2倍原画](../assets/ciel/master/ciel-upper-body-2x.png)、[1倍原画](../assets/ciel/generated/upper-body-1x.png)、v8 の[全体比較](../assets/ciel/layers/v8/_check.png)・[頭部比較](../assets/ciel/layers/v8/_check-head.png)・[分解図](../assets/ciel/layers/v8/_exploded.png)。さらに、顔・髪・目・首・胴・首輪の主要原本と枠、[frames.json](../assets/ciel/generated/v8/frames.json)、[生成報告](../assets/ciel/generated/v8/parts/report.md)・[修正生成報告](../assets/ciel/generated/v8/parts/report-fix.md)の所見と関連指示文、[組み立てコード](../scripts/live2d/assemble-v8.py)を確認した。全代替候補の全画素を検査したわけではない。
+確認した主な資料は、[承認済みの2倍原画](../assets/ciel/master/ciel-upper-body-2x.png)、1倍原画（ローカル履歴 `.local/history/assets/ciel/generated/upper-body-1x.png`）、v8 の[全体比較](../assets/ciel/layers/v8/_check.png)・[頭部比較](../assets/ciel/layers/v8/_check-head.png)・[分解図](../assets/ciel/layers/v8/_exploded.png)。さらに、顔・髪・目・首・胴・首輪の主要原本と枠、frames.json（ローカル履歴 `.local/history/assets/ciel/generated/v8/frames.json`）、生成報告（ローカル履歴 `.local/history/assets/ciel/generated/v8/parts/report.md`）・修正生成報告（ローカル履歴 `.local/history/assets/ciel/generated/v8/parts/report-fix.md`）の所見と関連指示文、[組み立てコード](../scripts/live2d/assemble-v8.py)を確認した。全代替候補の全画素を検査したわけではない。
 
 設計上の根拠は、[公式サンプルの解析](ciel-live2d-reference-rig-analysis-ja.md)、[再計画（特に8.1・8.2）](ciel-live2d-rebuild-analysis-plan-ja.md)、[リグ設計](ciel-live2d-rig-design-ja.md)、[キャラクター設計の要点](ciel-design-constraints-for-parts-ja.md)。サンプルの実物の再解析、v8 の Cubism・Unity での動作確認は**未確認**。資料にある過去の実測は、今回自分で再測定した値と区別する。
 

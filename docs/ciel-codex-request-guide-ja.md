@@ -36,8 +36,8 @@
 7. 採用した素材だけを現行素材へ反映する。同じ役割の旧素材・旧アートメッシュを
    重複させない。他の表情で必要な共通素材と、検証履歴・バックアップは区別する。
 
-実例：[v30の輪郭付き一体抽出](../assets/ciel/generated/v30/report.md)、
-[v31の画像編集による分離・差し替え合成](../assets/ciel/generated/v31/report.md)。
+実例：v30の輪郭付き一体抽出（ローカル履歴 `.local/history/assets/ciel/generated/v30/report.md`）、
+v31の画像編集による分離・差し替え合成（ローカル履歴 `.local/history/assets/ciel/generated/v31/report.md`）。
 v31の目・口・赤みには見本との差が残るが、ユーザーから「これまでと比べると良さそう」と評価された。
 
 一体抽出した素材をすべて差し替える必要はない。まばたき・目線・口パクが既にある場合は、

@@ -29,7 +29,7 @@ WORK = ROOT/'.local/cheek-integration'
 DRAFT = WORK/'draft/runtime'
 EDITED = WORK/'cheek-fixed.cmo3'
 CURRENT = ROOT/'assets/ciel/current'
-PROOF = ROOT/'assets/ciel/rig/proofs/cheek-v64'
+PROOF = ROOT/'assets/ciel/rig/proofs/current'
 RIG = ROOT/'assets/ciel/rig/ciel.cmo3'
 RUNTIME = ROOT/'assets/ciel/runtime'
 NEW_LAYERS = {'Cheek_Dimple_L': 'Cheek_Dimple_L_A.png', 'Cheek_Dimple_R': 'Cheek_Dimple_R_A.png'}
@@ -91,7 +91,7 @@ def adopt():
     doc = read(CURRENT/'layers.json')
     for name, file in NEW_LAYERS.items():
         dst = CURRENT/'layers'/(name+'.png')
-        shutil.copy2(ROOT/'assets/ciel/generated/v64'/file, dst)
+        shutil.copy2(ROOT/'.local/history/assets/ciel/generated/v64'/file, dst)   # Codex の原本は Git 外（採用済み）
         doc['layers'] = [e for e in doc['layers'] if e['name'] != name]
         doc['layers'].append({'name': name, 'path': dst.relative_to(ROOT).as_posix(), 'visible': False,
                               'canvas': [2172, 2896], 'offset': [414, 0]})

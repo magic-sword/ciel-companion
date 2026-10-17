@@ -18,7 +18,7 @@ FACE_W = 723.0                     # Face_Skin の横幅
 OUTWARD = {'L': np.array([1.0, 0.0]), 'R': np.array([-1.0, 0.0])}   # 顔の外向き
 DOWN = np.array([0.0, 1.0])
 
-# くぼみの中心（Codex が描いたくぼみの影の中心。assets/ciel/generated/v64/report.md）と、押しのける範囲・量
+# くぼみの中心（Codex が描いたくぼみの影の中心。現行素材 Cheek_Dimple_{L,R}.png）と、押しのける範囲・量
 DIMPLE = {'L': np.array([1304.0, 1236.0]), 'R': np.array([912.0, 1236.0])}
 DIMPLE_R = 0.085
 DIMPLE_PUSH = 0.012

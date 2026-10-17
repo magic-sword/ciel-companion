@@ -57,20 +57,20 @@ stroke は始まり（start）と終わり（end）、tap・hold は離したと
 
 輪の画像 `touch_ring.png`（小さく表示しても線がかすれない太さ）と六角形の輪の画像 `hex_ring.png` は、`scripts/ui/make_ui_sprites.py` が作る。
 共感の琥珀色は、会話の画面の琥珀色（#FFC46B）のままだと白い髪の上で見えなかったため、少し深い #F0A845 にした。軌跡の下にも薄い紺のにじみを敷く。
-[状態ごとの表示](../assets/ciel/rig/proofs/touch/visual-states.png)：左から、触れ始め・長く触れる・撫で始め・撫で続ける・ほっぺをつつく・胸に触れる。[頭を撫でているときの画面全体](../assets/ciel/rig/proofs/touch/visual-stroke.png)。
+[状態ごとの表示](../assets/ciel/rig/proofs/current/touch/visual-states.png)：左から、触れ始め・長く触れる・撫で始め・撫で続ける・ほっぺをつつく・胸に触れる。[頭を撫でているときの画面全体](../assets/ciel/rig/proofs/current/touch/visual-stroke.png)。
 好意を示すハートなどの飾りは描かず、シエルの体の反応で見せる。胸のプリズムを撫でている間に光らせる案は、後で検討する。
 
 ## 当たり判定の範囲
 
 部品のメッシュは絵より大きく、透明な余白を含む。横髪のメッシュは顔と肩の上まで広がっているため、メッシュの形だけで判定すると、ほっぺや肩に触れても髪になっていた（2026-10-15 のユーザーの確認）。
 現在は、メッシュに当たった点の UV からアトラスの不透明度を調べ、不透明度 0.5 以上の部品だけを数える。アトラスは CPU から読めない設定のため、初回の判定時に GPU で 1024×1024 に縮小コピーし、不透明度だけを持つ（1 枚 1MB）。
-[部位ごとの判定の範囲](../assets/ciel/rig/proofs/touch/hit-areas.png)：赤＝頭、橙＝耳、桃＝ほっぺ・顔、青＝髪、緑＝肩、黄＝手・腕、色なし＝反応しない。
+[部位ごとの判定の範囲](../assets/ciel/rig/proofs/current/touch/hit-areas.png)：赤＝頭、橙＝耳、桃＝ほっぺ・顔、青＝髪、緑＝肩、黄＝手・腕、色なし＝反応しない。
 確認用の画像は `CielTouchCheck.RunMap` で作れる。
 
 ## 確認
 
-- Unity：`CielTouchCheck.Run`（`-batchmode` なしで Unity.exe から実行）が会話シーンを再生し、7 通りの触れ方の判定・知らせの内容・体の反応を確かめる。[反応の一覧](../assets/ciel/rig/proofs/touch/reactions.png)、[記録](../assets/ciel/rig/proofs/touch/verification.txt)。赤い丸が触れた点。
-- 触れている点の表示：`.local/render-check/playmode-request` に `touch` と書いて Unity.exe を起動すると（`CielPlayModeShot`）、縦長の画面で触れ始め・長く触れる・頭を撫でる・ほっぺをつつく・胸に触れる、の順に再現して撮る（`.local/render-check/touch-*.png`）。[記録](../assets/ciel/rig/proofs/touch/visual-verification.txt)。
+- Unity：`CielTouchCheck.Run`（`-batchmode` なしで Unity.exe から実行）が会話シーンを再生し、7 通りの触れ方の判定・知らせの内容・体の反応を確かめる。[反応の一覧](../assets/ciel/rig/proofs/current/touch/reactions.png)、[記録](../assets/ciel/rig/proofs/current/touch/verification.txt)。赤い丸が触れた点。
+- 触れている点の表示：`.local/render-check/playmode-request` に `touch` と書いて Unity.exe を起動すると（`CielPlayModeShot`）、縦長の画面で触れ始め・長く触れる・頭を撫でる・ほっぺをつつく・胸に触れる、の順に再現して撮る（`.local/render-check/touch-*.png`）。[記録](../assets/ciel/rig/proofs/current/touch/visual-verification.txt)。
 - 会話サーバー：偽の会話で、知らせの文面、返事をしない条件（話し中・間隔）、撫で終わりでの返事、不正なメッセージの無視を確かめた。`touch.py` を含めて `agent.py` を読み込めることも確認した。
 - 未確認：実際の会話での声の反応の自然さ。会話モデルが知らせの文面を読み上げないか、反応が単調にならないかは、実際に触れて確かめる。
 - 今の会話シーンの映し方では手が画面の下に切れているため、手には触れられない。

@@ -12,7 +12,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[3]
 WORK = ROOT / '.local/cheek-integration'
-LAYERS = {'Cheek_Dimple_L': 'Cheek_Dimple_L_A.png', 'Cheek_Dimple_R': 'Cheek_Dimple_R_A.png'}
+LAYERS = {'Cheek_Dimple_L': 'Cheek_Dimple_L.png', 'Cheek_Dimple_R': 'Cheek_Dimple_R.png'}
 
 
 def u16(n): return struct.pack('>H', n)
@@ -24,7 +24,7 @@ def main():
     records, channels = [], []
     canvas = Image.new('RGBA', (2172, 2896))
     for name, file in LAYERS.items():
-        im = Image.open(ROOT / 'assets/ciel/generated/v64' / file).convert('RGBA')
+        im = Image.open(ROOT / 'assets/ciel/current/layers' / file).convert('RGBA')
         assert im.size == canvas.size, (file, im.size)
         canvas.alpha_composite(im)
         w, h = im.size

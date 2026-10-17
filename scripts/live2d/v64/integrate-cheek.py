@@ -40,7 +40,7 @@ def module(name, path):
     return m
 
 
-lib = module('integration', HERE.parent / 'integrate-expressions.py')
+import cmo3_editor as lib  # noqa: E402
 named, array = lib.named, lib.array
 
 BLUSH = {'Cheek_Blush': 471, 'Cheek_Happy': 471, 'Cheek_Relaxed': 472, 'Cheek_Embarrassed': 473, 'Cheek_Excited': 474}

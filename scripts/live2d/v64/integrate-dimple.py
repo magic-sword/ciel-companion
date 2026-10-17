@@ -29,7 +29,7 @@ def module(name, path):
     return m
 
 
-lib = module('integration', HERE.parent / 'integrate-expressions.py')
+import cmo3_editor as lib  # noqa: E402
 cheek = module('integrate_cheek', HERE / 'integrate-cheek.py')
 named, array = lib.named, lib.array
 

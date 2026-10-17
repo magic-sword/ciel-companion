@@ -45,11 +45,9 @@
 *.can3.bak
 __pycache__/
 
-# Rebuildable intermediate composites and per-attempt QA grids.
-# Keep generation originals, accepted layers, placement and main comparison proofs.
-/assets/ciel/generated/v23/assembled/
-/assets/ciel/generated/v23/qa/
-/assets/ciel/generated/v24/qa/
+# 素材の生成原本・版ごとの候補や確認図は Git に置かない（現行だけを assets/ciel/current・rig・runtime に置く）。
+# 過去の版はローカルの .local/history/ と Git の履歴（タグ archive/pre-history-cleanup）にある。
+/assets/ciel/generated/
 /unity/.utmp/
 
 # 会話サーバーが自宅サーバーで書くもの（議事録の下書きなど）

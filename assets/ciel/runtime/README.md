@@ -1,8 +1,6 @@
 # シエルの確定版SDKパッケージ
 
-2026-10-17にほっぺv64を追加。現行115素材、SDK20ファイル、通常を含む11表情、4096pxアトラス2枚・尻尾用2048px・くぼみの影用256pxのアトラス各1枚。2026-10-16に尻尾v63を追加。正式編集モデルは `../rig/ciel.cmo3`、現行素材は `../current/layers.json`。
-
-身体を首輪の中央へ合わせ、上着の内側と表側で明るさを分担した。着脱と手3種の切り替えを確認し、既存の頭部・表情・髪の物理・うなずきを維持した。[採用・検証](../rig/proofs/body-outfit-v60/README.md)。
+現行115素材、SDK20ファイル、通常を含む11表情、4096pxアトラス2枚・尻尾用2048px・くぼみの影用256pxのアトラス各1枚（2026-10-17）。正式編集モデルは `../rig/ciel.cmo3`、現行素材は `../current/layers.json`、確認図は `../rig/proofs/current/`。
 
 `manifest.json` に正式モデル・全素材・SDK全ファイルのSHA-256を記録する。Unityの `Assets/Characters/Ciel/runtime-manifest.json` と一致する。`CIEL > Model > Validate Current Package` で検証し、次回更新時は `CIEL > Model > Apply Current Package` を使う。既存の.metaとシーン参照を引き継ぎ、更新前は `.local/unity-model-update/` に退避する。
 
@@ -12,5 +10,5 @@
 
 ほっぺは `ParamCielCheekPoke/PullX/PullY/Jiggle{L,R}`。揺れ（Jiggle）は物理演算の6・7番目のグループ `PhysicsSettingCielCheekL/R` の出力。
 
-再検証: `python -B scripts/live2d/v64/adopt-cheek.py`。
+再検証: `python -B scripts/live2d/v64/adopt-cheek.py`。Unity への反映は、Unity を閉じた状態で `Unity.exe -batchmode -quit -projectPath unity -executeMethod Ciel.EditorTools.CielModelUpdate.ApplyCurrent` でもできる。
 再書き出し時はCubismで正式モデルを保存し、SDKを検証・採用してから `prepare-current-runtime.py <書き出しフォルダ>` を使う。モデルや素材のハッシュが異なる場合は更新を止める。
