@@ -20,6 +20,8 @@
   （generate_reply の instructions は、会話の指示の後ろに足される）。会話の指示の talk_quiet.md だけでは、呼ばれていない
   発言にも答えることが多く、一度答えると、続く人どうしの話も自分への返事と受け取って答え続けた（2026-10-16）。
 - 話者の識別が使えないとき（ECAPA の読み込み前・失敗、CIEL_VOICE が irodori 以外）は、[発言者] なしで作らせる。
+- 話しながらシエルに触れたとき（touch.py が知らせを持っている）は、その発言の [発言者：…] の後ろにタッチの 1 行を添える
+  （その声の人が触ったと分かる）。ひかえめで呼ばれていなくても、触れられたら返事を作らせる。
 """
 import asyncio
 import logging
@@ -57,6 +59,7 @@ class TurnReplies:
         self.style = style            # mode.ConversationStyle（おしゃべり度・その場にいる人）
         self.quiet_turn = quiet_turn  # ひかえめのとき、返事ごとに添える念押し（config/prompts/talk_quiet_turn.md）
         self.encoder: speakers.Encoder | None = None
+        self.touch = None             # touch.TouchReactions（話しながら触れたときの知らせ。agent.py がつなぐ）
         self._speaking = False
         self._started_at: float | None = None   # まだ返事を作らせていない発言の、最初の話し始め
         self._ended_at: float | None = None     # その最後の話し終わり
@@ -140,7 +143,8 @@ class TurnReplies:
         self._cancel_later()
         start, end, text = self._started_at, self._ended_at, ''.join(self._texts)
         self._forget()
-        if self.style.talk == 'quiet' and not self._called(text):
+        touched = self.touch is not None and self.touch.pending is not None
+        if self.style.talk == 'quiet' and not self._called(text) and not touched:
             log.info('ひかえめ：呼ばれていないので、返事を作らせない')
             return
         now = time.time()
@@ -161,6 +165,9 @@ class TurnReplies:
     async def _reply(self, start: float, end: float) -> None:
         extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
         if self.book is None or self.encoder is None:
+            touch = self.touch.take() if self.touch is not None else None
+            if touch is not None:
+                extra['user_input'] = touch
             self.session.generate_reply(**extra)
             return
         t0 = time.perf_counter()
@@ -172,7 +179,12 @@ class TurnReplies:
         presence = self.style.presence
         line = await self.book.identify(e, seconds, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
         self.style.on_voices(len(self.book.speakers))
+        if self.book.last is not None:
+            self.book.last_at = time.monotonic()   # 最後に話した人を、触った人とみなせる時間（touch.py）
         log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, seconds)
+        touch = self.touch.take() if self.touch is not None else None
+        if touch is not None:
+            line = (line + '\n' + touch) if line is not None else touch
         if line is not None:
             extra['user_input'] = line
         self.session.generate_reply(**extra)

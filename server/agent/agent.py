@@ -213,8 +213,11 @@ async def entrypoint(ctx: JobContext) -> None:
                 if os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live' else 'n/a', VOICE)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
-    # Unity で相手がシエルに触れたら、反応を話す（touch.py）
-    ctx.room.on('data_received', touch.TouchReactions(session).on_data)
+    # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
+    toucher = touch.TouchReactions(session, book, style)
+    replies.touch = toucher
+    session.on('user_state_changed', toucher.on_user_state)
+    ctx.room.on('data_received', toucher.on_data)
     # 会話のしかたの切り替え（mode.py。Unity が知らせる）
     ctx.room.on('data_received', style.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）

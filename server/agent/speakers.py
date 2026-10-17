@@ -169,6 +169,7 @@ class SpeakerBook:
         self.known: list[Known] = []
         self.speakers: list[SessionSpeaker] = []
         self.last: SessionSpeaker | None = None
+        self.last_at = -1e9   # 最後に話した人が話した時刻（time.monotonic。turns.py が付ける。touch.py が使う）
         self._unknown_count = 0
         self._adapted = 0
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
