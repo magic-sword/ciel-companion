@@ -12,7 +12,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [talk_quiet_turn.md](config/prompts/talk_quiet_turn.md) | ひかえめのとき、返事を作らせるたびに添える短い念押し。処理は `turns.py` |
 | [talk_chatty.md](config/prompts/talk_chatty.md)・[talk_chatty_nudge.md](config/prompts/talk_chatty_nudge.md) | おしゃべり度「おしゃべり」で、自分から話しかけるときの決まりと、しばらく静かなときに渡す合図。処理は `initiative.py` |
 | [presence_solo.md](config/prompts/presence_solo.md)・[presence_close.md](config/prompts/presence_close.md)・[presence_public.md](config/prompts/presence_public.md) | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
-| [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前を聞く・同意を取る流れ、人についての道具（`tools/people.py`）の使い方 |
+| [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前の一時設定・同意後の永続保存、`get_speaker_status` による本人の保存確認、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
 | [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/decisions/conversation-history-ja.md) |
 | [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/decisions/meeting-minutes-ja.md) |

@@ -149,6 +149,24 @@ class Store:
         row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()
         return row[0]
 
+    async def remember_person(self, name: str, embeddings: list[np.ndarray], person_id: int | None = None) -> int:
+        """名前・声・同意を一括保存する。途中の失敗で半端な登録を残さない。"""
+        async with self.conn.transaction():
+            if person_id is None:
+                person_id = await self.add_person(name)
+            else:
+                await self.rename(person_id, name)
+            await self.add_voiceprints(person_id, embeddings, None)
+            await self.set_notes_consent(person_id)
+        return person_id
+
+    async def identity(self, person_id: int) -> dict | None:
+        row = await (await self.conn.execute(
+            'SELECT p.name, p.notes_consented_at IS NOT NULL, '
+            '(SELECT count(*) FROM voiceprints v WHERE v.person_id = p.id) '
+            'FROM people p WHERE p.id = %s', (person_id,))).fetchone()
+        return {'name': row[0], 'notes_consented': row[1], 'voice_sample_count': row[2]} if row else None
+
     async def rename(self, person_id: int, name: str) -> None:
         await self.conn.execute('UPDATE people SET name = %s WHERE id = %s', (name, person_id))
 

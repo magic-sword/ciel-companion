@@ -16,6 +16,7 @@ import logging
 import os
 import string
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -153,6 +154,7 @@ class SessionSpeaker:
     notes_pushed: bool = False       # その人のメモを、この会話で会話モデルに渡したか
     relation_pushed: bool = False    # シエルとその人との関係を、この会話で会話モデルに渡したか
     split: bool = False              # 人違いだと言われて、ほかの人から分けた人
+    speaker_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
     def add(self, e: np.ndarray) -> None:
         self.embeddings.append(e)
@@ -193,6 +195,7 @@ class SpeakerBook:
         self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
         self.on_split = None           # 人違いを直したとき呼ぶ（conversation.Conversation.on_split）
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
+        self._identity_lock = asyncio.Lock()
 
     async def load(self) -> None:
         if self.store is not None:
@@ -284,6 +287,7 @@ class SpeakerBook:
         k = next((k for k in self.known if k.person_id == sp.person_id), None) if sp.person_id is not None else None
         if k is None:
             # この会話で聞いた、まだ覚えていない人（判定のあとで名前を聞いた人も）
+            self.last_sure = sure
             return self._session_tag(sp, sure)
 
         # 覚えている人
@@ -369,44 +373,85 @@ class SpeakerBook:
     def find(self, label: str) -> SessionSpeaker | None:
         label = label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん').split('（')[0]
         label = plain_name(label)
-        for s in self.speakers:
-            if label in (s.label, s.name):
-                return s
-        return None
+        matches = [s for s in self.speakers if label in (s.label, s.name, s.speaker_id)]
+        return matches[0] if len(matches) == 1 else None
 
-    async def name(self, label: str, name: str, remember: bool) -> str:
-        sp = self.find(label)
+    async def speaker_status(self, sp: SessionSpeaker | None = None) -> dict:
+        sp = sp or self.last
         if sp is None:
-            return f'「{label}」という発言者は、この会話にいません。[発言者：…] に出た呼び名を使ってください。'
-        name = plain_name(name)
+            return {'status': 'no_speaker', 'available': True, 'identity_certain': False,
+                    'storage_available': self.store is not None}
+        state = {'status': 'ok', 'available': True, 'speaker_id': sp.speaker_id, 'name': sp.name,
+                 'session_label': sp.label, 'identity_certain': self.last is sp and self.last_sure,
+                 'storage_available': self.store is not None, 'name_scope': 'session' if sp.name else 'unknown',
+                 'name_saved': False, 'voice_saved': False, 'voice_sample_count': 0, 'notes_consented': False}
         if sp.person_id is not None:
-            # もう覚えている人。同意を聞き直さない（呼び名を直すのは rename）
-            return (f'{sp.name}さんの声は、もう覚えています（同意も前にもらっています）。覚え直す必要はありません。'
-                    '呼び名を直したいと言われたときは rename_speaker を使ってください。')
-        sp.name = sp.label = name
+            if self.store is None:
+                return {**state, 'status': 'storage_unavailable', 'name_saved': None, 'voice_saved': None}
+            try:
+                saved = await self.store.identity(sp.person_id)
+            except Exception as e:
+                log.warning('話者：保存状態を確認できない error=%s', type(e).__name__)
+                return {**state, 'status': 'storage_error', 'name_saved': None, 'voice_saved': None}
+            if saved is not None:
+                state.update(name=saved['name'], name_scope='persistent', name_saved=True,
+                             voice_saved=saved['voice_sample_count'] > 0,
+                             voice_sample_count=saved['voice_sample_count'], notes_consented=saved['notes_consented'])
+        return state
+
+    async def name(self, label: str, name: str, remember: bool) -> dict:
+        async with self._identity_lock:
+            return await self._name(label, name, remember)
+
+    async def _name(self, label: str, name: str, remember: bool) -> dict:
+        sp = self.find(label) if label else self.last
+        if sp is None:
+            return {'status': 'speaker_not_found' if label else 'no_speaker'}
+        if sp is not self.last:
+            return {'status': 'not_current_speaker', 'speaker_id': sp.speaker_id}
+        name = plain_name(name)
+        if not name or len(name) > 100:
+            return {'status': 'invalid_name'}
+        if not self.last_sure:
+            return {'status': 'identity_uncertain', 'speaker_id': sp.speaker_id}
+        current = await self.speaker_status(sp)
+        if current['status'] in ('storage_error', 'storage_unavailable'):
+            return current
+        if current['voice_saved']:
+            return {**current, 'status': 'already_saved'}
+        if current['name_saved'] and not remember:
+            return {**current, 'status': 'already_named'}
+        sp.name = name  # 発言者の固定ラベル・IDは変えない
         if not remember:
-            return f'この会話の間だけ「{name}」と呼びます（声は保存していません）。'
+            return {**await self.speaker_status(sp), 'status': 'session_named'}
         if self.store is None:
-            return f'「{name}」と呼びます。ただ、記録の場所が使えないので、声はこの会話の間だけ覚えています。'
-        if sp.person_id is None:
-            sp.person_id = await self.store.add_person(name)
-            self.known.append(Known(sp.person_id, name, []))
-        else:
-            await self.store.rename(sp.person_id, name)
+            return {**await self.speaker_status(sp), 'status': 'storage_unavailable'}
+        if not sp.embeddings:
+            return {**await self.speaker_status(sp), 'status': 'need_voice_sample'}
+        try:
+            pid = await self.store.remember_person(name, list(sp.embeddings), sp.person_id)
+        except Exception as e:
+            log.warning('話者：名前と声を保存できない error=%s', type(e).__name__)
+            return {**await self.speaker_status(sp), 'status': 'save_failed'}
+        sp.person_id = pid  # コミットが成功してからメモリーも更新する
+        if not any(k.person_id == pid for k in self.known):
+            self.known.append(Known(pid, name, []))
         k = next(k for k in self.known if k.person_id == sp.person_id)
         k.name = name
         new = [e for e in sp.embeddings if not any(e is x for x in k.embeddings)]
         k.embeddings.extend(new)
-        await self.store.add_voiceprints(sp.person_id, new, None)
         # 覚えてよいかの質問は「お名前と声、それからお話も少し」なので、メモを残す同意も一緒にもらっている
-        await self.store.set_notes_consent(sp.person_id)
         k.notes_ok = True
         if self.on_notes_consent:
-            self.on_notes_consent(sp.person_id)
+            try:
+                self.on_notes_consent(sp.person_id)
+            except Exception as e:
+                log.warning('話者：保存後のメモ通知に失敗 error=%s', type(e).__name__)
         if self.last is sp:
             self.last_sure = True   # 本人が同意したので、この会話ではメモを読み書きしてよい
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
-        return f'「{name}」さんのお名前と声を覚えました。次の会話でも分かります。お話も少しずつ覚えていきます。'
+        state = await self.speaker_status(sp)
+        return {**state, 'status': 'saved' if state['name_saved'] and state['voice_saved'] else 'save_unverified'}
 
     # ---- その人について覚えておくメモ（読むのは本人が話しているときだけ。書くのは notes.py が裏で） ----
 
@@ -444,20 +489,27 @@ class SpeakerBook:
                 + feeling)
 
     async def rename(self, new_name: str) -> str:
+        async with self._identity_lock:
+            return await self._rename(new_name)
+
+    async def _rename(self, new_name: str) -> str:
         """呼び名を直す（聞き間違えたとき、呼び方を変えてほしいとき）。直せるのは、いま話している本人の呼び名だけ"""
         sp = self.last
-        if sp is None:
+        if sp is None or not self.last_sure:
             return '呼び名を直せるのは、ご本人が話しているときだけです。直したい方ご本人に、もう一度言ってもらってください。'
         if sp.name is None:
             return 'まだお名前を聞いていない方です。name_speaker で名前を付けてください。'
         old, new = sp.name, plain_name(new_name)
         if not new or new == old:
             return f'呼び名は「{old}」のままです。'
-        sp.name = sp.label = new
         if sp.person_id is None:
+            sp.name = new
             return f'呼び名を「{old}」から「{new}」に直しました（この会話の間だけ。声は保存していません）。'
         if self.store is not None:
             await self.store.rename(sp.person_id, new)
+        else:
+            return '記録の場所が使えないので、保存済みの呼び名は変更できません。'
+        sp.name = new
         for k in self.known:
             if k.person_id == sp.person_id:
                 k.name = new
@@ -480,7 +532,7 @@ class SpeakerBook:
         """この会話で声を聞いた人の呼び名"""
         if not self.speakers:
             return 'この会話では、まだ誰の声も区別していません。'
-        parts = [s.label + ('（声を覚えている人）' if s.person_id is not None else '') for s in self.speakers]
+        parts = [(s.name or s.label) + ('（声を覚えている人）' if s.person_id is not None else '') for s in self.speakers]
         return 'この会話で声を聞いた人：' + '、'.join(parts)
 
     async def forget(self, name: str) -> str:
