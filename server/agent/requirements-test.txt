@@ -1,0 +1,9 @@
+# 回帰テスト用。音声モデル・PyTorch・SpeechBrainはロードしない。
+livekit-agents==1.8.3
+livekit-plugins-openai==1.8.3
+python-dotenv==1.1.1
+websockets==13.1
+numpy==1.26.4
+requests==2.32.4
+psycopg[binary]==3.2.9
+pgvector==0.4.1

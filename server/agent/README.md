@@ -34,6 +34,8 @@ VS Code では `Alt+Z` で行を折り返し、Markdown の `Ctrl+K` → `V` で
 
 ## ローカルで読み込みを確認する
 
+機能の回帰テストは[実行手順](../../docs/regression-tests-ja.md)を参照。リポジトリ直下の `scripts/server/run-regression.py --suite unit` が入口で、DBを含める場合は `--suite all` を指定します。
+
 複数端末の独立した会話、DBの版番号による記憶の同期・競合検知、音声合成の待機制御は[決定記録](../../docs/decisions/independent-conversations-ja.md)を参照。共通履歴は部屋をまたいで共有しません。DB結合テストの使い捨て接続先も同記録に記載しています。
 
 Python 3.11 以降で、`server/agent/` から実行します。LiveKit や API キーは不要です。

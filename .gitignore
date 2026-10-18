@@ -20,6 +20,7 @@
 
 # Local tools, logs, credentials and private source assets
 /.local/
+/.venv/
 .env
 .env.*
 !.env.example

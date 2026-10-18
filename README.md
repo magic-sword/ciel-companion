@@ -132,6 +132,8 @@ Android の実機ビルドと音声会話は確認済み（2026-10-16、[アプ�
 
 ## 公式資料
 
+サーバーの改修時は[回帰テスト](docs/regression-tests-ja.md)を実行してください。通常テストと使い捨てDBの結合テストを、Git管理のスクリプトから実行できます。
+
 - [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
 - [Unityリリースとサポート](https://unity.com/releases/unity-6/support)
 - [Live2DのURP導入手順](https://docs.live2d.com/en/cubism-sdk-tutorials/urp-import/)
