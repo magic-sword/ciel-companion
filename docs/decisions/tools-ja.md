@@ -25,7 +25,7 @@
 | `people_here` | `tools/people.py` | この会話で声を聞いた人（呼び名） |
 | `remember_about_speaker` | `tools/memory.py` | いま話している本人について覚えておくことを 1 文で記録係に預ける。すぐ戻り、返事を作り直さない（`reply_required=False`） |
 | `recall_about_speaker` | `tools/memory.py` | いま話している本人について覚えていること（メモ）を読む（[メモの決定記録](person-notes-ja.md)） |
-| `forget_about_speaker` | `tools/memory.py` | 本人に頼まれたメモを忘れる |
+| `forget_about_speaker` | `tools/memory.py` | 本人に「忘れて」「それは別の人の話」と頼まれたことを、中身で忘れる（メモとシエルの気持ちから） |
 | `agree_to_notes` | `tools/memory.py` | 声を覚えている本人が、お話を覚えることに同意した |
 | `start_minutes` | `tools/minutes.py` | é ¼ã¾ããããä¼è­°ã®è­°äºé²ãã¨ãå§ãããããæ»ããè¿äºãä½ãç´ããªããã·ã¨ã«ã®ä¸è¨ã¯è­°äºé²ä¿ã®ç¥ããããï¼[è­°äºé²ã®æ±ºå®è¨é²](meeting-minutes-ja.md)ï¼ |
 | `finish_minutes` | `tools/minutes.py` | é ¼ã¾ããããè­°äºé²ãã¾ã¨ãã¦ä¸æ¸ããéããåããè¿äºãä½ãç´ããªã |

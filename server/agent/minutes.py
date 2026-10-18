@@ -130,11 +130,10 @@ class Minutes:
         self.finish(announce=False)
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
-    def on_user_text(self, text: str) -> None:
-        """相手の発言の文字起こし（確定したもの）。直前に判定した話者の発言とみなす"""
+    def on_user_text(self, text: str, sp: 'speakers.SessionSpeaker | None', sure: bool) -> None:
+        """相手の発言の文字起こし（確定したもの）と、その発言の声で決めた話者（turns.py の speaker_of。「たぶん」も含む）"""
         if self.meeting is None or not text.strip():
             return
-        sp = self.book.last if self.book is not None else None
         self.meeting.lines.append((datetime.now(JST), sp, (sp.name or sp.label) if sp else '', text.strip()))
 
     def on_ciel_text(self, text: str) -> None:

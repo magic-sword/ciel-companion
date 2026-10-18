@@ -41,24 +41,27 @@ class NoteTaker:
         self._done: dict[int, int] = {}                       # 人ごとに、どこまでメモにしたか（lines の位置）
         self._count: dict[int, int] = {}
         self._requested: dict[int, list[str]] = {}         # 会話モデルが道具で預けたメモ（まだ書いていない）
+        self._forgets: dict[int, list[str]] = {}           # 本人に「忘れて」と頼まれたこと（まだ消していない）
+        self.forgotten: dict[int, list[str]] = {}          # この会話で頼まれた「忘れて」のすべて（関係の係も使う）
         self._locks: dict[int, asyncio.Lock] = {}
         self._timer: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
         self._client = openai.AsyncOpenAI()
 
-    def on_user_text(self, text: str) -> None:
-        """相手の発言の文字起こし（確定したもの）。直前に判定した話者の発言とみなす"""
+    def on_user_text(self, text: str, sp: 'speakers.SessionSpeaker | None', sure: bool) -> None:
+        """相手の発言の文字起こし（確定したもの）と、その発言の声で決めた話者（turns.py の speaker_of）"""
         if not text.strip():
             return
-        sp = self.book.last
         label = (sp.name or sp.label) if sp else '不明'
         # 発言した人（この会話の話者）を、同意の前でも付けておく（メモリーの中だけ）。
         # この会話の途中で名乗って同意した人も、同意の前に話したこと（「ミルクティーが好き」など）を
         # メモにできるように（覚えたあとは sp.person_id が付く）。書くのは同意してから（_write が確かめる）。
-        # 「たぶん」と判定した発言は、誰の発言か確かでないので、本人の発言にしない
-        owner = sp if sp is not None and (sp.person_id is None or self.book.last_sure) else None
+        # 「たぶん」の発言・短くて決められなかった発言は、誰の発言か確かでないので、本人の発言にしない
+        owner = sp if sp is not None and (sp.person_id is None or sure) else None
         self.lines.append((owner, label, text.strip()))
-        k = self.book.current_person()
+        if owner is None or owner.person_id is None:
+            return
+        k = next((k for k in self.book.known if k.person_id == owner.person_id), None)
         if k is None or not k.notes_ok:
             return
         pid = k.person_id
@@ -101,6 +104,18 @@ class NoteTaker:
         log.info('メモ #%d：会話モデルから 1 件預かった', pid)
         self._start(pid)
 
+    def forget(self, pid: int, what: str) -> None:
+        """本人に「○○のことは忘れて」「それは別の人の話」と頼まれた（道具 forget_about_speaker）：すぐ裏で消す。
+        どのメモが当てはまるかは、記録係のモデルが中身で決める（番号を読み上げて確かめなくてよいように）"""
+        what = what.strip()[:MAX_NOTE_CHARS]
+        if not what:
+            return
+        self._forgets.setdefault(pid, []).append(what)
+        self.forgotten.setdefault(pid, []).append(what)
+        self._count.setdefault(pid, 0)
+        log.info('メモ #%d：忘れる依頼を 1 件預かった', pid)
+        self._start(pid)
+
     def on_consent(self, pid: int) -> None:
         """この会話の途中で、お話を覚えることに同意した：同意の前に話したことも含めて、すぐ書く"""
         self._count.setdefault(pid, 0)
@@ -122,7 +137,9 @@ class NoteTaker:
         async with lock:
             start, end = self._done.get(pid, 0), len(self.lines)
             requested = self._requested.pop(pid, [])
-            if not requested and not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end]):
+            forgets = self._forgets.pop(pid, [])
+            if (not requested and not forgets
+                    and not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end])):
                 return
             store = self.book.store
             k = next((k for k in self.book.known if k.person_id == pid), None)
@@ -135,6 +152,7 @@ class NoteTaker:
                 'person': k.name,
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
                 'requested_notes': requested,
+                'forget_requests': forgets,
                 'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                                  for o, who, text in window],
             }
@@ -147,6 +165,7 @@ class NoteTaker:
             except Exception as e:   # メモが書けなくても、会話は続ける（頼まれた分は次の機会に回す）
                 log.warning('メモを書けない：%s', type(e).__name__)
                 self._requested.setdefault(pid, [])[:0] = requested
+                self._forgets.setdefault(pid, [])[:0] = forgets
                 return
             valid = {i for i, _ in existing}
             add = [t.strip()[:MAX_NOTE_CHARS] for t in result.get('add', []) if isinstance(t, str) and t.strip()]

@@ -177,8 +177,6 @@ class SpeakerBook:
         self._adapted = 0
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
         self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
-        self._note_ids: list[int] = []                   # 直前に読んだメモの番号 → DB の行（忘れるときに使う）
-        self._note_owner: int | None = None
         self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
         self.on_split = None           # 人違いを直したとき呼ぶ（notes.NoteTaker.on_split）
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
@@ -195,6 +193,45 @@ class SpeakerBook:
         letters = string.ascii_uppercase
         return '知らない人' + (letters[i] if i < 26 else str(i + 1))
 
+    def _scores(self, e: np.ndarray) -> tuple[float, 'Known | None', float, 'SessionSpeaker | None', float]:
+        """覚えている人と、この会話で聞いた（まだ覚えていない）人を、まとめて比べる。
+        （一番近い覚えている人の類似度とその人、一番近いこの会話の人の類似度とその人、覚えている人の次点の類似度）。
+        人違いだと言われて分けた人（split）は、声が似ているので、元の人より少し優先する。
+        次点は、似た声の人との差が小さいときに断定しないために使う"""
+        known = sorted(((best_score(e, k.embeddings), k) for k in self.known), key=lambda x: -x[0])
+        session = sorted(((best_score(e, s.embeddings) + (SPLIT_BONUS if s.split else 0.0), s)
+                          for s in self.speakers if s.person_id is None), key=lambda x: -x[0])
+        k_score, k = known[0] if known else (-1.0, None)
+        s_score, s = session[0] if session else (-1.0, None)
+        runner_up = max(known[1][0] if len(known) > 1 else -1.0, s_score)
+        return k_score, k, s_score, s, runner_up
+
+    def _session_for(self, k: 'Known') -> SessionSpeaker:
+        """覚えている人の、この会話での話者（無ければ作る）"""
+        sp = next((s for s in self.speakers if s.person_id == k.person_id), None)
+        if sp is None:
+            sp = SessionSpeaker(label=k.name, person_id=k.person_id, name=k.name)
+            self.speakers.append(sp)
+        return sp
+
+    def attribute(self, e: np.ndarray | None, seconds: float) -> tuple[SessionSpeaker | None, bool]:
+        """文字起こし 1 つ分の声から、誰の発言かを決める（メモの記録係・議事録の係が使う）。
+        返事を作るときの identify とは別に、発言ごとに必ず動く（ひかえめで返事をしないときも）。
+        「直前の人のまま」とはみなさない：短い・判定できない発言は（None, False）。似た声で自信がなければ（その人, False）。
+        会話モデルには何も渡さず、覚えている人の見本も足さない。初めての声は、この会話の知らない人として区別する"""
+        if e is None or seconds < MIN_VOICED:
+            return None, False
+        k_score, k, s_score, s, runner_up = self._scores(e)
+        if s is not None and s_score >= MATCH and s_score >= k_score:
+            return s, True
+        if k is not None and k_score >= MAYBE:
+            return self._session_for(k), k_score >= MATCH and k_score - runner_up >= MARGIN
+        sp = SessionSpeaker(label=self._new_unknown_label())
+        sp.add(e)
+        self.speakers.append(sp)
+        log.info('話者（発言の記録）：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
+        return sp, True
+
     async def identify(self, e: np.ndarray | None, seconds: float, solo: bool = False,
                        push_notes: bool = False) -> str | None:
         """発言の声の特徴から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
@@ -210,13 +247,7 @@ class SpeakerBook:
             return '[発言者：不明]'
 
         self.last_embedding, self.last_rows, self.last_sure = e, [], False
-        # 覚えている人と、この会話で聞いた（まだ覚えていない）人を、まとめて比べて一番近い人にする。
-        # 人違いだと言われて分けた人（split）は、声が似ているので、元の人より少し優先する
-        known = sorted(((best_score(e, k.embeddings), k) for k in self.known), key=lambda x: -x[0])
-        session = sorted(((best_score(e, s.embeddings) + (SPLIT_BONUS if s.split else 0.0), s)
-                          for s in self.speakers if s.person_id is None), key=lambda x: -x[0])
-        k_score, k = known[0] if known else (-1.0, None)
-        s_score, s = session[0] if session else (-1.0, None)
+        k_score, k, s_score, s, runner_up = self._scores(e)
 
         # 1. この会話で聞いた、まだ覚えていない人
         if s is not None and s_score >= MATCH and s_score >= k_score:
@@ -228,14 +259,9 @@ class SpeakerBook:
         # 2. 覚えている人
         if k is not None and k_score >= MAYBE:
             score = k_score
-            sp = next((s for s in self.speakers if s.person_id == k.person_id), None)
-            if sp is None:
-                sp = SessionSpeaker(label=k.name, person_id=k.person_id, name=k.name)
-                self.speakers.append(sp)
+            sp = self._session_for(k)
             sp.add(e)
             self.last = sp
-            # 似た声の人（2 番目に近い人）との差が小さいときも、断定しない
-            runner_up = max(known[1][0] if len(known) > 1 else -1.0, s_score)
             sure = score >= MATCH and score - runner_up >= MARGIN
             log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s）', k.person_id, score, score - runner_up,
                      '' if sure else '、たぶん')
@@ -393,7 +419,6 @@ class SpeakerBook:
         if not k.notes_ok:
             return f'{k.name}さんからは、お話を覚える同意をまだもらっていません。'
         rows = await self.store.notes(k.person_id)
-        self._note_ids, self._note_owner = [i for i, _ in rows], k.person_id
         r = await self.store.relationship(k.person_id)
         feeling = (f'\nシエルの{k.name}さんへの気持ち（{relationship.STAGES[r.stage]}）：{r.feeling}'
                    if r is not None and r.feeling else '')
@@ -401,19 +426,6 @@ class SpeakerBook:
             return f'{k.name}さんについて、まだ覚えていることはありません。' + feeling
         return (f'{k.name}さんについて覚えていること：\n' + '\n'.join(f'{n}. {t}' for n, (_, t) in enumerate(rows, 1))
                 + feeling)
-
-    async def forget_notes(self, numbers: list[int]) -> str:
-        k = self.current_person()
-        if k is None or self.store is None or self._note_owner != k.person_id:
-            return '先に recall_about_speaker で、いま話している方のメモを読んでください。'
-        ids = [self._note_ids[n - 1] for n in numbers if 1 <= n <= len(self._note_ids)]
-        if not ids:
-            return 'その番号のメモはありません。'
-        await self.store.change_notes(k.person_id, [], {}, ids)
-        k.note_count = await self.store.count_notes(k.person_id)
-        self._note_ids, self._note_owner = [], None
-        log.info('話者：#%d のメモを %d 件消した', k.person_id, len(ids))
-        return f'{len(ids)} 件、忘れました。'
 
     async def rename(self, new_name: str) -> str:
         """呼び名を直す（聞き間違えたとき、呼び方を変えてほしいとき）。直せるのは、いま話している本人の呼び名だけ"""

@@ -32,6 +32,10 @@
   ひかえめのとき・シエルが話しているときは打たない。
 - 話しながらシエルに触れたとき（touch.py が知らせを持っている）は、その発言の [発言者：…] の後ろにタッチの 1 行を添える
   （その声の人が触ったと分かる）。ひかえめで呼ばれていなくても、触れられたら返事を作らせる。
+- 文字起こしが確定するたびに、その発言の区間（話し始め〜話し終わり）の声で、誰の発言かを決める（speaker_of）。
+  メモの記録係・議事録の係が使う。返事を作るかどうかに関係なく、発言ごとに必ず決める。「最後に判定した人」を使うと、
+  ひかえめで返事をしない発言・小さな声・判定より先に届いた文字起こしが、前の人の発言になってしまったため（2026-10-18）。
+  区間と文字起こしは、どちらも会話モデルの側の区切りごとに 1 つずつ届くので、古い順に組にする。
 """
 import asyncio
 import logging
@@ -72,6 +76,8 @@ NOD_SKIP_SECONDS = 2.0     # 相づちからこれ以内に話し終えたら、
 # 大きな声（LOUD_DB 以上の 20 ms）がこれより短い発言は、物音かもしれないので文字起こしを待つ
 LOUD_DB = -40.0
 LOUD_SECONDS = 0.2
+# 発言の区間を、文字起こしと組にするまで取っておく時間（これより古い区間は、文字起こしが来なかったものとして捨てる）
+SEGMENT_KEEP_SECONDS = 20.0
 
 
 class TurnReplies:
@@ -99,6 +105,8 @@ class TurnReplies:
         self._watch: asyncio.Task | None = None   # 話している途中の息つぎを見る
         self._nod_at = 0.0                        # 最後に話の途中の相づちを打った時刻
         self._tasks: set[asyncio.Task] = set()
+        self._segment_start: float | None = None             # いま話している発言の話し始め（区間ごと。返事とは別）
+        self._segments: list[tuple[float, float]] = []      # 文字起こしをまだ組にしていない発言の区間
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -109,6 +117,7 @@ class TurnReplies:
 
     def on_user_state(self, ev: UserStateChangedEvent) -> None:
         if ev.new_state == 'speaking':
+            self._segment_start = ev.created_at
             self._speaking = True
             self._cancel_later()
             self._cancel_early()   # 続きを話し始めた。続きの区切りで、まとめて作らせる
@@ -121,8 +130,31 @@ class TurnReplies:
         elif ev.new_state == 'listening' and ev.old_state == 'speaking':
             self._speaking = False
             self._ended_at = ev.created_at
+            if self._segment_start is not None:
+                self._segments.append((self._segment_start, ev.created_at))
+                self._segment_start = None
             if self._pending:
                 self._reply_later(STALE_SECONDS)
+
+    def take_segment(self) -> tuple[float, float] | None:
+        """文字起こしが 1 つ確定した：それと組になる発言の区間（一番古いもの）。文字起こしが届いた順に呼ぶこと"""
+        now = time.time()
+        self._segments = [s for s in self._segments if now - s[1] < SEGMENT_KEEP_SECONDS]
+        return self._segments.pop(0) if self._segments else None
+
+    async def speaker_of(self, segment: tuple[float, float] | None) -> tuple['speakers.SessionSpeaker | None', bool]:
+        """その区間の声で、誰の発言かを決める（speakers.SpeakerBook.attribute）。決められなければ（None, False）"""
+        if segment is None or self.book is None:
+            return None, False
+        seconds, pending = self._embed(*segment)
+        try:
+            e = await pending if pending is not None else None
+        except Exception:
+            log.exception('発言の声の特徴を計算できない')
+            return None, False
+        sp, sure = self.book.attribute(e, seconds)
+        self.style.on_voices(len(self.book.speakers))   # ひかえめで返事をしないときも、ほかの人の声に気づく
+        return sp, sure
 
     def on_transcribed(self, ev: UserInputTranscribedEvent) -> None:
         if not ev.is_final:

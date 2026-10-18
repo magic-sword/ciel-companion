@@ -2,7 +2,9 @@
 """その人について覚えていること（メモ）の道具：覚える・読む・忘れる・覚えることに同意する。
 読めるのは、いま話している本人が「声を覚えている人」だと自信を持って分かったときだけ（ほかの人のメモは読めない）。
 覚えるときは、会話モデルが渡した 1 文を記録係（notes.py）に預けてすぐ戻る（返事を作り直さない）。記録係が裏で今のメモと
-突き合わせて保存する。記録係は、会話の流れから道具で拾い漏れたことも補う。使い方の決まりは config/prompts/speakers.md。"""
+突き合わせて保存する。記録係は、会話の流れから道具で拾い漏れたことも補う。
+忘れるときも、頼まれた中身を短い言葉で記録係に預けてすぐ戻る。当てはまるメモは記録係が中身で決めて消す（番号で確かめなくてよい）。
+使い方の決まりは config/prompts/speakers.md。"""
 from livekit.agents import RunContext, ToolResult, function_tool
 
 NO_SPEAKERS = '今は話している人を区別していません。'
@@ -34,10 +36,20 @@ async def remember_about_speaker(context: RunContext, note: str):
 
 
 @function_tool
-async def forget_about_speaker(context: RunContext, numbers: list[int]) -> str:
-    """いま話している本人に頼まれたメモを忘れる。numbers は recall_about_speaker で読んだときの番号。"""
-    book = context.userdata.book
-    return await book.forget_notes(numbers) if book else NO_SPEAKERS
+async def forget_about_speaker(context: RunContext, what: str):
+    """いま話している本人に「忘れて」「それは別の人の話」と頼まれたことを、短い言葉で渡す（例：「ルミナス王国のこと」）。
+    呼ぶ前には何も言わない。結果が戻ったら、ひとことで返す。"""
+    state = context.userdata
+    book = state.book
+    if book is None or state.notes is None:
+        return NO_SPEAKERS
+    k = book.current_person()
+    if k is None:
+        return 'いま話している方が、声を覚えている方だと確かではないので、受け付けられません。ご本人にもう一度言ってもらってください。'
+    # 当てはまるメモを消すのは記録係（notes.py）が裏で、中身で決める。シエルの気持ちからも、会話の終わりに外す（relationship.py）
+    # 返事は道具のあとに作らせる（会話モデルは、先に話さずに道具だけ呼ぶことが多く、返事なしで黙ってしまうため）
+    state.notes.forget(k.person_id, what)
+    return '忘れました。この会話でも、もうその話はしない。'
 
 
 @function_tool

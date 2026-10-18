@@ -65,6 +65,8 @@ class RelationKeeper:
         for o, _, _ in self.note_taker.lines:
             if o is not None and o.person_id is not None:
                 turns[o.person_id] = turns.get(o.person_id, 0) + 1
+        for pid in self.note_taker.forgotten:   # 忘れてと頼まれた人は、話した回数が少なくても書き直す
+            turns.setdefault(pid, 0)
         for pid, n in turns.items():
             try:
                 await self._update(pid, n)
@@ -74,7 +76,7 @@ class RelationKeeper:
     async def _update(self, pid: int, n_turns: int) -> None:
         store = self.book.store
         k = next((k for k in self.book.known if k.person_id == pid), None)
-        if store is None or k is None or not k.notes_ok or n_turns < 2:
+        if store is None or k is None or not k.notes_ok or (n_turns < 2 and pid not in self.note_taker.forgotten):
             return
         current = await store.relationship(pid)
         first = current is None
@@ -92,6 +94,7 @@ class RelationKeeper:
             'current': None if first else {'stage': r.stage, 'feeling': r.feeling, 'mood': r.mood},
             'can_stage_up': can_up,
             'notes': [t for _, t in await store.notes(pid)],
+            'forget_requests': self.note_taker.forgotten.get(pid, []),
             'days_since_last_talk': (datetime.now(timezone.utc) - k.last_seen).days if k.last_seen else None,
             'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                              for o, who, text in lines],

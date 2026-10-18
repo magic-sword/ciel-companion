@@ -215,13 +215,30 @@ async def entrypoint(ctx: JobContext) -> None:
             for t in takers:
                 t.on_split(old, new)
         book.on_split = on_split
-    session.on('user_input_transcribed',
-               lambda ev: [t.on_user_text(ev.transcript) for t in takers] if ev.is_final else None)
+    # 文字起こしが確定するたびに、その発言の声で誰の発言かを決めてから、記録係・議事録の係に渡す（turns.py の speaker_of）。
+    # 「最後に判定した人」を使うと、ほかの人の発言が前の人の発言になり、メモに混ざった（2026-10-18）
+    pending_texts: set[asyncio.Task] = set()
+
+    async def to_takers(text: str, segment) -> None:
+        owner, sure = await replies.speaker_of(segment)
+        for t in takers:
+            t.on_user_text(text, owner, sure)
+
+    def on_final_text(ev) -> None:
+        if not ev.is_final:
+            return
+        segment = replies.take_segment()   # 文字起こしが届いた順に、発言の区間と組にする（ここで先に取る）
+        if ev.transcript.strip():
+            t = asyncio.create_task(to_takers(ev.transcript, segment))
+            pending_texts.add(t)
+            t.add_done_callback(pending_texts.discard)
+    session.on('user_input_transcribed', on_final_text)
     session.on('conversation_item_added',
                lambda ev: [t.on_ciel_text(ev.item.text_content or '') for t in takers]
                if getattr(ev.item, 'role', None) == 'assistant' else None)
 
     async def close_store() -> None:
+        await asyncio.gather(*pending_texts, return_exceptions=True)   # 話者を決めている途中の発言も渡してから
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
         if note_taker is not None:
             await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
