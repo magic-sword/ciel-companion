@@ -75,6 +75,35 @@ namespace Ciel.Conversation
         public bool MicBusy => _busy;
         /// 会話サーバーが会議の議事録をとっているか（会話サーバーの知らせ minutes.state で変わる）
         public bool MinutesOn { get; private set; }
+        [Serializable]
+        public sealed class ResearchSource
+        {
+            public int number;
+            public string title, url;
+        }
+        public sealed class ResearchResult
+        {
+            public int id;
+            public string question, checkedAt, status;
+            public bool clipped;
+            public string[] parts;
+            public readonly List<ResearchSource> sources = new List<ResearchSource>();
+            public string Summary => parts == null ? "" : string.Concat(parts);
+        }
+        [Serializable]
+        sealed class ResearchPacket
+        {
+            public string type, question, checked_at, status, text;
+            public int id, part_count, part;
+            public bool clipped;
+            public ResearchSource source;
+        }
+        readonly List<ResearchResult> _researchResults = new List<ResearchResult>();
+        public IReadOnlyList<ResearchResult> ResearchResults => _researchResults;
+        public int ResearchRevision { get; private set; }
+
+        public static bool IsWebUrl(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (uri.Scheme == "https" || uri.Scheme == "http") && string.IsNullOrEmpty(uri.UserInfo);
         /// 状態が変わったとき（画面の表示の更新用）
         public event Action Changed;
 
@@ -590,6 +619,11 @@ namespace Ciel.Conversation
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
         void OnDataReceived(byte[] data, Participant participant, DataPacketKind kind, string topic)
         {
+            if (topic == "ciel.research")
+            {
+                OnResearchData(data);
+                return;
+            }
             if (topic != "ciel.event") return;
             EventJson e;
             try { e = JsonUtility.FromJson<EventJson>(System.Text.Encoding.UTF8.GetString(data)); }
@@ -613,6 +647,39 @@ namespace Ciel.Conversation
             {
                 MinutesOn = e.recording;
                 Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
+                Changed?.Invoke();
+            }
+        }
+
+        void OnResearchData(byte[] data)
+        {
+            ResearchPacket p;
+            try { p = JsonUtility.FromJson<ResearchPacket>(System.Text.Encoding.UTF8.GetString(data)); }
+            catch (Exception) { return; }
+            if (p == null || p.id <= 0) return;
+            var r = _researchResults.Find(x => x.id == p.id);
+            if (p.type == "research.result")
+            {
+                if (p.part_count < 0 || p.part_count > 4 || (p.question?.Length ?? 0) > 1200) return;
+                if (r != null) _researchResults.Remove(r);
+                r = new ResearchResult { id = p.id, question = p.question, checkedAt = p.checked_at,
+                    status = p.status, clipped = p.clipped, parts = new string[p.part_count] };
+                _researchResults.Add(r);
+                if (_researchResults.Count > 20) _researchResults.RemoveAt(0);
+            }
+            else if (r != null && p.type == "research.text" && p.part >= 0 && p.part < r.parts.Length)
+            {
+                if ((p.text?.Length ?? 0) <= 3000) r.parts[p.part] = p.text;
+            }
+            else if (r != null && p.type == "research.source" && p.source != null)
+            {
+                if (r.sources.Count < 8 && p.source.number > 0 && p.source.number <= 8
+                    && (p.source.title?.Length ?? 0) <= 400 && (p.source.url?.Length ?? 0) <= 3000
+                    && IsWebUrl(p.source.url)) r.sources.Add(p.source);
+            }
+            else if (r != null && p.type == "research.complete")
+            {
+                ResearchRevision++;
                 Changed?.Invoke();
             }
         }
@@ -701,6 +768,8 @@ namespace Ciel.Conversation
             }
             if (_mouth != null) _mouth.MouthOpening = 0f;
             MinutesOn = false;
+            _researchResults.Clear();
+            ResearchRevision++;
             _serverTalk = null;
             _serverPresence = null;
             PresenceReason = "";

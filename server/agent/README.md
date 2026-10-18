@@ -15,6 +15,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前を聞く・同意を取る流れ、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
 | [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/decisions/conversation-history-ja.md) |
+| [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/decisions/web-research-ja.md) |
 | [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 

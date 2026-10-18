@@ -46,6 +46,7 @@ import voice_conversion
 import volume
 from conversation import Conversation
 from conversation_recording import ConversationRecorder
+from web_research import WebResearcher
 from persona import load_persona
 
 load_dotenv()
@@ -128,6 +129,7 @@ class Ciel(Agent):
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         instructions = instructions.rstrip('\n') + '\n\n' + p.minutes_voice_instructions
         instructions = instructions.rstrip('\n') + '\n\n' + p.conversation_instructions
+        instructions = instructions.rstrip('\n') + '\n\n' + p.research_voice_instructions
         if SPEAKERS:
             presence_text = {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
                              'public': p.presence_public_instructions}[presence]
@@ -186,6 +188,11 @@ async def entrypoint(ctx: JobContext) -> None:
     history = Conversation()
     replies.history = history
     session.userdata.history = history
+    async def publish_research(packet):
+        await ctx.room.local_participant.publish_data(
+            json.dumps(packet, ensure_ascii=False), reliable=True, topic='ciel.research')
+    researcher = WebResearcher(history, agent.persona.research_instructions, publish_research)
+    session.userdata.researcher = researcher
     # おしゃべりのとき、しばらく静かなら自分から話しかける（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge)
     session.on('user_state_changed', talker.on_user_state)
@@ -224,6 +231,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def close_store() -> None:
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
+        await researcher.close()
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
         if note_taker is not None:
             await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く

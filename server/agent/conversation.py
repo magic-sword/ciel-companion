@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import re
 import time
 import unicodedata
+from research import ResearchBook
 
 
 @dataclass
@@ -40,6 +41,7 @@ class Conversation:
         self.last_id = 0
         self.dropped_through = 0
         self._chars = 0
+        self.research = ResearchBook()
 
     def reserve(self, at: float | None = None, role: str = 'user') -> Turn:
         self.last_id += 1
@@ -128,6 +130,8 @@ class Conversation:
         return {'scope': 'current_session', 'dropped_through': self.dropped_through,
                 'pending_count': sum(not t.ready.is_set() for t in rows),
                 'last_id': self.last_id, 'matches': result,
+                'research': self.research.related(query, [r['id'] for r in result]),
+                'research_dropped_through': self.research.dropped_through,
                 'result_clipped': len(result) < len(selected)}
 
 

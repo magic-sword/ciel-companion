@@ -28,6 +28,9 @@ class ConversationRecorder:
 
     def on_item(self, ev) -> None:
         item = ev.item
+        # 会話開始・エージェント切り替えの AgentHandoff に role は無い。
+        if getattr(item, 'type', None) != 'message':
+            return
         if item.role == 'user' and item.id in self._final_texts:
             self._record_final(self._final_texts.pop(item.id), item.created_at,
                                item.metrics.get('started_speaking_at'), item.id)

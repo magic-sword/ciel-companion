@@ -3,6 +3,8 @@
 # 変更は次に開始する会話から反映されます。
 instructions_file = "prompts/character.md"
 conversation_instructions_file = "prompts/conversation.md"
+research_instructions_file = "prompts/research.md"
+research_voice_instructions_file = "prompts/research_voice.md"
 greeting_file = "prompts/greeting.md"
 emotion_instructions_file = "prompts/emotion.md"
 touch_instructions_file = "prompts/touch.md"

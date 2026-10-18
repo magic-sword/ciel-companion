@@ -310,6 +310,11 @@ class PersonaTests(unittest.TestCase):
 
 
 class RecordingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_agent_handoff_is_not_recorded_as_speech(self):
+        from livekit.agents.llm import AgentHandoff
+        self.recorder.on_item(ConversationItemAddedEvent(item=AgentHandoff(new_agent_id='ciel')))
+        self.assertEqual(self.h.turns, [])
+
     def setUp(self):
         self.h = Conversation()
         self.replies = TurnReplies(SimpleNamespace(), None, None, SimpleNamespace(talk='normal'), '')
