@@ -4,6 +4,7 @@
 POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）", "seconds": 0.6（省略可）}
   seconds … 音声の長さ（秒）。省略すると Irodori-TTS が文から長さを決める。短い相づち（server/agent/aizuchi.py）は
             決めさせると間延びする（「んー、」が 2 秒など）ので、長さを渡す
+  省略可：cfg_caption（キャプションの効き。既定 3.0）、cfg_speaker（参照音声の効き。既定 5.0）、seed（揺れを固定する）
   → 200、本文 = PCM（int16、リトルエンディアン、モノラル）、ヘッダー X-Sample-Rate
 GPU は 1 つなので、合成は 1 つのスレッドで 1 文ずつ順に行う。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
 参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込む。
@@ -46,16 +47,17 @@ RT = InferenceRuntime.from_key(RuntimeKey(
 WORKER = ThreadPoolExecutor(max_workers=1)
 
 
-def synthesize(text: str, caption: str | None, seconds: float | None = None):
-    return WORKER.submit(_synthesize, text, caption, seconds).result()
+def synthesize(text: str, caption: str | None, seconds: float | None = None, **options):
+    return WORKER.submit(_synthesize, text, caption, seconds, **options).result()
 
 
-def _synthesize(text: str, caption: str | None, seconds: float | None = None):
+def _synthesize(text: str, caption: str | None, seconds: float | None = None, **options):
+    """options：SamplingRequest の cfg_scale_caption・cfg_scale_speaker・seed（省略すると Irodori-TTS の既定）"""
     t = time.perf_counter()
     # 長さを渡すときは、下限（既定 0.5 秒）もそれに合わせて下げる
     length = {} if seconds is None else {'seconds': seconds, 'min_seconds': min(0.5, seconds)}
-    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_wavs=REFS, num_steps=STEPS, **length),
-                      log_fn=None)
+    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_wavs=REFS, num_steps=STEPS,
+                                      **length, **options), log_fn=None)
     audio = r.audio.squeeze().float().cpu().numpy()
     dt = time.perf_counter() - t
     log.info('合成 %.2f 秒 / 音声 %.2f 秒：%s', dt, len(audio) / r.sample_rate, text[:30])
@@ -81,8 +83,20 @@ class Handler(BaseHTTPRequestHandler):
         except (TypeError, ValueError):
             self.send_error(400, 'seconds must be 0.1-30')
             return
+        options = {}
         try:
-            pcm, sr = synthesize(text, body.get('caption'), seconds)
+            for key, name in (('cfg_caption', 'cfg_scale_caption'), ('cfg_speaker', 'cfg_scale_speaker')):
+                if body.get(key) is not None:
+                    options[name] = float(body[key])
+                    if not 0 <= options[name] <= 10:
+                        raise ValueError
+            if body.get('seed') is not None:
+                options['seed'] = int(body['seed'])
+        except (TypeError, ValueError):
+            self.send_error(400, 'cfg_caption / cfg_speaker must be 0-10, seed an integer')
+            return
+        try:
+            pcm, sr = synthesize(text, body.get('caption'), seconds, **options)
         except Exception as e:   # 1 文の失敗でサービスを止めない
             log.exception('合成に失敗')
             self.send_error(500, str(e)[:200])

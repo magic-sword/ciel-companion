@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""感情：会話モデルが文の頭に付けた印（例 [happy]）を読み取り、声の説明（キャプション）と、Unity の表情に使う。
+"""感情：会話モデルが文の頭に付けた印（例 [happy]）を読み取り、声の説明（キャプション）・文に入れる絵文字と、Unity の表情に使う。
 
 - 会話モデルには、config/prompts/emotion.md で印の付け方を教える。
 - tts_node：届いた文字を 1 文ずつに分け、印を外して Irodori-TTS で読み上げる。その文の声を流し始めるときに、
@@ -45,8 +45,26 @@ CAPTIONS = {
     'jitome': '柔らかなトーンの10代前半の少女。じとっと疑うような、少し不満げで平たい声。ゆっくりめ。',
     'thinking': '柔らかくナチュラルなトーンの10代前半の少女。うーんと考えながら話す、ゆっくりとした落ち着いた声。',
 }
+# 感情 → 文に入れる絵文字。Irodori-TTS が読み方の指示として学んだもの（モデルの EMOJI_ANNOTATIONS.md の意味から選んだ）。
+# キャプションだけより感情がはっきり出る（2026-10-18 の聞き比べ、server/tts-irodori/compare_emotions.py）
+EMOJI = {
+    'happy': '😊',        # Cheerfully, gladly
+    'relaxed': '😌',      # Relieved, contentedly
+    'surprised': '😲',    # Surprise, awe / exclamation
+    'angry': '😠',        # Angry, displeased, sulking
+    'sad': '🥺',          # Trembling voice, timidly / uncertainly
+    'troubled': '😟',     # Anxiously, worriedly
+    'embarrassed': '🫣',  # Shyly, bashfully
+    'teary': '😭',        # Sobbing, crying, sorrowfully / sadly
+    'excited': '😆',      # Joyfully, happily
+    'jitome': '🙄',       # Exasperatedly, rolling eyes
+    'thinking': '🤔',     # Questioning voice, wondering
+}
+# 効き方：キャプションを強め（既定 3.0）、参照音声を弱める（既定 5.0）。参照音声は通常の声なので、既定では感情が出にくかった。
+# 絵文字と合わせると、どちらか片方より感情がよく出た（同じ聞き比べ）
+STYLE = {'cfg_caption': 5.0, 'cfg_speaker': 3.5}
 NAMES = '|'.join(CAPTIONS)
-TAG = re.compile(r'\[\s*([A-Za-z]+)\s*\]')
+TAG =re.compile(r'\[\s*([A-Za-z]+)\s*\]')
 # かっこの無い印：文の頭（返事の始め・改行・文の終わりのあと）にある感情の名前で、すぐ後が日本語のもの
 BARE_TAG = re.compile(rf'(^|[\n。！？!?])[ \t　]*({NAMES})(?![A-Za-z])[ \t　]*(?=[^\x00-\x7f])', re.IGNORECASE)
 TRAILING_WORD = re.compile(r'(^|[\n。！？!?])([ \t　]*[A-Za-z]+[ \t　]*)$')   # 文字起こしで持ち越す、文の頭の英字
@@ -55,6 +73,7 @@ BROKEN_TAG = re.compile(r'\[\s*[A-Za-z]*\s*(?![A-Za-z\]])|\]')
 # 返事に漏れた話者の 1 行（turns.py が足す「[発言者：…]」。かっこが無いこともある）
 SPEAKER_LINE = re.compile(r'\[?発言者：[^\]\n]*?(?:）\]?|\])')
 SENTENCE_END = re.compile(r'[。！？!?\n]+|……')
+TAIL = re.compile(r'[。！？!?…\s]*$')   # 絵文字は文の終わりの記号の前に入れる
 MIN_SENTENCE = 4   # これより短い文は、次の文とまとめて読む
 
 
@@ -115,10 +134,17 @@ def split_sentences(buf: str) -> tuple[list[str], str]:
     return out, buf[start:]
 
 
+def with_emoji(text: str, emotion: str) -> str:
+    """感情の絵文字を、文の終わりの記号の前に入れる（neutral は入れない）"""
+    m = TAIL.search(text)
+    return text[:m.start()] + EMOJI.get(emotion, '') + text[m.start():]
+
+
 async def synthesize(session: aiohttp.ClientSession, text: str, caption: str,
-                     seconds: float | None = None) -> tuple[bytes, int]:
-    """読み上げる。seconds を渡すと、その長さの音声にする（省略すると Irodori-TTS が決める）"""
-    body = {'text': text, 'caption': caption} | ({} if seconds is None else {'seconds': seconds})
+                     seconds: float | None = None, style: dict | None = None) -> tuple[bytes, int]:
+    """読み上げる。seconds を渡すと、その長さの音声にする（省略すると Irodori-TTS が決める）。
+    style は効き方（STYLE。省略すると Irodori-TTS の既定）"""
+    body = {'text': text, 'caption': caption} | ({} if seconds is None else {'seconds': seconds}) | (style or {})
     async with session.post(irodori_tts.URL, json=body,
                             timeout=aiohttp.ClientTimeout(total=30)) as r:
         r.raise_for_status()
@@ -151,7 +177,7 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
             return
         t0 = time.perf_counter()
         latency.mark('最初の文')
-        pcm, sr = await synthesize(http, body, CAPTIONS[emotion])
+        pcm, sr = await synthesize(http, with_emoji(body, emotion), CAPTIONS[emotion], style=STYLE)
         latency.mark('最初の声')
         dur_ms = int(len(pcm) / 2 / sr * 1000)
         log.info('[%s] 合成 %.2f 秒：%s', emotion, time.perf_counter() - t0, body[:30])
