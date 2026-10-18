@@ -3,11 +3,12 @@
 
   docker compose exec agent python speaker_admin.py list
   docker compose exec agent python speaker_admin.py notes <番号>
+  docker compose exec agent python speaker_admin.py relation <番号>
   docker compose exec agent python speaker_admin.py rename <番号> <新しい呼び名>
   docker compose exec agent python speaker_admin.py delete <番号>
   docker compose exec agent python speaker_admin.py delete-all
 
-声の特徴そのものは表示しない。メモは本人の情報なので、見るのは管理のときだけにする。
+声の特徴そのものは表示しない。メモとシエルの気持ちは本人に関わる情報なので、見るのは管理のときだけにする。
 """
 import asyncio
 import os
@@ -36,6 +37,17 @@ async def main(args: list[str]) -> int:
             for (text,) in await (await conn.execute(
                     'SELECT text FROM person_notes WHERE person_id = %s ORDER BY id', (int(args[1]),))).fetchall():
                 print('-', text)
+        elif cmd == 'relation' and len(args) == 2:
+            row = await (await conn.execute(
+                'SELECT stage, feeling, mood, sessions, stage_sessions, updated_at FROM person_relationship '
+                'WHERE person_id = %s', (int(args[1]),))).fetchone()
+            if row is None:
+                print('まだ関係を書いていません')
+            else:
+                stage, feeling, mood, sessions, stage_sessions, updated = row
+                print(f'段階：{stage}（ちゃんと話した会話 {sessions}、この段階で {stage_sessions}、更新 {updated:%Y-%m-%d %H:%M}）')
+                print(f'気持ち：{feeling or "-"}')
+                print(f'気分：{mood or "-"}')
         elif cmd == 'rename' and len(args) == 3:
             n = (await conn.execute('UPDATE people SET name = %s WHERE id = %s', (args[2], int(args[1])))).rowcount
             print('直しました' if n else 'その番号の人はいません')

@@ -14,6 +14,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [presence_solo.md](config/prompts/presence_solo.md)・[presence_close.md](config/prompts/presence_close.md)・[presence_public.md](config/prompts/presence_public.md) | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前を聞く・同意を取る流れ、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
+| [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 
 本文は Markdown のソースをそのままモデルへ渡します。見出しや箇条書きを使えます。編集者向けのメモはこの README や管理方針に置いてください。`emotion.md` のタグ名は声・表情の処理が使うため維持してください。

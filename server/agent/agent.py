@@ -36,6 +36,7 @@ import irodori_tts
 import minutes
 import mode
 import notes
+import relationship
 import speaker_store
 import speakers
 import tools
@@ -193,6 +194,9 @@ async def entrypoint(ctx: JobContext) -> None:
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
+    # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
+    relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions)
+                       if note_taker is not None else None)
     # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
     minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions)
     session.userdata.minutes = minute_taker
@@ -221,6 +225,8 @@ async def entrypoint(ctx: JobContext) -> None:
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
         if note_taker is not None:
             await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
+        if relation_keeper is not None:
+            await relation_keeper.flush()   # メモを書いたあとで、関係を書き直す
         if store is not None:
             await store.close()
     ctx.add_shutdown_callback(close_store)

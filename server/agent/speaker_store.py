@@ -4,11 +4,13 @@
 - people：人（名前、声を覚える同意の日時、メモを残す同意の日時、最後に話した日時）
 - voiceprints：声の特徴（192 次元、人ごとに複数、多すぎたら古いものから消す）
 - person_notes：その人について覚えておくメモ（短い文、人ごとに上限あり。notes.py が書く）
+- person_relationship：シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分。relationship.py が書く）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
-人を消すと、声の特徴もメモも一緒に消える。管理（一覧・削除）は speaker_admin.py。
+人を消すと、声の特徴もメモも関係も一緒に消える。管理（一覧・削除）は speaker_admin.py。
 """
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
@@ -45,8 +47,27 @@ CREATE TABLE IF NOT EXISTS person_notes (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS person_notes_person ON person_notes(person_id);
+CREATE TABLE IF NOT EXISTS person_relationship (
+    person_id bigint PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE,
+    stage smallint NOT NULL DEFAULT 0,
+    feeling text NOT NULL DEFAULT '',
+    mood text NOT NULL DEFAULT '',
+    sessions integer NOT NULL DEFAULT 0,
+    stage_sessions integer NOT NULL DEFAULT 0,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
 """
 MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
+
+
+@dataclass
+class Relationship:
+    """シエルがその人をどう思っているか（1 人 1 行）"""
+    stage: int = 0            # 親しさの段階（relationship.STAGES。下げない）
+    feeling: str = ''         # シエルの気持ち（一人称の短い文）
+    mood: str = ''            # 前の会話から続く一時的な気分（拗ね・寂しさなど。次の会話で書き直す）
+    sessions: int = 0         # ちゃんと話した会話の数
+    stage_sessions: int = 0   # いまの段階になってから、ちゃんと話した会話の数
 
 
 class Store:
@@ -109,6 +130,20 @@ class Store:
     async def count_notes(self, person_id: int) -> int:
         return (await (await self.conn.execute(
             'SELECT count(*) FROM person_notes WHERE person_id = %s', (person_id,))).fetchone())[0]
+
+    async def relationship(self, person_id: int) -> 'Relationship | None':
+        row = await (await self.conn.execute(
+            'SELECT stage, feeling, mood, sessions, stage_sessions FROM person_relationship WHERE person_id = %s',
+            (person_id,))).fetchone()
+        return Relationship(*row) if row else None
+
+    async def save_relationship(self, person_id: int, r: 'Relationship') -> None:
+        await self.conn.execute(
+            'INSERT INTO person_relationship (person_id, stage, feeling, mood, sessions, stage_sessions) '
+            'VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (person_id) DO UPDATE SET stage = EXCLUDED.stage, '
+            'feeling = EXCLUDED.feeling, mood = EXCLUDED.mood, sessions = EXCLUDED.sessions, '
+            'stage_sessions = EXCLUDED.stage_sessions, updated_at = now()',
+            (person_id, r.stage, r.feeling, r.mood, r.sessions, r.stage_sessions))
 
     async def add_person(self, name: str) -> int:
         row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()

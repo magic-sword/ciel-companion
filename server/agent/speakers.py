@@ -22,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 from livekit import rtc
 
+import relationship
+
 log = logging.getLogger('ciel-agent.speakers')
 
 SR = 16000
@@ -146,6 +148,7 @@ class SessionSpeaker:
     name: str | None = None
     announced: bool = False          # 前に話した日を、この会話で伝えたか
     notes_pushed: bool = False       # その人のメモを、この会話で会話モデルに渡したか
+    relation_pushed: bool = False    # シエルとその人との関係を、この会話で会話モデルに渡したか
     split: bool = False              # 人違いだと言われて、ほかの人から分けた人
 
     def add(self, e: np.ndarray) -> None:
@@ -268,6 +271,12 @@ class SpeakerBook:
                 log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
             elif first and k.notes_ok and k.note_count and not push_notes:
                 extra += '。この人について覚えていることがある'
+            if k.notes_ok and not sp.relation_pushed and self.store is not None:
+                # シエルがその人をどう思っているか（relationship.py）。話し方の下敷きにする。
+                # 人前では、口調のための段階だけ（気持ちの中身は、ほかの人に伝わるので渡さない）
+                sp.relation_pushed = True
+                memory += relationship.context(k.name, await self.store.relationship(k.person_id), k.last_seen,
+                                               private=push_notes)
             return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
 
         # 3. 初めての人
@@ -385,9 +394,13 @@ class SpeakerBook:
             return f'{k.name}さんからは、お話を覚える同意をまだもらっていません。'
         rows = await self.store.notes(k.person_id)
         self._note_ids, self._note_owner = [i for i, _ in rows], k.person_id
+        r = await self.store.relationship(k.person_id)
+        feeling = (f'\nシエルの{k.name}さんへの気持ち（{relationship.STAGES[r.stage]}）：{r.feeling}'
+                   if r is not None and r.feeling else '')
         if not rows:
-            return f'{k.name}さんについて、まだ覚えていることはありません。'
-        return f'{k.name}さんについて覚えていること：\n' + '\n'.join(f'{n}. {t}' for n, (_, t) in enumerate(rows, 1))
+            return f'{k.name}さんについて、まだ覚えていることはありません。' + feeling
+        return (f'{k.name}さんについて覚えていること：\n' + '\n'.join(f'{n}. {t}' for n, (_, t) in enumerate(rows, 1))
+                + feeling)
 
     async def forget_notes(self, numbers: list[int]) -> str:
         k = self.current_person()
