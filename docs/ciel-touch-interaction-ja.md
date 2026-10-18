@@ -71,6 +71,7 @@ stroke は始まり（start）と終わり（end）、tap・hold は離したと
 
 - Unity：`CielTouchCheck.Run`（`-batchmode` なしで Unity.exe から実行）が会話シーンを再生し、7 通りの触れ方の判定・知らせの内容・体の反応を確かめる。[反応の一覧](../assets/ciel/rig/proofs/current/touch/reactions.png)、[記録](../assets/ciel/rig/proofs/current/touch/verification.txt)。赤い丸が触れた点。
 - 触れている点の表示：`.local/render-check/playmode-request` に `touch` と書いて Unity.exe を起動すると（`CielPlayModeShot`）、縦長の画面で触れ始め・長く触れる・頭を撫でる・ほっぺをつつく・胸に触れる、の順に再現して撮る（`.local/render-check/touch-*.png`）。[記録](../assets/ciel/rig/proofs/current/touch/visual-verification.txt)。
+- 触れたあと元へ戻るか：`CielTouchResidueCheck.Run` がほっぺをつつく・いろいろな向きへ引っ張る・画面の外まで遠く引っ張る、を続けたあと 4 秒待ち、目・ほっぺ・耳・毛皮の値が触れる前へ戻ったかを比べる（`.local/touch-residue/`）。遠くまで引くと引っ張りの計算が NaN になり、引いた側の目が細いまま戻らなかった不具合（2026-10-18 に修正）の再発を防ぐ。
 - 会話サーバー：偽の会話で、知らせの文面、返事をしない条件（話し中・間隔）、撫で終わりでの返事、不正なメッセージの無視を確かめた。`touch.py` を含めて `agent.py` を読み込めることも確認した。
 - 未確認：実際の会話での声の反応の自然さ。会話モデルが知らせの文面を読み上げないか、反応が単調にならないかは、実際に触れて確かめる。
 - 今の会話シーンの映し方では手が画面の下に切れているため、手には触れられない。

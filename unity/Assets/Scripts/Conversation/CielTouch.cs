@@ -273,11 +273,8 @@ namespace Ciel.Conversation
             }
         }
 
-        static float Tanh(float x)
-        {
-            var e = Mathf.Exp(2f * x);
-            return (e - 1f) / (e + 1f);
-        }
+        // Exp を使う式は、遠くまで引くと ∞/∞ = NaN になり、ほっぺと目が戻らなくなった（2026-10-18）
+        static float Tanh(float x) => (float)Math.Tanh(x);
 
         public void Drag(Vector2 screen)
         {
@@ -574,6 +571,9 @@ namespace Ciel.Conversation
                     _pull += _pullVel * step;
                 }
             }
+            // 万一、値が壊れても（NaN・∞）、元の形へ戻す
+            if (!float.IsFinite(_pull.x) || !float.IsFinite(_pull.y) || !float.IsFinite(_pullVel.x) || !float.IsFinite(_pullVel.y))
+                _pull = _pullTarget = _pullVel = Vector2.zero;
             var pull = _pull.magnitude;
             // 赤み：押す・引くと早く上がり、ゆっくり引く
             var blush = Mathf.Max(_pokeHeld ? 0.35f : 0f, _pulling ? 0.35f + 0.4f * pull : 0f);
