@@ -48,16 +48,17 @@ class NoteTaker:
         self._tasks: set[asyncio.Task] = set()
         self._client = openai.AsyncOpenAI()
 
-    def on_user_text(self, text: str, sp: 'speakers.SessionSpeaker | None', sure: bool) -> None:
-        """相手の発言の文字起こし（確定したもの）と、その発言の声で決めた話者（turns.py の speaker_of）"""
+    def on_user_text(self, text: str, j: 'speakers.Judgment | None') -> None:
+        """相手の発言の文字起こし（確定したもの）と、その発言の話者の判定（シエルへの [発言者：…] と同じもの）"""
         if not text.strip():
             return
-        label = (sp.name or sp.label) if sp else '不明'
+        sp, sure = (j.sp, j.sure) if j is not None else (None, False)
+        label = speakers.SpeakerBook.label(j)   # 「ハカセ」「たぶんハカセ」「知らない人A」「不明」
         # 発言した人（この会話の話者）を、同意の前でも付けておく（メモリーの中だけ）。
         # この会話の途中で名乗って同意した人も、同意の前に話したこと（「ミルクティーが好き」など）を
         # メモにできるように（覚えたあとは sp.person_id が付く）。書くのは同意してから（_write が確かめる）。
-        # 「たぶん」の発言・短くて決められなかった発言は、誰の発言か確かでないので、本人の発言にしない
-        owner = sp if sp is not None and (sp.person_id is None or sure) else None
+        # 「たぶん」の発言・短くて決められなかった発言は、誰の発言か確かでないので、誰の発言にもしない
+        owner = sp if sp is not None and sure else None
         self.lines.append((owner, label, text.strip()))
         if owner is None or owner.person_id is None:
             return

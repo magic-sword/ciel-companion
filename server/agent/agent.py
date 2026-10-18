@@ -215,14 +215,14 @@ async def entrypoint(ctx: JobContext) -> None:
             for t in takers:
                 t.on_split(old, new)
         book.on_split = on_split
-    # 文字起こしが確定するたびに、その発言の声で誰の発言かを決めてから、記録係・議事録の係に渡す（turns.py の speaker_of）。
+    # 文字起こしが確定するたびに、その発言の区間の判定（シエルへの [発言者：…] と同じ。turns.py の speaker_of）を添えて、記録係・議事録の係に渡す。
     # 「最後に判定した人」を使うと、ほかの人の発言が前の人の発言になり、メモに混ざった（2026-10-18）
     pending_texts: set[asyncio.Task] = set()
 
     async def to_takers(text: str, segment) -> None:
-        owner, sure = await replies.speaker_of(segment)
+        j = await replies.speaker_of(segment)   # シエルへの [発言者：…] と同じ判定
         for t in takers:
-            t.on_user_text(text, owner, sure)
+            t.on_user_text(text, j)
 
     def on_final_text(ev) -> None:
         if not ev.is_final:

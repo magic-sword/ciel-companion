@@ -32,15 +32,18 @@
   ひかえめのとき・シエルが話しているときは打たない。
 - 話しながらシエルに触れたとき（touch.py が知らせを持っている）は、その発言の [発言者：…] の後ろにタッチの 1 行を添える
   （その声の人が触ったと分かる）。ひかえめで呼ばれていなくても、触れられたら返事を作らせる。
-- 文字起こしが確定するたびに、その発言の区間（話し始め〜話し終わり）の声で、誰の発言かを決める（speaker_of）。
-  メモの記録係・議事録の係が使う。返事を作るかどうかに関係なく、発言ごとに必ず決める。「最後に判定した人」を使うと、
+- 会話モデルの側が区切った発言（区間）ごとに、話し終わったらすぐ、その声で誰が話したかを 1 回だけ決める（_judge）。
+  返事を作らせるときの「[発言者：…]」も、文字起こしの話者（メモの記録係・議事録の係。speaker_of）も、この判定を使う
+  （別々に計算すると、同じ発言でも食い違うことがあった）。返事を作るかどうかに関係なく、発言ごとに必ず決める。「最後に判定した人」を使うと、
   ひかえめで返事をしない発言・小さな声・判定より先に届いた文字起こしが、前の人の発言になってしまったため（2026-10-18）。
   区間と文字起こしは、どちらも会話モデルの側の区切りごとに 1 つずつ届くので、古い順に組にする。
 """
 import asyncio
+import collections
 import logging
 import re
 import time
+from dataclasses import dataclass
 
 import numpy as np
 from livekit.agents import AgentSession
@@ -80,6 +83,14 @@ LOUD_SECONDS = 0.2
 SEGMENT_KEEP_SECONDS = 20.0
 
 
+@dataclass
+class Segment:
+    """会話モデルの側が区切った発言 1 つ（話し始め〜話し終わり）と、その声での話者の判定（裏で決める）"""
+    start: float
+    end: float
+    judgment: 'asyncio.Task | None'   # speakers.Judgment を返す。ECAPA が無いときは None
+
+
 class TurnReplies:
     def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, style,
                  quiet_turn: str, backchannel=None) -> None:
@@ -106,7 +117,8 @@ class TurnReplies:
         self._nod_at = 0.0                        # 最後に話の途中の相づちを打った時刻
         self._tasks: set[asyncio.Task] = set()
         self._segment_start: float | None = None             # いま話している発言の話し始め（区間ごと。返事とは別）
-        self._segments: list[tuple[float, float]] = []      # 文字起こしをまだ組にしていない発言の区間
+        self._segments: list[Segment] = []                  # 文字起こしをまだ組にしていない発言の区間
+        self._recent: collections.deque[Segment] = collections.deque(maxlen=20)   # 最近の発言の区間（返事のため）
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -131,30 +143,55 @@ class TurnReplies:
             self._speaking = False
             self._ended_at = ev.created_at
             if self._segment_start is not None:
-                self._segments.append((self._segment_start, ev.created_at))
+                seg = Segment(self._segment_start, ev.created_at,
+                              self._start_judging(self._segment_start, ev.created_at))
+                self._segments.append(seg)   # 文字起こしと組にする
+                self._recent.append(seg)     # 返事を作らせるときに使う
                 self._segment_start = None
             if self._pending:
                 self._reply_later(STALE_SECONDS)
 
-    def take_segment(self) -> tuple[float, float] | None:
+    def take_segment(self) -> 'Segment | None':
         """文字起こしが 1 つ確定した：それと組になる発言の区間（一番古いもの）。文字起こしが届いた順に呼ぶこと"""
         now = time.time()
-        self._segments = [s for s in self._segments if now - s[1] < SEGMENT_KEEP_SECONDS]
+        self._segments = [s for s in self._segments if now - s.end < SEGMENT_KEEP_SECONDS]
         return self._segments.pop(0) if self._segments else None
 
-    async def speaker_of(self, segment: tuple[float, float] | None) -> tuple['speakers.SessionSpeaker | None', bool]:
-        """その区間の声で、誰の発言かを決める（speakers.SpeakerBook.attribute）。決められなければ（None, False）"""
-        if segment is None or self.book is None:
-            return None, False
-        seconds, pending = self._embed(*segment)
+    async def speaker_of(self, segment: 'Segment | None') -> 'speakers.Judgment | None':
+        """その区間の判定（話し終わりに 1 回だけ決めたもの。シエルへの [発言者：…] と同じ）。無ければ None"""
+        if segment is None or segment.judgment is None:
+            return None
+        return await segment.judgment
+
+    def _start_judging(self, start: float, end: float) -> 'asyncio.Task | None':
+        """話し終わった区間の声で、誰が話したかを裏で決め始める（返事と文字起こしの両方が、この結果を使う）"""
+        if self.book is None or self.encoder is None:
+            return None
+        t = asyncio.create_task(self._judge(start, end))
+        self._tasks.add(t)
+        t.add_done_callback(self._tasks.discard)
+        return t
+
+    async def _judge(self, start: float, end: float) -> 'speakers.Judgment | None':
+        seconds, pending = self._embed(start, end)
         try:
             e = await pending if pending is not None else None
         except Exception:
             log.exception('発言の声の特徴を計算できない')
-            return None, False
-        sp, sure = self.book.attribute(e, seconds)
+            return None
+        j = self.book.judge(e, seconds)
         self.style.on_voices(len(self.book.speakers))   # ひかえめで返事をしないときも、ほかの人の声に気づく
-        return sp, sure
+        return j
+
+    async def _judgment_for(self, start: float, end: float) -> 'speakers.Judgment | None':
+        """返事を作らせる発言（start〜end。区切りが続いた発言は、いくつかの区間をまとめたもの）の判定。
+        話者が分かった区間のうち、一番新しいものを使う（「シエル、」のような短い区間は不明になるので）。
+        区間がまだ無いとき（話し終わりの知らせより先に返事を作らせた）は、その場で決める"""
+        segs = [s for s in self._recent if start - 0.01 <= s.start and s.end <= end + 0.01 and s.judgment is not None]
+        if not segs:
+            return await self._judge(start, end)
+        judgments = [await s.judgment for s in segs]
+        return next((j for j in reversed(judgments) if j is not None and j.sp is not None), judgments[-1])
 
     def on_transcribed(self, ev: UserInputTranscribedEvent) -> None:
         if not ev.is_final:
@@ -238,13 +275,12 @@ class TurnReplies:
         t.add_done_callback(self._tasks.discard)
 
     async def _settle_then_reply(self, start: float, end: float, settle: float) -> None:
-        voice = self._embed(start, end)   # 待つあいだに、声の特徴を計算しておく
-        await asyncio.sleep(settle)
+        await asyncio.sleep(settle)   # 待つあいだに、話者の判定は裏で進んでいる（_start_judging）
         if self._speaking:
             return
         self._early = None
         self._forget()
-        await self._reply(start, end, voice)
+        await self._reply(start, end)
 
     def _cancel_early(self) -> None:
         if self._early is not None:
@@ -311,7 +347,7 @@ class TurnReplies:
             return seconds, None
         return seconds, asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
 
-    async def _reply(self, start: float, end: float, voice: tuple[float, asyncio.Future | None] | None = None) -> None:
+    async def _reply(self, start: float, end: float) -> None:
         extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
         # 相づち（aizuchi.py）：ひかえめ（黙ると決めることがある）と短い発言には流さない
         if (self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS
@@ -326,14 +362,12 @@ class TurnReplies:
             self.session.generate_reply(**extra)
             return
         t0 = time.perf_counter()
-        seconds, pending = voice if voice is not None else self._embed(start, end)
-        e = await pending if pending is not None else None
+        j = await self._judgment_for(start, end)
         presence = self.style.presence
-        line = await self.book.identify(e, seconds, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
-        self.style.on_voices(len(self.book.speakers))
+        line = await self.book.identify(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
         if self.book.last is not None:
             self.book.last_at = time.monotonic()   # 最後に話した人を、触った人とみなせる時間（touch.py）
-        log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, seconds)
+        log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, j.seconds if j else 0.0)
         touch = self.touch.take() if self.touch is not None else None
         if touch is not None:
             line = (line + '\n' + touch) if line is not None else touch

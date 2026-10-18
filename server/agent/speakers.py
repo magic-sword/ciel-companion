@@ -32,8 +32,11 @@ LEAD_SECONDS = 0.8           # 「話し始めた」の知らせは実際より�
 MAX_SECONDS = 8.0            # 長い発言は最後の 8 秒だけ使う（計算を軽くする）
 MIN_VOICED = float(os.environ.get('CIEL_SPK_MIN_SECONDS', '1.0'))   # これより短い発言は「不明」
 # コサイン類似度の基準（Zoom を通した声で測って決める。docs/decisions/speaker-identification-ja.md）
-MATCH = float(os.environ.get('CIEL_SPK_MATCH', '0.45'))   # これ以上なら同じ人
-MAYBE = float(os.environ.get('CIEL_SPK_MAYBE', '0.35'))   # これ以上なら「たぶん」
+MATCH = float(os.environ.get('CIEL_SPK_MATCH', '0.45'))   # この会話で聞いた（まだ覚えていない）人は、これ以上なら同じ人
+# 覚えている人は、これ以上なら「確か」（メモの元にしてよい）。0.45 では、覚えている人しかいない会話の最初に、
+# ほかの人の発言が 0.47 で「確か」になった（2026-10-18）。本人は 0.60〜0.88 だった
+SURE = float(os.environ.get('CIEL_SPK_SURE', '0.55'))
+MAYBE = float(os.environ.get('CIEL_SPK_MAYBE', '0.35'))   # これ以上なら「たぶん」（覚えている人も、この会話の人も）
 ADAPT = float(os.environ.get('CIEL_SPK_ADAPT', '0.60'))   # これ以上なら、覚えている人の見本に足す
 MAX_SESSION_EMBEDDINGS = 20
 MAX_ADAPT_PER_SESSION = 3
@@ -156,6 +159,16 @@ class SessionSpeaker:
         del self.embeddings[:-MAX_SESSION_EMBEDDINGS]
 
 
+@dataclass
+class Judgment:
+    """発言 1 つの、誰が話したかの判定（SpeakerBook.judge）。シエルへの [発言者：…] と記録係が同じものを使う"""
+    sp: SessionSpeaker | None            # 話した人。None は「不明」（短い・声の特徴が無い）
+    sure: bool                           # 確かか（False は「たぶん」）
+    e: np.ndarray | None = None          # 声の特徴（人違いを直すとき・見本に足すときに使う）
+    seconds: float = 0.0                 # 声のある長さ
+    score: float = -1.0                  # 類似度
+
+
 def best_score(e: np.ndarray, embeddings: list[np.ndarray]) -> float:
     """見本の中で似ている上位 3 つの平均（見本が 1 つなら、それとの類似度）"""
     if not embeddings:
@@ -214,104 +227,105 @@ class SpeakerBook:
             self.speakers.append(sp)
         return sp
 
-    def attribute(self, e: np.ndarray | None, seconds: float) -> tuple[SessionSpeaker | None, bool]:
-        """文字起こし 1 つ分の声から、誰の発言かを決める（メモの記録係・議事録の係が使う）。
-        返事を作るときの identify とは別に、発言ごとに必ず動く（ひかえめで返事をしないときも）。
-        「直前の人のまま」とはみなさない：短い・判定できない発言は（None, False）。似た声で自信がなければ（その人, False）。
-        会話モデルには何も渡さず、覚えている人の見本も足さない。初めての声は、この会話の知らない人として区別する"""
+    def judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
+        """発言 1 つ（話し始め〜話し終わりの区間）の声で、誰が話したかを 1 回だけ決める（turns.py が話し終わりに呼ぶ）。
+        この結果を、シエルへの「[発言者：…]」（identify）と、メモの記録係・議事録の係（文字起こしの話者）の両方に使う
+        （別々に計算すると、同じ発言でも食い違うことがあったため。2026-10-18）。
+        - この会話で聞いた人（まだ覚えていない人）：MATCH 以上なら同じ人。MAYBE 以上なら「たぶん」その人（新しい人を作らない）。
+        - 覚えている人：SURE 以上で、次に近い人との差が MARGIN 以上なら「確か」。MAYBE 以上なら「たぶん」。
+        - どちらにも近くなければ、初めての声として、この会話の知らない人を作る。
+        - 短い・声の特徴が無い発言は「不明」（sp が None）。"""
         if e is None or seconds < MIN_VOICED:
-            return None, False
+            log.info('話者：短い発言（声 %.1f 秒）', seconds)
+            return Judgment(None, False, e, seconds)
         k_score, k, s_score, s, runner_up = self._scores(e)
-        if s is not None and s_score >= MATCH and s_score >= k_score:
-            return s, True
+        if s is not None and s_score >= MAYBE and s_score >= k_score:
+            sure = s_score >= MATCH
+            if sure:
+                s.add(e)   # 「たぶん」の声は見本に足さない（別の人の声が混ざらないように）
+            log.info('話者：この会話の %s（%.2f%s）', '名前を聞いた人' if s.name else s.label, s_score,
+                     '' if sure else '、たぶん')
+            return Judgment(s, sure, e, seconds, s_score)
         if k is not None and k_score >= MAYBE:
-            return self._session_for(k), k_score >= MATCH and k_score - runner_up >= MARGIN
+            sure = k_score >= SURE and k_score - runner_up >= MARGIN
+            sp = self._session_for(k)
+            sp.add(e)
+            log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s）', k.person_id, k_score, k_score - runner_up,
+                     '' if sure else '、たぶん')
+            return Judgment(sp, sure, e, seconds, k_score)
         sp = SessionSpeaker(label=self._new_unknown_label())
         sp.add(e)
         self.speakers.append(sp)
-        log.info('話者（発言の記録）：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
-        return sp, True
+        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
+        return Judgment(sp, True, e, seconds, max(k_score, s_score))
 
-    async def identify(self, e: np.ndarray | None, seconds: float, solo: bool = False,
-                       push_notes: bool = False) -> str | None:
-        """発言の声の特徴から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
+    @staticmethod
+    def label(j: 'Judgment | None') -> str:
+        """記録係・議事録の係に渡す話者の呼び名（シエルへの [発言者：…] と同じ言葉）"""
+        if j is None or j.sp is None:
+            return '不明'
+        name = j.sp.name or j.sp.label
+        return name if j.sure else 'たぶん' + name
+
+    async def identify(self, j: 'Judgment | None', solo: bool = False, push_notes: bool = False) -> str | None:
+        """発言の判定（judge の結果）から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
         solo（ふたりきり）のとき、短くて判定できない発言は、直前の人のままとみなして何も足さない
         （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。
         push_notes のとき、本人のメモを渡す（その場にいる人が、ひとり・身近な人のとき。mode.py）。
         この会話でまだ渡していなければ、途中で渡せるようになったときにも渡す。"""
-        if e is None or seconds < MIN_VOICED:
-            log.info('話者：%s（声 %.1f 秒）', '短い発言（直前の人のまま）' if solo else '不明', seconds)
+        if j is None or j.sp is None:
             if solo:
                 return None
             self.last = None
             return '[発言者：不明]'
-
+        e, sp, sure, score, seconds = j.e, j.sp, j.sure, j.score, j.seconds
         self.last_embedding, self.last_rows, self.last_sure = e, [], False
-        k_score, k, s_score, s, runner_up = self._scores(e)
-
-        # 1. この会話で聞いた、まだ覚えていない人
-        if s is not None and s_score >= MATCH and s_score >= k_score:
-            s.add(e)
-            self.last = s
-            log.info('話者：この会話の %s（%.2f）', '名前を聞いた人' if s.name else s.label, s_score)
-            return self._session_tag(s)
-
-        # 2. 覚えている人
-        if k is not None and k_score >= MAYBE:
-            score = k_score
-            sp = self._session_for(k)
-            sp.add(e)
-            self.last = sp
-            sure = score >= MATCH and score - runner_up >= MARGIN
-            log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s）', k.person_id, score, score - runner_up,
-                     '' if sure else '、たぶん')
-            if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
-                    and self._adapted < MAX_ADAPT_PER_SESSION and self.store):
-                # よく当たった声を見本に足して、マイクや部屋が変わっても当たるようにしていく
-                # （人違いだと言われたら、split で消せるように、足した行を覚えておく）
-                self._adapted += 1
-                k.embeddings.append(e)
-                self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds)
-            if self.store:
-                await self.store.touch(k.person_id)
-            self.last_sure = sure
-            if not sure:
-                return f'[発言者：たぶん{k.name}（声を覚えている人）]'
-            extra, memory = '', ''
-            first = not sp.announced
-            if first:
-                # この会話で初めて分かったときだけ、前に話した日と、同意のことを添える（本人が話しているときだけ）
-                sp.announced = True
-                if k.last_seen is not None:
-                    extra += f'。前に話したのは{jst(k.last_seen)}'
-                if not k.notes_ok:
-                    extra += '。お話を覚える同意はまだ'
-            if k.notes_ok and k.note_count and push_notes and not sp.notes_pushed and self.store is not None:
-                # ひとり・身近な人のときは、本人のメモ（最近の分だけ）を渡す。どう使うかは presence_*.md。
-                # 人前のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
-                sp.notes_pushed = True
-                rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
-                today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
-                memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
-                          + '／'.join(t for _, t in rows) + ']')
-                log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
-            elif first and k.notes_ok and k.note_count and not push_notes:
-                extra += '。この人について覚えていることがある'
-            if k.notes_ok and not sp.relation_pushed and self.store is not None:
-                # シエルがその人をどう思っているか（relationship.py）。話し方の下敷きにする。
-                # 人前では、口調のための段階だけ（気持ちの中身は、ほかの人に伝わるので渡さない）
-                sp.relation_pushed = True
-                memory += relationship.context(k.name, await self.store.relationship(k.person_id), k.last_seen,
-                                               private=push_notes)
-            return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
-
-        # 3. 初めての人
-        sp = SessionSpeaker(label=self._new_unknown_label())
-        sp.add(e)
-        self.speakers.append(sp)
         self.last = sp
-        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
-        return self._session_tag(sp)
+        k = next((k for k in self.known if k.person_id == sp.person_id), None) if sp.person_id is not None else None
+        if k is None:
+            # この会話で聞いた、まだ覚えていない人（判定のあとで名前を聞いた人も）
+            return self._session_tag(sp, sure)
+
+        # 覚えている人
+        if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
+                and self._adapted < MAX_ADAPT_PER_SESSION and self.store):
+            # よく当たった声を見本に足して、マイクや部屋が変わっても当たるようにしていく
+            # （人違いだと言われたら、split で消せるように、足した行を覚えておく）
+            self._adapted += 1
+            k.embeddings.append(e)
+            self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds)
+        if self.store:
+            await self.store.touch(k.person_id)
+        self.last_sure = sure
+        if not sure:
+            return f'[発言者：たぶん{k.name}（声を覚えている人）]'
+        extra, memory = '', ''
+        first = not sp.announced
+        if first:
+            # この会話で初めて分かったときだけ、前に話した日と、同意のことを添える（本人が話しているときだけ）
+            sp.announced = True
+            if k.last_seen is not None:
+                extra += f'。前に話したのは{jst(k.last_seen)}'
+            if not k.notes_ok:
+                extra += '。お話を覚える同意はまだ'
+        if k.notes_ok and k.note_count and push_notes and not sp.notes_pushed and self.store is not None:
+            # ひとり・身近な人のときは、本人のメモ（最近の分だけ）を渡す。どう使うかは presence_*.md。
+            # 人前のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
+            sp.notes_pushed = True
+            rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
+            today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+            memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
+                      + '／'.join(t for _, t in rows) + ']')
+            log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
+        elif first and k.notes_ok and k.note_count and not push_notes:
+            extra += '。この人について覚えていることがある'
+        if k.notes_ok and not sp.relation_pushed and self.store is not None:
+            # シエルがその人をどう思っているか（relationship.py）。話し方の下敷きにする。
+            # 人前では、口調のための段階だけ（気持ちの中身は、ほかの人に伝わるので渡さない）
+            sp.relation_pushed = True
+            memory += relationship.context(k.name, await self.store.relationship(k.person_id), k.last_seen,
+                                           private=push_notes)
+        return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
 
     async def split(self, name: str = '') -> str:
         """人違いを直す：直前の発言を、判定された人から外し、別の人としてこの会話で区別する。
@@ -344,11 +358,13 @@ class SpeakerBook:
         return f'わかりました。直前の発言は{old}さんではない、別の方として区別します（呼び名：{new.label}）。お名前を聞いてください。'
 
     @staticmethod
-    def _session_tag(sp: 'SessionSpeaker') -> str:
-        """まだ声を覚えていない人。名前を聞いたかどうかも伝える（覚えている人と区別できるように）"""
+    def _session_tag(sp: 'SessionSpeaker', sure: bool = True) -> str:
+        """まだ声を覚えていない人。名前を聞いたかどうかも伝える（覚えている人と区別できるように）。
+        似た声で自信がなければ「たぶん」を付ける"""
+        maybe = '' if sure else 'たぶん'
         if sp.name:
-            return f'[発言者：{sp.name}（名前はこの会話の間だけ。声は覚えていない）]'
-        return f'[発言者：{sp.label}（まだ名前を知らない人）]'
+            return f'[発言者：{maybe}{sp.name}（名前はこの会話の間だけ。声は覚えていない）]'
+        return f'[発言者：{maybe}{sp.label}（まだ名前を知らない人）]'
 
     def find(self, label: str) -> SessionSpeaker | None:
         label = label.strip().strip('[]').replace('発言者：', '').removeprefix('たぶん').split('（')[0]
