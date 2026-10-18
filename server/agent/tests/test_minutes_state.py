@@ -149,7 +149,8 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         self.m.start()
         await replies._reply(1, 2)
         extra = session.generate_reply.call_args.kwargs
-        self.assertEqual(extra['user_input'], 'speaker metadata')
+        self.assertNotIn('user_input', extra)
+        self.assertIn('speaker metadata', extra['instructions'])
         self.assertTrue(json.loads(extra['instructions'].split('[議事録状態]\n')[1])['recording'])
 
     async def test_retention_loss_is_reported_in_status(self):

@@ -75,11 +75,20 @@ class RelationKeeper:
                 log.warning('関係 #%d を書けない：%s', pid, type(e).__name__)
 
     async def _update(self, pid: int, n_turns: int) -> None:
+        for _ in range(3):
+            if await self._update_once(pid, n_turns) is not False:
+                return
+        log.info('関係 #%d：同時更新のため今回は保存を見送る', pid)
+
+    async def _update_once(self, pid: int, n_turns: int) -> bool | None:
         store = self.book.store
         k = next((k for k in self.book.known if k.person_id == pid), None)
         if store is None or k is None or not k.notes_ok or (n_turns < 2 and pid not in self.note_taker.forgotten):
             return
-        current = await store.relationship(pid)
+        snapshot = await store.memory_snapshot(pid)
+        if snapshot is None or not snapshot['consent'] or snapshot['blocked']:
+            return
+        current = snapshot['relationship']
         first = current is None
         r = current or Relationship()
         if n_turns >= MIN_TURNS:
@@ -89,13 +98,14 @@ class RelationKeeper:
         lines = self.history.personal_lines()[-CONTEXT_LINES:]
         request = {
             'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
-            'person': k.name,
+            'person': snapshot['name'],
             'first': first,
             'stages': [f'{i}：{s}' for i, s in enumerate(STAGES)],
             'current': None if first else {'stage': r.stage, 'feeling': r.feeling, 'mood': r.mood},
             'can_stage_up': can_up,
-            'notes': [t for _, t in await store.notes(pid)],
-            'forget_requests': self.note_taker.forgotten.get(pid, []),
+            'notes': [t for _, t in snapshot['notes']],
+            'forget_requests': list(dict.fromkeys([*self.note_taker.forgotten.get(pid, []),
+                                                   *(f['request'] for f in snapshot['forgets'])])),
             'days_since_last_talk': (datetime.now(timezone.utc) - k.last_seen).days if k.last_seen else None,
             'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                              for o, who, text in lines],
@@ -118,6 +128,7 @@ class RelationKeeper:
             r.feeling = feeling.strip()[:MAX_FEELING_CHARS]
         if isinstance(mood, str):
             r.mood = mood.strip()[:MAX_MOOD_CHARS]
-        await store.save_relationship(pid, r)
+        if not await store.apply_relationship(pid, snapshot, r):
+            return False
         log.info('関係 #%d：段階 %d → %d（ちゃんと話した会話 %d、この段階で %d）%s', pid, before, r.stage,
                  r.sessions, r.stage_sessions, '、初めて書いた' if first else '')

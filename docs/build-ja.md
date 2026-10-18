@@ -194,5 +194,7 @@ exit
 
 ## アプリで確かめたこと・まだのこと
 
+2026-10-18追加：[複数端末の独立した会話](decisions/independent-conversations-ja.md)に合わせ、接続ごとに別の部屋を要求するWindowsビルドに成功。固定トークン（Literal）は使用せず、DevelopmentTokenServerまたは `room_name` に対応したEndpointを設定する。サーバーの共有記憶・音声合成の改善は本番未反映。実端末2台の同時会話とAndroid再ビルドは未確認。
+
 - Windows：ビルド・起動・会話・仮想ケーブルへの出力を確認済み（2026-10-15）。
 - Android：ビルドは確認済み（2026-10-15、APK 約 58 MB、arm64-v8a、API 26 以上、権限の宣言も確認）。**実機での起動・マイクの許可・会話は未確認。**

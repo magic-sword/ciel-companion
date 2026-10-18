@@ -17,8 +17,12 @@ import logging
 import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+import uuid
+from concurrent.futures import CancelledError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit, parse_qs
+
+from scheduler import FairScheduler, QueueFull
 
 sys.path.insert(0, '/opt/irodori')
 import numpy as np
@@ -44,11 +48,19 @@ RT = InferenceRuntime.from_key(RuntimeKey(
     checkpoint=download_hf_checkpoint('Aratako/Irodori-TTS-v4.1-Small'), model_device='cuda',
     model_precision='bf16', codec_device='cuda', codec_precision='bf16'))
 # 合成は 1 つの決まったスレッドで行う（新しいスレッドで初めて合成すると 1 秒ほど余計にかかったため）
-WORKER = ThreadPoolExecutor(max_workers=1)
+WORKER = FairScheduler()
 
 
-def synthesize(text: str, caption: str | None, seconds: float | None = None, **options):
-    return WORKER.submit(_synthesize, text, caption, seconds, **options).result()
+def synthesize(text: str, caption: str | None, seconds: float | None = None,
+               session_id='legacy', request_id=None, **options):
+    request_id = request_id or uuid.uuid4().hex
+    future = WORKER.submit(session_id, request_id, lambda: _synthesize(text, caption, seconds, **options))
+    try:
+        result, queued = future.result(timeout=30)
+        log.info('synthesis session=%s request=%s queue_ms=%.0f', session_id, request_id, queued * 1000)
+        return (*result, queued)
+    finally:
+        WORKER.cancel(session_id, request_id)
 
 
 def _synthesize(text: str, caption: str | None, seconds: float | None = None, **options):
@@ -60,17 +72,32 @@ def _synthesize(text: str, caption: str | None, seconds: float | None = None, **
                                       **length, **options), log_fn=None)
     audio = r.audio.squeeze().float().cpu().numpy()
     dt = time.perf_counter() - t
-    log.info('合成 %.2f 秒 / 音声 %.2f 秒：%s', dt, len(audio) / r.sample_rate, text[:30])
+    log.info('synthesis compute_ms=%.0f audio_ms=%.0f', dt * 1000, len(audio) / r.sample_rate * 1000)
     pcm = (np.clip(audio, -1, 1) * 32767).astype('<i2').tobytes()
     return pcm, r.sample_rate
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_DELETE(self):
+        path = urlsplit(self.path)
+        if not path.path.startswith('/synthesize/'):
+            self.send_error(404)
+            return
+        session = parse_qs(path.query).get('session_id', [''])[0]
+        WORKER.cancel(session, path.path.removeprefix('/synthesize/'))
+        self.send_response(204)
+        self.end_headers()
+
     def do_POST(self):
         if self.path != '/synthesize':
             self.send_error(404)
             return
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        session_id, request_id = body.get('session_id', 'legacy'), body.get('request_id', uuid.uuid4().hex)
+        if any(not isinstance(v, str) or not v or len(v) > 128 or not all(c.isalnum() or c in '-_' for c in v)
+               for v in (session_id, request_id)):
+            self.send_error(400, 'invalid session or request ID')
+            return
         text = str(body.get('text', '')).strip()
         if not text:
             self.send_error(400, 'text is empty')
@@ -96,7 +123,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(400, 'cfg_caption / cfg_speaker must be 0-10, seed an integer')
             return
         try:
-            pcm, sr = synthesize(text, body.get('caption'), seconds, **options)
+            pcm, sr, queued = synthesize(text, body.get('caption'), seconds,
+                                        session_id=session_id, request_id=request_id, **options)
+        except QueueFull:
+            self.send_error(429, 'synthesis queue is full')
+            return
+        except (TimeoutError, CancelledError):
+            self.send_error(408, 'synthesis expired or cancelled')
+            return
         except Exception as e:   # 1 文の失敗でサービスを止めない
             log.exception('合成に失敗')
             self.send_error(500, str(e)[:200])
@@ -104,6 +138,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', 'audio/pcm')
         self.send_header('X-Sample-Rate', str(sr))
+        self.send_header('X-Queue-Ms', str(round(queued * 1000)))
         self.send_header('Content-Length', str(len(pcm)))
         self.end_headers()
         self.wfile.write(pcm)

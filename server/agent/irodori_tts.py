@@ -4,14 +4,49 @@
 会話モデルには文字だけを作らせ、その文字を 1 文ずつこのサービスでシエルの声にする。
 1 文ずつに分けるのは StreamAdapter（日本語の 。！？ で区切る basic の文の区切り）。
 """
+import asyncio
+import hashlib
+import logging
 import os
+import time
 import uuid
 
 import aiohttp
-from livekit.agents import APIConnectionError, APIConnectOptions, tokenize, tts
+from livekit.agents import APIConnectionError, APIConnectOptions, get_job_context, tokenize, tts
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS
 
 URL = os.environ.get('CIEL_TTS_URL', 'http://127.0.0.1:8766/synthesize')
+SESSION_ID = uuid.uuid4().hex  # A job process belongs to one conversation; no personal identifiers.
+log = logging.getLogger('ciel-agent.tts')
+
+
+async def request_audio(http: aiohttp.ClientSession, body: dict, *, session_id=None) -> tuple[bytes, int]:
+    if session_id is None:
+        ctx = get_job_context(required=False)
+        session_id = hashlib.sha256(ctx.job.id.encode()).hexdigest()[:24] if ctx else SESSION_ID
+    request_id = uuid.uuid4().hex
+    complete = False
+    started = time.monotonic()
+    try:
+        async with http.post(URL, json={**body, 'session_id': session_id, 'request_id': request_id},
+                             timeout=aiohttp.ClientTimeout(total=30)) as r:
+            r.raise_for_status()
+            pcm = await r.read()
+            complete = True
+            log.info('tts session=%s request=%s queue_ms=%s total_ms=%.0f', session_id, request_id,
+                     r.headers.get('X-Queue-Ms', 'unknown'), (time.monotonic() - started) * 1000)
+            return pcm, int(r.headers.get('X-Sample-Rate', '48000'))
+    finally:
+        if not complete:
+            # Use a separate short-lived connection: the interrupted request may have closed its session.
+            async def cancel():
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as control:
+                    async with control.delete(URL + '/' + request_id, params={'session_id': session_id}):
+                        pass
+            try:
+                await asyncio.shield(cancel())
+            except (Exception, asyncio.CancelledError):
+                pass  # The server also discards jobs that expire before starting.
 
 
 class IrodoriTTS(tts.TTS):
@@ -36,15 +71,11 @@ class _Chunked(tts.ChunkedStream):
     async def _run(self, output_emitter: tts.AudioEmitter) -> None:
         t: IrodoriTTS = self._tts  # type: ignore[assignment]
         try:
-            async with t._http().post(URL, json={'text': self._input_text},
-                                      timeout=aiohttp.ClientTimeout(total=30)) as r:
-                r.raise_for_status()
-                sr = int(r.headers.get('X-Sample-Rate', t.sample_rate))
-                output_emitter.initialize(request_id=str(uuid.uuid4()), sample_rate=sr, num_channels=1,
-                                          mime_type='audio/pcm')
-                async for chunk in r.content.iter_chunked(8192):
-                    output_emitter.push(chunk)
-                output_emitter.flush()
+            pcm, sr = await request_audio(t._http(), {'text': self._input_text})
+            output_emitter.initialize(request_id=str(uuid.uuid4()), sample_rate=sr, num_channels=1,
+                                      mime_type='audio/pcm')
+            output_emitter.push(pcm)
+            output_emitter.flush()
         except aiohttp.ClientError as e:
             raise APIConnectionError(f'Irodori-TTS の読み上げサービスにつながらない: {e}') from e
 

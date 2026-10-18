@@ -12,7 +12,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [talk_quiet_turn.md](config/prompts/talk_quiet_turn.md) | ひかえめのとき、返事を作らせるたびに添える短い念押し。処理は `turns.py` |
 | [talk_chatty.md](config/prompts/talk_chatty.md)・[talk_chatty_nudge.md](config/prompts/talk_chatty_nudge.md) | おしゃべり度「おしゃべり」で、自分から話しかけるときの決まりと、しばらく静かなときに渡す合図。処理は `initiative.py` |
 | [presence_solo.md](config/prompts/presence_solo.md)・[presence_close.md](config/prompts/presence_close.md)・[presence_public.md](config/prompts/presence_public.md) | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
-| [speakers.md](config/prompts/speakers.md) | 話している人（`[発言者：…]`）の読み方、名前の一時設定・同意後の永続保存、`get_speaker_status` による本人の保存確認、人についての道具（`tools/people.py`）の使い方 |
+| [speakers.md](config/prompts/speakers.md) | 発言者の補足情報、自己紹介・他者紹介の仮名簿、本人確認と同意後の永続保存、本人の保存状態の確認、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
 | [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/decisions/conversation-history-ja.md) |
 | [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/decisions/meeting-minutes-ja.md) |
@@ -33,6 +33,8 @@ VS Code では `Alt+Z` で行を折り返し、Markdown の `Ctrl+K` → `V` で
 別の設定を使う場合は TOML と本文を用意し、`.env` の `CIEL_PERSONA_CONFIG=config/別の設定.toml` で選びます。環境変数の相対パスは `server/agent/` 基準、TOML 内の相対パスはその TOML のディレクトリ基準です。絶対パスも指定できます。Docker Compose ではマウントされる `config/` 内に配置してください。`.env` の変更後はサーバーの再起動が必要です（自宅サーバーの `~/work/ciel-companion/server` で `docker compose up -d`）。
 
 ## ローカルで読み込みを確認する
+
+複数端末の独立した会話、DBの版番号による記憶の同期・競合検知、音声合成の待機制御は[決定記録](../../docs/decisions/independent-conversations-ja.md)を参照。共通履歴は部屋をまたいで共有しません。DB結合テストの使い捨て接続先も同記録に記載しています。
 
 Python 3.11 以降で、`server/agent/` から実行します。LiveKit や API キーは不要です。
 

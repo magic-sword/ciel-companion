@@ -124,7 +124,10 @@ class ConsumersTests(unittest.IsolatedAsyncioTestCase):
 
     def make_notes(self, consent=True):
         known = SimpleNamespace(person_id=1, name='博士', notes_ok=consent, note_count=0)
-        store = SimpleNamespace(notes=AsyncMock(return_value=[]), change_notes=AsyncMock(), count_notes=AsyncMock(return_value=1))
+        store = SimpleNamespace(memory_snapshot=AsyncMock(return_value={
+            'revision': 1, 'name': '博士', 'consent': True, 'notes': [], 'relationship': None,
+            'forgets': [], 'blocked': False}), apply_notes=AsyncMock(return_value=True),
+            count_notes=AsyncMock(return_value=1))
         taker = notes.NoteTaker(SimpleNamespace(known=[known], store=store), 'test', self.h)
         payloads = []
 

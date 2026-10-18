@@ -155,6 +155,9 @@ class SessionSpeaker:
     relation_pushed: bool = False    # シエルとその人との関係を、この会話で会話モデルに渡したか
     split: bool = False              # 人違いだと言われて、ほかの人から分けた人
     speaker_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    notes_context: str = ''
+    relation_context: dict[bool, str] = field(default_factory=dict)
+    memory_suppressed: bool = False
 
     def add(self, e: np.ndarray) -> None:
         self.embeddings.append(e)
@@ -169,6 +172,21 @@ class Judgment:
     e: np.ndarray | None = None          # 声の特徴（人違いを直すとき・見本に足すときに使う）
     seconds: float = 0.0                 # 声のある長さ
     score: float = -1.0                  # 類似度
+
+
+@dataclass
+class NameRegistration:
+    name: str
+    source: str
+    introduced_by: str | None = None
+    registration_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    speaker_id: str | None = None
+    stage: str = 'pending_identity'
+
+    def view(self) -> dict:
+        return {'registration_id': self.registration_id, 'proposed_name': self.name,
+                'source': self.source, 'introduced_by': self.introduced_by,
+                'bound_speaker_id': self.speaker_id, 'registration_state': self.stage}
 
 
 def best_score(e: np.ndarray, embeddings: list[np.ndarray]) -> float:
@@ -196,12 +214,64 @@ class SpeakerBook:
         self.on_split = None           # 人違いを直したとき呼ぶ（conversation.Conversation.on_split）
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
         self._identity_lock = asyncio.Lock()
+        self.name_registrations: dict[str, NameRegistration] = {}  # この接続だけの仮名簿、最大64件
+        self.current_turns: list = []  # この返答の元発言。本人訂正の確認に使う（本文はログに出さない）
+        self._versions: dict[int, int] = {}
+        self._shared_available = True
 
     async def load(self) -> None:
         if self.store is not None:
             self.known = [Known(pid, name, embs, seen, disputed=False, notes_ok=ok, note_count=n)
                           for pid, name, embs, seen, ok, n in await self.store.load_all()]
         log.info('覚えている人：%d 人', len(self.known))
+
+    async def refresh(self) -> None:
+        """Refresh committed shared memory before judging a turn, without sharing conversation history."""
+        if self.store is None or not hasattr(self.store, 'versions'):
+            return
+        async with self._identity_lock:
+            try:
+                versions = await self.store.versions()
+                self._shared_available = True
+                if versions == self._versions:
+                    return
+                changed = {pid for pid in versions.keys() | self._versions.keys()
+                           if versions.get(pid) != self._versions.get(pid)}
+                old = {k.person_id: k for k in self.known}
+                rows = await self.store.load_all()
+                self.known = [Known(pid, name, embs, old[pid].last_seen if pid in old else seen,
+                                    disputed=old[pid].disputed if pid in old else False, notes_ok=ok, note_count=n)
+                              for pid, name, embs, seen, ok, n in rows]
+                live = {k.person_id: k for k in self.known}
+                for sp in self.speakers:
+                    pid = sp.person_id
+                    if pid is None or pid not in changed:
+                        continue
+                    sp.notes_pushed, sp.notes_context = False, ''
+                    sp.relation_context.clear()
+                    if pid not in live:
+                        sp.person_id, sp.name = None, None
+                        sp.memory_suppressed = True
+                        for entry in self.name_registrations.values():
+                            if entry.speaker_id == sp.speaker_id:
+                                entry.speaker_id, entry.stage = None, 'pending_identity'
+                    else:
+                        sp.name = live[pid].name
+                        snapshot = await self.store.memory_snapshot(pid)
+                        sp.memory_suppressed = snapshot is None or snapshot['blocked'] or not snapshot['consent']
+                        for entry in self.name_registrations.values():
+                            if entry.speaker_id == sp.speaker_id:
+                                entry.name = sp.name
+                self._versions = versions
+            except Exception as e:
+                self._versions = {}
+                self._shared_available = False
+                for sp in self.speakers:
+                    sp.notes_context = ''
+                    sp.notes_pushed = False
+                    sp.relation_context.clear()
+                    sp.memory_suppressed = True
+                log.warning('共有記憶を更新できない error=%s', type(e).__name__)
 
     def _new_unknown_label(self) -> str:
         i = self._unknown_count
@@ -276,6 +346,7 @@ class SpeakerBook:
         （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。
         push_notes のとき、本人のメモを渡す（その場にいる人が、ひとり・身近な人のとき。mode.py）。
         この会話でまだ渡していなければ、途中で渡せるようになったときにも渡す。"""
+        await self.refresh()
         if j is None or j.sp is None:
             if solo:
                 return None
@@ -289,6 +360,9 @@ class SpeakerBook:
             # この会話で聞いた、まだ覚えていない人（判定のあとで名前を聞いた人も）
             self.last_sure = sure
             return self._session_tag(sp, sure)
+        if not self._shared_available:
+            self.last_sure = sure
+            return f'[発言者：{k.name}（保存情報は現在確認できないため、以前のメモは使わない）]'
 
         # 覚えている人
         if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
@@ -303,6 +377,13 @@ class SpeakerBook:
         self.last_sure = sure
         if not sure:
             return f'[発言者：たぶん{k.name}（声を覚えている人）]'
+        snapshot = None
+        if self.store is not None and hasattr(self.store, 'memory_snapshot'):
+            snapshot = await self.store.memory_snapshot(k.person_id)
+            if snapshot is None or snapshot['blocked'] or not snapshot['consent']:
+                sp.memory_suppressed = True
+                sp.notes_context = ''
+                sp.relation_context.clear()
         extra, memory = '', ''
         first = not sp.announced
         if first:
@@ -312,23 +393,27 @@ class SpeakerBook:
                 extra += f'。前に話したのは{jst(k.last_seen)}'
             if not k.notes_ok:
                 extra += '。お話を覚える同意はまだ'
-        if k.notes_ok and k.note_count and push_notes and not sp.notes_pushed and self.store is not None:
+        if k.notes_ok and k.note_count and push_notes and not sp.notes_pushed and not sp.memory_suppressed and self.store is not None:
             # ひとり・身近な人のときは、本人のメモ（最近の分だけ）を渡す。どう使うかは presence_*.md。
             # 人前のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
-            sp.notes_pushed = True
-            rows = (await self.store.notes(k.person_id))[-PUSH_NOTES:]
+            rows = (snapshot['notes'] if snapshot is not None else await self.store.notes(k.person_id))[-PUSH_NOTES:]
             today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
-            memory = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
+            sp.notes_context = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
                       + '／'.join(t for _, t in rows) + ']')
+            sp.notes_pushed = True
             log.info('話者：#%d のメモ %d 件を会話モデルに渡した', k.person_id, len(rows))
         elif first and k.notes_ok and k.note_count and not push_notes:
             extra += '。この人について覚えていることがある'
-        if k.notes_ok and not sp.relation_pushed and self.store is not None:
+        memory = sp.notes_context if push_notes and not sp.memory_suppressed else ''
+        if k.notes_ok and not sp.memory_suppressed and self.store is not None:
             # シエルがその人をどう思っているか（relationship.py）。話し方の下敷きにする。
             # 人前では、口調のための段階だけ（気持ちの中身は、ほかの人に伝わるので渡さない）
+            if push_notes not in sp.relation_context:
+                sp.relation_context[push_notes] = relationship.context(
+                    k.name, snapshot['relationship'] if snapshot is not None else await self.store.relationship(k.person_id),
+                    k.last_seen, private=push_notes)
             sp.relation_pushed = True
-            memory += relationship.context(k.name, await self.store.relationship(k.person_id), k.last_seen,
-                                           private=push_notes)
+            memory += sp.relation_context[push_notes]
         return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
 
     async def split(self, name: str = '') -> str:
@@ -380,11 +465,14 @@ class SpeakerBook:
         sp = sp or self.last
         if sp is None:
             return {'status': 'no_speaker', 'available': True, 'identity_certain': False,
-                    'storage_available': self.store is not None}
+                    'storage_available': self.store is not None,
+                    'name_registrations': [r.view() for r in self.name_registrations.values()]}
         state = {'status': 'ok', 'available': True, 'speaker_id': sp.speaker_id, 'name': sp.name,
                  'session_label': sp.label, 'identity_certain': self.last is sp and self.last_sure,
                  'storage_available': self.store is not None, 'name_scope': 'session' if sp.name else 'unknown',
                  'name_saved': False, 'voice_saved': False, 'voice_sample_count': 0, 'notes_consented': False}
+        state['name_registrations'] = [r.view() for r in self.name_registrations.values()
+                                       if r.speaker_id is None or r.speaker_id == sp.speaker_id]
         if sp.person_id is not None:
             if self.store is None:
                 return {**state, 'status': 'storage_unavailable', 'name_saved': None, 'voice_saved': None}
@@ -399,21 +487,99 @@ class SpeakerBook:
                              voice_sample_count=saved['voice_sample_count'], notes_consented=saved['notes_consented'])
         return state
 
+    def roster(self) -> dict:
+        return {'scope': 'current_session', 'registrations': [r.view() for r in self.name_registrations.values()],
+                'heard_speakers': [{'speaker_id': s.speaker_id, 'name': s.name, 'label': s.label}
+                                   for s in self.speakers]}
+
+    def _propose_name(self, name: str, self_introduction: bool) -> tuple[NameRegistration | None, str]:
+        name = plain_name(name)
+        if not name or len(name) > 100:
+            return None, 'invalid_name'
+        current = self.last.speaker_id if self.last is not None else None
+        source = 'self' if self_introduction else 'introduced'
+        if self_introduction:
+            matches = [r for r in self.name_registrations.values() if r.name == name and (
+                r.speaker_id is None or (current is not None and r.speaker_id == current))]
+        else:
+            matches = [r for r in self.name_registrations.values() if r.name == name
+                       and r.source == source and current is not None and r.introduced_by == current]
+        if len(matches) > 1:
+            return None, 'ambiguous_name'
+        if matches:
+            return matches[0], 'ok'
+        if len(self.name_registrations) >= 64:
+            return None, 'registration_limit'
+        entry = NameRegistration(name, source, None if self_introduction else current)
+        self.name_registrations[entry.registration_id] = entry
+        return entry, 'ok'
+
+    async def register_name(self, name: str, self_introduction: bool = False, *, confirm_identity: bool = True) -> dict:
+        async with self._identity_lock:
+            entry, status = self._propose_name(name, self_introduction)
+            if entry is None:
+                return {'status': status}
+            if self_introduction and confirm_identity:
+                return await self._confirm_name(entry, name, False)
+            return {'status': entry.stage, **entry.view()}
+
+    async def confirm_name(self, registration_id: str, confirmed_name: str, remember: bool = False) -> dict:
+        async with self._identity_lock:
+            entry = self.name_registrations.get(registration_id)
+            if entry is None:
+                return {'status': 'registration_not_found', 'scope': 'current_session'}
+            return await self._confirm_name(entry, confirmed_name, remember)
+
+    async def _confirm_name(self, entry: NameRegistration, confirmed_name: str, remember: bool) -> dict:
+        info = entry.view()
+        if plain_name(confirmed_name) != entry.name:
+            return {'status': 'name_mismatch', **info}
+        sp = self.last
+        if sp is None or not self.last_sure:
+            return {'status': 'pending_identity', **info, 'identity_certain': False}
+        if entry.source == 'introduced' and entry.introduced_by == sp.speaker_id:
+            return {'status': 'introduced_person_must_confirm', **info}
+        if entry.speaker_id is not None and entry.speaker_id != sp.speaker_id:
+            return {'status': 'not_current_speaker', **info}
+        if sp.name is not None and plain_name(sp.name) != entry.name:
+            return {'status': 'name_conflict', **info}
+        # 先に会話中の本人対応を確定する。DB保存の失敗でこの確認まで失わない。
+        result = await self._name(sp.speaker_id, entry.name, False)
+        if result['status'] in ('session_named', 'already_named', 'already_saved'):
+            entry.speaker_id = sp.speaker_id
+            entry.stage = 'saved' if result.get('voice_saved') and result.get('name_saved') else 'session_named'
+            if remember:
+                result = await self._name(sp.speaker_id, entry.name, True)
+                if result.get('voice_saved') and result.get('name_saved'):
+                    entry.stage = 'saved'
+        if 'name_registrations' in result:
+            result['name_registrations'] = [r.view() for r in self.name_registrations.values()
+                                            if r.speaker_id is None or r.speaker_id == sp.speaker_id]
+        return {**result, **entry.view()}
+
     async def name(self, label: str, name: str, remember: bool) -> dict:
         async with self._identity_lock:
             return await self._name(label, name, remember)
 
     async def _name(self, label: str, name: str, remember: bool) -> dict:
         sp = self.find(label) if label else self.last
-        if sp is None:
-            return {'status': 'speaker_not_found' if label else 'no_speaker'}
-        if sp is not self.last:
-            return {'status': 'not_current_speaker', 'speaker_id': sp.speaker_id}
         name = plain_name(name)
         if not name or len(name) > 100:
             return {'status': 'invalid_name'}
+        if sp is None:
+            if not label and not remember:
+                entry, status = self._propose_name(name, True)
+                return {'status': 'pending_identity', **entry.view()} if entry else {'status': status}
+            return {'status': 'speaker_not_found' if label else 'no_speaker'}
+        if sp is not self.last:
+            return {'status': 'not_current_speaker', 'speaker_id': sp.speaker_id}
         if not self.last_sure:
+            if not remember:
+                entry, status = self._propose_name(name, True)
+                return {'status': 'pending_identity', **entry.view()} if entry else {'status': status}
             return {'status': 'identity_uncertain', 'speaker_id': sp.speaker_id}
+        if sp.person_id is not None and sp.name is not None and plain_name(sp.name) != name:
+            return {'status': 'name_conflict', 'speaker_id': sp.speaker_id}
         current = await self.speaker_status(sp)
         if current['status'] in ('storage_error', 'storage_unavailable'):
             return current
@@ -451,6 +617,10 @@ class SpeakerBook:
             self.last_sure = True   # 本人が同意したので、この会話ではメモを読み書きしてよい
         log.info('話者：#%d として声を覚えた（見本 %d）', sp.person_id, len(new))
         state = await self.speaker_status(sp)
+        if state['name_saved'] and state['voice_saved']:
+            for entry in self.name_registrations.values():
+                if entry.speaker_id == sp.speaker_id:
+                    entry.stage = 'saved'
         return {**state, 'status': 'saved' if state['name_saved'] and state['voice_saved'] else 'save_unverified'}
 
     # ---- その人について覚えておくメモ（読むのは本人が話しているときだけ。書くのは notes.py が裏で） ----
@@ -474,13 +644,22 @@ class SpeakerBook:
         return f'{k.name}さんのお話を、少しずつ覚えていきます。'
 
     async def recall(self) -> str:
+        await self.refresh()
         k = self.current_person()
         if k is None or self.store is None:
             return 'いま話している方が誰か確かではないので、覚えていることは読めません。'
         if not k.notes_ok:
             return f'{k.name}さんからは、お話を覚える同意をまだもらっていません。'
-        rows = await self.store.notes(k.person_id)
-        r = await self.store.relationship(k.person_id)
+        if hasattr(self.store, 'memory_snapshot'):
+            snapshot = await self.store.memory_snapshot(k.person_id)
+            if snapshot is None or not snapshot['consent']:
+                return '保存された記憶を確認できません。'
+            if snapshot['blocked']:
+                return '忘れる依頼を処理中なので、以前のメモは読みません。'
+            rows, r = snapshot['notes'], snapshot['relationship']
+        else:
+            rows = await self.store.notes(k.person_id)
+            r = await self.store.relationship(k.person_id)
         feeling = (f'\nシエルの{k.name}さんへの気持ち（{relationship.STAGES[r.stage]}）：{r.feeling}'
                    if r is not None and r.feeling else '')
         if not rows:
@@ -504,12 +683,22 @@ class SpeakerBook:
             return f'呼び名は「{old}」のままです。'
         if sp.person_id is None:
             sp.name = new
+            sp.notes_pushed, sp.notes_context = False, ''
+            sp.relation_context.clear()
+            for entry in self.name_registrations.values():
+                if entry.speaker_id == sp.speaker_id:
+                    entry.name = new
             return f'呼び名を「{old}」から「{new}」に直しました（この会話の間だけ。声は保存していません）。'
         if self.store is not None:
             await self.store.rename(sp.person_id, new)
         else:
             return '記録の場所が使えないので、保存済みの呼び名は変更できません。'
         sp.name = new
+        sp.notes_pushed, sp.notes_context = False, ''
+        sp.relation_context.clear()
+        for entry in self.name_registrations.values():
+            if entry.speaker_id == sp.speaker_id:
+                entry.name = new
         for k in self.known:
             if k.person_id == sp.person_id:
                 k.name = new
@@ -536,15 +725,22 @@ class SpeakerBook:
         return 'この会話で声を聞いた人：' + '、'.join(parts)
 
     async def forget(self, name: str) -> str:
+        async with self._identity_lock:
+            return await self._forget(name)
+
+    async def _forget(self, name: str) -> str:
         """本人の依頼のときだけ：直前の発言者が、その名前の覚えている人であること"""
         sp = self.last
-        if sp is None or sp.person_id is None or plain_name(name) not in (sp.name, sp.label):
+        if sp is None or not self.last_sure or sp.person_id is None or plain_name(name) not in (sp.name, sp.label):
             return 'ご本人からの依頼のときだけ消せます。消したい方ご本人に、もう一度お願いしてもらってください。'
         pid = sp.person_id
         if self.store is not None:
             await self.store.delete_person(pid)
         self.known = [k for k in self.known if k.person_id != pid]
         self.speakers.remove(sp)
+        for entry in self.name_registrations.values():
+            if entry.speaker_id == sp.speaker_id:
+                entry.speaker_id, entry.stage = None, 'pending_identity'
         self.last = None
         log.info('話者：#%d の声の記録を消した', pid)
         return f'「{name}」さんの声の記録を消しました。'

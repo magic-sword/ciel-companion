@@ -191,6 +191,7 @@ class TurnReplies:
         except Exception:
             log.exception('発言の声の特徴を計算できない')
             return None
+        await self.book.refresh()
         j = self.book.judge(e, seconds)
         self.style.on_voices(len(self.book.speakers))   # ひかえめで返事をしないときも、ほかの人の声に気づく
         return j
@@ -360,6 +361,8 @@ class TurnReplies:
         return seconds, asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
 
     async def _reply(self, start: float, end: float) -> None:
+        if self.book is not None:
+            self.book.current_turns = []
         extra = {'instructions': self.quiet_turn} if self.style.talk == 'quiet' else {}
         # 相づち（aizuchi.py）：ひかえめ（黙ると決めることがある）と短い発言には流さない
         if (self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS
@@ -375,6 +378,10 @@ class TurnReplies:
             return
         t0 = time.perf_counter()
         j = await self._judgment_for(start, end)
+        self.book.current_turns = [s.turn for s in self._recent
+                                   if start - 0.01 <= s.start and s.end <= end + 0.01 and s.turn is not None]
+        if not self.book.current_turns and self.history is not None:
+            self.book.current_turns = [t for t in self.history.turns if t.role == 'user' and start <= t.at <= end]
         presence = self.style.presence
         line = await self.book.identify(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
         if self.book.last is not None:
@@ -382,9 +389,9 @@ class TurnReplies:
         log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, j.seconds if j else 0.0)
         touch = self.touch.take() if self.touch is not None else None
         if touch is not None:
-            line = (line + '\n' + touch) if line is not None else touch
+            extra['user_input'] = touch
         if line is not None:
-            extra['user_input'] = line
+            extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), line)))
         latency.mark('返事を頼んだ')
         self._generate_reply(extra)
 

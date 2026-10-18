@@ -8,6 +8,8 @@
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
 人を消すと、声の特徴もメモも関係も一緒に消える。管理（一覧・削除）は speaker_admin.py。
 """
+import asyncio
+import functools
 import logging
 import os
 from dataclasses import dataclass
@@ -56,6 +58,52 @@ CREATE TABLE IF NOT EXISTS person_relationship (
     stage_sessions integer NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS memory_versions (
+    person_id bigint PRIMARY KEY,
+    revision bigint NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS memory_forgets (
+    id bigserial PRIMARY KEY,
+    person_id bigint NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    request text NOT NULL,
+    pending boolean NOT NULL DEFAULT true
+);
+CREATE INDEX IF NOT EXISTS memory_forgets_person ON memory_forgets(person_id);
+CREATE OR REPLACE FUNCTION ciel_memory_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE pid bigint;
+BEGIN
+    IF TG_TABLE_NAME = 'people' THEN
+        IF TG_OP = 'DELETE' THEN pid := OLD.id; ELSE pid := NEW.id; END IF;
+    ELSE
+        IF TG_OP = 'DELETE' THEN pid := OLD.person_id; ELSE pid := NEW.person_id; END IF;
+    END IF;
+    INSERT INTO memory_versions(person_id, revision) VALUES(pid, 1)
+        ON CONFLICT(person_id) DO UPDATE SET revision = memory_versions.revision + 1;
+    RETURN NULL;
+END $$;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ciel_people_changed') THEN
+        CREATE TRIGGER ciel_people_changed AFTER INSERT OR DELETE OR UPDATE OF name, notes_consented_at
+            ON people FOR EACH ROW EXECUTE FUNCTION ciel_memory_changed();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ciel_notes_changed') THEN
+        CREATE TRIGGER ciel_notes_changed AFTER INSERT OR UPDATE OR DELETE
+            ON person_notes FOR EACH ROW EXECUTE FUNCTION ciel_memory_changed();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ciel_relationship_changed') THEN
+        CREATE TRIGGER ciel_relationship_changed AFTER INSERT OR UPDATE OR DELETE
+            ON person_relationship FOR EACH ROW EXECUTE FUNCTION ciel_memory_changed();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ciel_voice_changed') THEN
+        CREATE TRIGGER ciel_voice_changed AFTER INSERT OR UPDATE OR DELETE
+            ON voiceprints FOR EACH ROW EXECUTE FUNCTION ciel_memory_changed();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ciel_forgets_changed') THEN
+        CREATE TRIGGER ciel_forgets_changed AFTER INSERT OR UPDATE OR DELETE
+            ON memory_forgets FOR EACH ROW EXECUTE FUNCTION ciel_memory_changed();
+    END IF;
+END $$;
+INSERT INTO memory_versions(person_id) SELECT id FROM people ON CONFLICT DO NOTHING;
 """
 MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
 
@@ -70,9 +118,27 @@ class Relationship:
     stage_sessions: int = 0   # いまの段階になってから、ちゃんと話した会話の数
 
 
+def serialized(method):
+    """A connection's transaction belongs to one task, including nested Store calls."""
+    @functools.wraps(method)
+    async def call(self, *args, **kwargs):
+        task = asyncio.current_task()
+        if self._owner is task:
+            return await method(self, *args, **kwargs)
+        async with self._lock:
+            self._owner = task
+            try:
+                return await method(self, *args, **kwargs)
+            finally:
+                self._owner = None
+    return call
+
+
 class Store:
     def __init__(self, conn: psycopg.AsyncConnection) -> None:
         self.conn = conn
+        self._lock = asyncio.Lock()
+        self._owner = None
 
     @classmethod
     async def open(cls) -> 'Store | None':
@@ -81,12 +147,17 @@ class Store:
         if not url:
             log.warning('CIEL_DB_URL が無いので、人の声は会話の間だけ覚える')
             return None
+        conn = None
         try:
             conn = await psycopg.AsyncConnection.connect(url, autocommit=True, connect_timeout=5)
-            await conn.execute(SCHEMA)
+            async with conn.transaction():
+                await conn.execute('SELECT pg_advisory_xact_lock(734921864)')
+                await conn.execute(SCHEMA)
             await register_vector_async(conn)
             return cls(conn)
         except Exception as e:
+            if conn is not None:
+                await conn.close()
             log.warning('記録の場所（DB）へつなげない：%s', type(e).__name__)
             return None
 
@@ -192,3 +263,71 @@ class Store:
 
     async def delete_person(self, person_id: int) -> None:
         await self.conn.execute('DELETE FROM people WHERE id = %s', (person_id,))
+
+    async def versions(self) -> dict[int, int]:
+        return dict(await (await self.conn.execute('SELECT person_id, revision FROM memory_versions')).fetchall())
+
+    async def memory_snapshot(self, person_id: int) -> dict | None:
+        # One statement: revision, notes and forget barriers describe the same committed snapshot.
+        row = await (await self.conn.execute(
+            "SELECT v.revision, p.name, p.notes_consented_at IS NOT NULL, "
+            "COALESCE((SELECT jsonb_agg(jsonb_build_array(id, text) ORDER BY updated_at, id) "
+            "FROM person_notes WHERE person_id=p.id), '[]'::jsonb), "
+            "(SELECT jsonb_build_array(stage, feeling, mood, sessions, stage_sessions) "
+            "FROM person_relationship WHERE person_id=p.id), "
+            "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'request', request, 'pending', pending) "
+            "ORDER BY id) FROM memory_forgets WHERE person_id=p.id), '[]'::jsonb) "
+            "FROM people p JOIN memory_versions v ON v.person_id=p.id WHERE p.id=%s",
+            (person_id,))).fetchone()
+        if row is None:
+            return None
+        return dict(revision=row[0], name=row[1], consent=row[2], notes=row[3],
+                    relationship=Relationship(*row[4]) if row[4] else None, forgets=row[5],
+                    blocked=any(f['pending'] for f in row[5]))
+
+    async def _lock_revision(self, person_id: int, revision: int) -> bool:
+        person = await (await self.conn.execute('SELECT id FROM people WHERE id=%s FOR UPDATE',
+                                               (person_id,))).fetchone()
+        if person is None:
+            return False
+        row = await (await self.conn.execute(
+            'SELECT revision FROM memory_versions WHERE person_id=%s FOR UPDATE', (person_id,))).fetchone()
+        return row is not None and row[0] == revision
+
+    async def apply_notes(self, person_id: int, snapshot: dict, add: list[str],
+                          update: dict[int, str], delete: list[int]) -> bool:
+        async with self.conn.transaction():
+            if not await self._lock_revision(person_id, snapshot['revision']):
+                return False
+            await self.change_notes(person_id, add, update, delete)
+            ids = [f['id'] for f in snapshot['forgets'] if f['pending']]
+            if ids:
+                await self.conn.execute('UPDATE memory_forgets SET pending=false WHERE person_id=%s AND id=ANY(%s)',
+                                        (person_id, ids))
+            return True
+
+    async def apply_relationship(self, person_id: int, snapshot: dict, relation: Relationship) -> bool:
+        async with self.conn.transaction():
+            if not await self._lock_revision(person_id, snapshot['revision']) or snapshot['blocked']:
+                return False
+            await self.save_relationship(person_id, relation)
+            return True
+
+    async def request_forget(self, person_id: int, request: str) -> bool:
+        async with self.conn.transaction():
+            row = await (await self.conn.execute('SELECT id FROM people WHERE id=%s FOR UPDATE',
+                                                (person_id,))).fetchone()
+            if row is None:
+                return False
+            await self.conn.execute('INSERT INTO memory_forgets(person_id, request) VALUES(%s,%s)',
+                                    (person_id, request.strip()[:500]))
+            # Suppress stale relationship text immediately, while the asynchronous writer removes notes.
+            await self.conn.execute("UPDATE person_relationship SET feeling='', mood='' WHERE person_id=%s",
+                                    (person_id,))
+            return True
+
+
+# All public connection operations are serialized; a transaction cannot absorb another task's writes.
+for _method in tuple(vars(Store)):
+    if _method != 'open' and asyncio.iscoroutinefunction(getattr(Store, _method)):
+        setattr(Store, _method, serialized(getattr(Store, _method)))

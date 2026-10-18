@@ -252,6 +252,25 @@ namespace Ciel.Conversation
             public string participant_token;
         }
 
+        [Serializable] class TokenVideoGrant { public string room; }
+        [Serializable] class TokenClaims { public TokenVideoGrant video; }
+
+        // 署名の検証は接続先の LiveKit が行う。ここでは取得先が指定した部屋を守ったか確認する。
+        static bool IsTokenForRoom(string token, string roomName)
+        {
+            if (string.IsNullOrEmpty(token)) return false;
+            var parts = token.Split('.');
+            if (parts.Length != 3) return false;
+            try
+            {
+                var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                payload = payload.PadRight((payload.Length + 3) / 4 * 4, '=');
+                var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                return JsonUtility.FromJson<TokenClaims>(json)?.video?.room == roomName;
+            }
+            catch (Exception) { return false; }
+        }
+
         // 接続のトークンを取る。LiveKit の TokenSourceComponent は .NET の HttpClient を使い、エディタの再生中に
         // スクリプトの再読み込みが起きて、シエルが描かれなくなった。Unity の UnityWebRequest で同じ要求を送る。
         // 開発用トークンサーバー（DevelopmentTokenServer）と、任意の取得先（Endpoint）に対応する。
@@ -272,12 +291,14 @@ namespace Ciel.Conversation
                     if (config.EndpointHeaders != null) foreach (var h in config.EndpointHeaders) headers.Add((h.key, h.value));
                     break;
                 case TokenSourceType.Literal:
-                    done(config.ServerUrl, config.Token);
+                    Debug.LogError("[CielConversation] 接続ごとに別の部屋が必要です。トークン取得先を DevelopmentTokenServer または Endpoint に設定してください。");
                     yield break;
                 default:
                     yield break;
             }
-            var body = string.IsNullOrEmpty(config.RoomName) ? "{}" : $"{{\"room_name\":\"{config.RoomName}\"}}";
+            // 接続ごとに独立した会話にする。端末名・利用者名は部屋名に入れない。
+            var roomName = "ciel-" + Guid.NewGuid().ToString("N");
+            var body = $"{{\"room_name\":\"{roomName}\"}}";
             using var req = new UnityEngine.Networking.UnityWebRequest(url, "POST");
             req.uploadHandler = new UnityEngine.Networking.UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
             req.downloadHandler = new UnityEngine.Networking.DownloadHandlerBuffer();
@@ -286,10 +307,15 @@ namespace Ciel.Conversation
             yield return req.SendWebRequest();
             if (req.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[CielConversation] トークンを取得できない: {req.error} {req.downloadHandler?.text}");
+                Debug.LogError($"[CielConversation] トークンを取得できない: {req.error}");
                 yield break;
             }
             var d = JsonUtility.FromJson<ConnectionDetailsJson>(req.downloadHandler.text);
+            if (d == null || string.IsNullOrEmpty(d.server_url) || !IsTokenForRoom(d.participant_token, roomName))
+            {
+                Debug.LogError("[CielConversation] 指定した部屋のトークンを取得できません。取得先の room_name 対応を確認してください。");
+                yield break;
+            }
             done(d.server_url, d.participant_token);
         }
 

@@ -145,10 +145,7 @@ async def synthesize(session: aiohttp.ClientSession, text: str, caption: str,
     """読み上げる。seconds を渡すと、その長さの音声にする（省略すると Irodori-TTS が決める）。
     style は効き方（STYLE。省略すると Irodori-TTS の既定）"""
     body = {'text': text, 'caption': caption} | ({} if seconds is None else {'seconds': seconds}) | (style or {})
-    async with session.post(irodori_tts.URL, json=body,
-                            timeout=aiohttp.ClientTimeout(total=30)) as r:
-        r.raise_for_status()
-        return await r.read(), int(r.headers.get('X-Sample-Rate', '48000'))
+    return await irodori_tts.request_audio(session, body)
 
 
 def frames(pcm: bytes, sr: int):
@@ -180,7 +177,7 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
         pcm, sr = await synthesize(http, with_emoji(body, emotion), CAPTIONS[emotion], style=STYLE)
         latency.mark('最初の声')
         dur_ms = int(len(pcm) / 2 / sr * 1000)
-        log.info('[%s] 合成 %.2f 秒：%s', emotion, time.perf_counter() - t0, body[:30])
+        log.info('[%s] 合成 %.2f 秒', emotion, time.perf_counter() - t0)
         if backchannel is not None:
             await backchannel.wait()   # 相づちが鳴り終わってから話す
         await events.send(emotion, ttl_ms=dur_ms + 1500)

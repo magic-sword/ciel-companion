@@ -25,6 +25,7 @@ async def remember_about_speaker(context: RunContext, note: str):
     book = state.book
     if book is None or state.notes is None:
         return NO_SPEAKERS
+    await book.refresh()
     k = book.current_person()
     if k is None:
         return 'いま話している方が、声を覚えている方だと確かではないので、覚えられません。'
@@ -43,12 +44,23 @@ async def forget_about_speaker(context: RunContext, what: str):
     book = state.book
     if book is None or state.notes is None:
         return NO_SPEAKERS
+    await book.refresh()
     k = book.current_person()
     if k is None:
         return 'いま話している方が、声を覚えている方だと確かではないので、受け付けられません。ご本人にもう一度言ってもらってください。'
     # 当てはまるメモを消すのは記録係（notes.py）が裏で、中身で決める。シエルの気持ちからも、会話の終わりに外す（relationship.py）
     # 返事は道具のあとに作らせる（会話モデルは、先に話さずに道具だけ呼ぶことが多く、返事なしで黙ってしまうため）
+    if not what.strip():
+        return '忘れる内容を教えてください。'
+    if book.store is not None and hasattr(book.store, 'request_forget'):
+        if not await book.store.request_forget(k.person_id, what):
+            return '保存されている本人情報を確認できませんでした。'
     state.notes.forget(k.person_id, what)
+    # 補足情報のキャッシュから、削除前のメモや気持ちを再注入しない。
+    sp = book.last
+    sp.memory_suppressed = True
+    sp.notes_context = ''
+    sp.relation_context.clear()
     return '忘れました。この会話でも、もうその話はしない。'
 
 

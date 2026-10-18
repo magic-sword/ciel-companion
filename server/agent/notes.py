@@ -129,12 +129,24 @@ class NoteTaker:
             self._tasks.difference_update(tasks)
 
     async def _write(self, pid: int) -> None:
+        for _ in range(3):
+            try:
+                if await self._write_once(pid) is not False:
+                    return
+            except Exception as e:
+                log.warning('メモ #%d：保存を再試行する error=%s', pid, type(e).__name__)
+                self._arm_timer()
+                return
+        log.info('メモ #%d：同時更新のため次の機会に再試行', pid)
+        self._arm_timer()
+
+    async def _write_once(self, pid: int) -> bool | None:
         lock = self._locks.setdefault(pid, asyncio.Lock())
         async with lock:
             start, end = self._done.get(pid, 0), self.history.settled_through()
             turns = self.history.between(start, end)
-            requested = self._requested.pop(pid, [])
-            forgets = self._forgets.pop(pid, [])
+            requested = self._requested.get(pid, [])
+            forgets = self._forgets.get(pid, [])
             if (not requested and not forgets
                     and not any(t.owner is not None and t.owner.person_id == pid for t in turns)):
                 return
@@ -148,13 +160,19 @@ class NoteTaker:
                 end = batch[-1].id
             window = [(t.owner, t.name, t.text) for t in self.history.between(through=end)[-CONTEXT_LINES:]
                       if t.ready.is_set() and t.text]
-            existing = await store.notes(pid)
+            snapshot = await store.memory_snapshot(pid)
+            if snapshot is None or not snapshot['consent']:
+                return
+            requested = self._requested.pop(pid, [])
+            forgets = self._forgets.pop(pid, [])
+            existing = snapshot['notes']
             request = {
                 'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
-                'person': k.name,
+                'person': snapshot['name'],
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
                 'requested_notes': requested,
-                'forget_requests': list(dict.fromkeys([*self.forgotten.get(pid, []), *forgets])),
+                'forget_requests': list(dict.fromkeys([*self.forgotten.get(pid, []), *forgets,
+                                                      *(f['request'] for f in snapshot['forgets'])])),
                 'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                                  for o, who, text in window],
             }
@@ -174,9 +192,17 @@ class NoteTaker:
             update = {int(u['id']): u['text'].strip()[:MAX_NOTE_CHARS] for u in result.get('update', [])
                       if isinstance(u, dict) and u.get('id') in valid and isinstance(u.get('text'), str) and u['text'].strip()}
             delete = [int(i) for i in result.get('delete', []) if i in valid and i not in update]
-            if add or update or delete:
-                await store.change_notes(pid, add, update, delete)
-                k.note_count = await store.count_notes(pid)
+            try:
+                committed = await store.apply_notes(pid, snapshot, add, update, delete)
+            except Exception:
+                self._requested.setdefault(pid, [])[:0] = requested
+                self._forgets.setdefault(pid, [])[:0] = forgets
+                raise
+            if not committed:
+                self._requested.setdefault(pid, [])[:0] = requested
+                self._forgets.setdefault(pid, [])[:0] = forgets
+                return False
+            k.note_count = await store.count_notes(pid)
             current = self._done.get(pid, 0)
             self._done[pid] = min(end, current) if current != start else end
             self._count[pid] = sum(t.owner is not None and t.owner.person_id == pid
