@@ -3,7 +3,7 @@
 
 - 持つもの（speaker_store.Relationship、1 人 1 行）：親しさの段階（STAGES）、シエルの気持ち（一人称の短い文）、
   次の会話まで続く一時的な気分（ちょっと拗ねている、など）。
-- 書くのは会話が終わるとき 1 回だけ。その会話の文字起こし（notes.NoteTaker がためたもの）と、今の関係・メモを
+- 書くのは会話が終わるとき 1 回だけ。その会話の共通履歴（conversation.Conversation）と、今の関係・メモを
   文字のモデル（CIEL_NOTES_MODEL）に渡して書き直してもらう。指示は config/prompts/relationship.md。
 - 段階は下げない。上げるのは 1 回の会話で 1 つまで、しかも今の段階で何回か（STAGE_UP_SESSIONS）ちゃんと話してから。
   ちょっとした会話で急に親しくなったり冷めたりしないように、上げてよいかはここで決め、モデルには「上げるか」だけ聞く。
@@ -53,16 +53,17 @@ def context(name: str, r: Relationship | None, last_seen: datetime | None, priva
 
 
 class RelationKeeper:
-    def __init__(self, book, note_taker, instructions: str) -> None:
+    def __init__(self, book, note_taker, instructions: str, history) -> None:
         self.book = book               # speakers.SpeakerBook
-        self.note_taker = note_taker   # notes.NoteTaker（この会話の文字起こしと、誰の発言か）
+        self.note_taker = note_taker   # notes.NoteTaker（本人からの「忘れて」の依頼）
+        self.history = history
         self.instructions = instructions
         self._client = openai.AsyncOpenAI()
 
     async def flush(self) -> None:
         """会話が終わるとき：この会話で話した、同意している人ごとに関係を書き直す"""
         turns: dict[int, int] = {}
-        for o, _, _ in self.note_taker.lines:
+        for o, _, _ in self.history.personal_lines():
             if o is not None and o.person_id is not None:
                 turns[o.person_id] = turns.get(o.person_id, 0) + 1
         for pid in self.note_taker.forgotten:   # 忘れてと頼まれた人は、話した回数が少なくても書き直す
@@ -85,7 +86,7 @@ class RelationKeeper:
             r.sessions += 1
             r.stage_sessions += 1
         can_up = not first and r.stage < len(STAGES) - 1 and r.stage_sessions >= STAGE_UP_SESSIONS[r.stage]
-        lines = self.note_taker.lines[-CONTEXT_LINES:]
+        lines = self.history.personal_lines()[-CONTEXT_LINES:]
         request = {
             'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
             'person': k.name,

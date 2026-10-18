@@ -44,6 +44,8 @@ import touch
 import turns
 import voice_conversion
 import volume
+from conversation import Conversation
+from conversation_recording import ConversationRecorder
 from persona import load_persona
 
 load_dotenv()
@@ -125,6 +127,7 @@ class Ciel(Agent):
             instructions = instructions.rstrip('\n') + '\n\n' + p.speaker_instructions
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         instructions = instructions.rstrip('\n') + '\n\n' + p.minutes_voice_instructions
+        instructions = instructions.rstrip('\n') + '\n\n' + p.conversation_instructions
         if SPEAKERS:
             presence_text = {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
                              'public': p.presence_public_instructions}[presence]
@@ -180,6 +183,9 @@ async def entrypoint(ctx: JobContext) -> None:
     replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
                                 agent.aizuchi if AIZUCHI else None)
     replies.nod = NOD
+    history = Conversation()
+    replies.history = history
+    session.userdata.history = history
     # おしゃべりのとき、しばらく静かなら自分から話しかける（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge)
     session.on('user_state_changed', talker.on_user_state)
@@ -192,13 +198,13 @@ async def entrypoint(ctx: JobContext) -> None:
         asyncio.create_task(replies.load_encoder())
 
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
-    note_taker = notes.NoteTaker(book, agent.persona.notes_instructions) if book is not None and store else None
+    note_taker = notes.NoteTaker(book, agent.persona.notes_instructions, history) if book is not None and store else None
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
-    relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions)
+    relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
                        if note_taker is not None else None)
     # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
-    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions)
+    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history)
     session.userdata.minutes = minute_taker
 
     def on_minutes(what: str) -> None:
@@ -207,38 +213,17 @@ async def entrypoint(ctx: JobContext) -> None:
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
-    takers = [t for t in (note_taker, minute_taker) if t is not None]
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
     if book is not None:
-        def on_split(old, new) -> None:   # 人違いを直したら、その発言を分けた人の発言にする
-            for t in takers:
-                t.on_split(old, new)
-        book.on_split = on_split
-    # 文字起こしが確定するたびに、その発言の区間の判定（シエルへの [発言者：…] と同じ。turns.py の speaker_of）を添えて、記録係・議事録の係に渡す。
-    # 「最後に判定した人」を使うと、ほかの人の発言が前の人の発言になり、メモに混ざった（2026-10-18）
-    pending_texts: set[asyncio.Task] = set()
-
-    async def to_takers(text: str, segment) -> None:
-        j = await replies.speaker_of(segment)   # シエルへの [発言者：…] と同じ判定
-        for t in takers:
-            t.on_user_text(text, j)
-
-    def on_final_text(ev) -> None:
-        if not ev.is_final:
-            return
-        segment = replies.take_segment()   # 文字起こしが届いた順に、発言の区間と組にする（ここで先に取る）
-        if ev.transcript.strip():
-            t = asyncio.create_task(to_takers(ev.transcript, segment))
-            pending_texts.add(t)
-            t.add_done_callback(pending_texts.discard)
-    session.on('user_input_transcribed', on_final_text)
-    session.on('conversation_item_added',
-               lambda ev: [t.on_ciel_text(ev.item.text_content or '') for t in takers]
-               if getattr(ev.item, 'role', None) == 'assistant' else None)
+        book.on_split = history.on_split
+    # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
+    recorder = ConversationRecorder(history, replies, note_taker)
+    session.on('user_input_transcribed', recorder.on_transcribed)
+    session.on('conversation_item_added', recorder.on_item)
 
     async def close_store() -> None:
-        await asyncio.gather(*pending_texts, return_exceptions=True)   # 話者を決めている途中の発言も渡してから
+        await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
         if note_taker is not None:
             await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く

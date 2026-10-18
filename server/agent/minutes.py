@@ -6,15 +6,16 @@
   （tools/minutes.py の start_minutes・finish_minutes）を呼ぶ。
 - 始めた・終えたときは on_change で知らせる。agent.py が、シエルに一言告げさせ（config/prompts/minutes_voice.md）、
   アプリへ今の状態（ciel.event の minutes.state）を送る。
-- とっているあいだ、発言を「時刻・話者・文」の形でメモリーの中だけにためる。話者は話者の識別（speakers.py）の判定を使う。
-  シエルの発言も入れる（感情の印と [silent] は外す）。
-- 長い会議では、10 分ごと（ROLL_SECONDS）に、それまでの議事録にその後の発言を合わせて作り直し、まとめた発言は捨てる。
+- 共通履歴（conversation.py）の開始・終了 ID と処理位置を持つ。独自の全文は持たない。
+  時刻と話者は共通履歴のものを使い、シエルの発言も入れる（感情の印と [silent] は収集時に外す）。
+- 長い会議では、10 分ごと（ROLL_SECONDS）に、それまでの議事録にその後の発言を合わせて作り直し、処理位置を進める。
+  共通履歴の元発言は消さず、接続中の会話検索でも参照できる。
   終わったときは、残りの発言を合わせるだけなので待ち時間が短く、文字のモデルに渡す量も増えすぎない。
 - 要約は別の文字のモデル（既定 gpt-5.4、CIEL_MINUTES_MODEL）。下書きを Discord の Webhook
   （CIEL_MINUTES_DISCORD_WEBHOOK。利用者だけが見るチャンネル）へ送る。
   自動で共有先へは出さない：利用者が確かめてから共有する（聞き間違い・外に出したくない発言が混ざることがあるため）。
 - 送れなかったとき（Webhook が無い・失敗）だけ、下書きを data/minutes/ に保存する。
-- ためた発言は、下書きを送ったら捨てる。会話が終わるときにとっている途中なら、そこまでで終える。
+- 会話が終わるときにとっている途中なら、そこまでで終える。共通履歴は会話が終わると消える。
 - 何を書くかは config/prompts/minutes.md。ログには会話も議事録の中身も出さない（行数・文字数だけ）。
 """
 import asyncio
@@ -30,8 +31,8 @@ import openai
 import requests
 from livekit import rtc
 
-import notes
 import speakers
+from conversation import Conversation, Turn
 
 log = logging.getLogger('ciel-agent.minutes')
 
@@ -48,24 +49,27 @@ DISCORD_LIMIT = 2000    # Discord のメッセージの本文の上限（文字�
 # on_change に渡す出来事
 STARTED, ALREADY, FINISHED, NOT_RECORDING = 'started', 'already', 'finished', 'not_recording'
 
-Line = tuple[datetime, 'speakers.SessionSpeaker | None', str, str]   # （時刻、話した人、その時の呼び名、文）
+Line = Turn
 
 
 @dataclass
 class Meeting:
     """1 回の議事録（始めてから終えるまで）"""
     started: datetime
-    lines: list[Line] = field(default_factory=list)   # まだ議事録に合わせていない発言
+    cursor: int
+    end_id: int | None = None
     summary: dict | None = None                       # 途中までの議事録（minutes.md の JSON）
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     timer: asyncio.Task | None = None
     closed: bool = False
+    incomplete: bool = False
 
 
 class Minutes:
-    def __init__(self, book: speakers.SpeakerBook | None, instructions: str) -> None:
+    def __init__(self, book: speakers.SpeakerBook | None, instructions: str, history: Conversation) -> None:
         self.book = book
         self.instructions = instructions
+        self.history = history
         self.meeting: Meeting | None = None   # とっていないときは None
         self.on_change: Callable[[str], None] | None = None   # 始めた・終えたとき（agent.py がつなぐ）
         self._tasks: set[asyncio.Task] = set()
@@ -99,10 +103,10 @@ class Minutes:
 
     def start(self) -> str:
         if self.meeting is not None:
-            log.info('議事録：もうとっている（%d 行）', len(self.meeting.lines))
+            log.info('議事録：もうとっている')
             self._changed(ALREADY)
             return ALREADY
-        m = self.meeting = Meeting(datetime.now(JST))
+        m = self.meeting = Meeting(datetime.now(JST), self.history.last_id)
         m.timer = asyncio.create_task(self._roll(m))
         log.info('議事録：とり始めた')
         self._changed(STARTED)
@@ -116,6 +120,7 @@ class Minutes:
                 self._changed(NOT_RECORDING)
             return NOT_RECORDING
         self.meeting, m.closed = None, True
+        m.end_id = self.history.last_id  # この時点で予約済みの、書き起こし待ちの発言も対象
         if m.timer is not None and not m.lock.locked():   # 途中の議事録を作っている最中なら、終わるのを待つ（_write が lock で待つ）
             m.timer.cancel()
         t = asyncio.create_task(self._write(m, datetime.now(JST)))
@@ -130,28 +135,6 @@ class Minutes:
         self.finish(announce=False)
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
-    def on_user_text(self, text: str, j: 'speakers.Judgment | None') -> None:
-        """相手の発言の文字起こし（確定したもの）と、その発言の話者の判定（シエルへの [発言者：…] と同じもの）"""
-        if self.meeting is None or not text.strip():
-            return
-        sp = j.sp if j is not None else None
-        label = speakers.SpeakerBook.label(j) if sp is not None else ''   # 「たぶん」も、そのまま書く
-        self.meeting.lines.append((datetime.now(JST), sp, label, text.strip()))
-
-    def on_ciel_text(self, text: str) -> None:
-        text = notes.ciel_text(text)
-        if self.meeting is not None and text:
-            self.meeting.lines.append((datetime.now(JST), None, 'シエル', text))
-
-    def on_split(self, old: speakers.SessionSpeaker, new: speakers.SessionSpeaker) -> None:
-        """人違いを直した：直前の発言を、分けた人の発言にする"""
-        lines = self.meeting.lines if self.meeting is not None else []
-        for i in range(len(lines) - 1, -1, -1):
-            at, o, label, text = lines[i]
-            if o is old:
-                lines[i] = (at, new, new.name or new.label, text)
-                return
-
     async def _roll(self, m: Meeting) -> None:
         """とっているあいだ、ROLL_SECONDS ごとに、途中までの議事録にその後の発言を合わせて作り直す"""
         while True:
@@ -159,14 +142,19 @@ class Minutes:
             async with m.lock:
                 if m.closed:
                     return
-                n = len(m.lines)
-                if n < MIN_LINES:
-                    continue
-                result = await self._summarize(m.started, datetime.now(JST), m.summary, m.lines[:n])
-                if result is not None:   # 作れなかったら、発言は残して次の機会（か終わり）に回す
+                through = self.history.settled_through()
+                m.incomplete |= m.cursor < self.history.dropped_through
+                while not m.closed:
+                    lines = self.history.between(m.cursor, through)[:100]
+                    if len(lines) < MIN_LINES:
+                        break
+                    result = await self._summarize(m.started, datetime.now(JST), m.summary, lines)
+                    if result is None:   # 作れなかったら次の機会（か終わり）に回す
+                        break
                     m.summary = result
-                    del m.lines[:n]
-                    log.info('議事録：途中までをまとめた（%d 行）', n)
+                    m.incomplete |= any(not t.ready.is_set() or t.clipped for t in lines)
+                    m.cursor = lines[-1].id
+                    log.info('議事録：途中までをまとめた（%d 行）', len(lines))
             if m.closed:
                 return
 
@@ -185,12 +173,23 @@ class Minutes:
             return None
 
     async def _write(self, m: Meeting, ended: datetime) -> None:
+        await self.history.wait_pending(m.cursor, m.end_id)
         async with m.lock:
-            lines = m.lines
-            if m.summary is None and len(lines) < MIN_LINES:
+            lines = self.history.between(m.cursor, m.end_id)
+            m.incomplete |= m.cursor < self.history.dropped_through or any(
+                not t.ready.is_set() or t.clipped for t in lines)
+            if m.summary is None and len(lines) < MIN_LINES and not m.incomplete:
                 log.info('議事録：発言が %d 行だけなので、議事録にしない', len(lines))
                 return
-            result = await self._summarize(m.started, ended, m.summary, lines) if lines else m.summary
+            # 長い会議の終了時も、一度にモデルへ渡す量を抑える。
+            while len(lines) > 100:
+                result = await self._summarize(m.started, ended, m.summary, lines[:100])
+                if result is None:
+                    break
+                m.summary, m.cursor = result, lines[99].id
+                lines = lines[100:]
+            result = (await self._summarize(m.started, ended, m.summary, lines)
+                      if 0 < len(lines) <= 100 else m.summary if not lines else None)
             if result is not None:
                 text = render(result, m.started, ended)
             elif m.summary is not None:   # 途中までの議事録に、まとめられなかった発言をそのまま足す
@@ -198,6 +197,8 @@ class Minutes:
             else:   # 発言をそのまま下書きとして残す
                 text = render_raw(conversation(lines), m.started, ended)
             log.info('議事録：%d 行 → %d 字', len(lines), len(text))
+            if m.incomplete:
+                text += '\n※ 書き起こし未完了または履歴の保持上限により、一部の発言が欠けています。\n'
         name = f'minutes-{m.started:%Y%m%d-%H%M}.md'
         if WEBHOOK:
             try:
@@ -214,7 +215,9 @@ class Minutes:
 
 
 def conversation(lines: list[Line]) -> list[dict]:
-    return [{'time': f'{at:%H:%M}', 'speaker': speaker_name(o, label), 'text': text} for at, o, label, text in lines]
+    return [{'id': t.id, 'time': f'{datetime.fromtimestamp(t.at, JST):%H:%M:%S}',
+             'speaker': speaker_name(t), 'text': t.text if t.ready.is_set() else '（書き起こし未完了・内容不明）'}
+            for t in lines if t.text or not t.ready.is_set()]
 
 
 def day(at: datetime) -> str:
@@ -222,14 +225,13 @@ def day(at: datetime) -> str:
     return f'{at:%Y-%m-%d}（{WEEKDAYS[at.weekday()]}）'
 
 
-def speaker_name(sp: speakers.SessionSpeaker | None, label: str) -> str:
+def speaker_name(turn: Turn) -> str:
     """議事録での呼び名。話したあとで名乗った人は、その名前にする。名前の無い人は「参加者A」"""
-    if label == 'シエル':
-        return label
-    if sp is None:
+    if turn.role == 'assistant':
+        return 'シエル'
+    if turn.speaker is None:
         return '参加者（不明）'
-    name = sp.name or sp.label
-    return name.replace('知らない人', '参加者', 1) if name.startswith('知らない人') else name
+    return turn.name.replace('知らない人', '参加者', 1)
 
 
 def render(result: dict, started: datetime, ended: datetime) -> str:

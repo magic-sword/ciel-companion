@@ -7,7 +7,7 @@
   2. 会話の流れから、道具で拾い漏れたことを補う。
   どちらも、今のメモと突き合わせて足す・書き直す・消すを決めるのは、別の文字のモデル
   （既定 gpt-5.4-mini、CIEL_NOTES_MODEL）に裏で任せる。
-- 会話の文字起こし（LiveKit が Realtime API で作る）に、話者の判定（speakers.py）を添えてためておく。
+- 会話の文字起こしと話者は共通履歴（conversation.py）から読む。独自の全文は持たない。
   同意した人（声を覚えていて、お話を覚えることにも同意した人）が何回か話すか、しばらく話が途切れたら、
   その人のメモ（DB）と最近の会話を渡して、足す・書き直す・消すを決めてもらう。会話が終わるときにも書く。
 - 何を覚えるか・覚えないかは config/prompts/notes.md。読むのは会話モデルが道具で（tools/memory.py）、本人が話しているときだけ。
@@ -21,8 +21,8 @@ import os
 
 import openai
 
-import emotion
 import speakers
+from conversation import Conversation, Turn
 
 log = logging.getLogger('ciel-agent.notes')
 
@@ -34,11 +34,11 @@ MAX_NOTE_CHARS = 120
 
 
 class NoteTaker:
-    def __init__(self, book: speakers.SpeakerBook, instructions: str) -> None:
+    def __init__(self, book: speakers.SpeakerBook, instructions: str, history: Conversation) -> None:
         self.book = book
         self.instructions = instructions
-        self.lines: list[tuple[speakers.SessionSpeaker | None, str, str]] = []   # （話した人、呼び名、文）
-        self._done: dict[int, int] = {}                       # 人ごとに、どこまでメモにしたか（lines の位置）
+        self.history = history
+        self._done: dict[int, int] = {}                       # 人ごとに、どこまでメモにしたか（発言 ID）
         self._count: dict[int, int] = {}
         self._requested: dict[int, list[str]] = {}         # 会話モデルが道具で預けたメモ（まだ書いていない）
         self._forgets: dict[int, list[str]] = {}           # 本人に「忘れて」と頼まれたこと（まだ消していない）
@@ -48,34 +48,29 @@ class NoteTaker:
         self._tasks: set[asyncio.Task] = set()
         self._client = openai.AsyncOpenAI()
 
-    def on_user_text(self, text: str, j: 'speakers.Judgment | None') -> None:
+    def on_turn(self, turn: Turn) -> None:
         """相手の発言の文字起こし（確定したもの）と、その発言の話者の判定（シエルへの [発言者：…] と同じもの）"""
-        if not text.strip():
+        if turn.role != 'user' or not turn.text:
             return
-        sp, sure = (j.sp, j.sure) if j is not None else (None, False)
-        label = speakers.SpeakerBook.label(j)   # 「ハカセ」「たぶんハカセ」「知らない人A」「不明」
         # 発言した人（この会話の話者）を、同意の前でも付けておく（メモリーの中だけ）。
         # この会話の途中で名乗って同意した人も、同意の前に話したこと（「ミルクティーが好き」など）を
         # メモにできるように（覚えたあとは sp.person_id が付く）。書くのは同意してから（_write が確かめる）。
         # 「たぶん」の発言・短くて決められなかった発言は、誰の発言か確かでないので、誰の発言にもしない
-        owner = sp if sp is not None and sure else None
-        self.lines.append((owner, label, text.strip()))
+        owner = turn.owner
         if owner is None or owner.person_id is None:
             return
         k = next((k for k in self.book.known if k.person_id == owner.person_id), None)
         if k is None or not k.notes_ok:
             return
         pid = k.person_id
+        if turn.id <= self._done.get(pid, 0):
+            # 待機上限を超えてから届いた発言も、次の更新で拾い直す。
+            self._done[pid] = turn.id - 1
         self._count[pid] = self._count.get(pid, 0) + 1
         if self._count[pid] >= TURNS:
             self._start(pid)
         else:
             self._arm_timer()
-
-    def on_ciel_text(self, text: str) -> None:
-        text = ciel_text(text)
-        if text:
-            self.lines.append((None, 'シエル', text))
 
     def _arm_timer(self) -> None:
         if self._timer is not None:
@@ -86,14 +81,6 @@ class NoteTaker:
         await asyncio.sleep(IDLE_SECONDS)
         for pid in list(self._count):
             self._start(pid)
-
-    def on_split(self, old: 'speakers.SessionSpeaker', new: 'speakers.SessionSpeaker') -> None:
-        """人違いを直した：直前の発言（「私はハカセじゃない」など）を、分けた人の発言にする"""
-        for i in range(len(self.lines) - 1, -1, -1):
-            o, label, text = self.lines[i]
-            if o is old:
-                self.lines[i] = (new, new.name or new.label, text)
-                return
 
     def request(self, pid: int, note: str) -> None:
         """会話モデルが道具（remember_about_speaker）で「これを覚えて」と渡した：すぐ裏で書く"""
@@ -131,29 +118,43 @@ class NoteTaker:
         """会話が終わるとき：まだメモにしていない分を書く"""
         if self._timer is not None:
             self._timer.cancel()
+        while self._tasks:
+            tasks = list(self._tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._tasks.difference_update(tasks)
         await asyncio.gather(*(self._write(pid) for pid in list(self._count)), return_exceptions=True)
+        while self._tasks:
+            tasks = list(self._tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._tasks.difference_update(tasks)
 
     async def _write(self, pid: int) -> None:
         lock = self._locks.setdefault(pid, asyncio.Lock())
         async with lock:
-            start, end = self._done.get(pid, 0), len(self.lines)
+            start, end = self._done.get(pid, 0), self.history.settled_through()
+            turns = self.history.between(start, end)
             requested = self._requested.pop(pid, [])
             forgets = self._forgets.pop(pid, [])
             if (not requested and not forgets
-                    and not any(o is not None and o.person_id == pid for o, _, _ in self.lines[start:end])):
+                    and not any(t.owner is not None and t.owner.person_id == pid for t in turns)):
                 return
             store = self.book.store
             k = next((k for k in self.book.known if k.person_id == pid), None)
             if store is None or k is None or not k.notes_ok:
                 return
-            window = self.lines[max(0, end - CONTEXT_LINES):end]
+            # 人数が多くても、未処理分を直近30行で飛ばさない。上限つきで順に処理する。
+            batch = turns[:CONTEXT_LINES]
+            if batch:
+                end = batch[-1].id
+            window = [(t.owner, t.name, t.text) for t in self.history.between(through=end)[-CONTEXT_LINES:]
+                      if t.ready.is_set() and t.text]
             existing = await store.notes(pid)
             request = {
                 'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
                 'person': k.name,
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
                 'requested_notes': requested,
-                'forget_requests': forgets,
+                'forget_requests': list(dict.fromkeys([*self.forgotten.get(pid, []), *forgets])),
                 'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                                  for o, who, text in window],
             }
@@ -176,11 +177,11 @@ class NoteTaker:
             if add or update or delete:
                 await store.change_notes(pid, add, update, delete)
                 k.note_count = await store.count_notes(pid)
-            self._done[pid], self._count[pid] = end, 0
+            current = self._done.get(pid, 0)
+            self._done[pid] = min(end, current) if current != start else end
+            self._count[pid] = sum(t.owner is not None and t.owner.person_id == pid
+                                   for t in self.history.between(end))
+            if any(t.owner is not None and t.owner.person_id == pid
+                   for t in self.history.between(self._done[pid], self.history.settled_through())):
+                self._start(pid)
             log.info('メモ #%d：足す %d・直す %d・消す %d（全 %d）', pid, len(add), len(update), len(delete), k.note_count)
-
-
-def ciel_text(text: str) -> str:
-    """シエルの返事から、感情の印と [silent] を外す"""
-    text = emotion.strip_tags(text).replace('[silent]', '').strip()
-    return text

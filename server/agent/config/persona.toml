@@ -2,6 +2,7 @@
 # 以下の相対パスは、この TOML ファイルのあるディレクトリを基準にします。
 # 変更は次に開始する会話から反映されます。
 instructions_file = "prompts/character.md"
+conversation_instructions_file = "prompts/conversation.md"
 greeting_file = "prompts/greeting.md"
 emotion_instructions_file = "prompts/emotion.md"
 touch_instructions_file = "prompts/touch.md"

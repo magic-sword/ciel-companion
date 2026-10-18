@@ -36,7 +36,7 @@
   返事を作らせるときの「[発言者：…]」も、文字起こしの話者（メモの記録係・議事録の係。speaker_of）も、この判定を使う
   （別々に計算すると、同じ発言でも食い違うことがあった）。返事を作るかどうかに関係なく、発言ごとに必ず決める。「最後に判定した人」を使うと、
   ひかえめで返事をしない発言・小さな声・判定より先に届いた文字起こしが、前の人の発言になってしまったため（2026-10-18）。
-  区間と文字起こしは、どちらも会話モデルの側の区切りごとに 1 つずつ届くので、古い順に組にする。
+  書き起こしの会話項目が持つ発言開始時刻で区間と組にする。時刻を取得できない場合だけ古い順に組にする。
 """
 import asyncio
 import collections
@@ -89,6 +89,7 @@ class Segment:
     start: float
     end: float
     judgment: 'asyncio.Task | None'   # speakers.Judgment を返す。ECAPA が無いときは None
+    turn: object | None = None  # conversation.Turn。文字起こしより先に発言順を確保する
 
 
 class TurnReplies:
@@ -119,6 +120,7 @@ class TurnReplies:
         self._segment_start: float | None = None             # いま話している発言の話し始め（区間ごと。返事とは別）
         self._segments: list[Segment] = []                  # 文字起こしをまだ組にしていない発言の区間
         self._recent: collections.deque[Segment] = collections.deque(maxlen=20)   # 最近の発言の区間（返事のため）
+        self.history = None  # 接続中の共通履歴（agent.py が接続する）
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -144,17 +146,26 @@ class TurnReplies:
             self._ended_at = ev.created_at
             if self._segment_start is not None:
                 seg = Segment(self._segment_start, ev.created_at,
-                              self._start_judging(self._segment_start, ev.created_at))
+                              self._start_judging(self._segment_start, ev.created_at),
+                              self.history.reserve(self._segment_start) if self.history is not None else None)
                 self._segments.append(seg)   # 文字起こしと組にする
                 self._recent.append(seg)     # 返事を作らせるときに使う
                 self._segment_start = None
             if self._pending:
                 self._reply_later(STALE_SECONDS)
 
-    def take_segment(self) -> 'Segment | None':
-        """文字起こしが 1 つ確定した：それと組になる発言の区間（一番古いもの）。文字起こしが届いた順に呼ぶこと"""
+    def take_segment(self, started_at: float | None = None) -> 'Segment | None':
+        """発言開始時刻で区間を選ぶ。時刻を取得できない場合は未対応の古い区間を使う。"""
         now = time.time()
         self._segments = [s for s in self._segments if now - s.end < SEGMENT_KEEP_SECONDS]
+        if started_at is not None:
+            # LiveKit のユーザー会話項目には、API が通知した実際の発言開始時刻が付く。
+            # 書き起こしが逆順に届いても、その発言の声・話者と組にする。
+            segment = min(self._segments, key=lambda s: abs(s.start - started_at), default=None)
+            if segment is not None and abs(segment.start - started_at) < 0.5:
+                self._segments.remove(segment)
+                return segment
+            return None  # 対応が不明な発言に、別の人の声を付けない
         return self._segments.pop(0) if self._segments else None
 
     async def speaker_of(self, segment: 'Segment | None') -> 'speakers.Judgment | None':

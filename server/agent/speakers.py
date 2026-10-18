@@ -191,7 +191,7 @@ class SpeakerBook:
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
         self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
         self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
-        self.on_split = None           # 人違いを直したとき呼ぶ（notes.NoteTaker.on_split）
+        self.on_split = None           # 人違いを直したとき呼ぶ（conversation.Conversation.on_split）
         self.last_rows: list[int] = []                   # 直前の発言で DB に足した見本の行
 
     async def load(self) -> None:

@@ -19,8 +19,9 @@ class State:
     book: SpeakerBook | None = None
     notes: object | None = None   # notes.NoteTaker（覚えておくメモの記録係）
     minutes: object | None = None   # minutes.Minutes（会議の議事録の係）
+    history: object | None = None   # conversation.Conversation（接続中だけの共通履歴）
 
 
-from . import memory, minutes, people  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS]
+TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS]
