@@ -1,6 +1,21 @@
-# アプリのビルド（Windows・Android）
+# ビルド・サーバーデプロイのコマンド集
 
-更新：2026-10-15（日本時間）。
+更新：2026-10-18（日本時間）。コマンドは **Git Bash** 用。
+
+## まずここから
+
+ターミナルでリポジトリのルート（`ciel-companion/`）を開く。ビルドだけは、そこから `cd unity` で移動して実行する。
+
+| やりたいこと | 実行する場所 | 手順 |
+|---|---|---|
+| Windows / Android をビルドする | 手元の `unity/` | [ビルドのコマンド](#コマンドからエディタを閉じて) |
+| Unity を開いたままビルドする | 手元の `unity/` | [メニューをコマンドで実行](#コマンドからエディタを開いたまま) |
+| Windows アプリを起動する | 手元のリポジトリルート | `"./unity/Builds/Windows/CIEL Companion.exe"` |
+| Android 端末に APK を入れる | 手元の `unity/` | [Android](#android) |
+| サーバーへデプロイする | 手元のリポジトリルート | `bash scripts/server/deploy-server.sh`（[前提と確認方法](#サーバーへのデプロイ)） |
+| サーバーの状態・ログを見る | SSH 接続先の `~/work/ciel-companion/server` | [デプロイ後の確認・再起動](#デプロイ後の確認再起動) |
+
+Unity 側の変更はアプリをビルドし直し、`server/` 側の変更はサーバーへデプロイする。両方を変更したときは両方を行う。
 
 ## Unity の標準との関係
 
@@ -34,26 +49,41 @@
 
 ### コマンドから（エディタを閉じて）
 
-Git Bash で、リポジトリの `unity` フォルダから実行する（PowerShell では途中の `--` が正しく渡らない）。
+VS Code の統合ターミナルで Git Bash を開き、まずリポジトリ直下から `cd unity` で Unity プロジェクトへ移動する（すでに `unity` フォルダにいる場合は移動不要）。Unity Editor と、起動中の Windows アプリは閉じておく。
+
+`run .` の `.` は現在のフォルダを指す。リポジトリ直下の `ciel-companion` で実行すると「Unity プロジェクトではありません」というエラーになる。Unity プロジェクトは `unity/` にあり、その中の `ProjectSettings/ProjectVersion.txt` が目印。
 
 ```sh
+# リポジトリ直下から Unity プロジェクトへ移動（最初に一度だけ）
+cd unity
+
 # Windows
 "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 1800 --log-file ./Logs/build-windows.log -- -executeMethod Ciel.Companion.Editor.CielBuild.Windows
 # Android
 "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 3000 --log-file ./Logs/build-android.log -- -executeMethod Ciel.Companion.Editor.CielBuild.Android
 ```
 
-成功するとログに `CIEL_BUILD_OK`、失敗すると `CIEL_BUILD_FAILED` が出る。
+成功するとログに `CIEL_BUILD_OK`、失敗すると `CIEL_BUILD_FAILED` が出る。出力先は Windows が `unity/Builds/Windows/CIEL Companion.exe`、Android が `unity/Builds/Android/CIEL Companion.apk`。
+
+`unity/` からログの末尾を見る：
+
+```sh
+tail -n 50 Logs/build-windows.log
+tail -n 50 Logs/build-android.log
+```
 
 ### コマンドから（エディタを開いたまま）
 
 開いているエディタのメニューを、Unity CLI から押せる。
 
 ```sh
+# Windows
+"/c/Program Files/Unity Hub/resources/unity.exe" --no-banner command menu --path "CIEL/Build/Windows" --detach
+# Android
 "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner command menu --path "CIEL/Build/Android" --detach
 ```
 
-結果は `unity/Logs/Editor.log` の `CIEL_BUILD_OK` で確かめる。
+`--detach` はビルド完了を待たずに戻る。結果は `unity/Logs/Editor.log` の `CIEL_BUILD_OK` で確かめる。
 
 ## Windows
 
@@ -91,7 +121,78 @@ Git Bash で、リポジトリの `unity` フォルダから実行する（Power
 
 手書きの `Assets/Plugins/Android/AndroidManifest.xml` は置かない。LiveKit のサンプルの手書きのものは古い起動の仕組み（UnityPlayerActivity）向けで、このプロジェクトが使う Unity 6 の GameActivity と食い違うため。
 
-## 確かめたこと・まだのこと
+## サーバーへのデプロイ
+
+### 前提
+
+- 既定の接続先は `prog@192.168.1.15`（自宅の GPU サーバー）。同じネットワークなど、SSH で到達できる環境から実行する。
+- 手元に SSH 鍵 `~/.ssh/prog_rsa` があり、この鍵で接続できること。
+- サーバーに Docker Compose と NVIDIA GPU の実行環境があり、`~/work/ciel-companion/server/agent/.env` に API キーなどを設定済みであること。必要なモデル・参照音声はサーバーの `data/` に別途用意する。
+
+### 手元から送って起動する
+
+**手元のリポジトリルート**で実行する。ビルド後に `unity/` にいる場合は、先に `cd ..` で戻る。
+
+```sh
+bash scripts/server/deploy-server.sh
+```
+
+接続先を指定する場合：
+
+```sh
+bash scripts/server/deploy-server.sh prog@192.168.1.15
+```
+
+このコマンドは手元の `server/` 一式を `~/work/ciel-companion/server` へ送り、サーバーで `docker compose up -d --build` を実行する。コミット前の変更も送られるので、配布したい内容を確認してから実行する。
+
+- 通常起動するもの：会話サーバー（`agent`）、読み上げ（`tts`）、DB（`db`）。声質変換（`vc`）は任意。
+- `.env` と `data/` は送信・上書きしない。DB のデータは Docker ボリュームに保持する。サーバーの `server/.env` が無い場合は DB のパスワードを自動生成する。
+- 転送は既存ファイルへの上書きで、手元で削除したファイルをサーバーから消す処理はない。
+- 最後に `DEPLOY_SERVER_DONE` が出たら、続けて下の手順で起動状態を確認する。
+
+処理の本体：[転送スクリプト](../scripts/server/deploy-server.sh) / [サーバー側の起動スクリプト](../server/deploy-remote.sh)。全体の構成は [システムの構成](architecture-ja.md) を参照。
+
+### デプロイ後の確認・再起動
+
+手元の Git Bash から SSH 接続する（接続先を変えた場合はここも合わせる）：
+
+```sh
+ssh -i ~/.ssh/prog_rsa -o IdentitiesOnly=yes prog@192.168.1.15
+```
+
+**ここからはサーバー上**で実行する：
+
+```sh
+cd ~/work/ciel-companion/server
+
+# 起動状態と直近のログ
+docker compose ps
+docker compose logs --tail 50 agent tts
+
+# 会話サーバーのログを追う（Ctrl+C で表示を終了）
+docker compose logs -f agent
+```
+
+必要な操作だけを選んで実行する：
+
+```sh
+# 会話サーバーを再起動する
+docker compose restart agent
+
+# サーバー上の agent/.env を変更したあと、その設定を反映する
+docker compose up -d agent
+
+# 声質変換を使うときだけ起動する / 使い終わったら止める
+docker compose --profile vc up -d vc
+docker compose stop vc
+
+# SSH 接続を終了して手元へ戻る
+exit
+```
+
+プロンプト本文・TOML は、**サーバー上の** `agent/config/` を編集した場合、次に開始する会話から反映される（再起動・再ビルド不要）。手元のファイルを編集した場合は、上のデプロイでサーバーへ送る。編集対象は [会話サーバーの README](../server/agent/README.md) を参照。
+
+## アプリで確かめたこと・まだのこと
 
 - Windows：ビルド・起動・会話・仮想ケーブルへの出力を確認済み（2026-10-15）。
 - Android：ビルドは確認済み（2026-10-15、APK 約 58 MB、arm64-v8a、API 26 以上、権限の宣言も確認）。**実機での起動・マイクの許可・会話は未確認。**

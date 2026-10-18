@@ -2,6 +2,8 @@
 
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。要件は [仕様書](docs/specification-ja.md)、原画・パーツ・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) を参照してください。
 
+**よく使うコマンド：[ビルド・サーバーデプロイのコマンド集](docs/build-ja.md)**（Git Bash 用。Windows / Android のビルド、APK のインストール、サーバーへの反映、状態・ログの確認）。
+
 ## キャラクター（シエル）のLive2D制作
 
 制作の仕様は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md)、**現在の方針・手順・進み具合は [作り直しの計画](docs/ciel-live2d-rebuild-analysis-plan-ja.md) の 6〜8 章**にまとめています。新しく参加する人・新しいセッションは、まずこの 6〜8 章から読んでください。
@@ -61,7 +63,7 @@ Editorを閉じて以下を実行してください。アプリ名、画面方�
 
 会話サーバーのプロンプト本文は Markdown、参照先は TOML で管理します。編集方法は [会話サーバーの README](server/agent/README.md)、他のセッション・AI エージェントへの引き継ぎは [プロンプト管理方針](docs/decisions/prompt-management-ja.md) を参照してください。
 
-Windows・Android のアプリのビルドと起動・端末への入れ方は [アプリのビルド](docs/build-ja.md) にまとめています。
+Windows・Android のビルドと起動・端末への入れ方、サーバーへのデプロイは [ビルド・サーバーデプロイのコマンド集](docs/build-ja.md) にまとめています。
 
 全体の構成（アプリ・LiveKit・会話サーバー・読み上げ・OpenAI のつながり、データのメッセージ、動かす場所）は [システムの構成](docs/architecture-ja.md) にまとめています。
 
