@@ -5,9 +5,19 @@
 使い方の決まりは config/prompts/minutes_voice.md。"""
 from livekit.agents import RunContext, ToolResult, function_tool
 import json
+import logging
 import minutes as service
 
 NO_MINUTES = '今は議事録をとれません。'
+log = logging.getLogger('ciel-agent.minutes-tools')
+
+
+def result(recorder, action: str, status: str) -> dict:
+    state = recorder.status()
+    latest = state['latest_export']
+    log.info('議事録ツール action=%s status=%s recording=%s id=%s', action, status,
+             state['recording'], state['meeting_id'] or (latest['meeting_id'] if latest else None))
+    return {'status': status, **state}
 
 
 @function_tool
@@ -19,7 +29,7 @@ async def start_minutes(context: RunContext, lookback_minutes: int = 0):
     status = minutes.start(lookback_minutes)
     if status == service.INVALID_RANGE:
         return json.dumps({'status': status})
-    return ToolResult('議事録の係に伝えました。', reply_required=False)
+    return ToolResult(json.dumps(result(minutes, 'start', status)), reply_required=False)
 
 
 @function_tool
@@ -28,8 +38,29 @@ async def finish_minutes(context: RunContext):
     minutes = context.userdata.minutes
     if minutes is None:
         return NO_MINUTES
-    minutes.finish()
-    return ToolResult('議事録の係に伝えました。', reply_required=False)
+    status = minutes.finish()
+    return ToolResult(json.dumps(result(minutes, 'finish', status)), reply_required=False)
+
+
+@function_tool
+async def get_minutes_status(context: RunContext):
+    """議事録ID・記録状態・要約済み件数と、直近の作成・送信・保存・失敗結果を確認する。本文は返さない。"""
+    minutes = context.userdata.minutes
+    if minutes is None:
+        return json.dumps({'available': False, 'recording': False})
+    return json.dumps({'available': True, **result(minutes, 'status', 'ok')})
+
+
+@function_tool
+async def read_minutes(context: RunContext, meeting_id: str = ''):
+    """議事録IDで途中要約・最近の未要約発言、または完成した下書きを読む。空なら記録中、なければ直近の議事録。送信はしない。"""
+    minutes = context.userdata.minutes
+    if minutes is None:
+        return json.dumps({'available': False})
+    data = minutes.read(meeting_id)
+    log.info('議事録ツール action=read status=%s id=%s', data['status'],
+             data.get('meeting_id') if data['status'] == 'ok' else None)
+    return json.dumps(data, ensure_ascii=False)
 
 
 @function_tool
@@ -40,9 +71,10 @@ async def summarize_past_minutes(context: RunContext, last_minutes: int = 0, fir
     if minutes is None:
         return NO_MINUTES
     status = minutes.summarize_past(last_minutes, first_id, last_id)
+    data = {**result(minutes, 'summarize_past', status), 'dropped_through': minutes.history.dropped_through}
     if status in (service.PAST_QUEUED, service.PAST_PARTIAL):
-        return ToolResult(json.dumps({'status': status}), reply_required=False)
-    return json.dumps({'status': status, 'dropped_through': minutes.history.dropped_through})
+        return ToolResult(json.dumps(data), reply_required=False)
+    return json.dumps(data)
 
 
-TOOLS = [start_minutes, finish_minutes, summarize_past_minutes]
+TOOLS = [start_minutes, finish_minutes, summarize_past_minutes, get_minutes_status, read_minutes]

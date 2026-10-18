@@ -41,6 +41,9 @@ TOPIC = 'ciel.minutes'
 MODEL = os.environ.get('CIEL_MINUTES_MODEL', 'gpt-5.4')
 WEBHOOK = os.environ.get('CIEL_MINUTES_DISCORD_WEBHOOK', '')
 SAVE_DIR = Path(__file__).resolve().parent / 'data' / 'minutes'
+RECENT_EXPORTS = 5
+DRAFT_CACHE_CHARS = 40_000
+READ_CHARS = 6000
 JST = timezone(timedelta(hours=9))
 WEEKDAYS = '月火水木金土日'
 MIN_LINES = 2           # これより少なければ、議事録にしない
@@ -69,6 +72,12 @@ class Meeting:
     incomplete: bool = False
     snapshot: list[Line] | None = None  # 過去の議事録は依頼時の対象を固定する
     export_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
+    summarized_turn_count: int = 0
+    stage: str = 'recording'
+    ended: datetime | None = None
+    draft: str | None = None
+    draft_clipped: bool = False
+    error: str | None = None
 
 
 class Minutes:
@@ -79,11 +88,99 @@ class Minutes:
         self.meeting: Meeting | None = None   # とっていないときは None
         self.on_change: Callable[[str], None] | None = None   # 始めた・終えたとき（agent.py がつなぐ）
         self._tasks: set[asyncio.Task] = set()
+        self._exports: list[Meeting] = []  # この接続で作成した直近5件。終了後も結果を照会できる
         self._client = openai.AsyncOpenAI()
 
     @property
     def recording(self) -> bool:
         return self.meeting is not None
+
+    def status(self) -> dict:
+        """会話モデルへ渡す事実だけ。議事録や会話の本文は含めない。"""
+        m = self.meeting
+        rows = self.history.between(m.cursor) if m is not None else []
+        return {
+            'recording': self.recording,
+            'meeting_id': m.export_id if m is not None else None,
+            'processing': any(not t.done() for t in self._tasks),
+            'started_at': m.started.isoformat() if m is not None else None,
+            'summarized_turn_count': m.summarized_turn_count if m is not None else 0,
+            'has_summary': m is not None and m.summary is not None,
+            'ready_turn_count': sum(t.ready.is_set() and bool(t.text) for t in rows),
+            'pending_turn_count': sum(not t.ready.is_set() for t in rows),
+            'incomplete': m is not None and (m.incomplete or m.cursor < self.history.dropped_through
+                                           or any(t.clipped for t in rows)),
+            'latest_export': self._export_status(self._exports[-1]) if self._exports else None,
+            'recent_exports': [{'meeting_id': e.export_id, 'stage': e.stage} for e in self._exports],
+        }
+
+    def context(self) -> str:
+        # 毎回は参照先だけ。件数・内容・送信結果は道具で同じ状態を読む。
+        latest = self._exports[-1] if self._exports else None
+        return '[議事録状態]\n' + json.dumps({
+            'recording': self.recording,
+            'meeting_id': self.meeting.export_id if self.meeting is not None else None,
+            'latest_export': {'meeting_id': latest.export_id, 'stage': latest.stage} if latest else None,
+        })
+
+    @staticmethod
+    def _export_status(m: Meeting) -> dict:
+        return {'meeting_id': m.export_id, 'stage': m.stage,
+                'started_at': m.started.isoformat(), 'ended_at': m.ended.isoformat() if m.ended else None,
+                'incomplete': m.incomplete, 'draft_available': m.draft is not None,
+                'error': m.error}
+
+    def read(self, meeting_id: str = '') -> dict:
+        """本文は要求時だけ、有界で返す。新しい要約や外部への送信はしない。"""
+        candidates = ([self.meeting] if self.meeting is not None else []) + list(reversed(self._exports))
+        m = next((m for m in candidates if not meeting_id or m.export_id == meeting_id), None)
+        if m is None:
+            return {'status': 'not_found', 'scope': 'current_session', 'meeting_id': meeting_id or None}
+        result = {'status': 'ok', 'scope': 'current_session', **self._export_status(m),
+                  'summary_through_id': m.cursor if m.summary is not None else None}
+        if m.draft is not None:
+            return {**result, 'draft': m.draft[:READ_CHARS],
+                    'content_clipped': m.draft_clipped or len(m.draft) > READ_CHARS}
+        summary = render(m.summary, m.started, m.ended or datetime.now(JST)) if m.summary is not None else ''
+        budget = max(0, READ_CHARS - min(len(summary), READ_CHARS))
+        rows = m.snapshot if m.snapshot is not None else self.history.between(m.cursor, m.end_id)
+        usable = [t for t in rows if t.text or not t.ready.is_set()]
+        selected = usable[-8:]
+        recent = []
+        for t in selected:
+            if budget <= 0:
+                break
+            text = t.text[:min(1800, budget)] if t.ready.is_set() else ''
+            recent.append({'id': t.id, 'speaker': speaker_name(t), 'text': text,
+                           'pending': not t.ready.is_set(), 'text_clipped': t.clipped or len(text) < len(t.text)})
+            budget -= len(text)
+        return {**result, 'summary': summary[:READ_CHARS], 'recent_turns': recent,
+                'unprocessed_turn_count': len(usable),
+                'content_clipped': len(summary) > READ_CHARS or len(recent) < len(usable)
+                                   or any(t['text_clipped'] for t in recent),
+                'incomplete': m.incomplete or (m.snapshot is None and m.cursor < self.history.dropped_through)}
+
+    def _queue_export(self, m: Meeting, ended: datetime) -> None:
+        m.ended, m.stage = ended, 'queued'
+        self._exports.append(m)
+        self._exports = self._exports[-RECENT_EXPORTS:]
+        task = asyncio.create_task(self._export(m, ended))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _export(self, m: Meeting, ended: datetime) -> None:
+        m.stage = 'building'
+        try:
+            await self._write(m, ended)
+        except asyncio.CancelledError:
+            m.stage, m.error = 'failed', 'CancelledError'
+            raise
+        except Exception as e:
+            m.stage, m.error = 'failed', type(e).__name__
+            log.warning('議事録：作成・保存に失敗 id=%s error=%s', m.export_id, m.error)
+        finally:
+            m.snapshot = None
+            log.info('議事録：処理結果 id=%s stage=%s', m.export_id, m.stage)
 
     def on_data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != TOPIC:
@@ -152,9 +249,7 @@ class Minutes:
             or (cutoff is None and first_id <= self.history.dropped_through))
         m = Meeting(datetime.fromtimestamp(rows[0].at, JST), rows[0].id - 1,
                     end_id=through, closed=True, incomplete=incomplete, snapshot=list(rows))
-        task = asyncio.create_task(self._write(m, ended))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        self._queue_export(m, ended)
         status = PAST_PARTIAL if incomplete else PAST_QUEUED
         self._changed(status)
         return status
@@ -168,11 +263,10 @@ class Minutes:
             return NOT_RECORDING
         self.meeting, m.closed = None, True
         m.end_id = self.history.last_id  # この時点で予約済みの、書き起こし待ちの発言も対象
+        log.info('議事録：終了を受け付けた（終了ID %d）', m.end_id)
         if m.timer is not None and not m.lock.locked():   # 途中の議事録を作っている最中なら、終わるのを待つ（_write が lock で待つ）
             m.timer.cancel()
-        t = asyncio.create_task(self._write(m, datetime.now(JST)))
-        self._tasks.add(t)
-        t.add_done_callback(self._tasks.discard)
+        self._queue_export(m, datetime.now(JST))
         if announce:
             self._changed(FINISHED)
         return FINISHED
@@ -199,6 +293,7 @@ class Minutes:
                     if result is None:   # 作れなかったら次の機会（か終わり）に回す
                         break
                     m.summary = result
+                    m.summarized_turn_count += sum(bool(t.text) or not t.ready.is_set() for t in lines)
                     m.incomplete |= any(not t.ready.is_set() or t.clipped for t in lines)
                     m.cursor = lines[-1].id
                     log.info('議事録：途中までをまとめた（%d 行）', len(lines))
@@ -228,6 +323,7 @@ class Minutes:
                     m.snapshot is not None and not t.text and t.id <= self.history.dropped_through)
                 for t in lines)
             if m.summary is None and len(lines) < MIN_LINES and not m.incomplete:
+                m.stage = 'empty'
                 log.info('議事録：発言が %d 行だけなので、議事録にしない', len(lines))
                 return
             # 長い会議の終了時も、一度にモデルへ渡す量を抑える。
@@ -248,10 +344,12 @@ class Minutes:
             log.info('議事録：%d 行 → %d 字', len(lines), len(text))
             if m.incomplete:
                 text += '\n※ 書き起こし未完了または履歴の保持上限により、一部の発言が欠けています。\n'
+            m.draft, m.draft_clipped = text[:DRAFT_CACHE_CHARS], len(text) > DRAFT_CACHE_CHARS
         name = f'minutes-{m.started:%Y%m%d-%H%M%S}-{m.export_id}.md'
         if WEBHOOK:
             try:
                 await asyncio.to_thread(post_discord, WEBHOOK, text, name)
+                m.stage = 'sent'
                 log.info('議事録：下書きを Discord に送った')
                 return
             except Exception as e:
@@ -260,6 +358,7 @@ class Minutes:
             log.warning('議事録：CIEL_MINUTES_DISCORD_WEBHOOK が無い')
         SAVE_DIR.mkdir(parents=True, exist_ok=True)
         (SAVE_DIR / name).write_text(text, encoding='utf-8')
+        m.stage = 'saved_locally'
         log.info('議事録：下書きを data/minutes/%s に保存した', name)
 
 

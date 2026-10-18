@@ -121,6 +121,7 @@ class TurnReplies:
         self._segments: list[Segment] = []                  # 文字起こしをまだ組にしていない発言の区間
         self._recent: collections.deque[Segment] = collections.deque(maxlen=20)   # 最近の発言の区間（返事のため）
         self.history = None  # 接続中の共通履歴（agent.py が接続する）
+        self.minutes = None  # minutes.Minutes。返答のたびに実際の記録状態を渡す
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -370,7 +371,7 @@ class TurnReplies:
             if touch is not None:
                 extra['user_input'] = touch
             latency.mark('返事を頼んだ')
-            self.session.generate_reply(**extra)
+            self._generate_reply(extra)
             return
         t0 = time.perf_counter()
         j = await self._judgment_for(start, end)
@@ -385,4 +386,10 @@ class TurnReplies:
         if line is not None:
             extra['user_input'] = line
         latency.mark('返事を頼んだ')
+        self._generate_reply(extra)
+
+    def _generate_reply(self, extra: dict) -> None:
+        if self.minutes is not None:
+            extra['instructions'] = '\n\n'.join(filter(None, (
+                extra.get('instructions'), self.minutes.context())))
         self.session.generate_reply(**extra)

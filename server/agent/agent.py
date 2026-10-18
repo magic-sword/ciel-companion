@@ -217,10 +217,11 @@ async def entrypoint(ctx: JobContext) -> None:
     # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
     minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history)
     session.userdata.minutes = minute_taker
+    replies.minutes = minute_taker
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        session.generate_reply(instructions=MINUTES_LINES[what])
+        session.generate_reply(instructions=MINUTES_LINES[what] + '\n\n' + minute_taker.context())
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
