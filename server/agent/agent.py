@@ -72,7 +72,11 @@ AIZUCHI = VOICE == 'irodori' and os.environ.get('CIEL_AIZUCHI', '1') != '0'
 NOD = os.environ.get('CIEL_NOD', '1') != '0'
 # 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
 MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
-                 minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]'}
+                 minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]',
+                 minutes.PAST_QUEUED: '[議事録：ここまでをまとめて送る]',
+                 minutes.PAST_PARTIAL: '[議事録：残っている範囲をまとめて送る]',
+                 minutes.STARTED_EARLIER: '[議事録：さかのぼってとり始めた]',
+                 minutes.STARTED_PARTIAL: '[議事録：残っている範囲からとり始めた]'}
 
 
 def transcription(names: list[str]) -> AudioTranscription:

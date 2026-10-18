@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -48,6 +49,9 @@ DISCORD_LIMIT = 2000    # Discord のメッセージの本文の上限（文字�
 
 # on_change に渡す出来事
 STARTED, ALREADY, FINISHED, NOT_RECORDING = 'started', 'already', 'finished', 'not_recording'
+PAST_QUEUED, PAST_PARTIAL = 'past_queued', 'past_partial'
+STARTED_EARLIER, STARTED_PARTIAL = 'started_earlier', 'started_partial'
+EMPTY, BUSY, INVALID_RANGE = 'empty', 'busy', 'invalid_range'
 
 Line = Turn
 
@@ -63,6 +67,8 @@ class Meeting:
     timer: asyncio.Task | None = None
     closed: bool = False
     incomplete: bool = False
+    snapshot: list[Line] | None = None  # 過去の議事録は依頼時の対象を固定する
+    export_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
 
 
 class Minutes:
@@ -101,16 +107,57 @@ class Minutes:
             except Exception:
                 log.exception('議事録の知らせを送れない')
 
-    def start(self) -> str:
+    def start(self, lookback_minutes: int = 0) -> str:
+        if type(lookback_minutes) is not int or not 0 <= lookback_minutes <= 1440:
+            return INVALID_RANGE
         if self.meeting is not None:
             log.info('議事録：もうとっている')
             self._changed(ALREADY)
             return ALREADY
         m = self.meeting = Meeting(datetime.now(JST), self.history.last_id)
+        if lookback_minutes:
+            cutoff = m.started.timestamp() - lookback_minutes * 60
+            past = [t for t in self.history.turns if t.at >= cutoff]
+            if past:
+                m.started = datetime.fromtimestamp(past[0].at, JST)
+                m.cursor = past[0].id - 1
+            m.incomplete = self.history.dropped_through > 0 and (
+                not self.history.turns or self.history.turns[0].at > cutoff)
         m.timer = asyncio.create_task(self._roll(m))
         log.info('議事録：とり始めた')
-        self._changed(STARTED)
-        return STARTED
+        status = STARTED_PARTIAL if m.incomplete else STARTED_EARLIER if lookback_minutes else STARTED
+        self._changed(status)
+        return status
+
+    def summarize_past(self, last_minutes: int = 0, first_id: int = 0, last_id: int = 0) -> str:
+        """開始し忘れた会話の下書きを作って送る。記録状態を切り替えない。"""
+        if (any(type(v) is not int or v < 0 for v in (last_minutes, first_id, last_id))
+                or last_minutes > 1440 or (last_minutes and (first_id or last_id))
+                or (last_id and (last_id < first_id or last_id > self.history.last_id))
+                or first_id > self.history.last_id):
+            return INVALID_RANGE
+        if self.recording:
+            return ALREADY
+        if any(not task.done() for task in self._tasks):
+            return BUSY
+        ended = datetime.now(JST)
+        through = last_id or self.history.last_id
+        cutoff = ended.timestamp() - last_minutes * 60 if last_minutes else None
+        rows = [t for t in self.history.between(max(0, first_id - 1), through)
+                if (cutoff is None or t.at >= cutoff) and (t.text or not t.ready.is_set())]
+        if len(rows) < MIN_LINES:
+            return EMPTY
+        incomplete = self.history.dropped_through > 0 and (
+            (cutoff is not None and (not self.history.turns or self.history.turns[0].at > cutoff))
+            or (cutoff is None and first_id <= self.history.dropped_through))
+        m = Meeting(datetime.fromtimestamp(rows[0].at, JST), rows[0].id - 1,
+                    end_id=through, closed=True, incomplete=incomplete, snapshot=list(rows))
+        task = asyncio.create_task(self._write(m, ended))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        status = PAST_PARTIAL if incomplete else PAST_QUEUED
+        self._changed(status)
+        return status
 
     def finish(self, announce: bool = True) -> str:
         m = self.meeting
@@ -175,9 +222,11 @@ class Minutes:
     async def _write(self, m: Meeting, ended: datetime) -> None:
         await self.history.wait_pending(m.cursor, m.end_id)
         async with m.lock:
-            lines = self.history.between(m.cursor, m.end_id)
-            m.incomplete |= m.cursor < self.history.dropped_through or any(
-                not t.ready.is_set() or t.clipped for t in lines)
+            lines = m.snapshot if m.snapshot is not None else self.history.between(m.cursor, m.end_id)
+            m.incomplete |= (m.snapshot is None and m.cursor < self.history.dropped_through) or any(
+                not t.ready.is_set() or t.clipped or (
+                    m.snapshot is not None and not t.text and t.id <= self.history.dropped_through)
+                for t in lines)
             if m.summary is None and len(lines) < MIN_LINES and not m.incomplete:
                 log.info('議事録：発言が %d 行だけなので、議事録にしない', len(lines))
                 return
@@ -199,7 +248,7 @@ class Minutes:
             log.info('議事録：%d 行 → %d 字', len(lines), len(text))
             if m.incomplete:
                 text += '\n※ 書き起こし未完了または履歴の保持上限により、一部の発言が欠けています。\n'
-        name = f'minutes-{m.started:%Y%m%d-%H%M}.md'
+        name = f'minutes-{m.started:%Y%m%d-%H%M%S}-{m.export_id}.md'
         if WEBHOOK:
             try:
                 await asyncio.to_thread(post_discord, WEBHOOK, text, name)
