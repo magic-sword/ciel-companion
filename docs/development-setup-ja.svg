@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1400" viewBox="0 0 1600 1400" role="img" aria-labelledby="title desc">
+  <title id="title">CIEL Companion クローンから始める開発環境構築</title>
+  <desc id="desc">WindowsとVS Codeを使う初回セットアップ。共通準備、Git LFSとクローン、CodexとClaude Codeの拡張導入を行い、Unity担当はSDK復元、プロジェクト導入、表示確認へ進む。音声会話は管理者の接続設定、サーバーの通常テストはPython仮想環境を準備する。</desc>
+  <defs>
+    <symbol id="icon-device" viewBox="0 0 64 64">
+      <rect x="3" y="8" width="44" height="34" rx="5" fill="#fff" stroke="#4274c6" stroke-width="2.5"/>
+      <path d="M25 43v8m-11 1h22" fill="none" stroke="#4274c6" stroke-width="3" stroke-linecap="round"/>
+      <path d="M12 36c0-12 25-12 25 0" fill="#b7d5ff"/>
+      <circle cx="24" cy="23" r="9" fill="#e6d7ff"/>
+      <path d="M16 21q8-14 16 0" fill="#7362af"/>
+      <circle cx="21" cy="24" r="1.2" fill="#354e70"/><circle cx="27" cy="24" r="1.2" fill="#354e70"/>
+      <path d="M21 28q3 3 6 0" fill="none" stroke="#7362af" stroke-width="1.5"/>
+      <rect x="43" y="25" width="17" height="32" rx="4" fill="#fff" stroke="#4274c6" stroke-width="2.5"/>
+      <path d="M48 30h7m-5 22h3" stroke="#4274c6" stroke-width="2" stroke-linecap="round"/>
+      <path d="M49 37v8m5-6v4" stroke="#49a7b2" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-cloud" viewBox="0 0 64 64">
+      <path d="M16 44C0 44 1 23 16 22 19 4 44 5 48 23c17-1 20 21 3 21Z" fill="#fff" stroke="#268c96" stroke-width="2.5"/>
+      <path d="M16 32h5l4-9 5 17 5-20 5 12h8" fill="none" stroke="#268c96" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M17 54h30m-25-5-5 5 5 5m20-10 5 5-5 5" fill="none" stroke="#54aeb5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-server" viewBox="0 0 64 64">
+      <rect x="7" y="5" width="40" height="17" rx="4" fill="#fff" stroke="#7762b5" stroke-width="2.5"/>
+      <rect x="7" y="26" width="40" height="17" rx="4" fill="#fff" stroke="#7762b5" stroke-width="2.5"/>
+      <circle cx="15" cy="13" r="2.5" fill="#51b3a4"/><circle cx="15" cy="34" r="2.5" fill="#51b3a4"/>
+      <path d="M25 13h14M25 34h14M27 44v10H12m15 0h25" fill="none" stroke="#7762b5" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="37" y="36" width="22" height="22" rx="4" fill="#e0d9f7" stroke="#7762b5" stroke-width="2"/>
+      <rect x="43" y="42" width="10" height="10" rx="2" fill="#fff"/>
+      <path d="M42 33v3m7-3v3m7-3v3m-14 22v3m7-3v3m7-3v3" stroke="#7762b5" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-ai" viewBox="0 0 64 64">
+      <path d="M11 8h42a6 6 0 0 1 6 6v29a6 6 0 0 1-6 6H28L16 59V49h-5a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6Z" fill="#fff" stroke="#c17b32" stroke-width="2.5"/>
+      <path d="M32 16c-7-5-15 1-13 8-7 4-3 15 4 14 3 6 9 4 9 0 0 4 6 6 9 0 7 1 11-10 4-14 2-7-6-13-13-8Z" fill="#f9dfb9" stroke="#c17b32" stroke-width="2"/>
+      <path d="M32 17v21m-10-13 5 3m15-3-5 3m-12 6 7-3 7 3" fill="none" stroke="#c17b32" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-key" viewBox="0 0 64 64"><circle cx="23" cy="24" r="14" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><circle cx="23" cy="24" r="5" fill="#fff"/><path d="m33 34 21 21m-9-9 7-7m-1 13 7-7" fill="none" stroke="#4274c6" stroke-width="5" stroke-linecap="round"/></symbol>
+    <symbol id="icon-voice" viewBox="0 0 64 64"><path d="M6 25h11l15-12v38L17 39H6Z" fill="#e0d9f7" stroke="#7762b5" stroke-width="3" stroke-linejoin="round"/><path d="M41 23q9 9 0 18m8-26q16 17 0 34" fill="none" stroke="#7762b5" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-db" viewBox="0 0 64 64"><path d="M10 15v33c0 14 44 14 44 0V15" fill="#e0d9f7" stroke="#7762b5" stroke-width="3"/><ellipse cx="32" cy="15" rx="22" ry="9" fill="#fff" stroke="#7762b5" stroke-width="3"/><path d="M10 30c0 12 44 12 44 0m-44 16c0 12 44 12 44 0" fill="none" stroke="#7762b5" stroke-width="2.5"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 64 64"><circle cx="26" cy="26" r="18" fill="#fff0d9" stroke="#c17b32" stroke-width="3"/><path d="m40 40 17 17" stroke="#c17b32" stroke-width="6" stroke-linecap="round"/><path d="M15 22h22M15 30h16" stroke="#c17b32" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-meeting" viewBox="0 0 64 64"><rect x="5" y="10" width="39" height="40" rx="6" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><path d="m44 24 15-8v29l-15-8Z" fill="#b7d5ff" stroke="#4274c6" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="25" r="7" fill="#fff"/><path d="M13 43q0-17 22 0" fill="#fff"/></symbol>
+    <symbol id="icon-message" viewBox="0 0 64 64"><path d="M12 8h40a6 6 0 0 1 6 6v29a6 6 0 0 1-6 6H28L14 59V49h-2a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6Z" fill="#fff0d9" stroke="#c17b32" stroke-width="3"/><path d="M18 22h28M18 32h20" stroke="#c17b32" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-code" viewBox="0 0 64 64"><rect x="4" y="8" width="56" height="45" rx="5" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><path d="m22 23-9 8 9 8m20-16 9 8-9 8m-7-20-7 25" fill="none" stroke="#4274c6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-palette" viewBox="0 0 64 64"><path d="M33 5C-2 5-5 55 25 58c11 1 6-13 15-13h9C68 43 62 5 33 5Z" fill="#f4e7ff" stroke="#9166ad" stroke-width="3"/><circle cx="18" cy="23" r="5" fill="#76b5e7"/><circle cx="31" cy="15" r="5" fill="#e8a1ba"/><circle cx="45" cy="23" r="5" fill="#e7bd69"/><circle cx="16" cy="38" r="5" fill="#71bba7"/></symbol>
+    <symbol id="icon-lock" viewBox="0 0 64 64"><path d="M18 28V18a14 14 0 0 1 28 0v10" fill="none" stroke="#526681" stroke-width="4"/><rect x="10" y="27" width="44" height="31" rx="5" fill="#cbd7e4" stroke="#526681" stroke-width="3"/><circle cx="32" cy="39" r="4" fill="#526681"/><path d="M32 42v7" stroke="#526681" stroke-width="3"/></symbol>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 8 4 0 8Z" fill="#657a97"/></marker>
+    <style>
+      text { font-family: 'Yu Gothic','Meiryo',sans-serif; fill:#1e304a; }
+      .title { font-size:34px; font-weight:700; }
+      .section { font-size:22px; font-weight:700; }
+      .heading { font-size:23px; font-weight:700; }
+      .body { font-size:18px; }
+      .small { font-size:16px; fill:#526681; }
+      .code { font-family:Consolas,'Yu Gothic',monospace; font-size:18px; }
+      .card { fill:white; stroke:#cbd7e4; stroke-width:1.5; }
+      .arrow { fill:none; stroke:#657a97; stroke-width:2.5; marker-end:url(#arrow); }
+      .badge { font-size:16px; font-weight:700; fill:#267969; }
+    </style>
+  </defs>
+  <rect width="1600" height="1400" fill="#f5f8fc"/>
+  <text x="40" y="58" class="title">CIEL Companion ｜ クローンから始める開発環境構築</text>
+  <text x="40" y="94" class="body">Windows ＋ VS Code ＋ Codex / Claude Code。図の番号に沿って、手順書のコマンドを実行する。</text>
+  <text x="40" y="124" class="small">2026-10-19 ｜ 詳細・入手先・コピー用コマンド：docs/development-setup-ja.md ｜ 版はプロジェクトの固定値</text>
+
+  <text x="40" y="166" class="section">全員 ｜ まずはコードを開き、編集できるようにする</text>
+  <rect x="40" y="184" width="480" height="262" rx="14" class="card"/>
+  <use href="#icon-device" x="58" y="205" width="56" height="56"/>
+  <text x="128" y="237" class="heading">1 ツールをインストール</text>
+  <text x="60" y="289" class="body">Git for Windows・Git LFS・VS Code</text>
+  <text x="60" y="321" class="body">Unity 担当：Hub ＋ Editor 6000.6.4f1</text>
+  <text x="60" y="353" class="small">サーバー担当：Python 3.11 または 3.12</text>
+  <text x="60" y="383" class="small">Android / Docker は担当作業に応じて追加</text>
+  <rect x="58" y="401" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="70" y="422" class="badge">確認：新しいターミナルで git --version</text>
+
+  <rect x="560" y="184" width="480" height="262" rx="14" class="card"/>
+  <use href="#icon-code" x="578" y="205" width="56" height="56"/>
+  <text x="648" y="237" class="heading">2 クローンして取得</text>
+  <text x="580" y="286" class="code">git lfs install</text>
+  <text x="580" y="316" class="code">git clone …/ciel-companion.git</text>
+  <text x="580" y="346" class="code">cd ciel-companion</text>
+  <text x="580" y="376" class="code">git lfs pull</text>
+  <rect x="578" y="401" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="590" y="422" class="badge">確認：LFS の取得完了・エラーなし</text>
+
+  <rect x="1080" y="184" width="480" height="262" rx="14" class="card"/>
+  <use href="#icon-ai" x="1098" y="205" width="56" height="56"/>
+  <text x="1168" y="237" class="heading">3 VS Code と AI 拡張</text>
+  <text x="1100" y="286" class="code">code .</text>
+  <text x="1100" y="317" class="body">Ctrl+Shift+X → Unity / Python 拡張</text>
+  <text x="1100" y="348" class="body">Codex（OpenAI）/ Claude Code（Anthropic）</text>
+  <text x="1100" y="379" class="small">使う AI のパネルを開いてサインイン</text>
+  <rect x="1098" y="401" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="1110" y="422" class="badge">確認：README を開き、AI に構成を質問できる</text>
+  <path d="M520 310H560" class="arrow"/>
+  <path d="M1040 310H1080" class="arrow"/>
+
+  <text x="40" y="492" class="section">Unity 担当 ｜ 4 → 5 → 6 の順に進む</text>
+  <text x="940" y="491" class="small">Python のテストから始める人は、3 の後に 8 へ</text>
+  <rect x="30" y="505" width="1540" height="337" rx="18" fill="#eaf2ff"/>
+  <rect x="40" y="516" width="480" height="314" rx="14" class="card"/>
+  <use href="#icon-palette" x="58" y="537" width="56" height="56"/>
+  <text x="128" y="571" class="heading">4 Live2D SDK を復元</text>
+  <text x="60" y="622" class="body">公式配布：Cubism 5 SDK R5（URP）</text>
+  <text x="60" y="654" class="body">Unity を閉じたまま PowerShell で実行</text>
+  <text x="60" y="691" class="code">.\scripts\restore-cubism.ps1 &#96;</text>
+  <text x="60" y="721" class="code">  -PackagePath '取得したパッケージ'</text>
+  <text x="60" y="756" class="small">SDK は Git に含まれない。固定版を使う。</text>
+  <rect x="58" y="784" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="70" y="805" class="badge">確認：Restored … assets and their GUIDs</text>
+
+  <rect x="560" y="516" width="480" height="314" rx="14" class="card"/>
+  <use href="#icon-server" x="578" y="537" width="56" height="56"/>
+  <text x="648" y="571" class="heading">5 Unity を開いて検証</text>
+  <text x="580" y="622" class="body">Hub → Add project from disk</text>
+  <text x="580" y="654" class="body">選ぶ場所：ciel-companion/unity</text>
+  <text x="580" y="686" class="body">初回インポート・パッケージ取得を待つ</text>
+  <text x="580" y="718" class="body">CIEL → SDK → Configure and Validate</text>
+  <text x="580" y="756" class="small">External Script Editor を VS Code に設定</text>
+  <rect x="578" y="784" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="590" y="805" class="badge">確認：Console に CIEL_SDK_OK</text>
+
+  <rect x="1080" y="516" width="480" height="314" rx="14" class="card"/>
+  <use href="#icon-device" x="1098" y="537" width="56" height="56"/>
+  <text x="1168" y="571" class="heading">6 表示できれば準備完了</text>
+  <text x="1100" y="622" class="body">Assets/Scenes/SdkCheck.unity → Play</text>
+  <text x="1100" y="654" class="body">Koharu の表示を確認（通信・録音なし）</text>
+  <text x="1100" y="692" class="body">シエルの画面：Conversation.unity</text>
+  <text x="1100" y="723" class="small">表示だけなら Connect On Start をオフ。</text>
+  <text x="1100" y="753" class="small">この確認用の切り替えはコミットに混ぜない。</text>
+  <rect x="1098" y="784" width="444" height="29" rx="7" fill="#e7f5ee"/>
+  <text x="1110" y="805" class="badge">確認：モデルが表示され、コンパイルエラーなし</text>
+  <path d="M520 670H560" class="arrow"/>
+  <path d="M1040 670H1080" class="arrow"/>
+
+  <text x="40" y="886" class="section">作業に合わせて追加 ｜ 音声会話と、サーバーのテストは別々に準備できる</text>
+  <rect x="40" y="908" width="740" height="296" rx="14" fill="#fff3e6" stroke="#ead4b9"/>
+  <use href="#icon-key" x="60" y="929" width="56" height="56"/>
+  <text x="130" y="964" class="heading">7 音声会話を試す ｜ 管理者と接続先を確認</text>
+  <text x="62" y="1011" class="body">管理者 → 開発用 Token Server ID・稼働中の agent / TTS</text>
+  <text x="62" y="1044" class="body">Unity → Assets/Settings/LiveKitTokenSource.asset</text>
+  <text x="62" y="1077" class="body">Development Token Server を選択 → Token Server Id を入力</text>
+  <text x="62" y="1110" class="body">Conversation の Token Config に指定 → Play → マイクをオン</text>
+  <rect x="60" y="1146" width="700" height="37" rx="8" fill="#fff"/>
+  <text x="73" y="1171" class="badge">確認：シエルの声・口パク・表情が返る。API キーは Unity に入れない。</text>
+
+  <rect x="820" y="908" width="740" height="296" rx="14" fill="#edf0ff" stroke="#d4d9ee"/>
+  <use href="#icon-code" x="840" y="929" width="56" height="56"/>
+  <text x="910" y="964" class="heading">8 サーバーの通常テスト ｜ API キー・GPU 不要</text>
+  <text x="842" y="1011" class="code">py -3.11 -m venv .venv</text>
+  <text x="842" y="1044" class="body">.venv の Python で requirements-test.txt を導入</text>
+  <text x="842" y="1077" class="body">scripts/server/test-regression.ps1 を実行（手順書参照）</text>
+  <text x="842" y="1110" class="small">DB 結合テストを行うときだけ Docker ＋ -Suite all を追加</text>
+  <rect x="840" y="1146" width="700" height="37" rx="8" fill="#fff"/>
+  <text x="853" y="1171" class="badge">確認：終了コード 0。レポートは .local/regression/ に出力。</text>
+
+  <rect x="40" y="1230" width="1520" height="122" rx="14" fill="#e7f5ee"/>
+  <use href="#icon-code" x="60" y="1250" width="48" height="48"/>
+  <text x="123" y="1282" class="heading">9 小さい修正から始める → 差分確認 → 検証 → ビルド・反映手順へ</text>
+  <text x="62" y="1322" class="body">git switch -c onboarding/first-change ｜ server/agent の編集前に AGENTS.md を確認 ｜ 反映コマンドは初回セットアップでは実行しない</text>
+  <text x="40" y="1381" class="small">青：アプリの表示まで ｜ オレンジ：管理者の接続設定が必要 ｜ 紫：ローカルのサーバーテスト ｜ インストール・認証の一連の手順はクリーン環境では未検証</text>
+</svg>

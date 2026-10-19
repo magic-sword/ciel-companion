@@ -12,6 +12,8 @@
 
 アプリ側の改修は `unity/`、会話・記憶・ツールは `server/agent/`、声の生成は `server/tts-irodori/`、キャラクターの素材・モデルは `assets/ciel/` から入る。起動と反映の手順は [ビルド・サーバーデプロイ](build-ja.md)、人物記憶の動作は [人を覚える機能](people-memory-ja.md) を参照。
 
+クローン直後は [開発環境構築の図](development-setup-ja.svg)と[コマンドつきの手順](development-setup-ja.md)から進める。Windows / VS Code、Codex・Claude Code の拡張、SDK 復元、表示確認、接続設定、Python のテストを案内する。
+
 ### 開発環境とツール
 
 ここで示す版はプロジェクトの固定値であり、各製品の最新版を示すものではない。

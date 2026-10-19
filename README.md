@@ -4,6 +4,8 @@ Live2Dキャラクターと日本語で音声会話するスマートフォン�
 
 **新しく参加する人へ：[1枚で見るシステム構成と開発環境](docs/system-overview-ja.svg)** → [構成・API・設定の詳細](docs/architecture-ja.md)。SVGはブラウザーで開いて拡大できます。
 
+**クローンしたら：[開発環境構築の図](docs/development-setup-ja.svg)** → [コマンドつきのセットアップ手順](docs/development-setup-ja.md)。Windows / VS Code、Codex・Claude Code の拡張、Live2D 復元、Unity の表示確認、音声接続、Python のテストを順に案内します。
+
 **よく使うコマンド：[ビルド・サーバーデプロイのコマンド集](docs/build-ja.md)**（Git Bash 用。Windows / Android のビルド、APK のインストール、サーバーへの反映、状態・ログの確認）。
 
 ## キャラクター（シエル）のLive2D制作
@@ -43,7 +45,7 @@ Androidの最低対応OSはテンプレートの既定値（API 26）を維持�
 
 Unity HubのProjectsからこのリポジトリの `unity` を開いてください。
 一覧に出ない場合は **Add → Add project from disk** で `unity` を選択します。
-メインシーンは `Assets/Scenes/Main.unity` です。
+会話アプリのシーンは `Assets/Scenes/Conversation.unity` です。SDK だけを確認する場合は、復元後に生成する `Assets/Scenes/SdkCheck.unity` を使います。初回は [セットアップ手順](docs/development-setup-ja.md) に沿って進めてください。
 
 PowerShellではリポジトリのルートから次のコマンドを使用できます。
 ラッパーはUnity CLIがPATHにない場合も、標準のUnity Hub同梱CLIを探します。
@@ -101,10 +103,9 @@ Live2Dの確認用シーンは `Assets/Scenes/SdkCheck.unity` です。
 プロジェクトのURPではCubismURPRendererを既定にし、公式手順に合わせてHDRを無効、
 Color SpaceをGammaに設定しています。従来の2D Rendererはリストに残しています。
 
-LiveKitの接続設定は `Assets/Settings/LiveKitTokenSource.asset` です。
-Inspectorの **Endpoint URL** に、短期トークンを返すサーバーのURLを指定します。
-現在は空欄で、自動接続・録音する処理はありません。トークン取得やRoom接続を呼び出す
-会話処理は次の実装段階です。API secretや長期トークンをこのアセットへ保存しないでください。
+LiveKitの接続設定は `Assets/Settings/LiveKitTokenSource.asset` です。初回生成時は Endpoint が選択され、接続先は空欄です。
+既存の開発環境を使う場合は、Inspector の **Token Source Type** を **Development Token Server** にし、管理者から共有された **Token Server Id** を設定します。独自の取得先を使う場合は **Endpoint** と **Endpoint URL** を設定します。
+`Conversation.unity` は再生時に接続を試みます。接続設定の参照とマイクの確認は [音声会話の初期設定](docs/development-setup-ja.md#7-音声会話を試す場合) を参照してください。API secretや長期トークンをこのアセットへ保存しないでください。
 
 再設定・導入検証は **CIEL → SDK → Configure and Validate** から行えます。
 Editorを閉じている場合は次のコマンドでも実行できます。
