@@ -1,12 +1,60 @@
 # システムの構成
 
-更新：2026-10-16（日本時間）。**いま実際に動いている構成**をまとめる。目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
+更新：2026-10-19（日本時間）。リポジトリの既定構成と、既存の運用記録をまとめる。本番未反映の追加実装は個別に示す。目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
+
+## 新しく参加する人へ
+
+**表示は Unity、通信は LiveKit Cloud、会話の生成は OpenAI、シエルの声は自宅 GPU の Irodori-TTS が担当する。** 会話サーバーがこれらをつなぎ、同意した人の長期記憶を PostgreSQL に保存する。
+
+[構成図をブラウザーで開く・拡大する](system-overview-ja.svg)
+
+![CIEL Companion のシステム構成、API、開発環境と反映の流れ](system-overview-ja.svg)
+
+アプリ側の改修は `unity/`、会話・記憶・ツールは `server/agent/`、声の生成は `server/tts-irodori/`、キャラクターの素材・モデルは `assets/ciel/` から入る。起動と反映の手順は [ビルド・サーバーデプロイ](build-ja.md)、人物記憶の動作は [人を覚える機能](people-memory-ja.md) を参照。
+
+### 開発環境とツール
+
+ここで示す版はプロジェクトの固定値であり、各製品の最新版を示すものではない。
+
+| 分野 | 環境・ツール | 設定・入口 |
+|---|---|---|
+| アプリ | Windows 上の Unity Hub / Unity Editor **6000.6.4f1**、C#、URP **17.6.0** | `unity/ProjectSettings/ProjectVersion.txt`、`unity/Packages/manifest.json` |
+| 描画・音声通信 | Live2D Cubism **5 SDK R5（URP）**、LiveKit Unity SDK **2.1.0** | Cubism は `scripts/restore-cubism.ps1` で復元、LiveKit は manifest / lock で固定 |
+| 対象端末 | Windows、Android（IL2CPP / ARM64、実機確認済み）。iOS は未検証 | `unity/Assets/Editor/CielBuild.cs`。Android は Hub で SDK・NDK・OpenJDK を導入 |
+| 会話サーバー | Python **3.11**、LiveKit Agents / OpenAI plugin **1.8.3** | `server/agent/Dockerfile`、`requirements.txt`、`agent.py` |
+| 話者識別 | SpeechBrain **1.0.3**、ECAPA、CPU 版 PyTorch **2.5.1** | `speakers.py`、`speaker_store.py`。モデルは Docker イメージ作成時に取得 |
+| 読み上げ | Irodori-TTS、Python 3.11、uv、CUDA **12.8** 系依存 | `server/tts-irodori/Dockerfile`。上流コードをコミット固定、GPU で合成 |
+| サーバー稼働 | Docker Compose、自宅 GPU サーバー `chris_local` | `server/compose.yaml`。GPU は既存運用資料で RTX A2000 12GB |
+| DB | PostgreSQL **17** ＋ pgvector **0.8.0** | Compose イメージ `pgvector/pgvector:0.8.0-pg17`、永続ボリューム `ciel_db-data` |
+| ビルド・反映 | Unity CLI、PowerShell / Git Bash、SSH・SCP・tar | `scripts/unity.ps1`、`scripts/server/deploy-server.ps1` / `.sh` |
+| バージョン管理 | Git、Git LFS | `.gitattributes`。LiveKit の依存取得や `.cmo3` の管理に LFS を使用 |
+| 検証 | Python unittest、使い捨て PostgreSQL の結合テスト、Unity の確認用メニュー | [回帰テスト](regression-tests-ja.md)、`server/agent/tests/`、`unity/Assets/Editor/` |
+| モデル制作 | Live2D Cubism、素材生成・加工用 Python スクリプト | `assets/ciel/current/` → `rig/ciel.cmo3` → `runtime/` → Unity のモデル更新メニュー |
+| 会議接続（任意） | Zoom / Google Meet、VB-Cable / Hi-Fi Cable、OBS Virtual Camera | [会議への参加](meeting-bridge-ja.md)。会議サービスの API は使わず、音声機器と映像で接続 |
+
+### 利用 API とローカル接続
+
+モデル名はコード・設定見本の既定値。稼働先の `.env` で変更できる項目は、実際の設定を優先する。
+
+| 接続先 | 用途・方式 | 既定モデル / 設定 |
+|---|---|---|
+| LiveKit Cloud | 開発用トークン発行、WebRTC 音声トラック、JSON データメッセージ | `LIVEKIT_URL`・`LIVEKIT_API_KEY`・`LIVEKIT_API_SECRET`。端末側は `LiveKitTokenSource.asset` |
+| OpenAI Realtime API | 音声入力、発話区切りの検出、返答テキスト、function calling | `gpt-realtime-2.1-mini`（`CIEL_REALTIME_MODEL`） |
+| Realtime の入力文字起こし | 会話履歴・人物メモ・議事録の元になる日本語の文字起こし | `gpt-4o-mini-transcribe`（`agent.py`） |
+| OpenAI Chat Completions API | 人物メモ・関係の更新、議事録の要約 | `gpt-5.4-mini`（`CIEL_NOTES_MODEL`）、`gpt-5.4`（`CIEL_MINUTES_MODEL`） |
+| OpenAI Responses API | `web_search` による調査と引用出典の取得 | `gpt-5.4-mini`（`CIEL_RESEARCH_MODEL`）。既存の OpenAI キーを使用 |
+| Irodori-TTS | 返答テキストを音声に変換するローカル HTTP 接続 | `http://127.0.0.1:8766/synthesize` |
+| PostgreSQL | 人物・声の特徴・メモ・関係の永続化 | `127.0.0.1:5433`。`CIEL_DB_URL` は Compose が設定 |
+| Discord Webhook（任意） | 議事録の下書き送信。未設定・送信失敗時はサーバー側ファイルへ保存 | `CIEL_MINUTES_DISCORD_WEBHOOK` |
+| Seed-VC（予備） | OpenAI の音声の声質変換。通常は停止 | `ws://127.0.0.1:8765`、Compose の `vc` profile |
+
+OpenAI・LiveKit のキーはサーバーだけに置く。Hugging Face などからのモデル取得はビルド・モデル準備の経路であり、通常会話の音声通信経路とは別。キーや接続設定の実値は図に記載しない。
 
 ## 全体図
 
 ```mermaid
 flowchart LR
-    subgraph PC["利用者の端末（Windows PC／将来はスマホ）"]
+    subgraph PC["利用者の端末（Windows PC／Android）"]
         U["Unity アプリ<br>CIEL Companion"]
     end
     subgraph Cloud["LiveKit Cloud"]
@@ -19,7 +67,7 @@ flowchart LR
         V["声質変換サービス<br>server/voice-conversion<br>127.0.0.1:8765（予備）"]
         D["記録の場所（DB）<br>PostgreSQL＋pgvector<br>127.0.0.1:5433"]
     end
-    O["OpenAI<br>Realtime API（会話・文字起こし）<br>文字のモデル（メモ・議事録）"]
+    O["OpenAI<br>Realtime API（会話・文字起こし）<br>Chat Completions（メモ・議事録）<br>Responses ＋ web_search（Web 調査）"]
     X["Discord<br>（利用者だけのチャンネル）"]
 
     U -- "① 接続のトークン" --> T
@@ -48,6 +96,7 @@ flowchart LR
 | 声質変換サービス | `server/voice-conversion/` | Seed-VC で OpenAI の声をシエルの声へ変える。今は使っていない（品質を上げる候補） |
 | OpenAI Realtime API | 外部サービス | 声を聞いて返事を考える。既定は `gpt-realtime-2.1-mini`、返事は**文字だけ**作らせる。相手の発言の文字起こし（`gpt-4o-mini-transcribe`、日本語＋「シエル」と覚えている人の名前をヒントに）も同じ接続で作る |
 | OpenAI の文字のモデル | 外部サービス | 会話の裏の作業：その人について覚えておくメモ（`gpt-5.4-mini`）、議事録のまとめ（`gpt-5.4`） |
+| Web 調査 | `server/agent/web_research.py` ＋ OpenAI Responses API | `web_search` で検索し、引用出典つきの結果を返す（`gpt-5.4-mini`）。会話サーバーへの反映は決定記録に記載。アプリの出典表示の実機確認は未実施。[詳細](decisions/web-research-ja.md) |
 | Discord | 外部サービス | 議事録の下書きを、利用者だけが見るチャンネルへ Webhook で送る（とったときだけ） |
 
 ### Unity アプリの中
@@ -80,6 +129,8 @@ flowchart LR
 | `speakers.py` ＋ `speaker_store.py` | 話者の識別（ECAPA の声の特徴、照合、知らない人A・B）と、覚えている人の記録（DB）。[決定記録](decisions/speaker-identification-ja.md) |
 | `tools/` | 会話モデルが必要なときに呼ぶ道具（function calling）。人についての道具（`people.py`）と、その人のメモの道具（`memory.py`）、議事録を始める・終える道具（`minutes.py`）。[道具の決定記録](decisions/tools-ja.md) |
 | `voice_conversion.py` | 声質変換サービスへの接続（`CIEL_VOICE=ciel` のとき） |
+| `conversation.py` ＋ `conversation_recording.py` | 接続中の共通会話履歴。人物メモ・議事録・会話検索が同じ発言を参照する。全文はメモリーに保持し、通常の全文ログ・DB 保存は行わない。[会話履歴](decisions/conversation-history-ja.md) |
+| `web_research.py` ＋ `research.py` ＋ `tools/research.py` | Web 検索、引用出典、接続中の調査記録、アプリへの結果通知。調査本文と実際の会話を分けて保持する。[Web 調査](decisions/web-research-ja.md) |
 
 ## 会話の流れ（既定：CIEL_VOICE=irodori）
 
@@ -140,6 +191,7 @@ sequenceDiagram
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"conversation.style","talk":"quiet","presence":"public","reason":"meeting"}` | いまの答え方と覚えていることの出し方（自動のときは会議・聞こえた声の数で決まる）。設定画面の「いまは：…」 |
 | `ciel.volume` | アプリ → 会話サーバー | `{"v":1,"type":"voice.volume","volume":0.7}` | シエルの声の大きさ（0〜1）。アプリの声の再生には音量を変える手段がないので、会話サーバーが送る前に声を小さくする（`server/agent/volume.py`） |
 | `ciel.minutes` | アプリ・管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
+| `ciel.research` | 会話サーバー → アプリ | `research.result`・`research.text`・`research.source`・`research.complete` | 調査本文と出典を小さいパケットに分けて送る。[Web 調査](decisions/web-research-ja.md) |
 
 ## 会議に参加するとき（多人数）
 
@@ -170,7 +222,7 @@ flowchart LR
 
 | 部品 | 動かす場所 | 起動・反映 |
 |---|---|---|
-| Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`）、Android（開発用の APK、実機は未確認） | [アプリのビルド](build-ja.md) |
+| Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`）、Android（開発用 APK、会話等は 2026-10-16 に実機確認済み） | [アプリのビルド](build-ja.md) |
 | 会話サーバー（`agent`） | chris_local の `~/work/ciel-companion/server`（Docker Compose の一式 `ciel`、ホストのネットワーク） | リポジトリのルートで `.\scripts\server\deploy-server.ps1`（Git Bash は `scripts/server/deploy-server.sh`）。`server/` 一式を送り、`docker compose up -d --build`。`.env` と `data/` は送らない・上書きしない |
 | 読み上げサービス（`tts`） | chris_local（Docker、GPU） | 同じ一式で起動する |
 | 声質変換サービス（`vc`） | chris_local（Docker、GPU） | 使うときだけ `docker compose --profile vc up -d`（読み上げサービスと GPU を分け合う） |

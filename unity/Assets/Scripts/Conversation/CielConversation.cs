@@ -66,6 +66,8 @@ namespace Ciel.Conversation
         RemoteTrackPublication _aizuchiPublication;
         AgentVoiceMeter _aizuchiMeter;
         bool _recording, _busy, _quitting, _micRestarting;
+        int? _sleepTimeoutBeforeMinutes;
+        bool _applicationPaused;
         string _micGuid;   // 選んだマイク。null は OS の既定
         string _speakerGuid;   // 選んだスピーカー。null は OS の既定
 
@@ -176,6 +178,51 @@ namespace Ciel.Conversation
         void SetStatus(State s)
         {
             Status = s;
+            UpdateMinutesSleep();
+            Changed?.Invoke();
+        }
+
+        void SetMinutesRecording(bool recording)
+        {
+            MinutesOn = recording;
+            UpdateMinutesSleep();
+        }
+
+        // 記録がサーバーで始まった間だけ画面の自動消灯を防ぐ。重複通知では元の値を上書きしない。
+        void UpdateMinutesSleep()
+        {
+            if (MinutesOn && Status == State.Connected && isActiveAndEnabled && !_applicationPaused && !_quitting)
+            {
+                if (!_sleepTimeoutBeforeMinutes.HasValue)
+                    _sleepTimeoutBeforeMinutes = Screen.sleepTimeout;
+                Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            }
+            else
+                RestoreMinutesSleep();
+        }
+
+        void RestoreMinutesSleep()
+        {
+            if (!_sleepTimeoutBeforeMinutes.HasValue) return;
+            // 別の機能が設定を変更していた場合は、その値を尊重する。
+            if (Screen.sleepTimeout == SleepTimeout.NeverSleep)
+                Screen.sleepTimeout = _sleepTimeoutBeforeMinutes.Value;
+            _sleepTimeoutBeforeMinutes = null;
+        }
+
+        void OnEnable() => UpdateMinutesSleep();
+        void OnDisable() => RestoreMinutesSleep();
+
+        void OnApplicationPause(bool paused)
+        {
+            _applicationPaused = paused;
+            UpdateMinutesSleep();
+        }
+
+        void OnRoomDisconnected(Room room)
+        {
+            if (room != _room) return;
+            SetMinutesRecording(false);
             Changed?.Invoke();
         }
 
@@ -232,6 +279,7 @@ namespace Ciel.Conversation
             _room.TrackUnsubscribed += OnTrackUnsubscribed;
             _room.DataReceived += OnDataReceived;
             _room.ParticipantConnected += OnParticipantConnected;
+            _room.Disconnected += OnRoomDisconnected;
             Trace("ルームへ接続");
             yield return _room.Connect(serverUrl, token, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
@@ -239,7 +287,7 @@ namespace Ciel.Conversation
             // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
             ApplySpeaker();
             ApplySpeakerphone();
-            MinutesOn = false;   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
+            SetMinutesRecording(false);   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
             SendStyle();
             SendVolume();
@@ -671,7 +719,7 @@ namespace Ciel.Conversation
             }
             else if (e.type == "minutes.state")
             {
-                MinutesOn = e.recording;
+                SetMinutesRecording(e.recording);
                 Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
                 Changed?.Invoke();
             }
@@ -774,6 +822,7 @@ namespace Ciel.Conversation
 
         public void EndConversation()
         {
+            SetMinutesRecording(false);
             DisposeVoice();
             DisposeAizuchi();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);
@@ -789,11 +838,11 @@ namespace Ciel.Conversation
                 _room.TrackUnsubscribed -= OnTrackUnsubscribed;
                 _room.DataReceived -= OnDataReceived;
                 _room.ParticipantConnected -= OnParticipantConnected;
+                _room.Disconnected -= OnRoomDisconnected;
                 _room.Disconnect();
                 _room = null;
             }
             if (_mouth != null) _mouth.MouthOpening = 0f;
-            MinutesOn = false;
             _researchResults.Clear();
             ResearchRevision++;
             _serverTalk = null;
@@ -802,10 +851,15 @@ namespace Ciel.Conversation
             SetStatus(State.Disconnected);
         }
 
-        void OnApplicationQuit() => _quitting = true;
+        void OnApplicationQuit()
+        {
+            _quitting = true;
+            RestoreMinutesSleep();
+        }
 
         void OnDestroy()
         {
+            RestoreMinutesSleep();
             // 終了時は SDK の部品が先に壊れていることがあるので、片付けは OS に任せる（サンプルと同じ）
             if (!_quitting) EndConversation();
         }

@@ -2,6 +2,8 @@
 
 Live2Dキャラクターと日本語で音声会話するスマートフォンアプリ。要件は [仕様書](docs/specification-ja.md)、原画・パーツ・モデル制作は [Live2Dモデル制作仕様書](docs/ciel-live2d-production-spec-ja.md) を参照してください。
 
+**新しく参加する人へ：[1枚で見るシステム構成と開発環境](docs/system-overview-ja.svg)** → [構成・API・設定の詳細](docs/architecture-ja.md)。SVGはブラウザーで開いて拡大できます。
+
 **よく使うコマンド：[ビルド・サーバーデプロイのコマンド集](docs/build-ja.md)**（Git Bash 用。Windows / Android のビルド、APK のインストール、サーバーへの反映、状態・ログの確認）。
 
 ## キャラクター（シエル）のLive2D制作

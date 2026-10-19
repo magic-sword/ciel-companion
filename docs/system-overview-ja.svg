@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1290" viewBox="0 0 1600 1290" role="img" aria-labelledby="title desc">
+  <title id="title">CIEL Companion システム構成と開発環境</title>
+  <desc id="desc">UnityアプリがLiveKit Cloud経由で自宅の会話サーバーへ接続する。会話サーバーはOpenAIで応答を生成し、Irodori-TTSで音声化する。人物記憶はPostgreSQLへ保存。下段に開発環境と制作・反映の流れを示す。</desc>
+  <defs>
+    <!-- 自作のベクターアイコン。外部画像・フォント・公式ロゴへの依存なし。 -->
+    <symbol id="icon-device" viewBox="0 0 64 64">
+      <rect x="3" y="8" width="44" height="34" rx="5" fill="#fff" stroke="#4274c6" stroke-width="2.5"/>
+      <path d="M25 43v8m-11 1h22" fill="none" stroke="#4274c6" stroke-width="3" stroke-linecap="round"/>
+      <path d="M12 36c0-12 25-12 25 0" fill="#b7d5ff"/>
+      <circle cx="24" cy="23" r="9" fill="#e6d7ff"/>
+      <path d="M16 21q8-14 16 0" fill="#7362af"/>
+      <circle cx="21" cy="24" r="1.2" fill="#354e70"/><circle cx="27" cy="24" r="1.2" fill="#354e70"/>
+      <path d="M21 28q3 3 6 0" fill="none" stroke="#7362af" stroke-width="1.5"/>
+      <rect x="43" y="25" width="17" height="32" rx="4" fill="#fff" stroke="#4274c6" stroke-width="2.5"/>
+      <path d="M48 30h7m-5 22h3" stroke="#4274c6" stroke-width="2" stroke-linecap="round"/>
+      <path d="M49 37v8m5-6v4" stroke="#49a7b2" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-cloud" viewBox="0 0 64 64">
+      <path d="M16 44C0 44 1 23 16 22 19 4 44 5 48 23c17-1 20 21 3 21Z" fill="#fff" stroke="#268c96" stroke-width="2.5"/>
+      <path d="M16 32h5l4-9 5 17 5-20 5 12h8" fill="none" stroke="#268c96" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M17 54h30m-25-5-5 5 5 5m20-10 5 5-5 5" fill="none" stroke="#54aeb5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-server" viewBox="0 0 64 64">
+      <rect x="7" y="5" width="40" height="17" rx="4" fill="#fff" stroke="#7762b5" stroke-width="2.5"/>
+      <rect x="7" y="26" width="40" height="17" rx="4" fill="#fff" stroke="#7762b5" stroke-width="2.5"/>
+      <circle cx="15" cy="13" r="2.5" fill="#51b3a4"/><circle cx="15" cy="34" r="2.5" fill="#51b3a4"/>
+      <path d="M25 13h14M25 34h14M27 44v10H12m15 0h25" fill="none" stroke="#7762b5" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="37" y="36" width="22" height="22" rx="4" fill="#e0d9f7" stroke="#7762b5" stroke-width="2"/>
+      <rect x="43" y="42" width="10" height="10" rx="2" fill="#fff"/>
+      <path d="M42 33v3m7-3v3m7-3v3m-14 22v3m7-3v3m7-3v3" stroke="#7762b5" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-ai" viewBox="0 0 64 64">
+      <path d="M11 8h42a6 6 0 0 1 6 6v29a6 6 0 0 1-6 6H28L16 59V49h-5a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6Z" fill="#fff" stroke="#c17b32" stroke-width="2.5"/>
+      <path d="M32 16c-7-5-15 1-13 8-7 4-3 15 4 14 3 6 9 4 9 0 0 4 6 6 9 0 7 1 11-10 4-14 2-7-6-13-13-8Z" fill="#f9dfb9" stroke="#c17b32" stroke-width="2"/>
+      <path d="M32 17v21m-10-13 5 3m15-3-5 3m-12 6 7-3 7 3" fill="none" stroke="#c17b32" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-key" viewBox="0 0 64 64"><circle cx="23" cy="24" r="14" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><circle cx="23" cy="24" r="5" fill="#fff"/><path d="m33 34 21 21m-9-9 7-7m-1 13 7-7" fill="none" stroke="#4274c6" stroke-width="5" stroke-linecap="round"/></symbol>
+    <symbol id="icon-voice" viewBox="0 0 64 64"><path d="M6 25h11l15-12v38L17 39H6Z" fill="#e0d9f7" stroke="#7762b5" stroke-width="3" stroke-linejoin="round"/><path d="M41 23q9 9 0 18m8-26q16 17 0 34" fill="none" stroke="#7762b5" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-db" viewBox="0 0 64 64"><path d="M10 15v33c0 14 44 14 44 0V15" fill="#e0d9f7" stroke="#7762b5" stroke-width="3"/><ellipse cx="32" cy="15" rx="22" ry="9" fill="#fff" stroke="#7762b5" stroke-width="3"/><path d="M10 30c0 12 44 12 44 0m-44 16c0 12 44 12 44 0" fill="none" stroke="#7762b5" stroke-width="2.5"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 64 64"><circle cx="26" cy="26" r="18" fill="#fff0d9" stroke="#c17b32" stroke-width="3"/><path d="m40 40 17 17" stroke="#c17b32" stroke-width="6" stroke-linecap="round"/><path d="M15 22h22M15 30h16" stroke="#c17b32" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-meeting" viewBox="0 0 64 64"><rect x="5" y="10" width="39" height="40" rx="6" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><path d="m44 24 15-8v29l-15-8Z" fill="#b7d5ff" stroke="#4274c6" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="25" r="7" fill="#fff"/><path d="M13 43q0-17 22 0" fill="#fff"/></symbol>
+    <symbol id="icon-message" viewBox="0 0 64 64"><path d="M12 8h40a6 6 0 0 1 6 6v29a6 6 0 0 1-6 6H28L14 59V49h-2a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6Z" fill="#fff0d9" stroke="#c17b32" stroke-width="3"/><path d="M18 22h28M18 32h20" stroke="#c17b32" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="icon-code" viewBox="0 0 64 64"><rect x="4" y="8" width="56" height="45" rx="5" fill="#e6efff" stroke="#4274c6" stroke-width="3"/><path d="m22 23-9 8 9 8m20-16 9 8-9 8m-7-20-7 25" fill="none" stroke="#4274c6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-palette" viewBox="0 0 64 64"><path d="M33 5C-2 5-5 55 25 58c11 1 6-13 15-13h9C68 43 62 5 33 5Z" fill="#f4e7ff" stroke="#9166ad" stroke-width="3"/><circle cx="18" cy="23" r="5" fill="#76b5e7"/><circle cx="31" cy="15" r="5" fill="#e8a1ba"/><circle cx="45" cy="23" r="5" fill="#e7bd69"/><circle cx="16" cy="38" r="5" fill="#71bba7"/></symbol>
+    <symbol id="icon-lock" viewBox="0 0 64 64"><path d="M18 28V18a14 14 0 0 1 28 0v10" fill="none" stroke="#526681" stroke-width="4"/><rect x="10" y="27" width="44" height="31" rx="5" fill="#cbd7e4" stroke="#526681" stroke-width="3"/><circle cx="32" cy="39" r="4" fill="#526681"/><path d="M32 42v7" stroke="#526681" stroke-width="3"/></symbol>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8Z" fill="#526681"/></marker>
+    <style>
+      text { font-family: 'Yu Gothic','Meiryo',sans-serif; fill: #1e304a; }
+      .title { font-size: 34px; font-weight: 700; }
+      .subtitle { font-size: 18px; fill: #526681; }
+      .heading { font-size: 21px; font-weight: 700; }
+      .body { font-size: 17px; }
+      .small { font-size: 15px; fill: #526681; }
+      .label { font-size: 15px; font-weight: 700; fill: #354e70; }
+      .card { fill: white; stroke: #cbd7e4; stroke-width: 1.5; }
+      .line { fill: none; stroke: #526681; stroke-width: 2; marker-end: url(#arrow); }
+      .both { marker-start: url(#arrow); }
+      .optional { stroke-dasharray: 7 5; }
+    </style>
+  </defs>
+  <rect width="1600" height="1290" fill="#f5f8fc"/>
+  <text x="40" y="58" class="title">CIEL Companion ｜ システム構成と開発環境</text>
+  <text x="40" y="92" class="subtitle">日本語で話す Live2D キャラクター。表示は Unity、通信は LiveKit、会話は OpenAI、声は自宅 GPU。</text>
+  <text x="40" y="123" class="small">2026-10-19 ｜ リポジトリの既定構成と運用ドキュメントに基づく。モデル名はコードの既定値。</text>
+
+  <rect x="30" y="153" width="340" height="699" rx="16" fill="#eaf2ff"/>
+  <rect x="410" y="153" width="300" height="699" rx="16" fill="#e8f5f6"/>
+  <rect x="750" y="153" width="460" height="699" rx="16" fill="#edf0ff"/>
+  <rect x="1250" y="153" width="320" height="699" rx="16" fill="#fff3e6"/>
+  <text x="50" y="188" class="heading">利用者の端末</text>
+  <text x="430" y="188" class="heading">外部の通信基盤</text>
+  <text x="770" y="188" class="heading">自宅サーバー ｜ chris_local</text>
+  <text x="1270" y="188" class="heading">外部 API</text>
+  <text x="50" y="215" class="small">Windows / Android（実機確認済み）</text>
+  <text x="430" y="215" class="small">LiveKit Cloud</text>
+  <text x="770" y="215" class="small">Docker Compose：agent / tts / db</text>
+  <text x="1270" y="215" class="small">会話・文字処理・検索・通知</text>
+
+  <use href="#icon-device" x="50" y="231" width="76" height="76"/>
+  <text x="140" y="261" class="heading">表示する・話す</text>
+  <text x="140" y="290" class="small">キャラクターとの接点</text>
+  <use href="#icon-cloud" x="430" y="231" width="76" height="76"/>
+  <text x="518" y="261" class="heading">中継する</text>
+  <text x="518" y="290" class="small">音声と操作を届ける</text>
+  <use href="#icon-server" x="770" y="231" width="76" height="76"/>
+  <text x="860" y="261" class="heading">会話と記憶をつなぐ</text>
+  <text x="860" y="290" class="small">自宅の CPU・GPU で動作</text>
+  <use href="#icon-ai" x="1270" y="231" width="76" height="76"/>
+  <text x="1358" y="261" class="heading">考える・調べる</text>
+  <text x="1358" y="290" class="small">生成 AI と外部サービス</text>
+  <g transform="translate(0 90)">
+  <rect x="50" y="245" width="300" height="78" rx="10" class="card"/>
+  <use href="#icon-key" x="66" y="249" width="29" height="29"/><text x="103" y="273" class="heading" style="font-size:20px">① 接続設定</text>
+  <text x="66" y="300" class="body">短期トークンを取得</text>
+  <rect x="430" y="245" width="260" height="78" rx="10" class="card"/>
+  <use href="#icon-key" x="446" y="250" width="29" height="29"/><text x="483" y="274" class="heading" style="font-size:19px">開発用トークン発行</text>
+  <text x="446" y="300" class="small">公開前に認証つき発行へ移行</text>
+  <path d="M350 284H430" class="line"/>
+
+  <rect x="50" y="360" width="300" height="195" rx="10" class="card"/>
+  <use href="#icon-device" x="66" y="370" width="29" height="29"/><text x="103" y="394" class="heading" style="font-size:20px">Unity アプリ / C#</text>
+  <text x="66" y="426" class="body">Live2D 表示・口パク・表情</text>
+  <text x="66" y="455" class="body">マイク入力・返答音声の再生</text>
+  <text x="66" y="484" class="body">タッチ・会話モード・調査表示</text>
+  <text x="66" y="531" class="small">unity/Assets/Scripts/Conversation/</text>
+  <rect x="430" y="360" width="260" height="195" rx="10" class="card"/>
+  <use href="#icon-cloud" x="446" y="370" width="29" height="29"/><text x="483" y="394" class="heading" style="font-size:19px">② LiveKit ルーム</text>
+  <text x="446" y="426" class="body">音声：WebRTC</text>
+  <text x="446" y="455" class="body">操作・表情・調査：JSON</text>
+  <text x="446" y="491" class="small">アプリと agent を中継</text>
+  <text x="446" y="520" class="small">LiveKit の録音は無効</text>
+  <path d="M350 442H430" class="line both"/>
+  <path d="M690 442H770" class="line both"/>
+
+  <rect x="770" y="245" width="420" height="310" rx="10" class="card"/>
+  <use href="#icon-server" x="788" y="255" width="29" height="29"/><text x="825" y="279" class="heading" style="font-size:20px">③ 会話サーバー / Python 3.11</text>
+  <text x="788" y="307" class="small">server/agent/ ｜ LiveKit Agents 1.8.3</text>
+  <text x="788" y="341" class="body">声を送る → 返答テキスト → 音声化</text>
+  <text x="788" y="373" class="body">話者識別：SpeechBrain ECAPA（CPU）</text>
+  <text x="788" y="405" class="body">function calling：人物・メモ・議事録・検索</text>
+  <text x="788" y="452" class="body">接続中のメモリー</text>
+  <text x="788" y="481" class="small">共通会話履歴・調査結果（切断で終了）</text>
+  <text x="788" y="526" class="small">人物像・指示：config/persona.toml + prompts/*.md</text>
+
+  <rect x="1270" y="245" width="280" height="172" rx="10" class="card"/>
+  <use href="#icon-ai" x="1286" y="253" width="29" height="29"/><text x="1323" y="277" class="heading" style="font-size:20px">④ OpenAI Realtime</text>
+  <text x="1286" y="308" class="body">gpt-realtime-2.1-mini</text>
+  <text x="1286" y="337" class="body">音声入力 → 文字で返答</text>
+  <text x="1286" y="367" class="small">入力の文字起こし：</text>
+  <text x="1286" y="392" class="body">gpt-4o-mini-transcribe</text>
+  <path d="M1190 330H1270" class="line both"/>
+  <rect x="1270" y="440" width="280" height="185" rx="10" class="card"/>
+  <use href="#icon-search" x="1286" y="448" width="29" height="29"/><text x="1323" y="472" class="heading" style="font-size:19px">OpenAI 文字処理・検索</text>
+  <text x="1286" y="503" class="body">Chat Completions API</text>
+  <text x="1286" y="531" class="small">人物メモ・関係：gpt-5.4-mini</text>
+  <text x="1286" y="557" class="small">議事録：gpt-5.4</text>
+  <text x="1286" y="586" class="body">Responses API + web_search</text>
+  <text x="1286" y="610" class="small">Web 調査：gpt-5.4-mini</text>
+  <path d="M1190 498H1270" class="line both optional"/>
+
+  <rect x="770" y="597" width="198" height="142" rx="10" class="card"/>
+  <use href="#icon-voice" x="784" y="605" width="29" height="29"/><text x="821" y="629" class="heading" style="font-size:19px">⑤ Irodori-TTS</text>
+  <text x="784" y="658" class="body">返答を 1 文ずつ合成</text>
+  <text x="784" y="685" class="small">GPU / CUDA 12.8</text>
+  <text x="784" y="714" class="small">HTTP :8766 /synthesize</text>
+  <rect x="989" y="597" width="201" height="142" rx="10" class="card"/>
+  <use href="#icon-db" x="1003" y="605" width="29" height="29"/><text x="1040" y="629" class="heading" style="font-size:19px">人物の長期記憶</text>
+  <text x="1003" y="658" class="body">PostgreSQL 17</text>
+  <text x="1003" y="685" class="small">pgvector 0.8.0 / :5433</text>
+  <text x="1003" y="714" class="small">同意済みの声・メモ・関係</text>
+  <path d="M865 555V597" class="line both"/>
+  <path d="M1085 555V597" class="line both"/>
+
+  <rect x="1270" y="658" width="280" height="81" rx="10" class="card"/>
+  <use href="#icon-message" x="1286" y="665" width="29" height="29"/><text x="1323" y="689" class="heading" style="font-size:17px">Discord Webhook（任意）</text>
+  <text x="1286" y="716" class="small">議事録の下書き → 非公開チャンネル</text>
+  <path d="M1190 540H1230V698H1270" class="line optional"/>
+  <rect x="50" y="597" width="300" height="142" rx="10" class="card"/>
+  <use href="#icon-meeting" x="66" y="605" width="29" height="29"/><text x="103" y="629" class="heading" style="font-size:18px">会議参加（任意 / Windows）</text>
+  <text x="66" y="660" class="body">Zoom / Meet ↔ 仮想ケーブル</text>
+  <text x="66" y="688" class="body">アプリ画面 → OBS → 仮想カメラ</text>
+  <text x="66" y="716" class="small">会議サービスの API 連携は使わない</text>
+  <path d="M200 597V555" class="line both optional"/>
+  <text x="430" y="605" class="label">実線：既定の会話・記憶の経路</text>
+  <text x="430" y="635" class="label">破線：検索・議事録など必要時</text>
+  <text x="430" y="684" class="small">返答の声は TTS → agent →</text>
+  <text x="430" y="710" class="small">LiveKit → Unity へ戻る</text>
+
+  <text x="40" y="805" class="heading">開発環境と、変更を届ける流れ</text>
+  <rect x="40" y="828" width="480" height="170" rx="12" class="card"/>
+  <use href="#icon-code" x="58" y="836" width="29" height="29"/><text x="95" y="860" class="heading" style="font-size:21px">アプリ開発 ｜ Windows</text>
+  <text x="58" y="890" class="body">Unity Hub / Editor 6000.6.4f1 / URP 17.6.0</text>
+  <text x="58" y="918" class="body">Cubism 5 SDK R5 / LiveKit Unity SDK 2.1.0</text>
+  <text x="58" y="946" class="body">Unity CLI・PowerShell / Git Bash・Git LFS</text>
+  <text x="58" y="978" class="small">unity/ → CIEL Build → Windows EXE / Android APK</text>
+  <rect x="540" y="828" width="480" height="170" rx="12" class="card"/>
+  <use href="#icon-server" x="558" y="836" width="29" height="29"/><text x="595" y="860" class="heading" style="font-size:21px">サーバー開発と反映</text>
+  <text x="558" y="890" class="body">Python 3.11 / unittest / PostgreSQL 結合テスト</text>
+  <text x="558" y="918" class="body">server/ → deploy-server → SSH・SCP・tar</text>
+  <text x="558" y="946" class="body">→ chris_local → Docker Compose で再構築</text>
+  <text x="558" y="978" class="small">GPU：NVIDIA RTX A2000 12GB（既存運用資料）</text>
+  <rect x="1040" y="828" width="520" height="170" rx="12" class="card"/>
+  <use href="#icon-palette" x="1058" y="836" width="29" height="29"/><text x="1095" y="860" class="heading" style="font-size:21px">Live2D 制作と組み込み</text>
+  <text x="1058" y="890" class="body">assets/ciel/current/ の素材 → Cubism 編集</text>
+  <text x="1058" y="918" class="body">→ rig/ciel.cmo3 → runtime/ の SDK 用データ</text>
+  <text x="1058" y="946" class="body">→ Unity「Model / Apply Current Package」</text>
+  <text x="1058" y="978" class="small">ハッシュ検証 → unity/Assets/Characters/Ciel/ に反映</text>
+
+  <rect x="40" y="1019" width="1520" height="143" rx="12" fill="#e7edf5"/>
+  <use href="#icon-lock" x="58" y="1027" width="29" height="29"/><text x="95" y="1051" class="heading" style="font-size:21px">参加時に押さえる設定と実装状況</text>
+  <text x="58" y="1082" class="body">秘密情報：server/agent/.env（OpenAI・LiveKit・Discord）、server/.env（DB）。API キーを Unity に入れない。</text>
+  <text x="58" y="1111" class="body">TTS・DB はサーバー内の 127.0.0.1。外部サービスへの接続はサーバー側から開始する。</text>
+  <text x="58" y="1140" class="small">予備：Seed-VC / :8765（通常停止） ｜ 複数端末の独立会話・共有記憶対策：実装済み、本番未反映 ｜ iOS：未検証</text>
+  <text x="40" y="1187" class="small">詳細・根拠：docs/architecture-ja.md ｜ 起動・ビルド：docs/build-ja.md ｜ 外部仕様の最新版や本番稼働状況の再確認は含まない</text>
+  </g>
+</svg>
