@@ -7,7 +7,7 @@
 | 項目 | 決定 | 理由 |
 | --- | --- | --- |
 | 音声の中継 | **LiveKit Cloud**（開発中は無料枠） | 自宅サーバーは LiveKit Cloud へ外向きにつなぐだけで済み、ルーターのポート開放・ドメイン・TLS 証明書が要らない。外から自宅への入り口を開けない。モバイル回線でも安定する。接続先の URL とキーを変えるだけで、自宅の LiveKit サーバーへ移せる |
-| 会話サーバー | 自宅の GPU サーバー `chris_local`（Ubuntu 22.04、RTX A2000 12GB、Docker）で `server/agent` を動かす | 運用費を抑える。外部へは LiveKit Cloud と OpenAI へ外向きにつなぐだけ |
+| 会話サーバー | 自宅の GPU サーバー（Ubuntu 22.04、RTX A2000 12GB、Docker）で `server/agent` を動かす | 運用費を抑える。外部へは LiveKit Cloud と OpenAI へ外向きにつなぐだけ |
 | 会話モデル | OpenAI Realtime API（`gpt-realtime`）から始め、GPT-Live（`gpt-live-1`）と比べる | LiveKit Agents 1.8 の OpenAI プラグインが両方に対応（`CIEL_MODEL` で切り替え） |
 | シエルの声 | Seed-VC で、OpenAI の声をシエルの声へ変換（フェーズ2） | OpenAI の音声会話の声は用意された声から選ぶ方式。抑揚・間は保ったまま声色だけ変えられる。Seed-VC は 10 秒程度の参照音声で使える。公式の値で遅延 約 0.43 秒（RTX 3060 ノート、変換 0.3＋機器 0.1） |
 | 参照音声 | Irodori-TTS で合成したシエルの声（`D:\CIEL\企画設計\キャラ\シエル\ボイスサンプル`、リポジトリの外）。スタイルは設定資料 第7章 | 追加の参照音声も同じスタイルで作れる。Irodori-TTS のモデルの重みのライセンス（モデルカード）は公開前に確認する |
@@ -21,8 +21,8 @@
 ## 接続の手順（開発）
 
 1. LiveKit Cloud でプロジェクトを作り、Settings → Keys で URL・API キー・API シークレットを得る。Settings → Options で開発用トークンサーバー（Development token server）を有効にし、その ID を控える。
-2. `chris_local` の `~/work/ciel-companion/server/agent/.env` に、`.env.example` をもとに LiveKit と OpenAI のキーを書く（利用者が書く。Git に入れない）。
-3. リポジトリのルートで `scripts/server/deploy-server.sh`（PowerShell は `.scriptsserverdeploy-server.ps1`）を実行する。`server/` 一式を送り、`~/work/ciel-companion/server` で `docker compose up -d --build` する（会話サーバー・読み上げ・DB。2026-10-15 に 1 つの `server/compose.yaml` にまとめた）。
+2. 自宅サーバーの `~/work/ciel-companion/server/agent/.env` に、`.env.example` をもとに LiveKit と OpenAI のキーを書く（利用者が書く。Git に入れない）。
+3. リポジトリのルートで、Git Bash から `scripts/server/deploy-server.sh` を実行する。接続先は先に `scripts/server/.env.local` に書いておく（[ビルドとデプロイ](../build-ja.md#前提)）。`server/` 一式を送り、`~/work/ciel-companion/server` で `docker compose up -d --build` する（会話サーバー・読み上げ・DB。2026-10-15 に 1 つの `server/compose.yaml` にまとめた）。
 4. Unity：`Assets/Settings/LiveKitTokenSource.asset`（Git 管理外）の Token Server Id に、1 の ID を入れる。`Assets/Scenes/Conversation.unity` を開いて再生する（メニュー CIEL ＞ Conversation ＞ Create Scene で作り直せる）。
 
 開発用トークンサーバーは誰でもトークンを取れるので、開発中だけ使う。公開前に、認証つきのトークン発行（仕様書の `server/session-api/`）へ切り替える。

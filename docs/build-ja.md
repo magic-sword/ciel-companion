@@ -125,8 +125,20 @@ tail -n 50 Logs/build-android.log
 
 ### 前提
 
-- 既定の接続先は `prog@192.168.1.15`（自宅の GPU サーバー）。同じネットワークなど、SSH で到達できる環境から実行する。
-- 手元に SSH 鍵 `~/.ssh/prog_rsa` があり、この鍵で接続できること。
+- 自宅の GPU サーバーへ、同じネットワークなど SSH で到達できる環境から実行する。
+- 接続先を `scripts/server/.env.local` に書いておく（Git に入れない）。見本の `scripts/server/.env.example` を写して、自分の値にする：
+
+  ```sh
+  cp scripts/server/.env.example scripts/server/.env.local
+  ```
+
+  | 名前 | 中身 |
+  |---|---|
+  | `CIEL_SERVER_HOST` | SSH の接続先（`<ユーザー>@<サーバーのアドレス>`、または `~/.ssh/config` の Host 名）。必須 |
+  | `CIEL_SSH_KEY` | SSH の秘密鍵の場所（例：`~/.ssh/id_ed25519`）。空なら ssh の普段の設定に任せる |
+
+  同じ名前の環境変数があればそちらを、スクリプトの引数で接続先を渡せば引数を使う。どれも無いと、何もせずに止まる。
+- 初めてつなぐサーバーの鍵は自動で覚え（`~/.ssh/known_hosts`）、2 回目からは鍵が変わっていたら止まる。サーバーを入れ直したなどで止まった場合は、`ssh-keygen -R <サーバーのアドレス>` で古い鍵を消してから実行し直す。
 - サーバーに Docker Compose と NVIDIA GPU の実行環境があり、`~/work/ciel-companion/server/agent/.env` に API キーなどを設定済みであること。必要なモデル・参照音声はサーバーの `data/` に別途用意する。
 
 ### 手元から送って起動する
@@ -137,10 +149,10 @@ tail -n 50 Logs/build-android.log
 bash scripts/server/deploy-server.sh
 ```
 
-接続先を指定する場合：
+Git Bash で実行する（PowerShell 版は無い）。その回だけ別の接続先にする場合：
 
 ```sh
-bash scripts/server/deploy-server.sh prog@192.168.1.15
+bash scripts/server/deploy-server.sh <ユーザー>@<サーバーのアドレス>
 ```
 
 このコマンドは手元の `server/` 一式を `~/work/ciel-companion/server` へ送り、サーバーで `docker compose up -d --build` を実行する。コミット前の変更も送られるので、配布したい内容を確認してから実行する。
@@ -154,10 +166,10 @@ bash scripts/server/deploy-server.sh prog@192.168.1.15
 
 ### デプロイ後の確認・再起動
 
-手元の Git Bash から SSH 接続する（接続先を変えた場合はここも合わせる）：
+手元から SSH 接続する（`.env.local` に書いた接続先と鍵を使う。鍵を指定していなければ `-i` は不要）：
 
 ```sh
-ssh -i ~/.ssh/prog_rsa -o IdentitiesOnly=yes prog@192.168.1.15
+ssh -i <秘密鍵> <ユーザー>@<サーバーのアドレス>
 ```
 
 **ここからはサーバー上**で実行する：

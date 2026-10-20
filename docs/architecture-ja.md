@@ -26,9 +26,9 @@
 | 会話サーバー | Python **3.11**、LiveKit Agents / OpenAI plugin **1.8.3** | `server/agent/Dockerfile`、`requirements.txt`、`agent.py` |
 | 話者識別 | SpeechBrain **1.0.3**、ECAPA、CPU 版 PyTorch **2.5.1** | `speakers.py`、`speaker_store.py`。モデルは Docker イメージ作成時に取得 |
 | 読み上げ | Irodori-TTS、Python 3.11、uv、CUDA **12.8** 系依存 | `server/tts-irodori/Dockerfile`。上流コードをコミット固定、GPU で合成 |
-| サーバー稼働 | Docker Compose、自宅 GPU サーバー `chris_local` | `server/compose.yaml`。GPU は既存運用資料で RTX A2000 12GB |
+| サーバー稼働 | Docker Compose、自宅の GPU サーバー | `server/compose.yaml`。GPU は既存運用資料で RTX A2000 12GB |
 | DB | PostgreSQL **17** ＋ pgvector **0.8.0** | Compose イメージ `pgvector/pgvector:0.8.0-pg17`、永続ボリューム `ciel_db-data` |
-| ビルド・反映 | Unity CLI、PowerShell / Git Bash、SSH・SCP・tar | `scripts/unity.ps1`、`scripts/server/deploy-server.ps1` / `.sh` |
+| ビルド・反映 | Unity CLI、PowerShell / Git Bash、SSH・SCP・tar | `scripts/unity.ps1`、`scripts/server/deploy-server.sh`（Git Bash） |
 | バージョン管理 | Git、Git LFS | `.gitattributes`。LiveKit の依存取得や `.cmo3` の管理に LFS を使用 |
 | 検証 | Python unittest、使い捨て PostgreSQL の結合テスト、Unity の確認用メニュー | [回帰テスト](regression-tests-ja.md)、`server/agent/tests/`、`unity/Assets/Editor/` |
 | モデル制作 | Live2D Cubism、素材生成・加工用 Python スクリプト | `assets/ciel/current/` → `rig/ciel.cmo3` → `runtime/` → Unity のモデル更新メニュー |
@@ -63,7 +63,7 @@ flowchart LR
         R["部屋（ルーム）<br>音声とデータの中継"]
         T["開発用トークンサーバー"]
     end
-    subgraph Home["自宅の GPU サーバー chris_local（Docker）"]
+    subgraph Home["自宅の GPU サーバー（Docker）"]
         A["会話サーバー<br>server/agent"]
         I["読み上げサービス<br>server/tts-irodori<br>127.0.0.1:8766"]
         V["声質変換サービス<br>server/voice-conversion<br>127.0.0.1:8765（予備）"]
@@ -225,10 +225,10 @@ flowchart LR
 | 部品 | 動かす場所 | 起動・反映 |
 |---|---|---|
 | Unity アプリ | 利用者の Windows PC（エディタか `unity/Builds/Windows/CIEL Companion.exe`）、Android（開発用 APK、会話等は 2026-10-16 に実機確認済み） | [アプリのビルド](build-ja.md) |
-| 会話サーバー（`agent`） | chris_local の `~/work/ciel-companion/server`（Docker Compose の一式 `ciel`、ホストのネットワーク） | リポジトリのルートで `.\scripts\server\deploy-server.ps1`（Git Bash は `scripts/server/deploy-server.sh`）。`server/` 一式を送り、`docker compose up -d --build`。`.env` と `data/` は送らない・上書きしない |
-| 読み上げサービス（`tts`） | chris_local（Docker、GPU） | 同じ一式で起動する |
-| 声質変換サービス（`vc`） | chris_local（Docker、GPU） | 使うときだけ `docker compose --profile vc up -d`（読み上げサービスと GPU を分け合う） |
-| 記録の場所（`db`、PostgreSQL＋pgvector） | chris_local（Docker、127.0.0.1:5433） | 同じ一式で起動する。データは Docker のボリューム `ciel_db-data` |
+| 会話サーバー（`agent`） | 自宅サーバーの `~/work/ciel-companion/server`（Docker Compose の一式 `ciel`、ホストのネットワーク） | リポジトリのルートで Git Bash から `scripts/server/deploy-server.sh`。`server/` 一式を送り、`docker compose up -d --build`。`.env` と `data/` は送らない・上書きしない |
+| 読み上げサービス（`tts`） | 自宅サーバー（Docker、GPU） | 同じ一式で起動する |
+| 声質変換サービス（`vc`） | 自宅サーバー（Docker、GPU） | 使うときだけ `docker compose --profile vc up -d`（読み上げサービスと GPU を分け合う） |
+| 記録の場所（`db`、PostgreSQL＋pgvector） | 自宅サーバー（Docker、127.0.0.1:5433） | 同じ一式で起動する。データは Docker のボリューム `ciel_db-data` |
 
 GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会話を試すあいだは vLLM を止めている（[決定記録](decisions/voice-pipeline-ja.md)）。
 

@@ -69,7 +69,7 @@
   <rect x="1250" y="153" width="320" height="699" rx="16" fill="#fff3e6"/>
   <text x="50" y="188" class="heading">利用者の端末</text>
   <text x="430" y="188" class="heading">外部の通信基盤</text>
-  <text x="770" y="188" class="heading">自宅サーバー ｜ chris_local</text>
+  <text x="770" y="188" class="heading">自宅サーバー</text>
   <text x="1270" y="188" class="heading">外部 API</text>
   <text x="50" y="215" class="small">Windows / Android（実機確認済み）</text>
   <text x="430" y="215" class="small">LiveKit Cloud</text>
@@ -177,7 +177,7 @@
   <use href="#icon-server" x="558" y="836" width="29" height="29"/><text x="595" y="860" class="heading" style="font-size:21px">サーバー開発と反映</text>
   <text x="558" y="890" class="body">Python 3.11 / unittest / PostgreSQL 結合テスト</text>
   <text x="558" y="918" class="body">server/ → deploy-server → SSH・SCP・tar</text>
-  <text x="558" y="946" class="body">→ chris_local → Docker Compose で再構築</text>
+  <text x="558" y="946" class="body">→ 自宅サーバー → Docker Compose で再構築</text>
   <text x="558" y="978" class="small">GPU：NVIDIA RTX A2000 12GB（既存運用資料）</text>
   <rect x="1040" y="828" width="520" height="170" rx="12" class="card"/>
   <use href="#icon-palette" x="1058" y="836" width="29" height="29"/><text x="1095" y="860" class="heading" style="font-size:21px">Live2D 制作と組み込み</text>

@@ -1,4 +1,4 @@
-# 自宅の GPU サーバー（chris_local）で動かすもの一式。このフォルダ（~/work/ciel-companion/server）で：
+# 自宅の GPU サーバーで動かすもの一式。このフォルダ（~/work/ciel-companion/server）で：
 #   docker compose up -d --build          会話サーバー・読み上げ・記録の場所（DB）を起動する
 #   docker compose --profile vc up -d     声質変換も起動する（読み上げと GPU を分け合うので、ふだんは止めておく）
 #   docker compose logs -f agent          会話サーバーのログ
