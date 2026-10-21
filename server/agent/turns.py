@@ -94,15 +94,19 @@ class Segment:
 
 class TurnReplies:
     def __init__(self, session: AgentSession, book: speakers.SpeakerBook, tap: speakers.AudioTap, style,
-                 quiet_turn: str, backchannel=None) -> None:
+                 quiet_turn: str, backchannel=None, *, history=None, minutes=None, nod: bool = True) -> None:
         self.session = session
         self.book = book
         self.tap = tap
         self.style = style            # mode.ConversationStyle（おしゃべり度・その場にいる人）
         self.quiet_turn = quiet_turn  # ひかえめのとき、返事ごとに添える念押し（config/prompts/talk_quiet_turn.md）
         self.backchannel = backchannel   # 返事の頭の相づち（aizuchi.Backchannel。irodori のときだけ）
+        self.history = history        # 接続中の共通履歴（conversation.Conversation）
+        self.minutes = minutes        # minutes.Minutes。返答のたびに実際の記録状態を渡す
+        self.nod = nod                # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
         self.encoder: speakers.Encoder | None = None
-        self.touch = None             # touch.TouchReactions（話しながら触れたときの知らせ。agent.py がつなぐ）
+        # touch.TouchReactions（話しながら触れたときの知らせ）。会話が始まってから作るので、agent.py があとでつなぐ
+        self.touch = None
         self._speaking = False
         self._started_at: float | None = None   # まだ返事を作らせていない発言の、最初の話し始め
         self._ended_at: float | None = None     # その最後の話し終わり
@@ -113,15 +117,12 @@ class TurnReplies:
         self._no_text: asyncio.TimerHandle | None = None
         self._early: asyncio.Task | None = None   # 区切りのあと、続きを見てから作らせる（ふつう・おしゃべり）
         self._await_text = False                  # 物音かもしれないので、文字起こしを待っている
-        self.nod = True                           # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
         self._watch: asyncio.Task | None = None   # 話している途中の息つぎを見る
         self._nod_at = 0.0                        # 最後に話の途中の相づちを打った時刻
         self._tasks: set[asyncio.Task] = set()
         self._segment_start: float | None = None             # いま話している発言の話し始め（区間ごと。返事とは別）
         self._segments: list[Segment] = []                  # 文字起こしをまだ組にしていない発言の区間
         self._recent: collections.deque[Segment] = collections.deque(maxlen=20)   # 最近の発言の区間（返事のため）
-        self.history = None  # 接続中の共通履歴（agent.py が接続する）
-        self.minutes = None  # minutes.Minutes。返答のたびに実際の記録状態を渡す
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""

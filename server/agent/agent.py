@@ -188,12 +188,13 @@ async def entrypoint(ctx: JobContext) -> None:
     style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
     style.publish = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
         json.dumps(msg), reliable=True, topic='ciel.event'))
-    replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
-                                agent.aizuchi if AIZUCHI else None)
-    replies.nod = NOD
     history = Conversation()
-    replies.history = history
     session.userdata.history = history
+    # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
+    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history)
+    session.userdata.minutes = minute_taker
+    replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
+                                agent.aizuchi if AIZUCHI else None, history=history, minutes=minute_taker, nod=NOD)
     async def publish_research(packet):
         await ctx.room.local_participant.publish_data(
             json.dumps(packet, ensure_ascii=False), reliable=True, topic='ciel.research')
@@ -216,10 +217,6 @@ async def entrypoint(ctx: JobContext) -> None:
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
                        if note_taker is not None else None)
-    # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
-    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history)
-    session.userdata.minutes = minute_taker
-    replies.minutes = minute_taker
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる

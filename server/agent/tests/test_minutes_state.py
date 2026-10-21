@@ -121,8 +121,7 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_every_user_reply_includes_fresh_state_with_quiet_instructions(self):
         session = SimpleNamespace(generate_reply=Mock())
         style = SimpleNamespace(talk='quiet')
-        replies = TurnReplies(session, None, None, style, 'quiet rules')
-        replies.minutes = self.m
+        replies = TurnReplies(session, None, None, style, 'quiet rules', minutes=self.m)
         self.m.start()
         self.add('first')
         await replies._reply(1, 2)
@@ -142,10 +141,9 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_speaker_identification_reply_also_includes_state(self):
         session = SimpleNamespace(generate_reply=Mock())
         book = SimpleNamespace(identify=AsyncMock(return_value='speaker metadata'), last=None)
-        replies = TurnReplies(session, book, None, SimpleNamespace(talk='normal', presence='solo'), '')
+        replies = TurnReplies(session, book, None, SimpleNamespace(talk='normal', presence='solo'), '', minutes=self.m)
         replies.encoder = object()
         replies._judgment_for = AsyncMock(return_value=None)
-        replies.minutes = self.m
         self.m.start()
         await replies._reply(1, 2)
         extra = session.generate_reply.call_args.kwargs

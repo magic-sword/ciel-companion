@@ -320,8 +320,7 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.h = Conversation()
-        self.replies = TurnReplies(SimpleNamespace(), None, None, SimpleNamespace(talk='normal'), '')
-        self.replies.history = self.h
+        self.replies = TurnReplies(SimpleNamespace(), None, None, SimpleNamespace(talk='normal'), '', history=self.h)
         self.recorder = ConversationRecorder(self.h, self.replies)
 
     def segment(self, at):
