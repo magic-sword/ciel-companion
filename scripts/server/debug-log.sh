@@ -8,26 +8,28 @@
 #   scripts/server/debug-log.sh pull     … ログを手元の .local/debug-logs/ へ持ち帰る（Git の外）
 #   scripts/server/debug-log.sh clear    … サーバーに残っているログを今すぐ消す
 # 接続先と SSH の鍵は deploy-server.sh と同じ（scripts/server/.env.local か環境変数）。
+# サーバーの server/agent/data/ はコンテナが作ったので root のもの。ファイルの操作は、動いている会話サーバーのコンテナの中で行う。
 set -euo pipefail
 ACTION="${1:-status}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/server/ssh-target.sh" "${2:-}"
-DIR='~/work/ciel-companion/server/agent/data/debug'
+IN_AGENT='cd ~/work/ciel-companion/server && docker compose exec -T agent sh -c'
+DIR=/app/data/debug
 
 case "$ACTION" in
   on)
-    "${SSH[@]}" "mkdir -p $DIR && touch $DIR/ON && echo 'デバッグ用の会話ログ：入れた（次に始まる会話から残す）'" ;;
+    "${SSH[@]}" "$IN_AGENT 'mkdir -p $DIR && touch $DIR/ON' && echo 'デバッグ用の会話ログ：入れた（次に始まる会話から残す）'" ;;
   off)
-    "${SSH[@]}" "rm -f $DIR/ON && echo 'デバッグ用の会話ログ：切った'" ;;
+    "${SSH[@]}" "$IN_AGENT 'rm -f $DIR/ON' && echo 'デバッグ用の会話ログ：切った'" ;;
   status)
-    "${SSH[@]}" "if [ -f $DIR/ON ]; then echo '入っている'; else echo '切っている'; fi; ls -l $DIR 2>/dev/null | grep '\.jsonl' || echo '残っているログはない'" ;;
+    "${SSH[@]}" "$IN_AGENT 'if [ -f $DIR/ON ]; then echo 入っている; else echo 切っている; fi; ls -l $DIR 2>/dev/null | grep \"\\.jsonl\" || echo 残っているログはない'" ;;
   pull)
     OUT="$ROOT/.local/debug-logs"
     mkdir -p "$OUT"
-    "${SSH[@]}" "cd $DIR 2>/dev/null && ls *.jsonl >/dev/null 2>&1 && tar cf - *.jsonl" | tar -C "$OUT" -xf - || true
+    "${SSH[@]}" "$IN_AGENT 'cd $DIR 2>/dev/null && ls *.jsonl >/dev/null 2>&1 && tar cf - *.jsonl'" | tar -C "$OUT" -xf - 2>/dev/null || true
     ls -l "$OUT" | grep '\.jsonl' || echo '持ち帰るログはなかった' ;;
   clear)
-    "${SSH[@]}" "rm -f $DIR/*.jsonl && echo 'サーバーのログを消した'" ;;
+    "${SSH[@]}" "$IN_AGENT 'rm -f $DIR/*.jsonl' && echo 'サーバーのログを消した'" ;;
   *)
     echo "使い方：$0 on|off|status|pull|clear" >&2; exit 2 ;;
 esac
