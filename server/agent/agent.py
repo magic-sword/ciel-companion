@@ -176,6 +176,10 @@ async def entrypoint(ctx: JobContext) -> None:
     names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
     session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
                            turn_detection='manual' if REALTIME else agents.NOT_GIVEN,
+                           # 読み上げる前の文字の変換は、絵文字を外すだけにする。既定の filter_markdown は、返事の頭の
+                           # 感情の印「[happy]」をリンクの書きかけとみなし、返事を最後まで書き終えるまで読み上げに渡さなかった
+                           # （2026-10-22、bench_latency.py。印は emotion.py が読み取って外す）
+                           tts_text_transforms=['filter_emoji'],
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
     tap = speakers.AudioTap()

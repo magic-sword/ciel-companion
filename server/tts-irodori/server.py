@@ -7,7 +7,7 @@ POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）", "
   省略可：cfg_caption（キャプションの効き。既定 3.0）、cfg_speaker（参照音声の効き。既定 5.0）、seed（揺れを固定する）
   → 200、本文 = PCM（int16、リトルエンディアン、モノラル）、ヘッダー X-Sample-Rate
 GPU は 1 つなので、合成は 1 つのスレッドで 1 文ずつ順に行う。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
-参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込む。
+参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込んで符号化する（encode_refs）。
 
 環境変数：TTS_PORT（既定 8766）、TTS_STEPS（既定 16。標準の 40 と聞き分けられない品質だった）
 """
@@ -29,7 +29,8 @@ import numpy as np
 import torch
 
 import irodori_tts.attention as attention
-from irodori_tts.inference_runtime import InferenceRuntime, RuntimeKey, SamplingRequest, download_hf_checkpoint
+from irodori_tts.inference_runtime import (InferenceRuntime, RuntimeKey, SamplingRequest, _load_audio,
+                                           download_hf_checkpoint)
 from torch.nn.attention import SDPBackend
 
 # Irodori-TTS は注意の計算に cuDNN を優先して使う。cuDNN は音声の長さが変わるたびに計算の準備（約 0.8 秒）をし直すため、
@@ -51,6 +52,25 @@ RT = InferenceRuntime.from_key(RuntimeKey(
 WORKER = FairScheduler()
 
 
+def encode_refs(paths: list[str]) -> str:
+    """参照音声を、起動時に 1 回だけ潜在表現にして保存し、そのファイルの場所を返す。
+    ref_wavs で渡すと、文ごとに参照音声を読み込んで符号化し直していた（1 文あたり約 0.16 秒。結果は毎回同じ）。
+    Irodori-TTS が ref_wavs を受け取ったときと同じ処理（音量をそろえて符号化し、順につなぐ）を行う。
+    同じ文・同じ種で、ref_wavs のときとまったく同じ音声になることを確かめた（2026-10-22）。"""
+    req = SamplingRequest(text='')
+    pieces = []
+    for path in paths:
+        wav, sr = _load_audio(path)
+        pieces.append(RT.codec.encode_waveform(wav.unsqueeze(0), sample_rate=int(sr), normalize_db=req.ref_normalize_db,
+                                               ensure_max=bool(req.ref_ensure_max)).cpu())
+    out = os.path.join('/tmp', 'ciel-ref-latent.pt')
+    torch.save(torch.cat(pieces, dim=1)[0], out)
+    return out
+
+
+REF_LATENT = encode_refs(REFS)
+
+
 def synthesize(text: str, caption: str | None, seconds: float | None = None,
                session_id='legacy', request_id=None, **options):
     request_id = request_id or uuid.uuid4().hex
@@ -68,7 +88,7 @@ def _synthesize(text: str, caption: str | None, seconds: float | None = None, **
     t = time.perf_counter()
     # 長さを渡すときは、下限（既定 0.5 秒）もそれに合わせて下げる
     length = {} if seconds is None else {'seconds': seconds, 'min_seconds': min(0.5, seconds)}
-    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_wavs=REFS, num_steps=STEPS,
+    r = RT.synthesize(SamplingRequest(text=text, caption=caption or CAPTION, ref_latents=[REF_LATENT], num_steps=STEPS,
                                       **length, **options), log_fn=None)
     audio = r.audio.squeeze().float().cpu().numpy()
     dt = time.perf_counter() - t
