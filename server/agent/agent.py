@@ -42,6 +42,7 @@ import speakers
 import tools
 import touch
 import turns
+import usage
 import voice_conversion
 import volume
 from conversation import Conversation
@@ -183,6 +184,9 @@ async def entrypoint(ctx: JobContext) -> None:
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
     tap = speakers.AudioTap()
+    # 返事ごとのトークン数（usage.py）。指示を短くしたときの比べる基準
+    usage_log = usage.UsageLog()
+    session.on('session_usage_updated', usage_log.on_usage)
 
     def on_track(track: rtc.Track, publication, participant: rtc.RemoteParticipant) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
@@ -238,6 +242,7 @@ async def entrypoint(ctx: JobContext) -> None:
     session.on('conversation_item_added', recorder.on_item)
 
     async def close_store() -> None:
+        usage_log.summary()
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await researcher.close()
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
@@ -250,6 +255,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(close_store)
     logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
                 agent.persona.fingerprint, MODEL, REALTIME_MODEL if REALTIME else 'n/a', VOICE)
+    logger.info('指示 %d 字・道具 %d 個', len(agent.instructions), len(agent.tools))
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
