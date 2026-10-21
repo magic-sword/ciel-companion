@@ -56,8 +56,11 @@ logger = logging.getLogger('ciel-agent')
 # 状態確認の HTTP の口（既定 8081）。試験用の会話サーバーを同じマシンで動かすときは別の番号にする（bench_latency.py）
 server = AgentServer(num_idle_processes=2, port=int(os.environ.get('CIEL_AGENT_PORT', '8081')))
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
+# 会話モデル（realtime・gpt-live）と、realtime のときのモデル名
+MODEL = os.environ.get('CIEL_MODEL', 'realtime')
+REALTIME_MODEL = os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
 # GPT-Live は聞きながら話す全二重なので、返事の作らせ方を変えない（話者の識別も使わない）
-REALTIME = os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live'
+REALTIME = MODEL != 'gpt-live'
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API のときだけ
 SPEAKERS = VOICE == 'irodori' and REALTIME
 # Realtime API の雑音除去（make_model）
@@ -88,12 +91,11 @@ def transcription(names: list[str]) -> AudioTranscription:
 
 
 def make_model(names: list[str] | None = None):
-    kind = os.environ.get('CIEL_MODEL', 'realtime')
     voice = os.environ.get('CIEL_OPENAI_VOICE', 'marin')
-    if kind == 'gpt-live':
+    if not REALTIME:
         return openai.realtime.GPTLiveModel(voice=voice)
     return openai.realtime.RealtimeModel(
-        model=os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini'),
+        model=REALTIME_MODEL,
         voice=voice,
         # irodori：声は Irodori-TTS で作るので、会話モデルには文字だけを作らせる（音声の出力の料金もかからない）
         modalities=['text'] if VOICE == 'irodori' else ['text', 'audio'],
@@ -124,23 +126,23 @@ class Ciel(Agent):
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
         おしゃべり度（ひかえめ talk_quiet.md・おしゃべり talk_chatty.md。ふつうは足さない）を最後に足す。"""
         p = self.persona
-        instructions = p.instructions + (p.emotion_instructions if VOICE == 'irodori' else '')
-        # 画面のタッチへの反応（touch.py）
-        instructions = instructions.rstrip('\n') + '\n\n' + p.touch_instructions
+        parts = [p.instructions + (p.emotion_instructions if VOICE == 'irodori' else ''),
+                 p.touch_instructions]   # 画面のタッチへの反応（touch.py）
         if SPEAKERS:
             # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
-            instructions = instructions.rstrip('\n') + '\n\n' + p.speaker_instructions
+            parts.append(p.speaker_instructions)
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
-        instructions = instructions.rstrip('\n') + '\n\n' + p.minutes_voice_instructions
-        instructions = instructions.rstrip('\n') + '\n\n' + p.conversation_instructions
-        instructions = instructions.rstrip('\n') + '\n\n' + p.research_voice_instructions
+        parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions]
         if SPEAKERS:
-            presence_text = {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
-                             'public': p.presence_public_instructions}[presence]
-            instructions = instructions.rstrip('\n') + '\n\n' + presence_text
+            parts.append({'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
+                          'public': p.presence_public_instructions}[presence])
         talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
         if talk_text:
-            instructions = instructions.rstrip('\n') + '\n\n' + talk_text
+            parts.append(talk_text)
+        # 1 つずつ、前の末尾の改行を落として空行 1 つでつなぐ（最後の本文の末尾はそのまま）
+        instructions = parts[0]
+        for part in parts[1:]:
+            instructions = instructions.rstrip('\n') + '\n\n' + part
         return instructions
 
     def tts_node(self, text, model_settings):
@@ -246,9 +248,7 @@ async def entrypoint(ctx: JobContext) -> None:
             await store.close()
     ctx.add_shutdown_callback(close_store)
     logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
-                agent.persona.fingerprint, os.environ.get('CIEL_MODEL', 'realtime'),
-                os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
-                if os.environ.get('CIEL_MODEL', 'realtime') != 'gpt-live' else 'n/a', VOICE)
+                agent.persona.fingerprint, MODEL, REALTIME_MODEL if REALTIME else 'n/a', VOICE)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る

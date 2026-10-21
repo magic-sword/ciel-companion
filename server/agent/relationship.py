@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import openai
 
+from jst import JST
 from speaker_store import Relationship
 
 log = logging.getLogger('ciel-agent.relationship')
@@ -97,7 +98,7 @@ class RelationKeeper:
         can_up = not first and r.stage < len(STAGES) - 1 and r.stage_sessions >= STAGE_UP_SESSIONS[r.stage]
         lines = self.history.personal_lines()[-CONTEXT_LINES:]
         request = {
-            'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
+            'today': datetime.now(JST).strftime('%Y-%m-%d（%a）'),
             'person': snapshot['name'],
             'first': first,
             'stages': [f'{i}：{s}' for i, s in enumerate(STAGES)],

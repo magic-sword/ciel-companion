@@ -18,12 +18,13 @@ import string
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import numpy as np
 from livekit import rtc
 
 import relationship
+from jst import JST
 
 log = logging.getLogger('ciel-agent.speakers')
 
@@ -131,7 +132,7 @@ class Known:
 
 
 def jst(t: datetime) -> str:
-    t = t.astimezone(timezone(timedelta(hours=9)))
+    t = t.astimezone(JST)
     return f'{t.month}月{t.day}日'
 
 
@@ -397,7 +398,7 @@ class SpeakerBook:
             # ひとり・身近な人のときは、本人のメモ（最近の分だけ）を渡す。どう使うかは presence_*.md。
             # 人前のときは渡さない（話題にすると、ほかの人に伝わる）。聞かれたら道具で読む
             rows = (snapshot['notes'] if snapshot is not None else await self.store.notes(k.person_id))[-PUSH_NOTES:]
-            today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+            today = datetime.now(JST).strftime('%Y-%m-%d')
             sp.notes_context = (f'\n[{k.name}さんについて覚えていること（今日は{today}）：'
                       + '／'.join(t for _, t in rows) + ']')
             sp.notes_pushed = True

@@ -25,7 +25,7 @@ import os
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 import openai
@@ -34,6 +34,7 @@ from livekit import rtc
 
 import speakers
 from conversation import Conversation, Turn
+from jst import JST
 
 log = logging.getLogger('ciel-agent.minutes')
 
@@ -44,7 +45,6 @@ SAVE_DIR = Path(__file__).resolve().parent / 'data' / 'minutes'
 RECENT_EXPORTS = 5
 DRAFT_CACHE_CHARS = 40_000
 READ_CHARS = 6000
-JST = timezone(timedelta(hours=9))
 WEEKDAYS = '月火水木金土日'
 MIN_LINES = 2           # これより少なければ、議事録にしない
 ROLL_SECONDS = float(os.environ.get('CIEL_MINUTES_ROLL_SECONDS', '600'))   # 途中の議事録を作り直す間隔

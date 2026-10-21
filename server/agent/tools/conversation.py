@@ -1,9 +1,11 @@
 """接続中の会話の検索。永続化された人物メモにはアクセスしない。"""
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from livekit.agents import RunContext, function_tool
+
+from jst import JST
 
 
 @function_tool
@@ -14,7 +16,7 @@ async def search_conversation(context: RunContext, query: str = '', first_id: in
         return json.dumps({'scope': 'current_session', 'available': False})
     result = await asyncio.to_thread(history.search, query, first_id, last_id)
     for row in result['matches']:
-        row['at'] = datetime.fromtimestamp(row['at'], timezone(timedelta(hours=9))).isoformat()
+        row['at'] = datetime.fromtimestamp(row['at'], JST).isoformat()
     return json.dumps(result, ensure_ascii=False)
 
 

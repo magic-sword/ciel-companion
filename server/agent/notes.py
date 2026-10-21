@@ -15,7 +15,7 @@
 """
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import logging
 import os
 
@@ -23,6 +23,7 @@ import openai
 
 import speakers
 from conversation import Conversation, Turn
+from jst import JST
 
 log = logging.getLogger('ciel-agent.notes')
 
@@ -167,7 +168,7 @@ class NoteTaker:
             forgets = self._forgets.pop(pid, [])
             existing = snapshot['notes']
             request = {
-                'today': datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d（%a）'),
+                'today': datetime.now(JST).strftime('%Y-%m-%d（%a）'),
                 'person': snapshot['name'],
                 'existing_notes': [{'id': i, 'text': t} for i, t in existing],
                 'requested_notes': requested,

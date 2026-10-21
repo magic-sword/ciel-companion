@@ -1,10 +1,12 @@
 """接続中だけの調査記録。会話本文・人物メモには混ぜない。"""
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import re
 import time
 import json
 from urllib.parse import urlsplit
+
+from jst import JST
 
 
 def web_url(value: str) -> bool:
@@ -35,7 +37,7 @@ class Research:
         result = asdict(self)
         for key in ('requested_at', 'checked_at'):
             if result[key] is not None:
-                result[key] = datetime.fromtimestamp(result[key], timezone(timedelta(hours=9))).isoformat()
+                result[key] = datetime.fromtimestamp(result[key], JST).isoformat()
         return result
 
 
