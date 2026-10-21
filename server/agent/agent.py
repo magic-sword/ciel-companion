@@ -30,6 +30,7 @@ from openai.types.realtime.realtime_reasoning import RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import aizuchi
+import debug_log
 import emotion
 import initiative
 import irodori_tts
@@ -168,6 +169,8 @@ class Ciel(Agent):
 @server.rtc_session(agent_name=os.environ.get('CIEL_AGENT_NAME', ''))
 async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
+    # デバッグ用の会話ログ（debug_log.py）。ふだんは残さない。入れているときだけ、この会話のファイルを作る
+    debug_log.start(ctx.room.name, model=MODEL, realtime_model=REALTIME_MODEL if REALTIME else None, voice=VOICE)
     # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
     # 話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
     store = await speaker_store.Store.open() if SPEAKERS else None
@@ -187,6 +190,7 @@ async def entrypoint(ctx: JobContext) -> None:
     # 返事ごとのトークン数（usage.py）。指示を短くしたときの比べる基準
     usage_log = usage.UsageLog()
     session.on('session_usage_updated', usage_log.on_usage)
+    debug_log.attach(session, ctx.room, agent)
 
     def on_track(track: rtc.Track, publication, participant: rtc.RemoteParticipant) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
@@ -243,6 +247,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def close_store() -> None:
         usage_log.summary()
+        debug_log.record('end')
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await researcher.close()
         await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
@@ -256,6 +261,8 @@ async def entrypoint(ctx: JobContext) -> None:
     logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
                 agent.persona.fingerprint, MODEL, REALTIME_MODEL if REALTIME else 'n/a', VOICE)
     logger.info('指示 %d 字・道具 %d 個', len(agent.instructions), len(agent.tools))
+    debug_log.record('settings', persona_sha256=agent.persona.fingerprint, instructions_chars=len(agent.instructions),
+                     tools=[getattr(t, 'id', str(t)) for t in agent.tools])
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る

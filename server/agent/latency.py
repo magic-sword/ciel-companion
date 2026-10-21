@@ -7,6 +7,8 @@ turns.py が start() を呼び、文字起こし・返事を頼んだ時・最�
 import logging
 import time
 
+import debug_log
+
 log = logging.getLogger('ciel-agent.latency')
 
 _start: float | None = None
@@ -17,6 +19,7 @@ def start() -> None:
     global _start
     _start = time.time()
     _seen.clear()
+    debug_log.record('turn_end')
 
 
 def mark(what: str) -> None:
@@ -25,3 +28,4 @@ def mark(what: str) -> None:
         return
     _seen.add(what)
     log.info('返事の速さ %s +%.0f ms', what, (time.time() - _start) * 1000)
+    debug_log.record('latency', stage=what, ms=round((time.time() - _start) * 1000))

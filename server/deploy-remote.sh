@@ -4,6 +4,8 @@ set -e
 cd "$(dirname "$0")"
 test -f agent/.env || { echo 'agent/.env がない（agent/.env.example をもとに作る）'; exit 1; }
 chmod 600 agent/.env
+# 会話サーバーが書く場所。コンテナに作らせると root のものになり、手元から消せないので、先に作っておく
+mkdir -p agent/data/minutes agent/data/debug
 # 以前の、サービスごとの compose.yaml で動いていたものを止めて片付ける（2026-10-15 にまとめた。一度だけ）
 for d in agent tts-irodori voice-conversion; do
   if [ -f "$d/compose.yaml" ]; then (cd "$d" && docker compose down) && rm -f "$d/compose.yaml"; fi

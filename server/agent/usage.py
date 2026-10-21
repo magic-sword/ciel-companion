@@ -8,6 +8,8 @@ LiveKit は、会話モデルが返事を 1 つ終えるたびに、この会話
 """
 import logging
 
+import debug_log
+
 log = logging.getLogger('ciel-agent.usage')
 
 FIELDS = ('input_tokens', 'input_cached_tokens', 'input_text_tokens', 'input_audio_tokens',
@@ -30,6 +32,7 @@ class UsageLog:
             if d['input_tokens'] <= 0 and d['output_tokens'] <= 0:
                 continue
             self.replies += 1
+            debug_log.record('usage', model=u.model, **d)
             log.info('使用量 返事 入力 %s（キャッシュ %s・%d%%、文字 %s・音声 %s） 出力 %s（文字 %s・考える %s）',
                      f"{d['input_tokens']:,}", f"{d['input_cached_tokens']:,}", percent(d), f"{d['input_text_tokens']:,}",
                      f"{d['input_audio_tokens']:,}", f"{d['output_tokens']:,}", f"{d['output_text_tokens']:,}",
