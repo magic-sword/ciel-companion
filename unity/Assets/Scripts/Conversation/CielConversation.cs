@@ -175,6 +175,11 @@ namespace Ciel.Conversation
             if (_connectOnStart) StartConversation();
         }
 
+        /// 会話サーバーのいまの様子（LiveKit Agents が参加者の属性 lk.agent.state で知らせる）：
+        /// listening（聞いている）・thinking（返事を考えている。返事を頼んでから声が出るまで）・speaking（話している）。つないでいなければ空
+        public string AgentState { get; private set; } = "";
+        const string AgentStateAttribute = "lk.agent.state";
+
         /// 開発用の会話サーバーにつなぐか（設定画面の開発スイッチ）
         public bool DevServer { get; private set; }
         bool _restartAfterConnect;   // つないでいる途中で切り替えられた。つながったら、つなぎ直す
@@ -305,6 +310,7 @@ namespace Ciel.Conversation
             _room.TrackUnsubscribed += OnTrackUnsubscribed;
             _room.DataReceived += OnDataReceived;
             _room.ParticipantConnected += OnParticipantConnected;
+            _room.ParticipantAttributesChanged += OnParticipantAttributesChanged;
             _room.Disconnected += OnRoomDisconnected;
             Trace("ルームへ接続");
             yield return _room.Connect(serverUrl, token, new RoomOptions());
@@ -503,6 +509,15 @@ namespace Ciel.Conversation
         {
             SendStyle();
             SendVolume();
+        }
+
+        // 会話サーバーの様子が変わったら、画面に知らせる（考えている間を「考えています…」と見せる）
+        void OnParticipantAttributesChanged(Participant participant)
+        {
+            if (participant == null || participant.Attributes == null) return;
+            if (!participant.Attributes.TryGetValue(AgentStateAttribute, out var state) || state == AgentState) return;
+            AgentState = state;
+            Changed?.Invoke();
         }
 
         /// シエルの声の大きさを変える（0〜1）。つまみを動かしているあいだは、送るのを間引く
@@ -873,6 +888,7 @@ namespace Ciel.Conversation
                 _room.TrackUnsubscribed -= OnTrackUnsubscribed;
                 _room.DataReceived -= OnDataReceived;
                 _room.ParticipantConnected -= OnParticipantConnected;
+                _room.ParticipantAttributesChanged -= OnParticipantAttributesChanged;
                 _room.Disconnected -= OnRoomDisconnected;
                 _room.Disconnect();
                 _room = null;
@@ -883,6 +899,7 @@ namespace Ciel.Conversation
             _serverTalk = null;
             _serverPresence = null;
             PresenceReason = "";
+            AgentState = "";
             SetStatus(State.Disconnected);
         }
 

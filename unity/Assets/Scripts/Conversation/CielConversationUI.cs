@@ -349,9 +349,10 @@ namespace Ciel.Conversation
                 CielConversation.State.Connecting => "シエルに接続しています…",
                 CielConversation.State.Failed => "接続できませんでした",
                 CielConversation.State.Disconnected => "接続していません",
+                _ when Thinking(c) => "考えています…",   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
                 _ => c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます",
             };
-            _caption.text = connected && c.MicEnabled ? "L I S T E N I N G" : "";
+            _caption.text = Thinking(c) ? "T H I N K I N G" : connected && c.MicEnabled ? "L I S T E N I N G" : "";
 
             // マイク：入れている（光る六角）・切っている（透けた六角）・使えない（薄い）
             var usable = connected && !c.MicBusy;
@@ -388,6 +389,10 @@ namespace Ciel.Conversation
             RefreshSettings();
         }
 
+        // 会話サーバーが返事を考えている（返事を頼んでから、声が出るまで）
+        static bool Thinking(CielConversation c) =>
+            c.Status == CielConversation.State.Connected && c.AgentState == "thinking" && c.VoiceLevel < 0.005f;
+
         // ---- 動き ----
 
         bool _firstRefresh;
@@ -416,15 +421,22 @@ namespace Ciel.Conversation
 
             // 声の様子
             var level = Mathf.Clamp01(c.VoiceLevel * 8f);
+            var thinking = Thinking(c);
             for (int i = 0; i < _bars.Count; i++)
             {
                 var env = Mathf.Sin(Mathf.PI * (i + 0.5f) / _bars.Count);
                 float h;
                 if (level > 0.02f) h = 3 + 15 * level * env * (0.45f + 0.55f * Mathf.Abs(Mathf.Sin(t * 9f + i * 1.3f)));
+                else if (thinking)
+                {
+                    // 考えている間：光の粒が左から右へ流れる（1.1 秒ごとに 1 回）
+                    var x = Mathf.Repeat(t / 1.1f, 1f) * (_bars.Count + 4) - 2;
+                    h = 3 + 7 * Mathf.Exp(-(i - x) * (i - x) / 3f);
+                }
                 else if (on) h = 3 + 6 * env * (0.5f + 0.5f * Mathf.Sin(t * 3f + i * 0.7f));
                 else h = 3;
                 _bars[i].sizeDelta = new Vector2(3, h);
-                _barImages[i].color = WithAlpha(Cyan, level > 0.02f || on ? 1f : 0.35f);
+                _barImages[i].color = WithAlpha(Cyan, level > 0.02f || on || thinking ? 1f : 0.35f);
             }
 
             UpdateSheet();

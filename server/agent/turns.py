@@ -70,9 +70,10 @@ CALL_WORDS = ('シエル', 'しえる', 'AI', 'ＡＩ', 'エーアイ')
 FOLLOW_SECONDS = 20.0
 TAGS = re.compile(r'\[[a-z]+\]')
 # ふつう・おしゃべりのとき、区切りのあと、続きを話し始めないかを見る時間（会話モデルの側は、読点の間で区切ったあと
-# 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る
-SETTLE_SECONDS = 0.25
-SHORT_SETTLE_SECONDS = 0.35
+# 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る。
+# 試すときは環境変数で変える（CIEL_SETTLE_SECONDS・CIEL_SHORT_SETTLE_SECONDS）
+SETTLE_SECONDS = float(os.environ.get('CIEL_SETTLE_SECONDS', '0.25'))
+SHORT_SETTLE_SECONDS = float(os.environ.get('CIEL_SHORT_SETTLE_SECONDS', '0.35'))
 # 話している途中の相づち（_watch_pauses）
 NOD_AFTER_SECONDS = 3.0    # 話し始めて（前の相づちから）これだけたってから
 NOD_PAUSE_SECONDS = 0.4    # 息つぎ（小さな音）がこれだけ続いたら
