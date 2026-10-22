@@ -7,11 +7,15 @@
   会話モデルへ渡す（agent.py が返事を作らせる前に足す）。
 - 名前を付ける・覚える・忘れるのは、会話モデルが道具（agent.py の name_speaker・forget_speaker）を呼んだとき。
   覚える（DB に保存する）のは、本人が同意したときだけ。知らない人の声の特徴は、この会話の間だけメモリーに持つ。
+- アプリの参加者パネルへ、名簿と最後に話した人を知らせる（state、topic ciel.event の speakers.state）。
+  アプリからは、この会話の間だけの名前・同じ人にまとめる・人違いを分けるができる（on_data、topic ciel.speakers）。
+  保存（DB）に触れる操作は、アプリからはできない。
 - 声の特徴は 192 次元のベクトル（録音そのものではない）。それでも個人を識別できる情報なので、名前や特徴をログに出さない。
   決めたことは docs/decisions/speaker-identification-ja.md。
 """
 import asyncio
 import collections
+import json
 import logging
 import os
 import string
@@ -48,6 +52,7 @@ MARGIN = float(os.environ.get('CIEL_SPK_MARGIN', '0.05'))   # 次に近い人と
 MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
 MODEL_REVISION = '0f99f2d0ebe89ac095bcc5903c4dd8f72b367286'   # Dockerfile と同じ版
 MODEL_DIR = os.environ.get('CIEL_ECAPA_DIR', '/opt/ecapa')
+APP_TOPIC = 'ciel.speakers'   # アプリの参加者パネルからの直し
 
 
 class Encoder:
@@ -219,6 +224,12 @@ class SpeakerBook:
         self.current_turns: list = []  # この返答の元発言。本人訂正の確認に使う（本文はログに出さない）
         self._versions: dict[int, int] = {}
         self._shared_available = True
+        self.on_change = None          # 名簿・最後に話した人が変わったとき呼ぶ（引数は state()。agent.py がアプリへ送る）
+        self.on_merge = None           # アプリで同じ人にまとめたとき呼ぶ（conversation.Conversation.on_merge）
+        self.heard: Judgment | None = None   # 最後に判定した発言（アプリで光らせる人）
+        self._heard_count = 0
+        self._published: dict | None = None
+        self._app_tasks: set[asyncio.Task] = set()
 
     async def load(self) -> None:
         if self.store is not None:
@@ -264,6 +275,7 @@ class SpeakerBook:
                             if entry.speaker_id == sp.speaker_id:
                                 entry.name = sp.name
                 self._versions = versions
+                self.notify()
             except Exception as e:
                 self._versions = {}
                 self._shared_available = False
@@ -302,6 +314,14 @@ class SpeakerBook:
         return sp
 
     def judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
+        j = self._judge(e, seconds)
+        if j.sp is not None:   # 短くて分からない発言では、光らせる人を変えない
+            self.heard = j
+            self._heard_count += 1
+        self.notify()
+        return j
+
+    def _judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
         """発言 1 つ（話し始め〜話し終わりの区間）の声で、誰が話したかを 1 回だけ決める（turns.py が話し終わりに呼ぶ）。
         この結果を、シエルへの「[発言者：…]」（identify）と、メモの記録係・議事録の係（文字起こしの話者）の両方に使う
         （別々に計算すると、同じ発言でも食い違うことがあったため。2026-10-18）。
@@ -348,6 +368,12 @@ class SpeakerBook:
 
     async def identify_parts(self, j: 'Judgment | None', solo: bool = False,
                              push_notes: bool = False) -> tuple[str, str] | None:
+        parts = await self._identify_parts(j, solo, push_notes)
+        self.notify()   # 人違いを分けられる人（直前の発言者）が変わる
+        return parts
+
+    async def _identify_parts(self, j: 'Judgment | None', solo: bool = False,
+                              push_notes: bool = False) -> tuple[str, str] | None:
         """発言の判定（judge の結果）から、会話モデルに渡す（話者の行, メモ・関係）を作る。None は「何も足さない」。
         話者の行は「[発言者：…]」の 1 行（この会話で初めて分かったときの、前に話した日・同意のことを含む）。
         メモ・関係は、その場にいる人によって渡したり渡さなかったりするもの（無ければ空）。
@@ -447,8 +473,11 @@ class SpeakerBook:
         new.add(e)
         self.speakers.append(new)
         self.last, self.last_rows = new, []
+        if self.heard is not None and self.heard.sp is sp and self.heard.e is e:
+            self.heard.sp = new
         if self.on_split:
             self.on_split(sp, new)
+        self.notify()
         log.info('話者：人違いを直した（%s から分けた）', '覚えている人 #%d' % sp.person_id if sp.person_id else 'この会話の人')
         if new_name:
             return (f'わかりました。直前の発言は{old}さんではなく、{new_name}さんとして区別します'
@@ -597,6 +626,7 @@ class SpeakerBook:
         if current['name_saved'] and not remember:
             return {**current, 'status': 'already_named'}
         sp.name = name  # 発言者の固定ラベル・IDは変えない
+        self.notify()
         if not remember:
             return {**await self.speaker_status(sp), 'status': 'session_named'}
         if self.store is None:
@@ -692,6 +722,7 @@ class SpeakerBook:
             return f'呼び名は「{old}」のままです。'
         if sp.person_id is None:
             sp.name = new
+            self.notify()
             sp.notes_pushed, sp.notes_context = False, ''
             sp.relation_context.clear()
             for entry in self.name_registrations.values():
@@ -703,6 +734,7 @@ class SpeakerBook:
         else:
             return '記録の場所が使えないので、保存済みの呼び名は変更できません。'
         sp.name = new
+        self.notify()
         sp.notes_pushed, sp.notes_context = False, ''
         sp.relation_context.clear()
         for entry in self.name_registrations.values():
@@ -751,5 +783,130 @@ class SpeakerBook:
             if entry.speaker_id == sp.speaker_id:
                 entry.speaker_id, entry.stage = None, 'pending_identity'
         self.last = None
+        if self.heard is not None and self.heard.sp is sp:
+            self.heard = None
+        self.notify()
         log.info('話者：#%d の声の記録を消した', pid)
         return f'「{name}」さんの声の記録を消しました。'
+
+    # ---- アプリの参加者パネル（名簿と最後に話した人を知らせる。この会話の間だけの直しを受ける） ----
+
+    def state(self) -> dict:
+        """アプリへ送る名簿。名前のほかは、声を覚えている人か・名前を聞いたかだけ（声の特徴や DB の番号は送らない）"""
+        heard = self.heard.sp if self.heard is not None else None
+        last = self.last
+        return {
+            'v': 1, 'type': 'speakers.state',
+            'speakers': [{'id': s.speaker_id, 'name': s.name or s.label, 'named': s.name is not None,
+                          'remembered': s.person_id is not None} for s in self.speakers],
+            'speaking': heard.speaker_id if heard is not None and any(s is heard for s in self.speakers) else '',
+            'speaking_sure': self.heard is not None and self.heard.sure,
+            'heard': self._heard_count,   # 同じ人が続けて話しても、話すたびに光らせ直す
+            # 人違いを分けられるのは、直前の発言者で、名前の分かっている人だけ（split と同じ条件）
+            'correctable': last.speaker_id if last is not None and self.last_embedding is not None
+            and (last.name is not None or last.person_id is not None) else '',
+        }
+
+    def notify(self) -> None:
+        if self.on_change is None:
+            return
+        now = self.state()
+        if now == self._published:
+            return
+        self._published = now
+        try:
+            self.on_change(now)
+        except Exception:
+            log.exception('話者：名簿をアプリへ知らせられない')
+
+    def _by_id(self, speaker_id) -> SessionSpeaker | None:
+        return next((s for s in self.speakers if s.speaker_id == speaker_id), None) if isinstance(speaker_id, str) else None
+
+    def on_data(self, packet: rtc.DataPacket) -> None:
+        if packet.topic != APP_TOPIC:
+            return
+        try:
+            msg = json.loads(packet.data.decode('utf-8'))
+            if not isinstance(msg, dict):
+                raise ValueError('not an object')
+        except (ValueError, UnicodeDecodeError) as ex:
+            log.warning('話者：アプリの直しを読めない: %s', ex)
+            return
+        task = asyncio.create_task(self.app_control(msg))
+        self._app_tasks.add(task)
+        task.add_done_callback(self._app_tasks.discard)
+
+    async def app_control(self, msg: dict) -> str:
+        """アプリの参加者パネルからの直し。どれもこの会話の間だけで、DB には書かない。
+        name：名前を付ける・直す（声を覚えている人の名前は、本人が声で頼んだときだけ直せるので、ここでは直さない）。
+        merge：別の人として聞いていた 2 人を、同じ人にまとめる。split：直前の発言を、その人から分ける"""
+        action = msg.get('action')
+        try:
+            async with self._identity_lock:
+                if action == 'name':
+                    status = self._app_name(self._by_id(msg.get('speaker_id')), msg.get('name'))
+                elif action == 'merge':
+                    status = self._app_merge(self._by_id(msg.get('speaker_id')), self._by_id(msg.get('into')))
+                elif action == 'split':
+                    sp = self._by_id(msg.get('speaker_id'))
+                    if sp is None or sp is not self.last or self.state()['correctable'] != sp.speaker_id:
+                        status = 'not_current_speaker'
+                    else:
+                        count = len(self.speakers)
+                        await self.split()
+                        status = 'split' if len(self.speakers) > count else 'not_split'
+                else:
+                    status = 'unknown_action'
+        except Exception:
+            log.exception('話者：アプリの直しに失敗 action=%s', action)
+            status = 'failed'
+        log.info('話者：アプリの直し action=%s status=%s', action, status)
+        self.notify()
+        return status
+
+    def _app_name(self, sp: SessionSpeaker | None, name) -> str:
+        if sp is None:
+            return 'speaker_not_found'
+        if sp.person_id is not None:
+            return 'remembered'
+        name = plain_name(name) if isinstance(name, str) else ''
+        if not name or len(name) > 40:
+            return 'invalid_name'
+        if any(s is not sp and name in (s.name, s.label) for s in self.speakers):
+            return 'name_taken'   # 同じ名前の人がいるなら、まとめる（merge）
+        sp.name = name
+        for entry in self.name_registrations.values():
+            if entry.speaker_id == sp.speaker_id:
+                entry.name = name
+            elif entry.speaker_id is None and entry.name == name:
+                # 声で紹介されて仮に受け付けていた名前なら、その人に結び付ける
+                entry.speaker_id, entry.stage = sp.speaker_id, 'session_named'
+        return 'session_named'
+
+    def _app_merge(self, src: SessionSpeaker | None, dst: SessionSpeaker | None) -> str:
+        if src is None or dst is None or src is dst:
+            return 'speaker_not_found'
+        if src.person_id is not None and dst.person_id is not None:
+            return 'both_remembered'
+        if src.person_id is not None:
+            src, dst = dst, src   # 声を覚えている人のほうを残す
+        if dst.name is None and dst.person_id is None:
+            dst.name = src.name
+        # まとめた声で、この会話の間は同じ人として当てる（覚えている人も、DB の見本には足さない）
+        dst.embeddings = (dst.embeddings + src.embeddings)[-MAX_SESSION_EMBEDDINGS:]
+        if dst.person_id is not None:
+            k = next((k for k in self.known if k.person_id == dst.person_id), None)
+            if k is not None:
+                k.embeddings = k.embeddings + src.embeddings
+        dst.split = dst.split or src.split
+        self.speakers = [s for s in self.speakers if s is not src]
+        if self.last is src:
+            self.last = dst
+        if self.heard is not None and self.heard.sp is src:
+            self.heard.sp = dst
+        for entry in self.name_registrations.values():
+            if entry.speaker_id == src.speaker_id:
+                entry.speaker_id = dst.speaker_id
+        if self.on_merge:
+            self.on_merge(src, dst)
+        return 'merged'

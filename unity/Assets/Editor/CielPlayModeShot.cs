@@ -6,6 +6,9 @@
 // 設定画面の中を押しても閉じないかを、押す操作を真似して確かめ、ui.txt に書く。
 // "touch" を含めると、縦長の画面でシエルに触れる操作を再現し、触れた点の表示（CielTouchVisual）を撮る：
 // touch-converge.png（触れ始め）、touch-hold.png（長く触れる）、touch-stroke-start.png（撫で始め）、touch-stroke.png（頭を撫で続ける）、touch-tap.png（ほっぺをつつく）、touch-none.png（反応しない胸）。
+// "people" を含めると、合成の名簿（speakers.state）を流し込み、参加者の札とパネルを縦長で撮る：
+// people-row.png（札の列。最後に話した人が光る）、people-remembered.png（声を覚えている人）、people-unknown.png（名前を知らない人）、
+// people-duplicate.png（ほかの人と同じ名前を入れたときの注意）。パネルの部品の数を people.txt に書く。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -47,7 +50,8 @@ namespace Ciel.EditorTools
                 }
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
-                if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek"))
+                if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
+                    || request.Contains("people"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -79,6 +83,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
             {
                 TouchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("people"))
+            {
+                PeopleShots(step);
                 return;
             }
             if (step >= 2 && step < Done && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("ui"))
@@ -375,6 +384,61 @@ namespace Ciel.EditorTools
             if (step == 5) { if (now - _mark < 4.0) return; Next(6); return; }
             if (now - _mark < 0.5) return;
             FinishUiShots();
+        }
+
+        // 参加者の札とパネル。会話サーバーにはつながず、合成の名簿を CielConversation に渡す
+        static void PeopleShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var log = Path.Combine(OutDir, "people.txt");
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                typeof(Ciel.Conversation.CielConversation).GetProperty("Status").GetSetMethod(true)
+                    .Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                const string json = "{\"v\":1,\"type\":\"speakers.state\",\"speakers\":["
+                    + "{\"id\":\"p1\",\"name\":\"ハカセ\",\"named\":true,\"remembered\":true},"
+                    + "{\"id\":\"p2\",\"name\":\"ミナ\",\"named\":true,\"remembered\":false},"
+                    + "{\"id\":\"p3\",\"name\":\"知らない人A\",\"named\":false,\"remembered\":false},"
+                    + "{\"id\":\"p4\",\"name\":\"知らない人B\",\"named\":false,\"remembered\":false}],"
+                    + "\"speaking\":\"p1\",\"speaking_sure\":true,\"heard\":1,\"correctable\":\"p1\"}";
+                typeof(Ciel.Conversation.CielConversation).GetMethod("OnSpeakers", flags)
+                    .Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json) });
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "people-row", "people-remembered", "people-unknown", "people-duplicate" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                var panel = ui.transform.Find("ConversationCanvas/SafeArea/PeoplePanel");
+                var buttons = panel.GetComponentsInChildren<UnityEngine.UI.Button>().Length;
+                var inputs = panel.GetComponentsInChildren<UnityEngine.UI.InputField>().Length;
+                var chips = ui.transform.Find("ConversationCanvas/SafeArea/People/Chips").childCount;
+                File.AppendAllText(log, $"{name}: 札 {chips - 1}、パネル {(panel.gameObject.activeSelf ? "開" : "閉")}、ボタン {buttons}、入力 {inputs}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.5) return;
+            _captured = false;
+            var show = ui.GetType().GetMethod("ShowPerson", flags);
+            if (step == 3) show.Invoke(ui, new object[] { "p1" });
+            if (step == 4) show.Invoke(ui, new object[] { "p3" });
+            if (step == 5)
+            {
+                // ミナさんと同じ名前を入れて「決める」：送らずに注意を出す
+                var panel = ui.transform.Find("ConversationCanvas/SafeArea/PeoplePanel");
+                panel.GetComponentInChildren<UnityEngine.UI.InputField>().text = "ミナさん";
+                panel.Find("Viewport/Content/Row/Set").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            }
+            if (step == 6) { FinishUiShots(); return; }
+            Next(step + 1);
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える

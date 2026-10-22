@@ -24,7 +24,11 @@ namespace Ciel.Conversation
             _researchButton.targetGraphic = Pill(chip, Glass, raycast: true);
             _researchLabel = Txt("Label", chip, 12, Cyan, TextAnchor.MiddleCenter);
             Stretch(_researchLabel.rectTransform);
-            _researchButton.onClick.AddListener(() => _researchPanel.SetActive(!_researchPanel.activeSelf));
+            _researchButton.onClick.AddListener(() =>
+            {
+                ShowPerson(null);
+                _researchPanel.SetActive(!_researchPanel.activeSelf);
+            });
 
             var panel = Rect("ResearchPanel", root, Center, Center, Vector2.zero, Vector2.zero);
             panel.anchorMin = Vector2.zero;

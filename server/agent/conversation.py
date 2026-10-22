@@ -90,6 +90,12 @@ class Conversation:
                 turn.speaker, turn.label, turn.sure = new, new.name or new.label, True
                 return
 
+    def on_merge(self, old, new) -> None:
+        # アプリで同じ人にまとめた：その人として聞いた発言を、全部まとめた先の人のものにする
+        for turn in self.turns:
+            if turn.speaker is old:
+                turn.speaker, turn.label = new, new.name or new.label
+
     def personal_lines(self, through: int | None = None):
         return [(t.owner, t.name, t.text) for t in self.between(through=through)
                 if t.ready.is_set() and t.text]

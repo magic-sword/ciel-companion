@@ -245,6 +245,10 @@ async def entrypoint(ctx: JobContext) -> None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
     if book is not None:
         book.on_split = history.on_split
+        book.on_merge = history.on_merge
+        # アプリの参加者パネル（speakers.py の state）。名簿・最後に話した人が変わるたびに知らせる
+        book.on_change = lambda state: asyncio.create_task(ctx.room.local_participant.publish_data(
+            json.dumps(state, ensure_ascii=False), reliable=True, topic='ciel.event'))
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)
@@ -286,6 +290,10 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', style.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
+    # 参加者パネルからの名前の直し（speakers.py。この会話の間だけ）
+    if book is not None:
+        ctx.room.on('data_received', book.on_data)
+        book.notify()
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
     await session.generate_reply(instructions=agent.persona.greeting)

@@ -18,6 +18,8 @@
 // 実際の答え方・出し方は会話サーバーが決め（自動なら、会議・聞こえた声の数で変わる）、conversation.style で返ってくる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
+// 参加者：会話サーバー（server/agent/speakers.py）が聞き分けた人と最後に話した人を speakers.state で知らせる（Speakers）。
+// 画面からの名前の直しは FixSpeaker で送る（topic ciel.speakers。この会話の間だけ）。
 // 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
 // つなぐ部屋にする。トークンを頼むときに「ciel-dev を呼ぶ」部屋の設定（room_config）を添える。本番の会話サーバーはその部屋に入らない。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
@@ -110,6 +112,38 @@ namespace Ciel.Conversation
         readonly List<ResearchResult> _researchResults = new List<ResearchResult>();
         public IReadOnlyList<ResearchResult> ResearchResults => _researchResults;
         public int ResearchRevision { get; private set; }
+
+        /// シエルが声で聞き分けた人（会話サーバーの speakers.state）
+        [Serializable]
+        public sealed class Speaker
+        {
+            public string id, name;
+            public bool named, remembered;
+        }
+        [Serializable]
+        sealed class SpeakersPacket
+        {
+            public Speaker[] speakers;
+            public string speaking, correctable;
+            public bool speaking_sure;
+            public int heard;
+        }
+        [Serializable]
+        sealed class SpeakerFix
+        {
+            public int v = 1;
+            public string type = "speakers.control", action, speaker_id, name, into;
+        }
+        readonly List<Speaker> _speakers = new List<Speaker>();
+        public IReadOnlyList<Speaker> Speakers => _speakers;
+        /// 最後に話したと判定した人と、そのときの時刻（Time.unscaledTime）。名前の札を少しのあいだ光らせる
+        public string SpeakingId { get; private set; } = "";
+        public bool SpeakingSure { get; private set; }
+        public float SpeakingAt { get; private set; } = -1f;
+        /// 「さっきの発言はこの人じゃない」と直せる人（直前の発言者）
+        public string CorrectableId { get; private set; } = "";
+        public int SpeakersRevision { get; private set; }
+        int _heard = -1;
 
         public static bool IsWebUrl(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
             && (uri.Scheme == "https" || uri.Scheme == "http") && string.IsNullOrEmpty(uri.UserInfo);
@@ -799,6 +833,40 @@ namespace Ciel.Conversation
                 Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
                 Changed?.Invoke();
             }
+            else if (e.type == "speakers.state")
+                OnSpeakers(data);
+        }
+
+        void OnSpeakers(byte[] data)
+        {
+            SpeakersPacket p;
+            try { p = JsonUtility.FromJson<SpeakersPacket>(System.Text.Encoding.UTF8.GetString(data)); }
+            catch (Exception) { return; }
+            if (p?.speakers == null || p.speakers.Length > 64) return;
+            _speakers.Clear();
+            foreach (var s in p.speakers)
+                if (s != null && !string.IsNullOrEmpty(s.id) && !string.IsNullOrEmpty(s.name) && s.name.Length <= 100) _speakers.Add(s);
+            if (p.heard != _heard && !string.IsNullOrEmpty(p.speaking)) SpeakingAt = Time.unscaledTime;
+            _heard = p.heard;
+            SpeakingId = p.speaking ?? "";
+            SpeakingSure = p.speaking_sure;
+            CorrectableId = p.correctable ?? "";
+            SpeakersRevision++;
+            Changed?.Invoke();
+        }
+
+        /// 参加者パネルからの直し（会話サーバーの speakers.py。この会話の間だけで、声や名前は保存しない）。
+        /// action：name（名前を付ける・直す）・merge（into の人と同じ人）・split（さっきの発言はこの人じゃない）
+        public void FixSpeaker(string action, string speakerId, string name = null, string into = null)
+        {
+            if (_room == null || Status != State.Connected) return;
+            var json = JsonUtility.ToJson(new SpeakerFix { action = action, speaker_id = speakerId, name = name, into = into });
+            try
+            {
+                _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.speakers");
+                Debug.Log($"[CielConversation] 参加者の直し {action} を送った");
+            }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 参加者の直しを送れない: {e.Message}"); }
         }
 
         void OnResearchData(byte[] data)
@@ -923,6 +991,11 @@ namespace Ciel.Conversation
             if (_mouth != null) _mouth.MouthOpening = 0f;
             _researchResults.Clear();
             ResearchRevision++;
+            _speakers.Clear();
+            SpeakingId = CorrectableId = "";
+            SpeakingAt = -1f;
+            _heard = -1;
+            SpeakersRevision++;
             _serverTalk = null;
             _serverPresence = null;
             PresenceReason = "";

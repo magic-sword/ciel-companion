@@ -5,6 +5,7 @@
 // シエルに触れている点の表示（CielTouchVisual）は、画面の暗がりとボタンの間の層に描く。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 // このファイルはふだんの画面。設定画面は CielConversationUI.Settings.cs、調べたこと・出典は CielConversationUI.Research.cs、
+// 参加者の札と名前の直しは CielConversationUI.People.cs、
 // 部品を作る道具は CielConversationUI.Parts.cs、部品に付ける動きは CielUIComponents.cs。
 // 寸法はモックアップ（390×844）の値。上下の位置は、端末の切り欠きを除いた範囲（Screen.safeArea）から測る。
 using System.Collections.Generic;
@@ -109,6 +110,7 @@ namespace Ciel.Conversation
             BuildVolumePop(_canvasRect);
             BuildSheet(_canvasRect);
             BuildResearch(_safe);
+            BuildPeople(_safe);
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -323,6 +325,7 @@ namespace Ciel.Conversation
         void Refresh()
         {
             RefreshResearch();
+            RefreshPeople();
             if (_micHex == null || _conversation == null) return;
             var c = _conversation;
             var connected = c.Status == CielConversation.State.Connected;
@@ -408,6 +411,7 @@ namespace Ciel.Conversation
             var t = Time.unscaledTime;
             var c = _conversation;
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;
+            UpdatePeople();
 
             if (on)
             {
