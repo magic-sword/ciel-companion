@@ -79,6 +79,9 @@ namespace Ciel.Conversation
         public State Status { get; private set; } = State.Disconnected;
         public bool MicEnabled => _recording;
         public bool MicBusy => _busy;
+        /// 自分の声が会話サーバーに届いているか（LiveKit の「話している人」の知らせで変わる。0.3〜0.5 秒ほど遅れる）
+        public bool UserSpeaking => _userSpeaking && _recording;
+        bool _userSpeaking;
         /// 会話サーバーが会議の議事録をとっているか（会話サーバーの知らせ minutes.state で変わる）
         public bool MinutesOn { get; private set; }
         [Serializable]
@@ -259,8 +262,15 @@ namespace Ciel.Conversation
         void OnRoomDisconnected(Room room)
         {
             if (room != _room) return;
+            _userSpeaking = false;
             SetMinutesRecording(false);
             Changed?.Invoke();
+        }
+
+        void OnActiveSpeakersChanged(List<Participant> speakers)
+        {
+            var me = _room?.LocalParticipant?.Identity;
+            _userSpeaking = me != null && speakers.Exists(p => p != null && p.Identity == me);
         }
 
         static void Trace(string what) =>
@@ -319,6 +329,7 @@ namespace Ciel.Conversation
             _room.ParticipantConnected += OnParticipantConnected;
             _room.ParticipantAttributesChanged += OnParticipantAttributesChanged;
             _room.Disconnected += OnRoomDisconnected;
+            _room.ActiveSpeakersChanged += OnActiveSpeakersChanged;
             Trace("ルームへ接続");
             yield return _room.Connect(serverUrl, token, new RoomOptions());
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
@@ -905,6 +916,7 @@ namespace Ciel.Conversation
                 _room.ParticipantConnected -= OnParticipantConnected;
                 _room.ParticipantAttributesChanged -= OnParticipantAttributesChanged;
                 _room.Disconnected -= OnRoomDisconnected;
+                _room.ActiveSpeakersChanged -= OnActiveSpeakersChanged;
                 _room.Disconnect();
                 _room = null;
             }

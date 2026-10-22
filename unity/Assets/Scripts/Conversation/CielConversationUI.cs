@@ -397,6 +397,7 @@ namespace Ciel.Conversation
         // ---- 動き ----
 
         bool _firstRefresh;
+        float _userLevel;   // 波形の高さ（自分の声が届いていると 1 へ近づく）
 
         void Update()
         {
@@ -421,14 +422,21 @@ namespace Ciel.Conversation
             if (c.MinutesOn)
                 _minutesEdge.color = WithAlpha(Amber, 0.45f + 0.45f * (Mathf.Sin(t * Mathf.PI * 2 / 1.6f) + 1) / 2);
 
-            // 声の様子
-            var level = Mathf.Clamp01(c.VoiceLevel * 8f);
+            // マイクの様子：自分の声が届いている間だけ波が立つ（シエルの声には反応しない）
+            var target = c.UserSpeaking ? 1f : 0f;
+            _userLevel = Mathf.MoveTowards(_userLevel, target, Time.unscaledDeltaTime / (target > _userLevel ? 0.12f : 0.35f));
+            var level = _userLevel;
             var thinking = Thinking(c);
             for (int i = 0; i < _bars.Count; i++)
             {
                 var env = Mathf.Sin(Mathf.PI * (i + 0.5f) / _bars.Count);
                 float h;
-                if (level > 0.02f) h = 3 + 15 * level * env * (0.45f + 0.55f * Mathf.Abs(Mathf.Sin(t * 9f + i * 1.3f)));
+                if (level > 0.02f)
+                {
+                    // 声らしく不規則に揺れるよう、速さの違う波を重ねる
+                    var w = Mathf.Abs(Mathf.Sin(t * 9f + i * 1.3f)) * 0.6f + Mathf.Abs(Mathf.Sin(t * 13.7f - i * 2.1f)) * 0.4f;
+                    h = 3 + 15 * level * env * (0.3f + 0.7f * w);
+                }
                 else if (thinking)
                 {
                     // 考えている間：光の粒が左から右へ流れる（1.1 秒ごとに 1 回）
