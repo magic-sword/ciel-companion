@@ -53,3 +53,6 @@ __pycache__/
 
 # 会話サーバーが自宅サーバーで書くもの（議事録の下書きなど）
 /server/agent/data/
+
+# Claude Code の個人の設定（許可など）。共有の設定は .claude/settings.json
+/.claude/settings.local.json
