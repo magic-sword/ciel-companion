@@ -31,6 +31,10 @@ namespace Ciel.EditorTools
                     throw new Exception("Research packet roundtrip failed");
                 if (CielConversation.IsWebUrl("javascript:alert(1)") || CielConversation.IsWebUrl("file:///C:/secret"))
                     throw new Exception("Non-web links were accepted");
+                var richText = (string)typeof(CielConversationUI).GetMethod("MarkdownToRichText", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { "## 確認できたこと\n\n\n- **営業** は *10時* から [1]\n| 曜日 | 時間 |\n|---|---|\n| 月 | 休み |\n<size=99>大</size>" });
+                if (richText != "<size=16><b>確認できたこと</b></size>\n\n・<b>営業</b> は <i>10時</i> から [1]\n曜日 ／ 時間\n月 ／ 休み\n＜size=99>大＜/size>")
+                    throw new Exception("Markdown conversion failed: " + richText);
                 var ui = go.AddComponent<CielConversationUI>();
                 typeof(CielConversationUI).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(ui, null);
                 typeof(CielConversationUI).GetMethod("Refresh", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(ui, null);

@@ -1,6 +1,9 @@
 // 会話の画面（CielConversationUI）のうち、調べたことと出典のパネル（右上のボタンで開く）。
 // 中身は CielConversation.ResearchResults（会話サーバーの web_research.py が送る）。
 using System;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -79,8 +82,8 @@ namespace Ciel.Conversation
                 heading.supportRichText = false;
                 heading.text = r.question;
                 var body = Txt("Summary", _researchContent, 13, TextSub, TextAnchor.UpperLeft);
-                body.supportRichText = false;
-                var state = r.status == "pending" ? "調べています…" : r.status == "completed" ? r.Summary : "確認できませんでした。";
+                body.supportRichText = true;
+                var state = r.status == "pending" ? "調べています…" : r.status == "completed" ? MarkdownToRichText(r.Summary) : "確認できませんでした。";
                 body.text = (r.checkedAt != null ? "取得日時：" + r.checkedAt + "\n" : "") + state + (r.clipped ? "\n（一部省略）" : "");
                 foreach (var source in r.sources)
                 {
@@ -98,6 +101,66 @@ namespace Ciel.Conversation
                     link.onClick.AddListener(() => { if (CielConversation.IsWebUrl(url)) Application.OpenURL(url); });
                 }
             }
+        }
+
+        static readonly Regex MdHeading = new Regex(@"^(#{1,6})\s+(.*?)(\s+#+)?$");
+        static readonly Regex MdRule = new Regex(@"^([-*_])(\s*\1){2,}$");
+        static readonly Regex MdBullet = new Regex(@"^(\s*)[-*+]\s+(.*)$");
+        static readonly Regex MdNumbered = new Regex(@"^(\s*)(\d+[.)]\s+.*)$");
+        static readonly Regex MdQuote = new Regex(@"^>\s?(.*)$");
+        static readonly Regex MdTableRule = new Regex(@"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$");
+        static readonly Regex MdLink = new Regex(@"!?\[([^\]]*)\]\(([^()\s]|\([^()]*\))*\)");
+        static readonly Regex MdCode = new Regex(@"`([^`]+)`");
+        static readonly Regex MdBold = new Regex(@"\*\*(?=\S)(.+?)(?<=\S)\*\*");
+        static readonly Regex MdItalic = new Regex(@"(?<![*\w])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![*\w])");
+        static readonly Regex MdEscape = new Regex(@"\\([\\`*_{}\[\]()#+\-.!|>~])");
+
+        // 調査結果のマークダウンを Text のリッチテキストにする。
+        // 「<」は全角にして、Web 由来の文字列が <size> などのタグとして効かないようにする。
+        internal static string MarkdownToRichText(string markdown)
+        {
+            var output = new StringBuilder();
+            bool fence = false, blank = false;
+            foreach (var raw in markdown.Replace("\r\n", "\n").Split('\n'))
+            {
+                var line = raw.TrimEnd().Replace("<", "＜");
+                var trimmed = line.TrimStart();
+                if (trimmed.StartsWith("```")) { fence = !fence; continue; }
+                if (!fence)
+                {
+                    Match m;
+                    if (MdRule.IsMatch(trimmed) || (trimmed.Contains("-") && trimmed.Contains("|") && MdTableRule.IsMatch(trimmed))) continue;
+                    if ((m = MdHeading.Match(trimmed)).Success)
+                        line = $"<size={(m.Groups[1].Length <= 2 ? 16 : 14)}><b>{Inline(m.Groups[2].Value)}</b></size>";
+                    else if ((m = MdBullet.Match(line)).Success)
+                        line = Indent(m.Groups[1].Value) + "・" + Inline(m.Groups[2].Value);
+                    else if ((m = MdNumbered.Match(line)).Success)
+                        line = Indent(m.Groups[1].Value) + Inline(m.Groups[2].Value);
+                    else if ((m = MdQuote.Match(trimmed)).Success)
+                        line = "｜" + Inline(m.Groups[1].Value);
+                    else if (trimmed.Length > 1 && trimmed.StartsWith("|") && trimmed.EndsWith("|"))
+                        line = string.Join(" ／ ", trimmed.Substring(1, trimmed.Length - 2).Split('|').Select(c => Inline(c.Trim())));
+                    else
+                        line = Inline(line);
+                }
+                // 空行は続けず1つにまとめる
+                if (line.Length == 0) { if (blank || output.Length == 0) continue; blank = true; }
+                else blank = false;
+                output.Append(line).Append('\n');
+            }
+            return output.ToString().TrimEnd();
+        }
+
+        static string Indent(string spaces) => new string('　', spaces.Replace("\t", "  ").Length / 2);
+
+        static string Inline(string text)
+        {
+            text = MdLink.Replace(text, "$1");
+            text = MdCode.Replace(text, "$1");
+            // 5000字で切られて閉じていない ** は記号だけ消す
+            text = MdBold.Replace(text, "<b>$1</b>").Replace("**", "");
+            text = MdItalic.Replace(text, "<i>$1</i>");
+            return MdEscape.Replace(text, "$1");
         }
     }
 }
