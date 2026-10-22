@@ -33,6 +33,7 @@ import aizuchi
 import debug_log
 import emotion
 import initiative
+import interruptions
 import irodori_tts
 import minutes
 import mode
@@ -75,6 +76,8 @@ REASONING = os.environ.get('CIEL_REASONING', 'minimal')
 AIZUCHI = VOICE == 'irodori' and os.environ.get('CIEL_AIZUCHI', '1') != '0'
 # 相手が長く話している途中の息つぎにも相づちを打つか（turns.py）。0 で打たない
 NOD = os.environ.get('CIEL_NOD', '1') != '0'
+# シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py。CIEL_INTERRUPT_SECONDS=0 で以前のやり方）
+INTERRUPT_GATE = REALTIME and interruptions.CONFIRM_SECONDS > 0
 # 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
 MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
                  minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]',
@@ -103,7 +106,9 @@ def make_model(names: list[str] | None = None):
         modalities=['text'] if VOICE == 'irodori' else ['text', 'audio'],
         # 話し終わりの判定と割り込みは今までどおり会話モデルの側（LiveKit の既定と同じ semantic_vad）。
         # 返事は自動で作らせず、turns.py が作らせる（多人数のとき、話者の 1 行を先に足すため）
-        turn_detection=SemanticVad(type='semantic_vad', eagerness=EAGERNESS, create_response=False, interrupt_response=True),
+        turn_detection=SemanticVad(type='semantic_vad', eagerness=EAGERNESS, create_response=False,
+                                  # 話し始めで返事を取り消さない。止めるかは interruptions.py が決める
+                                  interrupt_response=not INTERRUPT_GATE),
         # 返事の前に考える量。既定のままだと毎回 70 トークンほど考えてから書き始め、0.6 秒ほど遅れた（2026-10-17）
         reasoning=RealtimeReasoning(effort=REASONING) if REASONING else None,
         # 相手の発言の文字起こし：日本語と、シエル・覚えている人の名前をヒントにする
@@ -268,6 +273,13 @@ async def entrypoint(ctx: JobContext) -> None:
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
     toucher = touch.TouchReactions(session, book, style)
     replies.touch = toucher
+    # シエルが話している途中の短い声で、話を止めない（interruptions.py）
+    if INTERRUPT_GATE:
+        gate = interruptions.InterruptionGate(session, tap)
+        if gate.install():
+            replies.overlap = gate
+        else:   # LiveKit の中が想定と違う。LiveKit が今までどおり話し始めた瞬間に止める
+            logger.warning('中断の差し替えができなかった（今までどおり、話し始めた瞬間に止める）')
     session.on('user_state_changed', toucher.on_user_state)
     ctx.room.on('data_received', toucher.on_data)
     # 会話のしかたの切り替え（mode.py。Unity が知らせる）

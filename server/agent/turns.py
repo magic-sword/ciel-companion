@@ -122,6 +122,8 @@ class TurnReplies:
         self.encoder: speakers.Encoder | None = None
         # touch.TouchReactions（話しながら触れたときの知らせ）。会話が始まってから作るので、agent.py があとでつなぐ
         self.touch = None
+        # interruptions.InterruptionGate（シエルが話している途中の短い声を、中断にしない）。会話が始まってから作る
+        self.overlap = None
         self._speaking = False
         self._started_at: float | None = None   # まだ返事を作らせていない発言の、最初の話し始め
         self._ended_at: float | None = None     # その最後の話し終わり
@@ -227,6 +229,11 @@ class TurnReplies:
         if not ev.is_final:
             if not ev.transcript:
                 # 会話モデルの側が発言を区切った（LiveKit が空の途中経過で知らせる）
+                if self.overlap is not None and self.overlap.end_of_turn():
+                    # シエルが話している間の短い声（咳・「あっ」・相づち）で、話を止めなかったもの。返事もしない
+                    log.info('シエルが話している間の短い声には、返事を作らせない')
+                    self._forget()
+                    return
                 latency.start()
                 self._cancel_later()
                 if self.backchannel is not None:
