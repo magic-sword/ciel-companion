@@ -9,8 +9,9 @@
 ここでは、LiveKit が「話し始めた」を受ける処理を差し替える：
 - シエルが話していないとき：今までどおり（ふつうの話し始め）。
 - シエルが話しているとき：利用者の状態（話している）は今までどおり LiveKit に更新させ、声は止めさせない。
-  マイクの声（speakers.AudioTap）が CONFIRM_SECONDS 秒たまったら、そこで止める（本当の割り込み）。
-  たまらないまま話し終えたら、止めず、その発言には返事もしない（turns.py が end_of_turn で聞く）。
+  直近 WINDOW_SECONDS 秒のマイクの声（speakers.AudioTap）が CONFIRM_SECONDS 秒たまったら、そこで止める（本当の割り込み）。
+  話し始めてからの声の合計が TOTAL_SECONDS 秒になっても止める（間をあけながら長く話したとき）。
+  どちらにも届かないまま話し終えたら、止めず、その発言には返事もしない（turns.py が end_of_turn で聞く）。
 会話モデルの側の「話し始めたら返事を取り消す」（interrupt_response）は切る（agent.py）。止めるときは、こちらから止める。
 LiveKit の中の作り（AgentActivity の _rt_session・_on_input_speech_started）が想定と違うときは差し替えず、今までどおりにする。
 """
@@ -30,7 +31,13 @@ log = logging.getLogger('ciel-agent.interruptions')
 CONFIRM_SECONDS = float(os.environ.get('CIEL_INTERRUPT_SECONDS', '0.6'))
 LOUD_DB = -40.0       # 声とみなす大きさ（turns.py の LOUD_DB と同じ）
 LEAD_SECONDS = 0.5    # 「話し始めた」の知らせは実際の話し始めより遅れて届くので、少し前から数える
-MAX_WAIT = 3.0        # この秒数のあいだに決まらなければ、止めない
+MAX_WAIT = 15.0       # 話し終わり（end_of_turn）が来ないまま、この秒数たったら止めない（念のため）
+# 声を数えるのは、直近のこの秒数だけ。本当の割り込みは続けて話すのでたまるが、間をあけた相づち（「うん。」…「うんうん。」）は
+# 足し合わせない（2026-10-22、足し合わせていたら、2 秒あけた相づちで止まった）
+WINDOW_SECONDS = 1.2
+# 話し始めてからの声の合計がこれだけになったら止める。読点で間をあけながら長く話すと、直近の声は CONFIRM_SECONDS に
+# 届かないことがある（2026-10-22、話し続けたのに止めず、その発言に返事もしなかった）。間をあけた相づちは 0.6〜0.8 秒
+TOTAL_SECONDS = 1.2
 
 
 def loud_seconds(audio: np.ndarray) -> float:
@@ -56,6 +63,7 @@ class InterruptionGate:
         self._activity = None
         self._original = None
         self._watch: asyncio.Task | None = None
+        self._start = 0.0   # 判定している声の数え始め
         self._overlap: str | None = None   # シエルが話している間の声：'pending'（判定中）・'confirmed'（止めた）・'ignored'
 
     def install(self) -> bool:
@@ -90,7 +98,7 @@ class InterruptionGate:
         self._watch = asyncio.create_task(self._decide(time.time()))
 
     async def _decide(self, detected: float) -> None:
-        start = detected - LEAD_SECONDS
+        start = self._start = detected - LEAD_SECONDS
         while time.time() - detected < MAX_WAIT:
             await asyncio.sleep(0.05)
             if self._overlap != 'pending':
@@ -98,8 +106,11 @@ class InterruptionGate:
             if self.session.agent_state != 'speaking':
                 self._overlap = None   # シエルが話し終えた。ふつうの発言として扱う
                 return
-            voiced = loud_seconds(self.tap.window(start, time.time()))
-            if voiced >= self.confirm_seconds:
+            now = time.time()
+            voiced = loud_seconds(self.tap.window(max(start, now - WINDOW_SECONDS), now))
+            total = loud_seconds(self.tap.window(start, now))
+            if voiced >= self.confirm_seconds or total >= TOTAL_SECONDS:
+                voiced = max(voiced, total)
                 self._overlap = 'confirmed'
                 log.info('中断：声が %.2f 秒続いたので、シエルの話を止める', voiced)
                 debug_log.record('interruption', decision='confirmed', voiced=round(voiced, 2))
@@ -120,7 +131,7 @@ class InterruptionGate:
         （その発言には返事をしない）。止めた発言・ふつうの発言なら False"""
         state, self._overlap = self._overlap, None
         if state == 'pending':
-            self._ignore(loud_seconds(self.tap.window(time.time() - MAX_WAIT, time.time())))
+            self._ignore(loud_seconds(self.tap.window(self._start, time.time())))
             if self._watch is not None:
                 self._watch.cancel()
             self._overlap = None

@@ -7,9 +7,11 @@ bench_latency.py と同じく、試験用の参加者が部屋に入り、名前
   noise   … 0.25 秒の雑音（物を置いた音・衣ずれのつもり）
   cough   … 咳のような音（0.12 秒の強い雑音を 2 回）
   aizuchi … 「うん。」（相づち。止まらないほうがよい）
+  nods    … 「うん。」と、1.2 秒あけて「うんうん。」（間をあけた相づち。止まらないほうがよい）
   vcough  … 声の入った咳（読み上げで作った「ゴホッ、ゴホッ。」）
   ah      … 「あっ。」（思わず出た短い声）
   barge   … 「ちょっと待って、シエル。」（本当の割り込み。止まるべき）
+  long    … 読点で間をあけながら長く話す（シエルに話しかけ直す。止まるべき）
 測るもの：送ってから AFTER_WINDOW 秒のあいだに、シエルの声が鳴っていた秒数（talk_after）。
 1.5 秒未満なら「止まった」とみなす（止まるときも、届くまでの遅れで 0.8 秒ほどは声が鳴る）。止まったあとにシエルが返事をしたか（replied）も記録する。
 
@@ -35,7 +37,7 @@ PROMPT = 'ねえシエル、好きな季節について、どうして好きな�
 STIMULUS_AFTER = 2.5   # シエルが話し始めてから、刺激を送るまで（秒）
 AFTER_WINDOW = 4.0     # 刺激のあと、シエルの声を見る時間（秒）
 STOPPED = 1.5          # この秒数より声が短ければ「止まった」（止まるときも 0.8 秒ほどは鳴る）
-KINDS = ['quiet', 'noise', 'cough', 'vcough', 'ah', 'aizuchi', 'barge']
+KINDS = ['quiet', 'noise', 'cough', 'vcough', 'ah', 'aizuchi', 'nods', 'barge', 'long']
 
 
 def burst(seconds: float, level: float, rng: np.random.Generator) -> np.ndarray:
@@ -69,7 +71,9 @@ async def main() -> None:
     async with aiohttp.ClientSession() as http:
         prompt = await synth(http, PROMPT)
         voiced = {kind: await synth(http, text) for kind, text in (
-            ('vcough', 'ゴホッ、ゴホッ。'), ('ah', 'あっ。'), ('aizuchi', 'うん。'), ('barge', 'ちょっと待って、シエル。'))}
+            ('vcough', 'ゴホッ、ゴホッ。'), ('ah', 'あっ。'), ('aizuchi', 'うん。'), ('barge', 'ちょっと待って、シエル。'),
+            ('long', 'ねえシエル、ちょっと聞いて、さっきの話なんだけど、もう一回、最初から教えてくれる？'))}
+        voiced['nods'] = np.concatenate([voiced['aizuchi'], np.zeros(int(1.2 * SR), '<i2'), await synth(http, 'うんうん。')])
         sounds = stimuli(np.random.default_rng(0), voiced)
 
     room = rtc.Room()

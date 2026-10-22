@@ -1,4 +1,5 @@
 import asyncio
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -45,8 +46,12 @@ class FakeActivity:
 class FakeTap:
     def __init__(self):
         self.loud = 0.0
+        self.segments = []   # 声のあった区間（time.time() の秒）。空なら loud 秒の声を返す
 
     def window(self, start, end):
+        if self.segments:
+            seconds = sum(max(0.0, min(e, end) - max(s, start)) for s, e in self.segments)
+            return np.full(int(seconds * speakers.SR), 0.1, np.float32)
         n = int(self.loud * speakers.SR)
         return np.full(n, 0.1, np.float32)   # -20 dB：声とみなす大きさ
 
@@ -84,6 +89,27 @@ class InterruptionGateTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.15)
         self.session.interrupt.assert_called_once()
         self.assertFalse(self.gate.end_of_turn())   # 止めた発言には、ふつうに返事をする
+
+    async def test_spaced_backchannels_do_not_add_up_to_an_interruption(self):
+        now = time.time()
+        # 「うん。」と、1.5 秒あけて「うんうん。」（合わせると 0.9 秒。足し合わせると 0.6 秒を超える）
+        self.tap.segments = [(now, now + 0.45), (now + 1.95, now + 2.4)]
+        self.speech_started()
+        await asyncio.sleep(2.5)
+        self.session.interrupt.assert_not_called()
+        self.assertTrue(self.gate.end_of_turn())
+
+    async def test_long_speech_with_pauses_still_interrupts(self):
+        gate = interruptions.InterruptionGate(self.session, self.tap, confirm_seconds=0.8)
+        self.session._activity._rt_session.handlers['input_speech_started'] = [self.session._activity._on_input_speech_started]
+        self.assertTrue(gate.install())
+        now = time.time()
+        # 0.3 秒話して 0.4 秒休む、を繰り返す（読点の多い長い発言）。直近 1.2 秒の声は 0.8 秒に届かない
+        self.tap.segments = [(now + i * 0.7, now + i * 0.7 + 0.3) for i in range(6)]
+        self.speech_started()
+        await asyncio.sleep(3.6)
+        self.session.interrupt.assert_called_once()
+        self.assertFalse(gate.end_of_turn())
 
     async def test_ciel_finishing_on_her_own_makes_it_a_normal_turn(self):
         self.tap.loud = 0.2
