@@ -71,9 +71,11 @@ FOLLOW_SECONDS = 20.0
 TAGS = re.compile(r'\[[a-z]+\]')
 # ふつう・おしゃべりのとき、区切りのあと、続きを話し始めないかを見る時間（会話モデルの側は、読点の間で区切ったあと
 # 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る。
+# 2026-10-22 に 0.25 秒・0.35 秒から短くした。区切りから 0.1〜0.2 秒で続きを話し始めると、頼んだ返事が取り消される
+# （声は出ず、続きとまとめて返事をする。試験では 20 回中 5 回）代わりに、返事が約 0.16 秒早くなる。
 # 試すときは環境変数で変える（CIEL_SETTLE_SECONDS・CIEL_SHORT_SETTLE_SECONDS）
-SETTLE_SECONDS = float(os.environ.get('CIEL_SETTLE_SECONDS', '0.25'))
-SHORT_SETTLE_SECONDS = float(os.environ.get('CIEL_SHORT_SETTLE_SECONDS', '0.35'))
+SETTLE_SECONDS = float(os.environ.get('CIEL_SETTLE_SECONDS', '0.1'))
+SHORT_SETTLE_SECONDS = float(os.environ.get('CIEL_SHORT_SETTLE_SECONDS', '0.2'))
 # 話している途中の相づち（_watch_pauses）
 NOD_AFTER_SECONDS = 3.0    # 話し始めて（前の相づちから）これだけたってから
 NOD_PAUSE_SECONDS = 0.4    # 息つぎ（小さな音）がこれだけ続いたら
@@ -91,7 +93,7 @@ SEGMENT_KEEP_SECONDS = 20.0
 #   items        … 話者の行は相手の発言のすぐ後ろ、議事録の状態は変わったときだけ、会話の後ろに system の項目として置く。
 #                  会話の指示が毎回同じになり、過去の発言にも誰が話したかが残る。覚えている人のメモ・関係は、人前になったら
 #                  すぐ外せるように、今までどおり返事ごとの指示に足す
-TURN_CONTEXT = os.environ.get('CIEL_TURN_CONTEXT', 'instructions')
+TURN_CONTEXT = os.environ.get('CIEL_TURN_CONTEXT', 'items')   # 2026-10-22 から items（開発用で確かめてから）
 
 
 @dataclass

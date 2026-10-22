@@ -23,11 +23,7 @@ services:
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
-      # 返事ごとに変わる情報（話者の行・議事録の状態）を会話の後ろに置く（turns.py の TURN_CONTEXT）。本番に入れる前にここで確かめる
-      - CIEL_TURN_CONTEXT=items
-      # 話し終わりのあと、続きを話し始めないかを見る時間を短くする（turns.py。本番は 0.25 秒・短い発言 0.35 秒）
-      - CIEL_SETTLE_SECONDS=0.1
-      - CIEL_SHORT_SETTLE_SECONDS=0.2
+      # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel_dev
       # 本番の Webhook を使わないように、必ずここで上書きする
       - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
