@@ -204,6 +204,22 @@ exit
 
 プロンプト本文・TOML は、**サーバー上の** `agent/config/` を編集した場合、次に開始する会話から反映される（再起動・再ビルド不要）。手元のファイルを編集した場合は、上のデプロイでサーバーへ送る。編集対象は [会話サーバーの README](../server/agent/README.md) を参照。
 
+### 開発用の会話サーバー
+
+分析・デバッグ・試験は、本番とは別の**開発用の会話サーバー**で行う（ほかの人が本番を使っていても影響しない。決めたことは [開発用の会話サーバーの決定記録](decisions/dev-server-ja.md)）。開発中のコードを、開発用だけに送る：
+
+```sh
+bash scripts/server/deploy-server.sh --dev
+```
+
+アプリは、設定 ＞ そのほか ＞ 開発 の「**開発用のサーバーにつなぐ**」を入れると、開発用につなぎ直す（左上に「C I E L ・ 開発用」と出る）。開発用は会話をいつも記録している。持ち帰るとき：
+
+```sh
+bash scripts/server/debug-log.sh pull --dev
+```
+
+開発用で議事録をとると、下書きは開発用の Discord のチャンネルへ送る。Webhook の URL は、サーバーの `~/work/ciel-companion-dev/server/.env.dev` の `CIEL_DEV_DISCORD_WEBHOOK=` に自分で書き、`deploy-server.sh --dev` で反映する（空のあいだはサーバーに保存するだけ）。
+
 ### デバッグ用の会話ログ
 
 ふだんは会話を残さない。調べるときだけ入れる（決めたこと・残す中身は [デバッグ用の会話ログの決定記録](decisions/debug-log-ja.md)）。**手元のリポジトリルート**で Git Bash から：

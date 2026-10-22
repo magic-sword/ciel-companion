@@ -35,7 +35,7 @@ namespace Ciel.Conversation
 
         // 上
         Image _linkDot;
-        Text _linkText, _modeText;
+        Text _linkText, _modeText, _nameText;
         RectTransform _modeChip;
         // 声の様子と状態
         readonly List<RectTransform> _bars = new List<RectTransform>();
@@ -146,9 +146,9 @@ namespace Ciel.Conversation
 
         void BuildTop(RectTransform root)
         {
-            var name = Txt("Name", root, 13, TextMain, TextAnchor.UpperLeft, true);
-            name.text = "C I E L";
-            Place(name.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -12), new Vector2(120, 20));
+            _nameText = Txt("Name", root, 13, TextMain, TextAnchor.UpperLeft, true);
+            _nameText.text = "C I E L";
+            Place(_nameText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -12), new Vector2(150, 20));
 
             // 接続の状態。つながっていないときはタップでつなぎ直す
             var link = Rect("Link", root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -30), new Vector2(230, 24));
@@ -335,6 +335,9 @@ namespace Ciel.Conversation
                 _ => (Mint, "つながっています"),
             };
             _linkDot.transform.GetChild(0).GetComponent<Image>().color = WithAlpha(_linkDot.color, 0.6f);
+            // 開発用のサーバーにつないでいることを、いつも見えるように（左上の名前の横）
+            _nameText.text = c.DevServer ? "C I E L ・ 開発用" : "C I E L";
+            _nameText.color = c.DevServer ? Amber : TextMain;
 
             var talk = (int)c.CurrentTalk;
             var presence = (int)c.CurrentPresence;

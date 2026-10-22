@@ -1,6 +1,6 @@
 // 会話の画面（CielConversationUI）のうち、設定画面（下からすべり出る）。
 // タブ：声と会話（シエルの声の大きさ・おしゃべり度・その場にいる人）、背景（CielBackground）、
-// そのほか（PC ではマイクとスピーカー、開発用の表情の確認ボタン）。
+// そのほか（PC ではマイクとスピーカー、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -25,7 +25,7 @@ namespace Ciel.Conversation
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
-        Image _exprSwitch, _exprKnob;
+        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob;
 
         void BuildSheet(RectTransform root)
         {
@@ -298,22 +298,39 @@ namespace Ciel.Conversation
         {
             var sec = Section(content);
             SectionLabel(Row(sec, 20), "開発");
-            var row = Row(sec, 44);
-            var hit = Img(row, null, Color.clear, raycast: true);
-            var text = Txt("Text", row, 14, TextSub, TextAnchor.MiddleLeft);
-            Stretch(text.rectTransform);
-            text.text = "表情の確認ボタンを出す";
-            var sw = Rect("Switch", row, new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(48, 28));
-            _exprSwitch = Pill(sw, Glass);
-            Edge(sw, WithAlpha(Cyan, 0.45f));
-            _exprKnob = Img(Rect("Knob", sw, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(14, 0), new Vector2(20, 20)), "circle", TextSub);
-            var b = row.gameObject.AddComponent<Button>();
-            b.targetGraphic = hit;
-            b.onClick.AddListener(() =>
+            (_devServerSwitch, _devServerKnob) = SwitchRow(sec, "開発用のサーバーにつなぐ",
+                () => _conversation.SetDevServer(!_conversation.DevServer));
+            Note(sec, "試験・分析用のシエルにつなぎます。会話は調べるために記録され、7 日で消えます。切り替えると、つなぎ直します");
+            (_exprSwitch, _exprKnob) = SwitchRow(sec, "表情の確認ボタンを出す", () =>
             {
                 PlayerPrefs.SetInt(ExpressionPrefKey, ExpressionButtonsOn ? 0 : 1);
                 Refresh();
             });
+        }
+
+        // 文字と、右端のスイッチの行。押すと click を呼ぶ（表示は ShowSwitch で合わせる）
+        (Image sw, Image knob) SwitchRow(RectTransform sec, string label, Action click)
+        {
+            var row = Row(sec, 44);
+            var hit = Img(row, null, Color.clear, raycast: true);
+            var text = Txt("Text", row, 14, TextSub, TextAnchor.MiddleLeft);
+            Stretch(text.rectTransform);
+            text.text = label;
+            var sw = Rect("Switch", row, new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(48, 28));
+            var bg = Pill(sw, Glass);
+            Edge(sw, WithAlpha(Cyan, 0.45f));
+            var knob = Img(Rect("Knob", sw, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(14, 0), new Vector2(20, 20)), "circle", TextSub);
+            var b = row.gameObject.AddComponent<Button>();
+            b.targetGraphic = hit;
+            b.onClick.AddListener(() => click());
+            return (bg, knob);
+        }
+
+        static void ShowSwitch(Image sw, Image knob, bool on)
+        {
+            sw.color = on ? WithAlpha(CyanDeep, 0.55f) : Glass;
+            knob.color = on ? Color.white : TextSub;
+            ((RectTransform)knob.transform).anchoredPosition = new Vector2(on ? 34 : 14, 0);
         }
 
         static bool ExpressionButtonsOn => PlayerPrefs.GetInt(ExpressionPrefKey, 0) == 1;
@@ -358,9 +375,8 @@ namespace Ciel.Conversation
             RefreshDevices(_speakers, _speakerGuids, c.CanSelectSpeaker, c.SpeakerDevices, c.SelectedSpeaker, "既定のスピーカー（OS の設定）", "声の出力：");
             var expr = ExpressionButtonsOn;
             if (_exprPanel != null) _exprPanel.SetActive(expr);
-            _exprSwitch.color = expr ? WithAlpha(CyanDeep, 0.55f) : Glass;
-            _exprKnob.color = expr ? Color.white : TextSub;
-            ((RectTransform)_exprKnob.transform).anchoredPosition = new Vector2(expr ? 34 : 14, 0);
+            ShowSwitch(_exprSwitch, _exprKnob, expr);
+            ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
         }
 
         static void RefreshDevices(Dropdown dd, List<string> guids, bool can, List<(string name, string guid)> devices,

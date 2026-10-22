@@ -18,6 +18,8 @@
 // 実際の答え方・出し方は会話サーバーが決め（自動なら、会議・聞こえた声の数で変わる）、conversation.style で返ってくる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
+// 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
+// つなぐ部屋にする。トークンを頼むときに「ciel-dev を呼ぶ」部屋の設定（room_config）を添える。本番の会話サーバーはその部屋に入らない。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
 using System;
 using System.Collections;
@@ -49,6 +51,8 @@ namespace Ciel.Conversation
         const string PresencePrefKey = "ciel.presence";
         const string SpeakerphonePrefKey = "ciel.speakerphone";
         const string VolumePrefKey = "ciel.voiceVolume";
+        const string DevServerPrefKey = "ciel.devServer";
+        const string DevAgentName = "ciel-dev";   // 開発用の会話サーバーの名前（server/compose.dev.yaml の CIEL_AGENT_NAME）
         const string AizuchiTrack = "ciel-aizuchi";   // 相づちのトラックの名前（server/agent/aizuchi.py の TRACK）
 
         [Tooltip("この文字を名前に含む「声の出力」は会議へつなぐ仮想オーディオケーブルとみなす（自動のとき多人数にする）")]
@@ -167,7 +171,28 @@ namespace Ciel.Conversation
             PresenceChoice = (Presence)Mathf.Clamp(PlayerPrefs.GetInt(PresencePrefKey, (int)Presence.Auto), 0, 3);
             SpeakerphoneOn = PlayerPrefs.GetInt(SpeakerphonePrefKey, 1) == 1;
             VoiceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
+            DevServer = PlayerPrefs.GetInt(DevServerPrefKey, 0) == 1;
             if (_connectOnStart) StartConversation();
+        }
+
+        /// 開発用の会話サーバーにつなぐか（設定画面の開発スイッチ）
+        public bool DevServer { get; private set; }
+        bool _restartAfterConnect;   // つないでいる途中で切り替えられた。つながったら、つなぎ直す
+
+        /// 開発用の会話サーバーにつなぐ・本番に戻す。会話は別の部屋になるので、つないでいたらつなぎ直す
+        public void SetDevServer(bool on)
+        {
+            if (on == DevServer) return;
+            DevServer = on;
+            PlayerPrefs.SetInt(DevServerPrefKey, on ? 1 : 0);
+            PlayerPrefs.Save();
+            if (Status == State.Connected || Status == State.Failed)
+            {
+                EndConversation();
+                StartConversation();
+            }
+            else if (Status == State.Connecting) _restartAfterConnect = true;
+            Changed?.Invoke();
         }
 
         public void StartConversation()
@@ -231,6 +256,7 @@ namespace Ciel.Conversation
 
         IEnumerator Connect()
         {
+            _restartAfterConnect = false;
             SetStatus(State.Connecting);
             Trace("トークンを取得");
             string serverUrl = null, token = null;
@@ -289,6 +315,13 @@ namespace Ciel.Conversation
             ApplySpeakerphone();
             SetMinutesRecording(false);   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetStatus(State.Connected);
+            if (_restartAfterConnect)
+            {
+                // つないでいる途中で、本番・開発用が切り替えられた。選ばれたほうの部屋につなぎ直す
+                EndConversation();
+                StartConversation();
+                yield break;
+            }
             SendStyle();
             SendVolume();
         }
@@ -346,7 +379,9 @@ namespace Ciel.Conversation
             }
             // 接続ごとに独立した会話にする。端末名・利用者名は部屋名に入れない。
             var roomName = "ciel-" + Guid.NewGuid().ToString("N");
-            var body = $"{{\"room_name\":\"{roomName}\"}}";
+            // 開発用のサーバーにつなぐときは、その部屋に開発用の会話サーバーを呼ぶ（LiveKit の部屋の設定 room_config）
+            var roomConfig = DevServer ? $",\"room_config\":{{\"agents\":[{{\"agent_name\":\"{DevAgentName}\"}}]}}" : "";
+            var body = $"{{\"room_name\":\"{roomName}\"{roomConfig}}}";
             using var req = new UnityEngine.Networking.UnityWebRequest(url, "POST");
             req.uploadHandler = new UnityEngine.Networking.UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
             req.downloadHandler = new UnityEngine.Networking.DownloadHandlerBuffer();

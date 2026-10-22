@@ -1,0 +1,33 @@
+# 開発用の会話サーバー（本番とは別のコンテナ）。分析・デバッグ・試験はここで行い、本番の会話サーバーには触らない。
+# 置き場所は ~/work/ciel-companion-dev/server（本番は ~/work/ciel-companion/server）。手元から：
+#   scripts/server/deploy-server.sh --dev     開発中のコードを送り、開発用だけを作り直す（server/deploy-remote.sh dev）
+# 読み上げ（Irodori-TTS、127.0.0.1:8766）と DB のコンテナは、本番のものを共通で使う。
+# - 名前 ciel-dev を付ける。アプリが「ciel-dev を呼ぶ」部屋（設定画面の開発スイッチ）にだけ入る。本番の会話サーバーはその部屋に入らない。
+# - デバッグ用の会話ログはいつも残す（data/debug、7 日で消える）。
+# - 覚えている人の記録は、本番と同じ DB のコンテナの中の別のデータベース ciel_dev（試験の登録が本番の記憶に混ざらない）。
+# - 議事録の下書きは、開発用の Discord のチャンネルへ（server/.env.dev の CIEL_DEV_DISCORD_WEBHOOK。空ならサーバーに保存するだけ）。
+# 秘密情報は本番のものを読む：OpenAI・LiveKit のキーは本番の agent/.env、DB のパスワードは本番の server/.env（deploy-remote.sh が --env-file で渡す）。
+name: ciel-dev
+
+services:
+  agent-dev:
+    build:
+      context: ./agent
+      network: host
+    image: ciel-dev-agent
+    network_mode: host
+    env_file: ../../ciel-companion/server/agent/.env
+    environment:
+      - CIEL_VOICE=irodori
+      - CIEL_AGENT_NAME=ciel-dev
+      # 状態確認の HTTP の口（本番は 8081）
+      - CIEL_AGENT_PORT=8091
+      - CIEL_DEBUG_LOG=1
+      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel_dev
+      # 本番の Webhook を使わないように、必ずここで上書きする
+      - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
+    volumes:
+      - ./agent/config:/app/config:ro
+      - ./agent/data/minutes:/app/data/minutes
+      - ./agent/data/debug:/app/data/debug
+    restart: unless-stopped
