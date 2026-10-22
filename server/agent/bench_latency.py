@@ -10,6 +10,7 @@
   first … 話し終わり（声の最後のフレームを送った時刻）から、シエルの声（相づちを含む）が始まるまで
   segs  … シエルの声のかたまり（話し終わりからの始まりと終わりの秒。相づちのトラックの分も入る）
   nods  … 話している途中に始まったシエルの声（話の途中の相づち。話し終わりからの秒なので負になる）
+  thinking … アプリに「考えています」と知らせた時刻（agent.thinking の on。話し終わりからの秒。turns.py）
 必要な環境変数：LIVEKIT_URL・LIVEKIT_API_KEY・LIVEKIT_API_SECRET（.env）、CIEL_TTS_URL。
 """
 import argparse
@@ -127,6 +128,18 @@ async def main() -> None:
     room = rtc.Room()
     listener = Voices()
     tasks = []
+    thinking: list[float] = []   # agent.thinking（on）が届いた時刻
+
+    def on_data(packet) -> None:
+        if packet.topic != 'ciel.event':
+            return
+        try:
+            msg = json.loads(packet.data.decode('utf-8'))
+        except ValueError:
+            return
+        if msg.get('type') == 'agent.thinking' and msg.get('on'):
+            thinking.append(time.time())
+    room.on('data_received', on_data)
 
     def on_track(track, pub, participant):
         print(f"{time.strftime('%H:%M:%S')} 受信 {participant.identity} {pub.name}", flush=True)
@@ -180,8 +193,10 @@ async def main() -> None:
             nods = [s for s in listener.segs[n_before:] if t_start < s[0] <= t_end - 0.1]
             segs = [s for s in listener.segs[n_before:] if s[0] > t_end - 0.1]
             first = segs[0][0] - t_end if segs else None
+            think = [t - t_end for t in thinking if t > t_end - 0.5]
             r = {'text': text, 'first': None if first is None else round(first, 2),
                  'nods': [round(a - t_end, 2) for a, _ in nods],
+                 'thinking': round(think[0], 2) if think else None,
                  'segs': [[round(a - t_end, 2), round((b or a) - t_end, 2)] for a, b in segs]}
             results.append(r)
             print(json.dumps(r, ensure_ascii=False), flush=True)
