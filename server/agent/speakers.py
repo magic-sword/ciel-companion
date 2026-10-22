@@ -342,7 +342,15 @@ class SpeakerBook:
         return name if j.sure else 'たぶん' + name
 
     async def identify(self, j: 'Judgment | None', solo: bool = False, push_notes: bool = False) -> str | None:
-        """発言の判定（judge の結果）から、会話モデルに渡す 1 行を作る。None は「何も足さない」。
+        """発言の判定から、会話モデルに渡す 1 行（話者の行と、メモ・関係をつないだもの）を作る。None は「何も足さない」"""
+        parts = await self.identify_parts(j, solo=solo, push_notes=push_notes)
+        return None if parts is None else parts[0] + parts[1]
+
+    async def identify_parts(self, j: 'Judgment | None', solo: bool = False,
+                             push_notes: bool = False) -> tuple[str, str] | None:
+        """発言の判定（judge の結果）から、会話モデルに渡す（話者の行, メモ・関係）を作る。None は「何も足さない」。
+        話者の行は「[発言者：…]」の 1 行（この会話で初めて分かったときの、前に話した日・同意のことを含む）。
+        メモ・関係は、その場にいる人によって渡したり渡さなかったりするもの（無ければ空）。
         solo（ふたりきり）のとき、短くて判定できない発言は、直前の人のままとみなして何も足さない
         （「不明」を渡すと、シエルが声の判定のことを話してしまうので）。
         push_notes のとき、本人のメモを渡す（その場にいる人が、ひとり・身近な人のとき。mode.py）。
@@ -352,7 +360,7 @@ class SpeakerBook:
             if solo:
                 return None
             self.last = None
-            return '[発言者：不明]'
+            return '[発言者：不明]', ''
         e, sp, sure, score, seconds = j.e, j.sp, j.sure, j.score, j.seconds
         self.last_embedding, self.last_rows, self.last_sure = e, [], False
         self.last = sp
@@ -360,10 +368,10 @@ class SpeakerBook:
         if k is None:
             # この会話で聞いた、まだ覚えていない人（判定のあとで名前を聞いた人も）
             self.last_sure = sure
-            return self._session_tag(sp, sure)
+            return self._session_tag(sp, sure), ''
         if not self._shared_available:
             self.last_sure = sure
-            return f'[発言者：{k.name}（保存情報は現在確認できないため、以前のメモは使わない）]'
+            return f'[発言者：{k.name}（保存情報は現在確認できないため、以前のメモは使わない）]', ''
 
         # 覚えている人
         if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
@@ -377,7 +385,7 @@ class SpeakerBook:
             await self.store.touch(k.person_id)
         self.last_sure = sure
         if not sure:
-            return f'[発言者：たぶん{k.name}（声を覚えている人）]'
+            return f'[発言者：たぶん{k.name}（声を覚えている人）]', ''
         snapshot = None
         if self.store is not None and hasattr(self.store, 'memory_snapshot'):
             snapshot = await self.store.memory_snapshot(k.person_id)
@@ -415,7 +423,7 @@ class SpeakerBook:
                     k.last_seen, private=push_notes)
             sp.relation_pushed = True
             memory += sp.relation_context[push_notes]
-        return f'[発言者：{k.name}（声を覚えている人{extra}）]{memory}'
+        return f'[発言者：{k.name}（声を覚えている人{extra}）]', memory
 
     async def split(self, name: str = '') -> str:
         """人違いを直す：直前の発言を、判定された人から外し、別の人としてこの会話で区別する。

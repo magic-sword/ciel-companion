@@ -41,6 +41,7 @@
 import asyncio
 import collections
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -49,6 +50,7 @@ import numpy as np
 from livekit.agents import AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
+import debug_log
 import latency
 import speakers
 
@@ -81,6 +83,14 @@ LOUD_DB = -40.0
 LOUD_SECONDS = 0.2
 # 発言の区間を、文字起こしと組にするまで取っておく時間（これより古い区間は、文字起こしが来なかったものとして捨てる）
 SEGMENT_KEEP_SECONDS = 20.0
+# 返事ごとに変わる情報の渡し方（2026-10-22）。
+#   instructions … 話者の行・議事録の状態を、返事ごとの指示に足す（以前のやり方）。LiveKit は返事ごとの指示を
+#                  「会話の指示＋足した分」に置き換えて送るので、足した分が前と変わると、指示から後ろ（道具の説明・会話の履歴）の
+#                  キャッシュが効かなくなる
+#   items        … 話者の行は相手の発言のすぐ後ろ、議事録の状態は変わったときだけ、会話の後ろに system の項目として置く。
+#                  会話の指示が毎回同じになり、過去の発言にも誰が話したかが残る。覚えている人のメモ・関係は、人前になったら
+#                  すぐ外せるように、今までどおり返事ごとの指示に足す
+TURN_CONTEXT = os.environ.get('CIEL_TURN_CONTEXT', 'instructions')
 
 
 @dataclass
@@ -104,6 +114,7 @@ class TurnReplies:
         self.history = history        # 接続中の共通履歴（conversation.Conversation）
         self.minutes = minutes        # minutes.Minutes。返答のたびに実際の記録状態を渡す
         self.nod = nod                # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
+        self._minutes_context: str | None = None   # 会話の後ろに最後に置いた議事録の状態（TURN_CONTEXT=items）
         self.encoder: speakers.Encoder | None = None
         # touch.TouchReactions（話しながら触れたときの知らせ）。会話が始まってから作るので、agent.py があとでつなぐ
         self.touch = None
@@ -375,7 +386,7 @@ class TurnReplies:
             if touch is not None:
                 extra['user_input'] = touch
             latency.mark('返事を頼んだ')
-            self._generate_reply(extra)
+            await self._generate_reply(extra)
             return
         t0 = time.perf_counter()
         j = await self._judgment_for(start, end)
@@ -384,7 +395,14 @@ class TurnReplies:
         if not self.book.current_turns and self.history is not None:
             self.book.current_turns = [t for t in self.history.turns if t.role == 'user' and start <= t.at <= end]
         presence = self.style.presence
-        line = await self.book.identify(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
+        parts = await self.book.identify_parts(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
+        line = None
+        if parts is not None:
+            tag, memory = parts
+            if TURN_CONTEXT == 'items' and await self._add_context(tag):
+                line = memory or None   # 話者の行は会話に置いた。メモ・関係だけ返事ごとの指示に足す
+            else:
+                line = tag + memory
         if self.book.last is not None:
             self.book.last_at = time.monotonic()   # 最後に話した人を、触った人とみなせる時間（touch.py）
         log.info('話者の判定 %.0f ms（声 %.1f 秒）', (time.perf_counter() - t0) * 1000, j.seconds if j else 0.0)
@@ -394,10 +412,58 @@ class TurnReplies:
         if line is not None:
             extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), line)))
         latency.mark('返事を頼んだ')
-        self._generate_reply(extra)
+        await self._generate_reply(extra)
 
-    def _generate_reply(self, extra: dict) -> None:
+    async def _generate_reply(self, extra: dict) -> None:
         if self.minutes is not None:
-            extra['instructions'] = '\n\n'.join(filter(None, (
-                extra.get('instructions'), self.minutes.context())))
+            context = self.minutes.context()
+            if TURN_CONTEXT == 'items':
+                # 議事録の状態は、変わったときだけ会話の後ろに置く（足せなかったら、今回の指示に足す）
+                if context != self._minutes_context and await self._add_context(context):
+                    self._minutes_context = context
+                elif context != self._minutes_context:
+                    extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), context)))
+            else:
+                extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), context)))
         self.session.generate_reply(**extra)
+
+    async def _add_context(self, text: str) -> bool:
+        """会話の後ろ（相手の発言のすぐ後ろ）に、会話モデルへの補足を system の項目として 1 つ置く（TURN_CONTEXT=items）。
+        置いたと確かめる返事（1 往復、約 0.12 秒）は待たない。LiveKit は項目を作る知らせを送ってから確認を待つので、
+        送るところまで進めてから返事を頼めば、同じ接続の上で「項目を作る → 返事を作る」の順に届く（2026-10-22、bench_latency.py）。
+        すぐに失敗したときだけ False（呼んだ側が、今までどおり返事ごとの指示に足す）。あとから断られたら、ログに残す"""
+        agent = getattr(self.session, 'current_agent', None)
+        if agent is None:
+            return False
+        try:
+            ctx = agent.chat_ctx.copy()
+            ctx.add_message(role='system', content=text)
+        except Exception as e:
+            log.warning('会話に補足を置けない（返事ごとの指示に足す）: %s', e)
+            return False
+        # LiveKit は、手元の会話と会話モデルの側の会話の差を送る。会話モデルの側にだけある項目（まだ手元に届いていない
+        # 相手の発言など）があると、それを消してしまうので、そのときは置かない
+        remote = getattr(agent, 'realtime_llm_session', None)
+        if remote is not None:
+            try:
+                local_ids = {item.id for item in ctx.items}
+                if any(item.id not in local_ids for item in remote.chat_ctx.items):
+                    log.info('会話モデルの側の会話が手元にまだ届いていないので、補足は返事ごとの指示に足す')
+                    return False
+            except Exception as e:   # 会話モデルの側の会話を読めない（会話の始まる前など）
+                log.warning('会話モデルの側の会話を読めない（返事ごとの指示に足す）: %s', e)
+                return False
+        task = asyncio.create_task(agent.update_chat_ctx(ctx))
+        self._tasks.add(task)
+        task.add_done_callback(self._context_done)
+        await asyncio.sleep(0)   # 項目を作る知らせを送るところまで進める
+        if task.done() and not task.cancelled() and task.exception() is not None:
+            return False
+        latency.mark('補足を置いた')
+        debug_log.record('context_item', text=text)
+        return True
+
+    def _context_done(self, task: asyncio.Task) -> None:
+        self._tasks.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.warning('会話に置いた補足が断られた: %s', task.exception())

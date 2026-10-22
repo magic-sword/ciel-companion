@@ -140,7 +140,7 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_speaker_identification_reply_also_includes_state(self):
         session = SimpleNamespace(generate_reply=Mock())
-        book = SimpleNamespace(identify=AsyncMock(return_value='speaker metadata'), last=None)
+        book = SimpleNamespace(identify_parts=AsyncMock(return_value=('speaker metadata', '')), last=None)
         replies = TurnReplies(session, book, None, SimpleNamespace(talk='normal', presence='solo'), '', minutes=self.m)
         replies.encoder = object()
         replies._judgment_for = AsyncMock(return_value=None)
