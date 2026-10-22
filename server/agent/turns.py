@@ -116,6 +116,7 @@ class TurnReplies:
         self.minutes = minutes        # minutes.Minutes。返答のたびに実際の記録状態を渡す
         self.nod = nod                # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
         self._minutes_context: str | None = None   # 会話の後ろに最後に置いた議事録の状態（TURN_CONTEXT=items）
+        self._thinking = False   # アプリに「考えています」と知らせている（_set_thinking）
         self.encoder: speakers.Encoder | None = None
         # touch.TouchReactions（話しながら触れたときの知らせ）。会話が始まってから作るので、agent.py があとでつなぐ
         self.touch = None
@@ -149,6 +150,7 @@ class TurnReplies:
             self._speaking = True
             self._cancel_later()
             self._cancel_early()   # 続きを話し始めた。続きの区切りで、まとめて作らせる
+            self._set_thinking(False)   # 頼んだ返事は取り消される。アプリの「考えています」を消す
             if self.backchannel is not None:
                 self.backchannel.stop()
             if self._started_at is None:
@@ -427,6 +429,18 @@ class TurnReplies:
             else:
                 extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), context)))
         self.session.generate_reply(**extra)
+        self._set_thinking(True)
+
+    def _set_thinking(self, on: bool) -> None:
+        """アプリに、返事を考えているか（返事を頼んでから声が出るまで）を知らせる。LiveKit の lk.agent.state は、
+        Realtime API と自前の読み上げの組み合わせでは thinking を通らない（listening から speaking へ直接変わる）ので、自分で送る。
+        アプリは、声が出るか（speaking）、取り消しの知らせ（on=false）か、6 秒たつまで「考えています…」と出す"""
+        if not on and not self._thinking:
+            return   # 知らせていないのに、取り消しだけ送らない（「考えています」は毎回送る）
+        self._thinking = on
+        publish = getattr(self.style, 'publish', None)
+        if publish is not None:
+            publish({'v': 1, 'type': 'agent.thinking', 'on': on})
 
     async def _add_context(self, text: str) -> bool:
         """会話の後ろ（相手の発言のすぐ後ろ）に、会話モデルへの補足を system の項目として 1 つ置く（TURN_CONTEXT=items）。

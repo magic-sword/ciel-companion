@@ -156,7 +156,11 @@ Irodori-TTS（v4.1-Small、MIT）で直接読み上げる方法の速さ（自�
 
 ### 考えている間の見た目
 
-LiveKit Agents は、会話サーバーの様子を参加者の属性 `lk.agent.state`（listening・thinking・speaking）で知らせる。アプリは thinking の間（返事を頼んでから声が出るまで）、「考えています…」と出し、声の波の棒に光の粒を流す（`CielConversation.AgentState`、`CielConversationUI`）。相づちの無い短い発言でも、聞こえたことが分かる。実機での見え方は、アプリを作り直してから確かめる。
+返事を頼んでから声が出るまで、アプリに「考えています…」と出し、声の波の棒に光の粒を流す（`CielConversation.Thinking`、`CielConversationUI`）。相づちの無い短い発言でも、聞こえたことが分かる。
+
+- LiveKit Agents は会話サーバーの様子を参加者の属性 `lk.agent.state` で知らせるが、Realtime API と自前の読み上げの組み合わせでは thinking を通らず、listening から speaking へ直接変わった（15 回の返事すべて）。そこで会話サーバー（`turns.py` の `_set_thinking`）が、返事を頼んだときに `{"type": "agent.thinking", "on": true}`、続きを話し始めて返事が取り消されるときに `on: false` を送る（topic `ciel.event`）。
+- アプリは、`lk.agent.state` が speaking になる（声が出る）か、`on: false` か、6 秒たつまで出す。
+- 実機での見え方は、アプリを作り直してから確かめる。
 
 ## 表情に合わせた声の強さ（2026-10-18）
 

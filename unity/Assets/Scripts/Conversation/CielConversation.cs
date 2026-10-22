@@ -175,8 +175,15 @@ namespace Ciel.Conversation
             if (_connectOnStart) StartConversation();
         }
 
+        /// 返事を考えているか（会話サーバーの agent.thinking を受けてから、声が出るまで。6 秒で消える）
+        public bool Thinking => Status == State.Connected && _thinkingSince >= 0f && Time.unscaledTime - _thinkingSince < ThinkingTimeout
+                                && AgentState != "speaking";
+        float _thinkingSince = -1f;
+        const float ThinkingTimeout = 6f;
+
         /// 会話サーバーのいまの様子（LiveKit Agents が参加者の属性 lk.agent.state で知らせる）：
-        /// listening（聞いている）・thinking（返事を考えている。返事を頼んでから声が出るまで）・speaking（話している）。つないでいなければ空
+        /// listening（聞いている）・speaking（話している）など。つないでいなければ空。Realtime API と自前の読み上げの組み合わせでは
+        /// thinking を通らないので、考えている間は Thinking（会話サーバーの agent.thinking）で見る
         public string AgentState { get; private set; } = "";
         const string AgentStateAttribute = "lk.agent.state";
 
@@ -517,6 +524,7 @@ namespace Ciel.Conversation
             if (participant == null || participant.Attributes == null) return;
             if (!participant.Attributes.TryGetValue(AgentStateAttribute, out var state) || state == AgentState) return;
             AgentState = state;
+            if (state == "speaking") _thinkingSince = -1f;   // 声が出たので、考え終わった
             Changed?.Invoke();
         }
 
@@ -738,6 +746,7 @@ namespace Ciel.Conversation
             public int ttl_ms;
             public bool recording;   // minutes.state
             public string talk, presence, reason;   // conversation.style
+            public bool on;   // agent.thinking
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -765,6 +774,12 @@ namespace Ciel.Conversation
                 if (p > 0) _serverPresence = (Presence)p;
                 PresenceReason = e.reason ?? "";
                 Debug.Log($"[CielConversation] いまの会話のしかた：{e.talk}・{e.presence}{(PresenceReason != "" ? $"（{PresenceReason}）" : "")}");
+                Changed?.Invoke();
+            }
+            else if (e.type == "agent.thinking")
+            {
+                // 返事を頼んだ（on）・取り消された（off）。声が出たら（AgentState が speaking）消える
+                _thinkingSince = e.on ? Time.unscaledTime : -1f;
                 Changed?.Invoke();
             }
             else if (e.type == "minutes.state")
@@ -900,6 +915,7 @@ namespace Ciel.Conversation
             _serverPresence = null;
             PresenceReason = "";
             AgentState = "";
+            _thinkingSince = -1f;
             SetStatus(State.Disconnected);
         }
 

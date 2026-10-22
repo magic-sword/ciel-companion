@@ -89,6 +89,19 @@ class TurnContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.updates, [])
         self.assertIn('[発言者：ハカセ（声を覚えている人）]', self.session.generate_reply.call_args.kwargs['instructions'])
 
+    async def test_tells_the_app_when_thinking_and_when_cancelled(self):
+        r = self.replies(FakeAgent())
+        sent = []
+        r.style.publish = sent.append
+        await r._reply(1, 2)
+        await r._reply(3, 4)
+        self.assertEqual(sent, [{'v': 1, 'type': 'agent.thinking', 'on': True}] * 2)
+        r.on_user_state(SimpleNamespace(new_state='speaking', old_state='listening', created_at=5.0))
+        self.assertEqual(sent[-1], {'v': 1, 'type': 'agent.thinking', 'on': False})
+        r.on_user_state(SimpleNamespace(new_state='listening', old_state='speaking', created_at=6.0))
+        r.on_user_state(SimpleNamespace(new_state='speaking', old_state='listening', created_at=7.0))
+        self.assertEqual(len(sent), 3)   # 知らせていないときは、取り消しを重ねて送らない
+
     async def test_falls_back_to_instructions_when_the_conversation_rejects_items(self):
         r = self.replies(FakeAgent(fail=True))
         await r._reply(1, 2)

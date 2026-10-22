@@ -353,6 +353,7 @@ namespace Ciel.Conversation
                 _ => c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます",
             };
             _caption.text = Thinking(c) ? "T H I N K I N G" : connected && c.MicEnabled ? "L I S T E N I N G" : "";
+            _shownThinking = Thinking(c);
 
             // マイク：入れている（光る六角）・切っている（透けた六角）・使えない（薄い）
             var usable = connected && !c.MicBusy;
@@ -390,8 +391,8 @@ namespace Ciel.Conversation
         }
 
         // 会話サーバーが返事を考えている（返事を頼んでから、声が出るまで）
-        static bool Thinking(CielConversation c) =>
-            c.Status == CielConversation.State.Connected && c.AgentState == "thinking" && c.VoiceLevel < 0.005f;
+        static bool Thinking(CielConversation c) => c.Thinking;
+        bool _shownThinking;   // 表示に出している「考えています」（時間切れで消えたら、表示を合わせる）
 
         // ---- 動き ----
 
@@ -402,6 +403,7 @@ namespace Ciel.Conversation
             if (_conversation == null) return;
             // CielConversation は保存した設定（モード・声の大きさ）を Start で読むので、全部の Start のあとに表示を合わせる
             if (!_firstRefresh) { _firstRefresh = true; Refresh(); }
+            if (Thinking(_conversation) != _shownThinking) Refresh();   // 考えていたのが時間切れで終わった
             var t = Time.unscaledTime;
             var c = _conversation;
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;
