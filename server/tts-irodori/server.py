@@ -9,8 +9,8 @@ POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）", "
 GPU は 1 つなので、合成は 1 つのスレッドで 1 文ずつ順に行う。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
 参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込んで符号化する（encode_refs）。
 
-環境変数：TTS_PORT（既定 8766）、TTS_STEPS（既定 8。16 は標準の 40 と聞き分けられなかった。8・12・16 を同じ文・同じ種で聞き比べ、
-  8 と 12 で違いが分からなかった（2026-10-22、利用者）。1 文あたり 16 より約 0.09 秒速い）
+環境変数：TTS_PORT（既定 8766）、TTS_STEPS（既定 16。標準の 40 と聞き分けられなかった。2026-10-22 に 8 にしたが、
+  実際の会話でざらつき・品質の落ちたところが目立ったので 16 に戻した（利用者。8 は 1 文あたり約 0.1 秒速い））
 """
 import glob
 import json
@@ -44,7 +44,7 @@ log = logging.getLogger('tts-irodori')
 # 設定資料 7.1 の通常の声
 CAPTION = ('柔らかく朗らかな響きを持つ10代前半の少女。人懐っこく甘すぎないナチュラルなトーンで、聞く人を笑顔にする温かみのある声。'
            '無邪気で親しみやすく、一生懸命寄り添ってくれるパートナー風。')
-STEPS = int(os.environ.get('TTS_STEPS', '8'))
+STEPS = int(os.environ.get('TTS_STEPS', '16'))
 REFS = sorted(glob.glob('/data/samples/*.wav'))
 RT = InferenceRuntime.from_key(RuntimeKey(
     checkpoint=download_hf_checkpoint('Aratako/Irodori-TTS-v4.1-Small'), model_device='cuda',

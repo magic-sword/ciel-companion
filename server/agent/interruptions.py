@@ -28,7 +28,7 @@ import speakers
 log = logging.getLogger('ciel-agent.interruptions')
 
 # シエルが話している途中で、これだけの秒数の声（LOUD_DB より大きい 20 ms の合計）がたまったら止める。0 なら差し替えない
-CONFIRM_SECONDS = float(os.environ.get('CIEL_INTERRUPT_SECONDS', '0.6'))
+CONFIRM_SECONDS = float(os.environ.get('CIEL_INTERRUPT_SECONDS', '0.8'))   # 0.6 では声の入った咳がすれすれだった
 LOUD_DB = -40.0       # 声とみなす大きさ（turns.py の LOUD_DB と同じ）
 LEAD_SECONDS = 0.5    # 「話し始めた」の知らせは実際の話し始めより遅れて届くので、少し前から数える
 MAX_WAIT = 15.0       # 話し終わり（end_of_turn）が来ないまま、この秒数たったら止めない（念のため）
