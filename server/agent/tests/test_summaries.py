@@ -201,6 +201,33 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sent[-1]['title'], '清書')
         self.assertEqual(self.m._summarize.await_args.args[4].name, 'meeting')
 
+    async def test_shutdown_without_time_left_uses_the_live_list(self):
+        # 会話の後片付けの持ち時間が足りなければ、清書のモデルを待たずにライブの一覧で下書きにする（強制終了で失わない）
+        self.m._summarize = AsyncMock(return_value={'title': '清書'})
+        self.m.start()
+        self.m.meeting.state.apply({'title': 'ライブ', 'ops': [{'op': 'add', 'section': 'decisions', 'item': {'text': '決定'}}]})
+        self.add('一')
+        self.add('二')
+        with patch('minutes.FLUSH_SECONDS', 1.0):
+            await self.m.flush()
+        self.m._summarize.assert_not_called()
+        export = self.m._exports[-1]
+        self.assertEqual(export.stage, 'saved_locally')
+        self.assertIn('# ライブ', export.draft)
+        self.assertIn('- 決定', export.draft)
+        self.assertIn('まとめきれなかった発言', export.draft)
+
+    async def test_shutdown_passes_the_remaining_time_to_the_model(self):
+        self.m._summarize = AsyncMock(return_value={'title': '清書'})
+        self.m.start()
+        self.add('一')
+        self.add('二')
+        await self.m.flush()
+        timeout = self.m._summarize.await_args.args[7]
+        self.assertLessEqual(timeout, minutes.FINAL_TIMEOUT)
+        self.assertGreater(timeout, 5)
+        self.assertIn('# 清書', self.m._exports[-1].draft)
+
     async def test_packets_split_and_rejoin(self):
         state = {'title': 'あ' * 5000, 'sections': []}
         parts = minutes.packets(state, 7)

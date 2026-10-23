@@ -55,6 +55,11 @@ FINAL_FULL_LINES = 400  # 清書で発言を全部見直す上限（これより
 FINAL_FULL_CHARS = 60_000
 FINAL_CHUNK = 100       # 続きを合わせるとき、一度にモデルへ渡す発言の数
 PART_CHARS = 2000       # アプリへ送る 1 つのデータのメッセージの文字数（LiveKit の上限に余裕を持たせる）
+FINAL_TIMEOUT = 45.0    # 清書 1 回の待ち時間の上限（秒）
+LIVE_TIMEOUT = 20.0     # ライブの差分 1 回の待ち時間の上限（秒）
+# 会話が終わるときの清書の持ち時間（秒）。過ぎたら、モデルを待たずにライブの一覧で下書きにする。
+# 会話サーバーの後片付けの上限（agent.py の shutdown_process_timeout、90 秒）から、Discord へ送る時間を引いた分
+FLUSH_SECONDS = 50.0
 
 # on_change に渡す出来事
 STARTED, ALREADY, FINISHED, NOT_RECORDING = 'started', 'already', 'finished', 'not_recording'
@@ -90,6 +95,7 @@ class Meeting:
     updated_wall: float | None = None                          # 前のライブの更新（アプリに「何秒前」と出す）
     research_seen: int = 0                                     # ライブに渡した調べた記録の最後の ID
     pending_shown: int = -1                                    # アプリに知らせた、まだ反映していない発言の数
+    deadline: float | None = None                              # 清書の締め切り（time.monotonic。会話が終わるときだけ）
 
     def __post_init__(self) -> None:
         if self.cursor < 0:
@@ -335,8 +341,13 @@ class Minutes:
         task.add_done_callback(self._tasks.discard)
 
     async def flush(self) -> None:
-        """会話が終わるとき：とっている途中なら、そこまでで議事録にする（もう誰もいないので、告げない）"""
+        """会話が終わるとき：とっている途中なら、そこまでで議事録にする（もう誰もいないので、告げない）。
+        会話サーバーの後片付けには上限があるので、清書は FLUSH_SECONDS で打ち切り、ライブの一覧で下書きにする"""
         self.finish(announce=False)
+        deadline = time.monotonic() + FLUSH_SECONDS
+        for m in self._exports:
+            if m.stage in ('queued', 'building'):
+                m.deadline = min(m.deadline or deadline, deadline)
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
     # ---- ライブ ----
@@ -397,7 +408,7 @@ class Minutes:
                    **({'research': research} if research else {})}
         try:
             r = await self._client.chat.completions.create(
-                model=live.LIVE_MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
+                model=live.LIVE_MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=LIVE_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.live_instructions},
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
             return json.loads(r.choices[0].message.content or '{}')
@@ -434,7 +445,7 @@ class Minutes:
 
     async def _summarize(self, started: datetime, ended: datetime, draft: dict | None, lines: list[Line],
                          template: Template | None = None, draft_through: int = 0,
-                         research: list[dict] | None = None) -> dict | None:
+                         research: list[dict] | None = None, timeout: float = FINAL_TIMEOUT) -> dict | None:
         template = template or self.templates[summary_templates.DEFAULT]
         request = {'date': day(started), 'start': f'{started:%H:%M}', 'end': f'{ended:%H:%M}',
                    'template': template.for_model(),
@@ -443,13 +454,21 @@ class Minutes:
                    **({'research': research} if research else {})}
         try:
             r = await self._client.chat.completions.create(
-                model=MODEL, reasoning_effort='medium', response_format={'type': 'json_object'},
+                model=MODEL, reasoning_effort='medium', response_format={'type': 'json_object'}, timeout=timeout,
                 messages=[{'role': 'system', 'content': self.instructions},
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
             return json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 要約できなくても、会話は続ける
             log.warning('議事録を要約できない：%s', type(e).__name__)
             return None
+
+    @staticmethod
+    def _budget(m: Meeting) -> float:
+        """清書 1 回に使える秒数。締め切りが近ければ 0（モデルを呼ばずに、ライブの一覧で下書きにする）"""
+        if m.deadline is None:
+            return FINAL_TIMEOUT
+        left = min(FINAL_TIMEOUT, m.deadline - time.monotonic())
+        return left if left >= 5.0 else 0.0
 
     async def _write(self, m: Meeting, ended: datetime) -> None:
         await self.history.wait_pending(m.first_id, m.end_id)
@@ -473,16 +492,16 @@ class Minutes:
                 log.info('議事録：発言が %d 行だけなので、議事録にしない', len(usable))
                 return
             # 多すぎるときは、ライブの一覧に続きを少しずつ合わせる
-            while not full and len(lines) > FINAL_CHUNK:
+            while not full and len(lines) > FINAL_CHUNK and self._budget(m) > 0:
                 result = await self._summarize(m.started, ended, m.state.for_model(), lines[:FINAL_CHUNK],
-                                               m.template, m.cursor, research)
+                                               m.template, m.cursor, research, self._budget(m))
                 if result is None:
                     break
                 m.state.replace(result)
                 m.cursor, lines = lines[FINAL_CHUNK - 1].id, lines[FINAL_CHUNK:]
             draft = m.state.for_model() if m.state.has_content() else None
-            result = (await self._summarize(m.started, ended, draft, lines, m.template, m.cursor, research)
-                      if lines and (full or len(lines) <= FINAL_CHUNK) else None)
+            result = (await self._summarize(m.started, ended, draft, lines, m.template, m.cursor, research, self._budget(m))
+                      if lines and (full or len(lines) <= FINAL_CHUNK) and self._budget(m) > 0 else None)
             rest = [t for t in lines if t.id > m.cursor]   # ライブの一覧に入っていない発言
             if result is not None:
                 m.state.replace(result)

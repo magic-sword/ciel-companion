@@ -57,7 +57,11 @@ logger = logging.getLogger('ciel-agent')
 
 # 待機させておく子プロセスの数（既定は CPU の数 = 24 で多すぎる。会話は 1 人ずつなので 2 で足りる）
 # 状態確認の HTTP の口（既定 8081）。試験用の会話サーバーを同じマシンで動かすときは別の番号にする（bench_latency.py）
-server = AgentServer(num_idle_processes=2, port=int(os.environ.get('CIEL_AGENT_PORT', '8081')))
+# 会話が終わってから後片付け（議事録の清書と送信・メモ・関係の書き直し）を待つ秒数。既定の 10 秒では、
+# 議事録の清書（11〜18 秒）の途中で子プロセスが止められ、下書きもメモも失われた（2026-10-23）。
+# 議事録は minutes.FLUSH_SECONDS で打ち切って、間に合わなければライブの一覧で下書きにする
+server = AgentServer(num_idle_processes=2, port=int(os.environ.get('CIEL_AGENT_PORT', '8081')),
+                     shutdown_process_timeout=90.0)
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
 # 会話モデル（realtime・gpt-live）と、realtime のときのモデル名
 MODEL = os.environ.get('CIEL_MODEL', 'realtime')
@@ -213,16 +217,22 @@ async def entrypoint(ctx: JobContext) -> None:
     session.userdata.minutes = minute_taker
     summary_seq = 0
 
-    async def publish_summary(state):
+    async def send(topic: str, *messages: dict) -> None:
+        # アプリへの知らせ。会話が終わって部屋が閉じたあと（議事録の清書の結果など）は送れないので、捨てる
+        try:
+            for msg in messages:
+                await ctx.room.local_participant.publish_data(
+                    json.dumps(msg, ensure_ascii=False), reliable=True, topic=topic)
+        except Exception as e:
+            logger.info('アプリへ送れない（%s）: %s', topic, type(e).__name__)
+
+    def publish_summary(state) -> None:
         # まとめの中身は大きいので、分けて送る（アプリが seq ごとにつなぐ）
         nonlocal summary_seq
         summary_seq += 1
-        for packet in minutes.packets(state, summary_seq):
-            await ctx.room.local_participant.publish_data(
-                json.dumps(packet, ensure_ascii=False), reliable=True, topic='ciel.summary')
-    minute_taker.on_state = lambda state: asyncio.create_task(publish_summary(state))
-    minute_taker.on_progress = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
-        json.dumps(msg), reliable=True, topic='ciel.event'))
+        asyncio.create_task(send('ciel.summary', *minutes.packets(state, summary_seq)))
+    minute_taker.on_state = publish_summary
+    minute_taker.on_progress = lambda msg: asyncio.create_task(send('ciel.event', msg))
     replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
                                 agent.aizuchi if AIZUCHI else None, history=history, minutes=minute_taker, nod=NOD)
     async def publish_research(packet):
@@ -260,8 +270,7 @@ async def entrypoint(ctx: JobContext) -> None:
         book.on_split = history.on_split
         book.on_merge = history.on_merge
         # アプリの参加者パネル（speakers.py の state）。名簿・最後に話した人が変わるたびに知らせる
-        book.on_change = lambda state: asyncio.create_task(ctx.room.local_participant.publish_data(
-            json.dumps(state, ensure_ascii=False), reliable=True, topic='ciel.event'))
+        book.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)
@@ -272,11 +281,15 @@ async def entrypoint(ctx: JobContext) -> None:
         debug_log.record('end')
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await researcher.close()
-        await minute_taker.flush()   # 議事録をとっている途中なら、そこまでで下書きを送る
-        if note_taker is not None:
-            await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
-        if relation_keeper is not None:
-            await relation_keeper.flush()   # メモを書いたあとで、関係を書き直す
+        async def memories() -> None:
+            if note_taker is not None:
+                await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
+            if relation_keeper is not None:
+                await relation_keeper.flush()   # メモを書いたあとで、関係を書き直す
+        # 議事録（とっている途中なら、そこまでで下書きを送る）とメモは別々なので、並べて待つ（片方の失敗で、もう片方を止めない）
+        for result in await asyncio.gather(minute_taker.flush(), memories(), return_exceptions=True):
+            if isinstance(result, BaseException):
+                logger.warning('会話の後片付けに失敗 error=%s', type(result).__name__)
         if store is not None:
             await store.close()
     ctx.add_shutdown_callback(close_store)
