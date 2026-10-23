@@ -1,0 +1,24 @@
+# 会議の議事録。見出しの順に Markdown へ並べる。kind は summaries/kinds.py の種類
+label = "会議の議事録"
+description = "会議で話したこと・決まったこと・宿題・決まっていないことをまとめる"
+guide_file = "meeting.md"
+
+[[sections]]
+id = "topics"
+label = "話したこと"
+kind = "topic"
+
+[[sections]]
+id = "decisions"
+label = "決まったこと"
+kind = "decision"
+
+[[sections]]
+id = "actions"
+label = "宿題"
+kind = "action"
+
+[[sections]]
+id = "questions"
+label = "決まっていないこと"
+kind = "question"

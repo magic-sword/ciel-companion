@@ -1,11 +1,11 @@
 // 会話の画面（A案「シエルの視界」）。デザインは CIEL Companion UI案のキャンバス（A案・設定・その場で音量）。
-// 下の中央に Ciel Prism の形のマイクボタン、左に議事録、右に声の出力（Android はタップでスピーカー・受話口、
+// 下の中央に Ciel Prism の形のマイクボタン、左にまとめ（議事録など）、右に声の出力（Android はタップでスピーカー・受話口、
 // 長押しで声の大きさ。PC はタップで声の大きさ）。上に接続の状態、会話のモード、設定のボタン。
 // 設定画面：シエルの声の大きさ、背景（CielBackground）、会話のしかた、PC ではマイクとスピーカー、開発用の表情の確認ボタン。
 // シエルに触れている点の表示（CielTouchVisual）は、画面の暗がりとボタンの間の層に描く。
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 // このファイルはふだんの画面。設定画面は CielConversationUI.Settings.cs、調べたこと・出典は CielConversationUI.Research.cs、
-// 参加者の札と名前の直しは CielConversationUI.People.cs、
+// 参加者の札と名前の直しは CielConversationUI.People.cs、会話のまとめ（議事録など）は CielConversationUI.Summary.cs、
 // 部品を作る道具は CielConversationUI.Parts.cs、部品に付ける動きは CielUIComponents.cs。
 // 寸法はモックアップ（390×844）の値。上下の位置は、端末の切り欠きを除いた範囲（Screen.safeArea）から測る。
 using System.Collections.Generic;
@@ -111,6 +111,7 @@ namespace Ciel.Conversation
             BuildSheet(_canvasRect);
             BuildResearch(_safe);
             BuildPeople(_safe);
+            BuildSummary(_safe);
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -242,7 +243,7 @@ namespace Ciel.Conversation
             _minutesButton = minutes.gameObject.AddComponent<Button>();
             _minutesButton.targetGraphic = mHit;
             _minutesButton.transition = Selectable.Transition.None;
-            _minutesButton.onClick.AddListener(() => _conversation.SetMinutes(!_conversation.MinutesOn));
+            _minutesButton.onClick.AddListener(() => ShowSummary(!_summaryPanel.activeSelf));
             minutes.gameObject.AddComponent<PressScale>();
 
             // 声の出力（Android：タップでスピーカー・受話口、長押しで声の大きさ。PC：タップで声の大きさ）
@@ -326,6 +327,7 @@ namespace Ciel.Conversation
         {
             RefreshResearch();
             RefreshPeople();
+            RefreshSummary();
             if (_micHex == null || _conversation == null) return;
             var c = _conversation;
             var connected = c.Status == CielConversation.State.Connected;
@@ -376,7 +378,7 @@ namespace Ciel.Conversation
             _minutesBg.color = rec ? AmberGlass : Glass;
             _minutesEdge.color = rec ? WithAlpha(Amber, 0.8f) : WithAlpha(Cyan, connected ? 0.45f : 0.18f);
             _minutesIcon.color = rec ? Amber : WithAlpha(Hex(0xE6F8FF), connected ? 1f : 0.4f);
-            _minutesLabel.text = rec ? "記録中" : "議事録";
+            _minutesLabel.text = rec ? "記録中" : "まとめ";
             _minutesLabel.color = rec ? Amber : TextSub;
 
             // 声の出力
@@ -412,6 +414,7 @@ namespace Ciel.Conversation
             var c = _conversation;
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;
             UpdatePeople();
+            UpdateSummary();
 
             if (on)
             {

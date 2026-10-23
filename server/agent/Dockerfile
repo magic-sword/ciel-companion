@@ -12,6 +12,7 @@ RUN python -c "from speechbrain.inference.speaker import EncoderClassifier as E;
 ENV HF_HUB_OFFLINE=1
 COPY *.py ./
 COPY tools/ ./tools/
+COPY summaries/ ./summaries/
 COPY config/ ./config/
 # プラグインが使うモデルファイル（あれば）を先に取得しておく
 RUN python -m livekit.agents download-files || true

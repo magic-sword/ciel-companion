@@ -165,6 +165,7 @@ namespace Ciel.Conversation
             _peoplePanel.SetActive(person != null);
             if (person == null) return;
             _researchPanel.SetActive(false);
+            _summaryPanel.SetActive(false);
             foreach (Transform child in _peopleContent) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
             _peopleTitle.text = person.name;
             var c = _conversation;

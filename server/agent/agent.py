@@ -207,9 +207,22 @@ async def entrypoint(ctx: JobContext) -> None:
         json.dumps(msg), reliable=True, topic='ciel.event'))
     history = Conversation()
     session.userdata.history = history
-    # 会議の議事録（minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
-    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history)
+    # 会話のまとめ（議事録など。minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
+    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history,
+                                   agent.persona.minutes_live_instructions)
     session.userdata.minutes = minute_taker
+    summary_seq = 0
+
+    async def publish_summary(state):
+        # まとめの中身は大きいので、分けて送る（アプリが seq ごとにつなぐ）
+        nonlocal summary_seq
+        summary_seq += 1
+        for packet in minutes.packets(state, summary_seq):
+            await ctx.room.local_participant.publish_data(
+                json.dumps(packet, ensure_ascii=False), reliable=True, topic='ciel.summary')
+    minute_taker.on_state = lambda state: asyncio.create_task(publish_summary(state))
+    minute_taker.on_progress = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
+        json.dumps(msg), reliable=True, topic='ciel.event'))
     replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
                                 agent.aizuchi if AIZUCHI else None, history=history, minutes=minute_taker, nod=NOD)
     async def publish_research(packet):
@@ -274,6 +287,9 @@ async def entrypoint(ctx: JobContext) -> None:
                      tools=[getattr(t, 'id', str(t)) for t in agent.tools])
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
+    # アプリの「まとめをとる」で選べるテンプレート（minutes.py）
+    await ctx.room.local_participant.publish_data(
+        json.dumps(minute_taker.templates_event(), ensure_ascii=False), reliable=True, topic='ciel.event')
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
     toucher = touch.TouchReactions(session, book, style)
     replies.touch = toucher

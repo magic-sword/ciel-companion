@@ -27,6 +27,7 @@ namespace Ciel.Conversation
             _researchButton.onClick.AddListener(() =>
             {
                 ShowPerson(null);
+                _summaryPanel.SetActive(false);
                 _researchPanel.SetActive(!_researchPanel.activeSelf);
             });
 

@@ -1,0 +1,24 @@
+# 調べもののまとめ。話しながら調べて、注目の技術・話題をまとめたいとき
+label = "調べもののまとめ"
+description = "話しながら調べたことと、注目の技術・話題をまとめる"
+guide_file = "research.md"
+
+[[sections]]
+id = "topics"
+label = "注目の技術・話題"
+kind = "topic"
+
+[[sections]]
+id = "findings"
+label = "分かったこと"
+kind = "finding"
+
+[[sections]]
+id = "why"
+label = "なぜ大事か"
+kind = "point"
+
+[[sections]]
+id = "follow"
+label = "これから追いかけたいこと"
+kind = "question"

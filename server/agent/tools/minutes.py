@@ -21,13 +21,14 @@ def result(recorder, action: str, status: str) -> dict:
 
 
 @function_tool
-async def start_minutes(context: RunContext, lookback_minutes: int = 0):
-    """議事録をとり始める。遅れて開始したときはlookback_minutes分前から含める（0は今から）。"""
+async def start_minutes(context: RunContext, lookback_minutes: int = 0, template: str = 'meeting'):
+    """まとめ（議事録など）をとり始める。templateはmeeting（会議の議事録）・goals（目標と計画）・research（調べもののまとめ）。
+    遅れて開始したときはlookback_minutes分前から含める（0は今から）。"""
     minutes = context.userdata.minutes
     if minutes is None:
         return NO_MINUTES
-    status = minutes.start(lookback_minutes)
-    if status == service.INVALID_RANGE:
+    status = minutes.start(lookback_minutes, template)
+    if status in (service.INVALID_RANGE, service.UNKNOWN_TEMPLATE):
         return json.dumps({'status': status})
     return ToolResult(json.dumps(result(minutes, 'start', status)), reply_required=False)
 
@@ -64,13 +65,14 @@ async def read_minutes(context: RunContext, meeting_id: str = ''):
 
 
 @function_tool
-async def summarize_past_minutes(context: RunContext, last_minutes: int = 0, first_id: int = 0, last_id: int = 0):
-    """開始し忘れた会話を議事録にして送る。last_minutes=0は保持中の全会話、正数は直近の分数。
-    first_id・last_idで発言の範囲も指定できる（分数と併用不可）。記録中には使わない。"""
+async def summarize_past_minutes(context: RunContext, last_minutes: int = 0, first_id: int = 0, last_id: int = 0,
+                                 template: str = 'meeting'):
+    """開始し忘れた会話をまとめ（議事録など）にして送る。last_minutes=0は保持中の全会話、正数は直近の分数。
+    first_id・last_idで発言の範囲も指定できる（分数と併用不可）。記録中には使わない。templateはstart_minutesと同じ。"""
     minutes = context.userdata.minutes
     if minutes is None:
         return NO_MINUTES
-    status = minutes.summarize_past(last_minutes, first_id, last_id)
+    status = minutes.summarize_past(last_minutes, first_id, last_id, template)
     data = {**result(minutes, 'summarize_past', status), 'dropped_through': minutes.history.dropped_through}
     if status in (service.PAST_QUEUED, service.PAST_PARTIAL):
         return ToolResult(json.dumps(data), reply_required=False)

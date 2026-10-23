@@ -49,13 +49,13 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(state['started_at'])
 
     async def test_rolling_summary_does_not_look_like_empty_meeting(self):
-        self.m._summarize = AsyncMock(return_value={'title': 'private summary'})
-        with patch('minutes.ROLL_SECONDS', 0.001):
+        self.m._live_update = AsyncMock(return_value={'title': 'private summary'})
+        with patch.multiple('summaries.live', LIVE_POLL_SECONDS=0.001, LIVE_MIN_SECONDS=0, LIVE_TURNS=1):
             self.m.start()
             self.add('first')
             self.add('second')
             for _ in range(30):
-                if self.m.meeting.summary is not None:
+                if self.m.meeting.state.has_content() and self.m.meeting.cursor == 2:
                     break
                 await asyncio.sleep(0.002)
         state = self.m.status()
@@ -101,13 +101,14 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_voice_finish_delivers_even_when_all_turns_were_summarized(self):
         self.m._write = minutes.Minutes._write.__get__(self.m)
         self.m._summarize = AsyncMock(return_value={'title': 'synthetic draft'})
-        with patch('minutes.ROLL_SECONDS', 0.001), patch('minutes.WEBHOOK', 'test'), \
+        self.m._live_update = AsyncMock(return_value={'title': 'live draft'})
+        with patch.multiple('summaries.live', LIVE_POLL_SECONDS=0.001, LIVE_MIN_SECONDS=0, LIVE_TURNS=1), patch('minutes.WEBHOOK', 'test'), \
                 patch('minutes.post_discord') as post:
             await start_minutes(self.context)
             self.add('first')
             self.add('second')
             for _ in range(30):
-                if self.m.meeting.summary is not None:
+                if self.m.meeting.state.has_content() and self.m.meeting.cursor == 2:
                     break
                 await asyncio.sleep(0.002)
             self.assertTrue(self.m.status()['has_summary'])
@@ -163,7 +164,7 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         self.add('earlier1')
         earlier = self.add('earlier2')
         m = self.m.meeting
-        m.summary = {'title': 'checkpoint', 'decisions': ['Friday at three']}
+        m.state.apply({'title': 'checkpoint', 'ops': [{'op': 'add', 'section': 'decisions', 'item': {'text': 'Friday at three'}}]})
         m.cursor, m.summarized_turn_count = earlier.id, 2
         self.add('newer decision')
         self.h.reserve()
@@ -241,7 +242,8 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_and_cache_limits_are_explicit(self):
         self.m._write = minutes.Minutes._write.__get__(self.m)
-        self.m._summarize = AsyncMock(return_value={'title': 'x' * 60000})
+        self.m._summarize = AsyncMock(return_value={'sections': {'topics': [
+            {'text': f'{i}' + 'x' * 390, 'points': ['y' * 300] * 12} for i in range(40)]}})
         self.add('first')
         self.add('second')
         self.m.summarize_past()

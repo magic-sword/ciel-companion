@@ -9,6 +9,9 @@
 // "people" を含めると、合成の名簿（speakers.state）を流し込み、参加者の札とパネルを縦長で撮る：
 // people-row.png（札の列。最後に話した人が光る）、people-remembered.png（声を覚えている人）、people-unknown.png（名前を知らない人）、
 // people-duplicate.png（ほかの人と同じ名前を入れたときの注意）。パネルの部品の数を people.txt に書く。
+// "summary" を含めると、合成のまとめ（ciel.summary）を流し込み、まとめの帯とパネルを縦長で撮る：
+// summary-strip.png（記録中の帯）、summary-panel.png（パネル）、summary-glow.png（項目が増えて光る）、
+// summary-done.png（終えたあと：送った結果と、種類を選ぶボタン）。パネルの部品の数を summary.txt に書く。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -51,7 +54,7 @@ namespace Ciel.EditorTools
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
-                    || request.Contains("people"))
+                    || request.Contains("people") || request.Contains("summary"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -83,6 +86,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
             {
                 TouchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("summary"))
+            {
+                SummaryShots(step);
                 return;
             }
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("people"))
@@ -437,6 +445,87 @@ namespace Ciel.EditorTools
                 panel.GetComponentInChildren<UnityEngine.UI.InputField>().text = "ミナさん";
                 panel.Find("Viewport/Content/Row/Set").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             }
+            if (step == 6) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
+        [System.Serializable]
+        class SummaryPart
+        {
+            public string text;
+            public int seq, part, parts;
+        }
+
+        static int _summarySeq;
+
+        // 会話サーバーの minutes.py と同じ形のまとめを、CielConversation に渡す
+        static void SendSummary(Ciel.Conversation.CielConversation c, bool recording, string stage, bool extra)
+        {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            string Item(string id, int rev, string text, string who = "", string due = "", string points = "") =>
+                $"{{\"id\":\"{id}\",\"rev\":{rev},\"text\":\"{text}\",\"points\":[{points}],\"who\":\"{who}\",\"due\":\"{due}\",\"done\":false,\"status\":\"\",\"sources\":[]}}";
+            var decisions = Item("decisions-2", 1, "展示のテーマは「冬の星空」にする")
+                + (extra ? "," + Item("decisions-5", 2, "予算は三万円までにする") : "");
+            var state = "{\"v\":1,\"type\":\"summary.state\",\"meeting_id\":\"m1\",\"recording\":" + (recording ? "true" : "false")
+                + $",\"stage\":\"{stage}\",\"template\":\"meeting\",\"label\":\"会議の議事録\",\"title\":\"来月の展示の準備\","
+                + "\"summary\":\"" + (recording ? "" : "展示のテーマと予算、準備の分担を決めた。") + "\","
+                + "\"current_topic\":\"" + (extra ? "予算と見積もり" : "展示のテーマ") + "\",\"attendees\":[],"
+                + $"\"started_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 900},\"updated_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 40},"
+                + $"\"pending_turns\":{(extra ? 0 : 3)},\"rev\":{(extra ? 2 : 1)},\"sections\":["
+                + "{\"id\":\"topics\",\"label\":\"話したこと\",\"kind\":\"topic\",\"items\":["
+                + Item("topics-1", 1, "展示のテーマ", points: "\"星空の写真を中心にする\",\"子ども向けの解説も置く\"") + "]},"
+                + "{\"id\":\"decisions\",\"label\":\"決まったこと\",\"kind\":\"decision\",\"items\":[" + decisions + "]},"
+                + "{\"id\":\"actions\",\"label\":\"宿題\",\"kind\":\"action\",\"items\":["
+                + Item("actions-3", 1, "会場に写真の大きさを問い合わせる", "ミナ", "10/30") + "]},"
+                + "{\"id\":\"questions\",\"label\":\"決まっていないこと\",\"kind\":\"question\",\"items\":["
+                + Item("questions-4", 1, "解説を印刷するか、画面で見せるか") + "]}]}";
+            var part = JsonUtility.ToJson(new SummaryPart { text = state, seq = ++_summarySeq, part = 0, parts = 1 });
+            typeof(Ciel.Conversation.CielConversation).GetMethod("OnSummaryPart", flags)
+                .Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(part) });
+        }
+
+        static void SummaryShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var log = Path.Combine(OutDir, "summary.txt");
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                typeof(Ciel.Conversation.CielConversation).GetProperty("Status").GetSetMethod(true)
+                    .Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                const string people = "{\"v\":1,\"type\":\"speakers.state\",\"speakers\":["
+                    + "{\"id\":\"p1\",\"name\":\"ハカセ\",\"named\":true,\"remembered\":true},"
+                    + "{\"id\":\"p2\",\"name\":\"ミナ\",\"named\":true,\"remembered\":false}],"
+                    + "\"speaking\":\"p2\",\"speaking_sure\":true,\"heard\":1,\"correctable\":\"\"}";
+                typeof(Ciel.Conversation.CielConversation).GetMethod("OnSpeakers", flags)
+                    .Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(people) });
+                SendSummary(c, true, "recording", false);
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "summary-strip", "summary-panel", "summary-glow", "summary-done" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                var panel = ui.transform.Find("ConversationCanvas/SafeArea/SummaryPanel");
+                var items = panel.Find("Viewport/Content").GetComponentsInChildren<UnityEngine.UI.VerticalLayoutGroup>(true).Length - 1;
+                var strip = ui.transform.Find("ConversationCanvas/SafeArea/SummaryStrip").gameObject.activeSelf;
+                File.AppendAllText(log, $"{name}: 帯 {(strip ? "出" : "無")}、パネル {(panel.gameObject.activeSelf ? "開" : "閉")}、項目 {items}、"
+                    + $"ボタン {panel.GetComponentsInChildren<UnityEngine.UI.Button>().Length}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.5) return;
+            _captured = false;
+            if (step == 3) ui.GetType().GetMethod("ShowSummary", flags).Invoke(ui, new object[] { true });
+            if (step == 4) SendSummary(c, true, "recording", true);
+            if (step == 5) SendSummary(c, false, "sent", true);
             if (step == 6) { FinishUiShots(); return; }
             Next(step + 1);
         }

@@ -17,7 +17,8 @@
 // つないだとき・会話サーバーが入ってきたとき・設定や声の出力が変わったときに知らせる（topic ciel.style）。
 // 実際の答え方・出し方は会話サーバーが決め（自動なら、会議・聞こえた声の数で変わる）、conversation.style で返ってくる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
-// 会議の議事録：SetMinutes（画面の「議事録」ボタン）で、会話サーバー（server/agent/minutes.py）へ始め・終わりを送る。
+// 会話のまとめ（議事録など）：StartSummary・FinishSummary・RefreshSummary（画面の「まとめ」のパネル）で、会話サーバー（server/agent/minutes.py）へ送る。
+// 中身は ciel.summary で分けて届き（Summary）、選べる種類は summary.templates で届く（SummaryTemplates）。
 // 参加者：会話サーバー（server/agent/speakers.py）が聞き分けた人と最後に話した人を speakers.state で知らせる（Speakers）。
 // 画面からの名前の直しは FixSpeaker で送る（topic ciel.speakers。この会話の間だけ）。
 // 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
@@ -134,6 +135,62 @@ namespace Ciel.Conversation
             public int v = 1;
             public string type = "speakers.control", action, speaker_id, name, into;
         }
+        /// 会話のまとめ（議事録など。会話サーバーの minutes.py が ciel.summary で分けて送る）
+        [Serializable]
+        public sealed class SummarySource
+        {
+            public string title, url;
+        }
+        [Serializable]
+        public sealed class SummaryItem
+        {
+            public string id, text, who, due, status;
+            public int rev;
+            public bool done;
+            public string[] points;
+            public SummarySource[] sources;
+        }
+        [Serializable]
+        public sealed class SummarySection
+        {
+            public string id, label, kind;
+            public SummaryItem[] items;
+        }
+        [Serializable]
+        public sealed class SummaryState
+        {
+            public string meeting_id, stage, template, label, title, summary, current_topic;
+            public bool recording;
+            public double started_at, updated_at;
+            public int pending_turns, rev;
+            public string[] attendees;
+            public SummarySection[] sections;
+        }
+        [Serializable]
+        public sealed class SummaryTemplate
+        {
+            public string name, label, description;
+        }
+        [Serializable]
+        sealed class SummaryPart
+        {
+            public string text;
+            public int seq, part, parts;
+        }
+        [Serializable]
+        sealed class TemplatesPacket
+        {
+            public SummaryTemplate[] templates;
+        }
+        /// 今のまとめ（とっていないときは、直近に終えたもの。まだ無ければ null）
+        public SummaryState Summary { get; private set; }
+        public int SummaryRevision { get; private set; }
+        /// 選べるまとめの種類（会話サーバーが会話の始めに送る）
+        public IReadOnlyList<SummaryTemplate> SummaryTemplates => _summaryTemplates;
+        readonly List<SummaryTemplate> _summaryTemplates = new List<SummaryTemplate>();
+        int _summarySeq = -1;
+        string[] _summaryParts;
+
         readonly List<Speaker> _speakers = new List<Speaker>();
         public IReadOnlyList<Speaker> Speakers => _speakers;
         /// 最後に話したと判定した人と、そのときの時刻（Time.unscaledTime）。名前の札を少しのあいだ光らせる
@@ -792,6 +849,8 @@ namespace Ciel.Conversation
             public bool recording;   // minutes.state
             public string talk, presence, reason;   // conversation.style
             public bool on;   // agent.thinking
+            public string meeting_id;   // summary.progress
+            public int pending_turns;
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -800,6 +859,11 @@ namespace Ciel.Conversation
             if (topic == "ciel.research")
             {
                 OnResearchData(data);
+                return;
+            }
+            if (topic == "ciel.summary")
+            {
+                OnSummaryPart(data);
                 return;
             }
             if (topic != "ciel.event") return;
@@ -835,6 +899,60 @@ namespace Ciel.Conversation
             }
             else if (e.type == "speakers.state")
                 OnSpeakers(data);
+            else if (e.type == "summary.progress" && Summary != null && Summary.meeting_id == e.meeting_id)
+            {
+                Summary.pending_turns = e.pending_turns;
+                Changed?.Invoke();
+            }
+            else if (e.type == "summary.templates")
+            {
+                TemplatesPacket p;
+                try { p = JsonUtility.FromJson<TemplatesPacket>(System.Text.Encoding.UTF8.GetString(data)); }
+                catch (Exception) { return; }
+                if (p?.templates == null || p.templates.Length > 20) return;
+                _summaryTemplates.Clear();
+                foreach (var t in p.templates)
+                    if (t != null && !string.IsNullOrEmpty(t.name) && !string.IsNullOrEmpty(t.label)) _summaryTemplates.Add(t);
+                Changed?.Invoke();
+            }
+        }
+
+        // まとめの中身は分けて届く。seq ごとに parts 個そろったら、つないで読む（古い seq の残りは捨てる）
+        void OnSummaryPart(byte[] data)
+        {
+            SummaryPart p;
+            try { p = JsonUtility.FromJson<SummaryPart>(System.Text.Encoding.UTF8.GetString(data)); }
+            catch (Exception) { return; }
+            if (p == null || p.parts <= 0 || p.parts > 64 || p.part < 0 || p.part >= p.parts || (p.text?.Length ?? 0) > 4000) return;
+            if (p.seq != _summarySeq || _summaryParts == null || _summaryParts.Length != p.parts)
+            {
+                _summarySeq = p.seq;
+                _summaryParts = new string[p.parts];
+            }
+            _summaryParts[p.part] = p.text ?? "";
+            if (Array.IndexOf(_summaryParts, null) >= 0) return;
+            SummaryState s;
+            try { s = JsonUtility.FromJson<SummaryState>(string.Concat(_summaryParts)); }
+            catch (Exception ex) { Debug.LogWarning($"[CielConversation] まとめを読めない: {ex.Message}"); return; }
+            _summaryParts = null;
+            if (s?.sections == null || s.sections.Length > 20) return;
+            Summary = s;
+            SummaryRevision++;
+            Changed?.Invoke();
+        }
+
+        /// まとめをとり始める（template は SummaryTemplates の name）・終えて下書きを送る・今すぐ更新する
+        public void StartSummary(string template) => SendMinutes($"{{\"v\":1,\"type\":\"minutes.control\",\"action\":\"start\",\"template\":{JsonString(template)}}}");
+        public void FinishSummary() => SendMinutes("{\"v\":1,\"type\":\"minutes.control\",\"action\":\"finish\"}");
+        public void RefreshSummary() => SendMinutes("{\"v\":1,\"type\":\"minutes.control\",\"action\":\"refresh\"}");
+
+        static string JsonString(string s) => "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+
+        void SendMinutes(string json)
+        {
+            if (_room == null || Status != State.Connected) return;
+            try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.minutes"); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] まとめの操作を送れない: {e.Message}"); }
         }
 
         void OnSpeakers(byte[] data)
@@ -900,21 +1018,6 @@ namespace Ciel.Conversation
                 ResearchRevision++;
                 Changed?.Invoke();
             }
-        }
-
-        /// 会議の議事録をとり始める・まとめる（画面の「議事録」ボタン）。会話サーバー（server/agent/minutes.py）が
-        /// シエルに一言告げさせ、minutes.state で今の状態を返すので、ボタンの表示はその知らせで変わる
-        public void SetMinutes(bool on)
-        {
-            if (_room == null || Status != State.Connected) return;
-            var action = on ? "start" : "finish";
-            var json = $"{{\"v\":1,\"type\":\"minutes.control\",\"action\":\"{action}\"}}";
-            try
-            {
-                _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.minutes");
-                Debug.Log($"[CielConversation] 議事録の {action} を送った");
-            }
-            catch (Exception e) { Debug.LogWarning($"[CielConversation] 議事録の操作を送れない: {e.Message}"); }
         }
 
         /// シエルに触れたことを会話サーバーへ知らせる（CielTouch から。サーバーの touch.py が声の反応を返す）
@@ -991,6 +1094,10 @@ namespace Ciel.Conversation
             if (_mouth != null) _mouth.MouthOpening = 0f;
             _researchResults.Clear();
             ResearchRevision++;
+            Summary = null;
+            SummaryRevision++;
+            _summarySeq = -1;
+            _summaryParts = null;
             _speakers.Clear();
             SpeakingId = CorrectableId = "";
             SpeakingAt = -1f;

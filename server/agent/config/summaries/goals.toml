@@ -1,0 +1,29 @@
+# 目標と計画。やりたいこと・目標を決めて、何をしていくかを話したとき
+label = "目標と計画"
+description = "やりたいこと・目標と、そのために何をしていくかをまとめる"
+guide_file = "goals.md"
+
+[[sections]]
+id = "goals"
+label = "目標"
+kind = "goal"
+
+[[sections]]
+id = "reasons"
+label = "理由・思い"
+kind = "point"
+
+[[sections]]
+id = "actions"
+label = "やること"
+kind = "action"
+
+[[sections]]
+id = "concerns"
+label = "気になること・壁"
+kind = "question"
+
+[[sections]]
+id = "ideas"
+label = "アイデア"
+kind = "idea"

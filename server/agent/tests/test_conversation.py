@@ -199,7 +199,7 @@ class ConsumersTests(unittest.IsolatedAsyncioTestCase):
         add(self.h, '会議の返事', role='assistant')
         written = []
 
-        async def summarize(started, ended, previous, lines):
+        async def summarize(started, ended, previous, lines, *args):
             written.extend(minutes.conversation(lines))
             return {'title': 'テスト'}
 
@@ -217,34 +217,46 @@ class ConsumersTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_minutes_roll_does_not_destroy_searchable_source(self):
         m = minutes.Minutes(None, 'test', self.h)
-        m._summarize = AsyncMock(return_value={'title': '途中'})
-        with patch.object(minutes, 'ROLL_SECONDS', 0.001):
+        m._live_update = AsyncMock(return_value={'title': '途中'})
+        with patch.multiple('summaries.live', LIVE_POLL_SECONDS=0.001, LIVE_MIN_SECONDS=0, LIVE_TURNS=1):
             m.start()
             add(self.h, '予算は三万円')
             add(self.h, '承認します')
             for _ in range(20):
-                if m.meeting.summary:
+                if m.meeting.cursor == 2:
                     break
                 await asyncio.sleep(0.002)
-            self.assertIsNotNone(m.meeting.summary)
+            self.assertTrue(m.meeting.state.has_content())
             self.assertEqual(m.meeting.cursor, 2)
             self.assertTrue(self.h.search('予算')['matches'])
             m.meeting.timer.cancel()
 
     async def test_minutes_roll_drains_large_backlog_in_bounded_batches(self):
         m = minutes.Minutes(None, 'test', self.h)
-        m._summarize = AsyncMock(return_value={'title': '途中'})
-        with patch.object(minutes, 'ROLL_SECONDS', 0.001):
+        m._live_update = AsyncMock(return_value={'title': '途中'})
+        with patch.multiple('summaries.live', LIVE_POLL_SECONDS=0.001, LIVE_MIN_SECONDS=0, LIVE_TURNS=1):
             m.start()
             for i in range(250):
                 add(self.h, f'発言{i}')
-            for _ in range(20):
+            for _ in range(200):
                 if m.meeting.cursor == 250:
                     break
                 await asyncio.sleep(0.002)
             self.assertEqual(m.meeting.cursor, 250)
-            self.assertEqual([len(c.args[-1]) for c in m._summarize.await_args_list], [100, 100, 50])
+            self.assertEqual([len(c.args[1]) for c in m._live_update.await_args_list], [40] * 6 + [10])
             m.meeting.timer.cancel()
+
+    async def test_minutes_final_merges_long_meeting_in_bounded_batches(self):
+        m = minutes.Minutes(None, 'test', self.h)
+        m._summarize = AsyncMock(return_value={'title': 'まとめ'})
+        m.start()
+        for i in range(450):   # 全部を見直す上限（400）より多い：ライブの一覧に続きを少しずつ合わせる
+            add(self.h, f'発言{i}')
+        with patch.object(minutes, 'WEBHOOK', 'unused'), patch.object(minutes, 'post_discord'):
+            m.finish(False)
+            await asyncio.gather(*list(m._tasks))
+        self.assertEqual([len(c.args[3]) for c in m._summarize.await_args_list], [100, 100, 100, 100, 50])
+        self.assertEqual(m._exports[-1].stage, 'sent')
 
     async def test_minutes_retention_loss_is_visible(self):
         h = Conversation(max_turns=2)
