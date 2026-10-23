@@ -94,6 +94,14 @@ SEGMENT_KEEP_SECONDS = 20.0
 #                  会話の指示が毎回同じになり、過去の発言にも誰が話したかが残る。覚えている人のメモ・関係は、人前になったら
 #                  すぐ外せるように、今までどおり返事ごとの指示に足す
 TURN_CONTEXT = os.environ.get('CIEL_TURN_CONTEXT', 'items')   # 2026-10-22 から items（開発用で確かめてから）
+# 返事が止まったときの見張り（2026-10-23、本番で議事録をとっている途中に返事が止まった）。
+# 話し始め・話し終わり（利用者の状態）は LiveKit の手元の音声検出が決め、返事のきっかけの「発言の区切り」は会話モデルの側
+# （Realtime API）が決める。LiveKit は、割り込めない話（allow_interruptions=False）が終わらないあいだ、会話モデルへ声の
+# 代わりに無音を送る（AgentActivity.push_audio）。そうなると、話者の判定や相づちは動くのに、区切りが来ず、返事が作られない。
+# 手元で STALL_SEGMENTS 回以上話し終わったのに、会話モデルの側から STALL_SECONDS 秒区切りも文字起こしも来なければ、
+# LiveKit の中の様子をログに残し、終わらない話を止める
+STALL_SECONDS = float(os.environ.get('CIEL_STALL_SECONDS', '20'))
+STALL_SEGMENTS = 3
 
 
 @dataclass
@@ -140,6 +148,9 @@ class TurnReplies:
         self._segment_start: float | None = None             # いま話している発言の話し始め（区間ごと。返事とは別）
         self._segments: list[Segment] = []                  # 文字起こしをまだ組にしていない発言の区間
         self._recent: collections.deque[Segment] = collections.deque(maxlen=20)   # 最近の発言の区間（返事のため）
+        self._heard_at = time.time()   # 会話モデルの側から、最後に区切り・文字起こしが届いた時刻（返事が止まった見張り）
+        self._unheard = 0              # そのあと手元で話し終わった回数
+        self._stall_reported = False
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -171,6 +182,8 @@ class TurnReplies:
                 self._segments.append(seg)   # 文字起こしと組にする
                 self._recent.append(seg)     # 返事を作らせるときに使う
                 self._segment_start = None
+                self._unheard += 1
+                self._check_stall()
             if self._pending:
                 self._reply_later(STALE_SECONDS)
 
@@ -226,6 +239,7 @@ class TurnReplies:
         return next((j for j in reversed(judgments) if j is not None and j.sp is not None), judgments[-1])
 
     def on_transcribed(self, ev: UserInputTranscribedEvent) -> None:
+        self._heard_at, self._unheard, self._stall_reported = time.time(), 0, False
         if not ev.is_final:
             if not ev.transcript:
                 # 会話モデルの側が発言を区切った（LiveKit が空の途中経過で知らせる）
@@ -270,6 +284,32 @@ class TurnReplies:
             self._reply_later(GRACE_SECONDS)
             return
         self._reply_now()
+
+    def _check_stall(self) -> None:
+        """手元では話しているのに、会話モデルの側から区切りが来ない（STALL_SECONDS の説明）"""
+        waited = time.time() - self._heard_at
+        if self._stall_reported or self._unheard < STALL_SEGMENTS or waited < STALL_SECONDS:
+            return
+        self._stall_reported = True
+        activity = getattr(self.session, '_activity', None)
+        speech = getattr(activity, '_current_speech', None)
+        info = {'seconds': round(waited, 1), 'segments': self._unheard, 'agent_state': self.session.agent_state,
+                'queued': len(getattr(activity, '_speech_q', None) or []),
+                'speech': None if speech is None else {
+                    'id': getattr(speech, 'id', None), 'allow_interruptions': speech.allow_interruptions,
+                    'done': speech.done(), 'interrupted': speech.interrupted}}
+        log.warning('会話モデルの側から発言の区切りが %.0f 秒届かない（手元では %d 回話し終わった）：%s',
+                    waited, self._unheard, info)
+        debug_log.record('stall', **info)
+        # 終わらない話（割り込めない話か、声を出していない話）を止めて、会話モデルへ声が届くようにする。
+        # シエルがふつうに話している途中（割り込める話）は止めない（会話モデルが物音を声とみなさなかっただけのことがある）
+        if speech is not None and not speech.done() and (
+                not speech.allow_interruptions or self.session.agent_state != 'speaking'):
+            try:
+                speech.interrupt(force=True)
+                log.warning('終わらない話を止めた')
+            except Exception as e:
+                log.warning('終わらない話を止められない: %s', type(e).__name__)
 
     async def _watch_pauses(self) -> None:
         """話している途中の息つぎを見つけて、相づちを打つ（会話モデルの側が区切るまで）"""
