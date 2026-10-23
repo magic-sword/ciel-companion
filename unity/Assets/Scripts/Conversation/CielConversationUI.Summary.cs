@@ -39,7 +39,8 @@ namespace Ciel.Conversation
             strip.GetComponent<Button>().onClick.AddListener(() => ShowSummary(!_summaryPanel.activeSelf));
             _stripText = Txt("Text", strip, 11, TextMain, TextAnchor.MiddleLeft);
             _stripText.supportRichText = false;
-            _stripText.verticalOverflow = VerticalWrapMode.Truncate;
+            // 1 行で出す（折り返すと、高さに入らない行が消え、「●」だけになった。2026-10-23、Android）。入りきらなければ FitLine で「…」
+            _stripText.horizontalOverflow = HorizontalWrapMode.Overflow;
             Stretch(_stripText.rectTransform);
             _stripText.rectTransform.offsetMin = new Vector2(14, 0);
             _stripText.rectTransform.offsetMax = new Vector2(-14, 0);
@@ -132,13 +133,32 @@ namespace Ciel.Conversation
             _summaryStrip.gameObject.SetActive(recording);
             // 参加者の札が出ていれば、その下に並べる
             var top = _peopleRow.gameObject.activeSelf ? -94f : -58f;
+            // 右上の「調査・出典」のボタン（-52〜-86）と同じ高さに上がったときだけ、右を空ける
+            var beside = top > -88f && _researchButton.gameObject.activeSelf;
             _summaryStrip.offsetMin = new Vector2(16, top - 28);
-            _summaryStrip.offsetMax = new Vector2(_researchButton.gameObject.activeSelf ? -152 : -16, top);
-            if (recording) _stripText.text = StripText(s);
+            _summaryStrip.offsetMax = new Vector2(beside ? -152 : -16, top);
+            if (recording) FitLine(_stripText, StripText(s));
             if (_summaryRevision == c.SummaryRevision) return;
             _summaryRevision = c.SummaryRevision;
             MarkChangedItems(s);
             if (_summaryPanel.activeSelf) BuildSummaryContent();
+        }
+
+        // 1 行に入りきらなければ、末尾を「…」にして入る長さまで縮める（文字の幅は Text に測らせる）
+        static void FitLine(Text t, string text)
+        {
+            t.text = text;
+            var width = t.rectTransform.rect.width;
+            if (width <= 0 || t.preferredWidth <= width) return;
+            int lo = 0, hi = text.Length;
+            while (lo < hi)
+            {
+                var mid = (lo + hi + 1) / 2;
+                t.text = text.Substring(0, mid) + "…";
+                if (t.preferredWidth <= width) lo = mid;
+                else hi = mid - 1;
+            }
+            t.text = text.Substring(0, lo) + "…";
         }
 
         static string StripText(CielConversation.SummaryState s)

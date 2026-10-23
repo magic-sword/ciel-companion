@@ -10,7 +10,8 @@
 // people-row.png（札の列。最後に話した人が光る）、people-remembered.png（声を覚えている人）、people-unknown.png（名前を知らない人）、
 // people-duplicate.png（ほかの人と同じ名前を入れたときの注意）。パネルの部品の数を people.txt に書く。
 // "summary" を含めると、合成のまとめ（ciel.summary）を流し込み、まとめの帯とパネルを縦長で撮る：
-// summary-strip.png（記録中の帯）、summary-panel.png（パネル）、summary-glow.png（項目が増えて光る）、
+// summary-strip.png（記録中の帯）、summary-panel.png（帯をタップして開いたパネル）、summary-glow.png（項目が増えて光る）、
+// summary-closed.png（帯をもう一度タップして閉じたあと）、
 // summary-done.png（終えたあと：送った結果と、種類を選ぶボタン）。パネルの部品の数を summary.txt に書く。
 using System.IO;
 using UnityEditor;
@@ -469,7 +470,7 @@ namespace Ciel.EditorTools
             var state = "{\"v\":1,\"type\":\"summary.state\",\"meeting_id\":\"m1\",\"recording\":" + (recording ? "true" : "false")
                 + $",\"stage\":\"{stage}\",\"template\":\"meeting\",\"label\":\"会議の議事録\",\"title\":\"来月の展示の準備\","
                 + "\"summary\":\"" + (recording ? "" : "展示のテーマと予算、準備の分担を決めた。") + "\","
-                + "\"current_topic\":\"" + (extra ? "予算と見積もり" : "展示のテーマ") + "\",\"attendees\":[],"
+                + "\"current_topic\":\"" + (extra ? "予算と見積もり、それから会場への問い合わせの分担について" : "展示のテーマ") + "\",\"attendees\":[],"
                 + $"\"started_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 900},\"updated_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 40},"
                 + $"\"pending_turns\":{(extra ? 0 : 3)},\"rev\":{(extra ? 2 : 1)},\"sections\":["
                 + "{\"id\":\"topics\",\"label\":\"話したこと\",\"kind\":\"topic\",\"items\":["
@@ -504,13 +505,15 @@ namespace Ciel.EditorTools
                 typeof(Ciel.Conversation.CielConversation).GetMethod("OnSpeakers", flags)
                     .Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(people) });
                 SendSummary(c, true, "recording", false);
+                // 調べものをしたあと（右上に「調査・出典」のボタンが出ている。帯の文言が消えた条件。2026-10-23、Android）
+                ((UnityEngine.UI.Button)ui.GetType().GetField("_researchButton", flags).GetValue(ui)).gameObject.SetActive(true);
                 Next(3);
                 return;
             }
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = new[] { "summary-strip", "summary-panel", "summary-glow", "summary-done" }[step - 3];
+                var name = new[] { "summary-strip", "summary-panel", "summary-glow", "summary-closed", "summary-done" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 var panel = ui.transform.Find("ConversationCanvas/SafeArea/SummaryPanel");
                 var items = panel.Find("Viewport/Content").GetComponentsInChildren<UnityEngine.UI.VerticalLayoutGroup>(true).Length - 1;
@@ -523,10 +526,17 @@ namespace Ciel.EditorTools
             }
             if (now - _mark < 0.5) return;
             _captured = false;
-            if (step == 3) ui.GetType().GetMethod("ShowSummary", flags).Invoke(ui, new object[] { true });
+            // 帯をタップして開き、もう一度タップして閉じる（利用者の操作と同じ。閉じたあとの帯も撮る）
+            var stripButton = ui.transform.Find("ConversationCanvas/SafeArea/SummaryStrip").GetComponent<UnityEngine.UI.Button>();
+            if (step == 3) stripButton.onClick.Invoke();
             if (step == 4) SendSummary(c, true, "recording", true);
-            if (step == 5) SendSummary(c, false, "sent", true);
-            if (step == 6) { FinishUiShots(); return; }
+            if (step == 5) stripButton.onClick.Invoke();
+            if (step == 6)
+            {
+                SendSummary(c, false, "sent", true);
+                ui.GetType().GetMethod("ShowSummary", flags).Invoke(ui, new object[] { true });
+            }
+            if (step == 7) { FinishUiShots(); return; }
             Next(step + 1);
         }
 
