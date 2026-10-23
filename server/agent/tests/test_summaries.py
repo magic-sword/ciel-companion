@@ -158,6 +158,23 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state['pending_turns'], 0)
         self.assertGreater(state['updated_at'], 0)
 
+    async def test_app_is_told_while_the_live_update_runs(self):
+        seen = []
+
+        async def update(m, lines, research):
+            seen.append(self.progress[-1]['updating'])
+            return {'ops': []}
+        self.m._live_update = update
+        self.m.start()
+        self.add('一')
+        self.assertTrue(await self.m._update(self.m.meeting, force=True))
+        self.assertEqual(seen, [True])
+        self.assertFalse(self.sent[-1]['updating'])
+        self.m._live_update = AsyncMock(return_value=None)
+        self.add('二')
+        self.assertFalse(await self.m._update(self.m.meeting, force=True))
+        self.assertFalse(self.progress[-1]['updating'])
+
     async def test_refresh_updates_now_and_failures_do_not_advance(self):
         self.m._live_update = AsyncMock(return_value=None)
         self.m.start()

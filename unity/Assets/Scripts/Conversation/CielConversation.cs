@@ -160,7 +160,7 @@ namespace Ciel.Conversation
         public sealed class SummaryState
         {
             public string meeting_id, stage, template, label, title, summary, current_topic;
-            public bool recording;
+            public bool recording, updating;   // updating：ライブの差分を作っている最中
             public double started_at, updated_at;
             public int pending_turns, rev;
             public string[] attendees;
@@ -185,6 +185,10 @@ namespace Ciel.Conversation
         /// 今のまとめ（とっていないときは、直近に終えたもの。まだ無ければ null）
         public SummaryState Summary { get; private set; }
         public int SummaryRevision { get; private set; }
+        /// まとめを作っている（とっている途中のライブの更新か、終えたあとの清書）
+        public bool Summarizing => Summary != null && (Summary.updating || Summary.stage == "queued" || Summary.stage == "building");
+        /// Web で調べている（調べた記録のうち、まだ終わっていないものがある）
+        public bool ResearchPending => _researchResults.Exists(r => r.status == "pending");
         /// 選べるまとめの種類（会話サーバーが会話の始めに送る）
         public IReadOnlyList<SummaryTemplate> SummaryTemplates => _summaryTemplates;
         readonly List<SummaryTemplate> _summaryTemplates = new List<SummaryTemplate>();
@@ -851,6 +855,7 @@ namespace Ciel.Conversation
             public bool on;   // agent.thinking
             public string meeting_id;   // summary.progress
             public int pending_turns;
+            public bool updating;
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -902,6 +907,7 @@ namespace Ciel.Conversation
             else if (e.type == "summary.progress" && Summary != null && Summary.meeting_id == e.meeting_id)
             {
                 Summary.pending_turns = e.pending_turns;
+                Summary.updating = e.updating;
                 Changed?.Invoke();
             }
             else if (e.type == "summary.templates")

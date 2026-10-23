@@ -41,7 +41,7 @@ namespace Ciel.Conversation
         // 声の様子と状態
         readonly List<RectTransform> _bars = new List<RectTransform>();
         readonly List<Image> _barImages = new List<Image>();
-        Text _status, _caption;
+        Text _status, _caption, _activity;
         // マイク
         Button _micButton;
         Image _micHex, _micGlow, _micIcon, _ringBreath, _ringDots;
@@ -213,6 +213,14 @@ namespace Ciel.Conversation
 
             _caption = Txt("Caption", root, 9, WithAlpha(TextSub, 0.55f), TextAnchor.MiddleCenter);
             Place(_caption.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 6), new Vector2(200, 14));
+
+            // 裏で進んでいること（まとめを作っている・話しながら調べている）。声の様子のすぐ上に細く
+            _activity = Txt("Activity", root, 12, Amber, TextAnchor.MiddleCenter);
+            _activity.supportRichText = false;
+            Place(_activity.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 216), new Vector2(360, 18));
+            var activityShadow = _activity.gameObject.AddComponent<Shadow>();
+            activityShadow.effectColor = new Color(0, 0.08f, 0.16f, 0.8f);
+            activityShadow.effectDistance = new Vector2(0, -1f);
         }
 
         void BuildBottomRow(RectTransform root)
@@ -349,16 +357,7 @@ namespace Ciel.Conversation
             _modeText.text = $"{TalkLabels[talk]}・{PresenceLabels[presence]}";
             _modeChip.sizeDelta = new Vector2(34 + _modeText.preferredWidth + 14, 36);
 
-            _status.text = c.Status switch
-            {
-                CielConversation.State.Connecting => "シエルに接続しています…",
-                CielConversation.State.Failed => "接続できませんでした",
-                CielConversation.State.Disconnected => "接続していません",
-                _ when Thinking(c) => "考えています…",   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
-                _ => c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます",
-            };
-            _caption.text = Thinking(c) ? "T H I N K I N G" : connected && c.MicEnabled ? "L I S T E N I N G" : "";
-            _shownThinking = Thinking(c);
+            UpdateStatusLine();
 
             // マイク：入れている（光る六角）・切っている（透けた六角）・使えない（薄い）
             var usable = connected && !c.MicBusy;
@@ -397,7 +396,36 @@ namespace Ciel.Conversation
 
         // 会話サーバーが返事を考えている（返事を頼んでから、声が出るまで）
         static bool Thinking(CielConversation c) => c.Thinking;
-        bool _shownThinking;   // 表示に出している「考えています」（時間切れで消えたら、表示を合わせる）
+
+        // シエルの状態（マイクの上）と、裏で進んでいること（声の様子の上）。利用者の声やシエルの声の始まり・終わりでも変わるので、
+        // 毎フレーム見る（変わったときだけ書き換える）。上から順に優先する：
+        // 話しています（声が出ている）→ 調べています（Web で調べている）→ 考えています（返事を頼んでから声が出るまで）
+        // → 聞いています（利用者の声が届いている）→ 話しかけてください
+        void UpdateStatusLine()
+        {
+            var c = _conversation;
+            var connected = c.Status == CielConversation.State.Connected;
+            var speaking = connected && c.AgentState == "speaking";
+            var research = connected && c.ResearchPending;
+            var listening = connected && c.MicEnabled && c.UserSpeaking;
+            var (status, caption) = c.Status switch
+            {
+                CielConversation.State.Connecting => ("シエルに接続しています…", ""),
+                CielConversation.State.Failed => ("接続できませんでした", ""),
+                CielConversation.State.Disconnected => ("接続していません", ""),
+                _ when speaking => ("話しています", "S P E A K I N G"),
+                _ when research => ("調べています…", "S E A R C H I N G"),
+                _ when Thinking(c) => ("考えています…", "T H I N K I N G"),   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
+                _ when listening => ("聞いています…", "L I S T E N I N G"),
+                _ => (c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます", c.MicEnabled ? "L I S T E N I N G" : ""),
+            };
+            if (_status.text != status) _status.text = status;
+            if (_caption.text != caption) _caption.text = caption;
+            var activity = connected && c.Summarizing ? c.Summary.label + "をまとめています…" : "";
+            if (research && speaking)   // 話しながら調べているときは、裏のこととして出す
+                activity = activity == "" ? "調べています…" : activity + "・調べています…";
+            if (_activity.text != activity) _activity.text = activity;
+        }
 
         // ---- 動き ----
 
@@ -409,7 +437,7 @@ namespace Ciel.Conversation
             if (_conversation == null) return;
             // CielConversation は保存した設定（モード・声の大きさ）を Start で読むので、全部の Start のあとに表示を合わせる
             if (!_firstRefresh) { _firstRefresh = true; Refresh(); }
-            if (Thinking(_conversation) != _shownThinking) Refresh();   // 考えていたのが時間切れで終わった
+            UpdateStatusLine();   // 声の始まり・終わり、考えていたのが時間切れで終わったときも、すぐ表示に出す
             var t = Time.unscaledTime;
             var c = _conversation;
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;

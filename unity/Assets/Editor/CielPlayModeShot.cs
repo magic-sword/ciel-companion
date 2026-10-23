@@ -55,7 +55,7 @@ namespace Ciel.EditorTools
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
-                    || request.Contains("people") || request.Contains("summary"))
+                    || request.Contains("people") || request.Contains("summary") || request.Contains("status"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -87,6 +87,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
             {
                 TouchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("status"))
+            {
+                StatusShots(step);
                 return;
             }
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("summary"))
@@ -460,7 +465,7 @@ namespace Ciel.EditorTools
         static int _summarySeq;
 
         // 会話サーバーの minutes.py と同じ形のまとめを、CielConversation に渡す
-        static void SendSummary(Ciel.Conversation.CielConversation c, bool recording, string stage, bool extra)
+        static void SendSummary(Ciel.Conversation.CielConversation c, bool recording, string stage, bool extra, bool updating = false)
         {
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             string Item(string id, int rev, string text, string who = "", string due = "", string points = "") =>
@@ -472,7 +477,7 @@ namespace Ciel.EditorTools
                 + "\"summary\":\"" + (recording ? "" : "展示のテーマと予算、準備の分担を決めた。") + "\","
                 + "\"current_topic\":\"" + (extra ? "予算と見積もり、それから会場への問い合わせの分担について" : "展示のテーマ") + "\",\"attendees\":[],"
                 + $"\"started_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 900},\"updated_at\":{System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 40},"
-                + $"\"pending_turns\":{(extra ? 0 : 3)},\"rev\":{(extra ? 2 : 1)},\"sections\":["
+                + $"\"pending_turns\":{(extra ? 0 : 3)},\"updating\":{(updating ? "true" : "false")},\"rev\":{(extra ? 2 : 1)},\"sections\":["
                 + "{\"id\":\"topics\",\"label\":\"話したこと\",\"kind\":\"topic\",\"items\":["
                 + Item("topics-1", 1, "展示のテーマ", points: "\"星空の写真を中心にする\",\"子ども向けの解説も置く\"") + "]},"
                 + "{\"id\":\"decisions\",\"label\":\"決まったこと\",\"kind\":\"decision\",\"items\":[" + decisions + "]},"
@@ -537,6 +542,58 @@ namespace Ciel.EditorTools
                 ui.GetType().GetMethod("ShowSummary", flags).Invoke(ui, new object[] { true });
             }
             if (step == 7) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
+        // シエルの状態の表示（マイクの上）と、裏で進んでいること（声の様子の上）。会話サーバーにはつながず、状態を直接入れる
+        static void StatusShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var type = typeof(Ciel.Conversation.CielConversation);
+            void Set(string field, object value) => type.GetField(field, flags).SetValue(c, value);
+            var log = Path.Combine(OutDir, "status.txt");
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                Set("_recording", true);
+                Set("_userSpeaking", true);   // 聞いています
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "status-listening", "status-thinking", "status-research", "status-speaking" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                string Text(string path) => ui.transform.Find("ConversationCanvas/SafeArea/" + path).GetComponent<UnityEngine.UI.Text>().text;
+                File.AppendAllText(log, $"{name}: {Text("Status")}｜{Text("Activity")}｜{Text("Caption")}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.5) return;
+            _captured = false;
+            if (step == 3)
+            {
+                // 聞き終えて返事を考えている。議事録のライブの更新も走っている
+                Set("_userSpeaking", false);
+                Set("_thinkingSince", Time.unscaledTime);
+                SendSummary(c, true, "recording", false, updating: true);
+            }
+            if (step == 4)
+            {
+                // Web で調べている（調べた記録が pending）
+                const string pending = "{\"v\":1,\"type\":\"research.result\",\"id\":1,\"question\":\"PHPの脆弱性\",\"checked_at\":null,"
+                    + "\"status\":\"pending\",\"clipped\":false,\"part_count\":0}";
+                type.GetMethod("OnResearchData", flags).Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(pending) });
+            }
+            if (step == 5) type.GetProperty("AgentState").GetSetMethod(true).Invoke(c, new object[] { "speaking" });   // 調べながら話している
+            if (step == 6) { FinishUiShots(); return; }
             Next(step + 1);
         }
 

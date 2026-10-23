@@ -96,6 +96,7 @@ class Meeting:
     research_seen: int = 0                                     # ライブに渡した調べた記録の最後の ID
     pending_shown: int = -1                                    # アプリに知らせた、まだ反映していない発言の数
     deadline: float | None = None                              # 清書の締め切り（time.monotonic。会話が終わるときだけ）
+    updating: bool = False                                     # ライブの差分を作っている最中（アプリに「まとめています」と出す）
 
     def __post_init__(self) -> None:
         if self.cursor < 0:
@@ -200,7 +201,7 @@ class Minutes:
         return {'v': 1, 'type': 'summary.state', 'meeting_id': m.export_id, 'recording': m is self.meeting,
                 'stage': m.stage, 'template': m.template.name, 'label': m.template.label,
                 'started_at': m.started.timestamp(), 'updated_at': m.updated_wall or 0.0,
-                'pending_turns': max(m.pending_shown, 0), **m.state.for_app()}
+                'pending_turns': max(m.pending_shown, 0), 'updating': m.updating, **m.state.for_app()}
 
     def templates_event(self) -> dict:
         """アプリの「まとめをとる」の選び先（会話の始めに一度送る）"""
@@ -218,13 +219,16 @@ class Minutes:
         except Exception:
             log.exception('まとめをアプリへ送れない')
 
-    def _progress(self, m: Meeting, pending: int) -> None:
-        if pending == m.pending_shown:
-            return
-        m.pending_shown = pending
+    def _progress(self, m: Meeting, pending: int | None = None) -> None:
+        """まだ反映していない発言の数（変わったときだけ）か、ライブの差分を作っているか（pending なし）をアプリへ知らせる"""
+        if pending is not None:
+            if pending == m.pending_shown:
+                return
+            m.pending_shown = pending
         if self.on_progress is not None:
             try:
-                self.on_progress({'v': 1, 'type': 'summary.progress', 'meeting_id': m.export_id, 'pending_turns': pending})
+                self.on_progress({'v': 1, 'type': 'summary.progress', 'meeting_id': m.export_id,
+                                  'pending_turns': max(m.pending_shown, 0), 'updating': m.updating})
             except Exception:
                 log.exception('まとめの進み具合をアプリへ送れない')
 
@@ -377,8 +381,17 @@ class Minutes:
             lines = self.history.between(m.cursor, through)[:live.LIVE_MAX_LINES]
             m.updated_at = time.monotonic()   # 作れなかったときも、すぐには呼び直さない
             research = self._research(m, after=m.research_seen)
-            result = await self._live_update(m, lines, research) if conversation(lines) else {}
+            if conversation(lines):
+                m.updating = True
+                self._progress(m)
+                try:
+                    result = await self._live_update(m, lines, research)
+                finally:
+                    m.updating = False
+            else:
+                result = {}
             if result is None:
+                self._progress(m)   # 作れなかった。「まとめています」を消す
                 return False
             changed = m.state.apply(result)
             m.summarized_turn_count += sum(bool(t.text) or not t.ready.is_set() for t in lines)
