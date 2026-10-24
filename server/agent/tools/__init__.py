@@ -24,6 +24,6 @@ class State:
     initiative: object | None = None   # initiative.Initiative（シエルの内なる考え）
 
 
-from . import memory, minutes, people, conversation, research, thoughts  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation, research, thoughts, clock  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS, *research.TOOLS, *thoughts.TOOLS]
+TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS, *research.TOOLS, *thoughts.TOOLS, *clock.TOOLS]

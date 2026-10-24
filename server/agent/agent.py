@@ -30,6 +30,7 @@ from openai.types.realtime.realtime_reasoning import RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import aizuchi
+import clock
 import debug_log
 import emotion
 import initiative
@@ -342,7 +343,9 @@ async def entrypoint(ctx: JobContext) -> None:
     # （2026-10-24、開発用の試験で 3 回に 2 回、hello か会話のしかたが届かなかった）。準備ができたので、もう一度送ってもらう
     await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})
     # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
-    await session.generate_reply(instructions=await greeting(agent, book, style), tool_choice='none')
+    # 今の日付・時間帯（clock.py）も添える（「おはよう」「こんばんは」を合わせる）
+    await session.generate_reply(instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
+                                 tool_choice='none')
     talker.start()
     if AIZUCHI:
         await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく

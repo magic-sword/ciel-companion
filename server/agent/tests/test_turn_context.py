@@ -110,5 +110,22 @@ class TurnContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('[議事録状態]', instructions)
 
 
+    async def test_now_line_is_placed_only_when_the_date_or_time_band_changes(self):
+        agent = FakeAgent()
+        r = self.replies(agent)
+        lines = iter(['[今：A・夜]', '[今：A・夜]', '[今：A・深夜]'])
+        with patch('turns.clock.now_line', side_effect=lambda: next(lines)):
+            for i in range(3):
+                await r._reply(i * 2 + 1, i * 2 + 2)
+        self.assertEqual([u for u in agent.updates if u.startswith('[今：')], ['[今：A・夜]', '[今：A・深夜]'])
+
+    async def test_now_line_falls_back_to_instructions_and_is_retried(self):
+        r = self.replies(FakeAgent(fail=True))
+        await r._reply(1, 2)
+        self.assertIn('[今：', self.session.generate_reply.call_args.kwargs['instructions'])
+        await r._reply(3, 4)
+        self.assertIn('[今：', self.session.generate_reply.call_args.kwargs['instructions'])
+
+
 if __name__ == '__main__':
     unittest.main()

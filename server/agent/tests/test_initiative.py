@@ -4,7 +4,7 @@ import json
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from conversation import Conversation
 import initiative
@@ -375,6 +375,10 @@ class InnerStateTests(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(generate_reply=Mock())
         style = SimpleNamespace(talk='chatty', presence='close', publish=None)
         r = TurnReplies(session, None, None, style, '')
+        r._clock_line = '[今]'   # 今の日時はもう置いてある（この試験では見ない）
+        patcher = patch('turns.clock.now_line', return_value='[今]')
+        patcher.start()
+        self.addCleanup(patcher.stop)
         r.initiative = SimpleNamespace(state_note=lambda: 'STATE x', place_state=AsyncMock(return_value=False))
         await r._generate_reply({'instructions': '[発言者：ミナ]'})
         self.assertEqual(session.generate_reply.call_args.kwargs['instructions'], '[発言者：ミナ]\n\nSTATE x')

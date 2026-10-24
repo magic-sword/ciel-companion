@@ -466,7 +466,7 @@ class SpeakerBook:
         about = f'[アプリを開いた人：たぶん{k.name}さん（この端末の持ち主。声ではまだ確かめていない）'
         if k.last_seen is not None:
             about += f'。前に話したのは{jst(k.last_seen)}'
-        about += f'。今日は{datetime.now(JST).strftime("%Y-%m-%d")}]'
+        about += ']'
         if not k.notes_ok or self.store is None or not hasattr(self.store, 'memory_snapshot'):
             return about
         try:

@@ -10,7 +10,8 @@
 |---|---|
 | `server/agent/config/persona.toml` | 本文ファイルの選択 |
 | `server/agent/config/prompts/character.md` | 人物像・話し方・会話上のルール |
-| `server/agent/config/prompts/greeting.md` | 初回あいさつを生成するための指示 |
+| `server/agent/config/prompts/greeting.md` | 初回あいさつを生成するための指示（前に「[今：…]」の 1 行が付く。[今の日時](clock-ja.md)） |
+| `server/agent/config/prompts/greeting_owner.md` | 端末の持ち主が分かっているとき（ひとり・身近な人）の初回あいさつ。`{name}` を持ち主の名前に置き換える（`agent.py` の `greeting`。本文で置き換えるのはこれだけ）。[話者の識別](speaker-identification-ja.md) |
 | `server/agent/config/prompts/emotion.md` | Irodori 用の感情タグの指示 |
 | `server/agent/config/prompts/touch.md` | 画面のタッチの知らせ（`[タッチ]` の行）への反応の仕方 |
 | `server/agent/config/prompts/talk_quiet.md` | おしゃべり度「ひかえめ」で足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py`（2026-10-17 に `group.md` から） |
@@ -21,21 +22,21 @@
 | `server/agent/config/prompts/presence_solo.md`・`presence_close.md`・`presence_public.md` | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、人についての道具の使い方（2 人でも多人数でも。`CIEL_VOICE=irodori` で Realtime API のとき）。処理は `speakers.py`・`tools/people.py` |
 | `server/agent/config/prompts/notes.md` | 会話の裏でメモを書く記録係（別の文字のモデル）への指示。処理は `notes.py`。[メモの決定記録](person-notes-ja.md) |
-| `server/agent/config/prompts/conversation.md` | 接続中の共通履歴を検索する道具の使い方。[共通会話履歴](conversation-history-ja.md) |
+| `server/agent/config/prompts/conversation.md` | 接続中の共通履歴を検索する道具の使い方。[共通会話履歴](conversation-history-ja.md)。今の日時（「[今：…]」と道具 `current_time`）の使い方。[今の日時](clock-ja.md) |
 | `server/agent/config/prompts/relationship.md` | 会話の終わりに、シエルがその人をどう思っているか（関係）を書き直す係への指示。処理は `relationship.py`。[関係の決定記録](person-relationship-ja.md) |
 | `server/agent/config/prompts/minutes.md`・`minutes_live.md`・`minutes_voice.md` | 会話のまとめ（議事録など）の清書・ライブの差分・声での頼まれ方。処理は `minutes.py`・`summaries/`。[議事録の決定記録](meeting-minutes-ja.md) |
 | `server/agent/config/summaries/*.toml`・`*.md` | まとめのテンプレート。TOML は見出しと種類（モデルへの本文ではない）、Markdown は書き方の指示（モデルへそのまま渡す） |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
 | `server/agent/agent.py` | 声の方式に応じた指示の組み合わせと会話への適用 |
 
-Markdown は HTML に変換せず、そのソースをモデルへ渡す。見出し・箇条書きは利用できる。コメントや front matter を取り除く処理、変数展開、テンプレート処理はない。編集者向けの説明・出典は README やこの文書に置く。
+Markdown は HTML に変換せず、そのソースをモデルへ渡す。見出し・箇条書きは利用できる。コメントや front matter を取り除く処理、テンプレート処理はない。変数展開は `greeting_owner.md` の `{name}` だけ（名前を別の行のデータとして渡すだけでは、名前を呼ばないことがあったため）。編集者向けの説明・出典は README やこの文書に置く。
 
 既存のプロンプトは内容を変えずに移行した。人物像の元資料はリポジトリ外の `D:\CIEL\企画設計\キャラ\シエル\キャラクター設定資料_主人公_シエル.md`。会話用プロンプトは資料全文ではなく、会話に必要な設定をまとめたものとする。
 
 ## 読み込みと反映
 
 - `CIEL_PERSONA_CONFIG` が未指定または空の場合、`server/agent/config/persona.toml` を使う。環境変数の相対パスは `server/agent/` 基準。
-- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`talk_quiet_instructions_file`、`talk_quiet_turn_instructions_file`、`talk_chatty_instructions_file`、`talk_chatty_nudge_file`、`inner_thoughts_instructions_file`、`talk_correction_nudge_file`、`talk_inner_state_instructions_file`、`inner_thoughts_voice_instructions_file`、`presence_solo_instructions_file`、`presence_close_instructions_file`、`presence_public_instructions_file`、`speaker_instructions_file`、`notes_instructions_file`、`relationship_instructions_file`、`minutes_instructions_file`、`minutes_live_instructions_file`、`minutes_voice_instructions_file`、`conversation_instructions_file`、`research_instructions_file`、`research_voice_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
+- TOML 内の `instructions_file`、`greeting_file`、`greeting_owner_file`、`emotion_instructions_file`、`touch_instructions_file`、`talk_quiet_instructions_file`、`talk_quiet_turn_instructions_file`、`talk_chatty_instructions_file`、`talk_chatty_nudge_file`、`inner_thoughts_instructions_file`、`talk_correction_nudge_file`、`talk_inner_state_instructions_file`、`inner_thoughts_voice_instructions_file`、`presence_solo_instructions_file`、`presence_close_instructions_file`、`presence_public_instructions_file`、`speaker_instructions_file`、`notes_instructions_file`、`relationship_instructions_file`、`minutes_instructions_file`、`minutes_live_instructions_file`、`minutes_voice_instructions_file`、`conversation_instructions_file`、`research_instructions_file`、`research_voice_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
 - 会話開始時に設定された本文ファイル一式を読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
 - 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。その場にいる人の指示（話者の識別を使うとき）と、おしゃべり度の指示（ひかえめは `CIEL_VOICE=irodori` のときだけ。ふつうは足さない）を最後に追加する。
 - 設定・本文の欠落、不正な TOML、不正な UTF-8、空の本文はエラーにする。別のキャラクターへ自動で切り替えない。

@@ -50,6 +50,7 @@ import numpy as np
 from livekit.agents import AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
+import clock
 import debug_log
 import latency
 import speakers
@@ -126,6 +127,7 @@ class TurnReplies:
         self.minutes = minutes        # minutes.Minutes。返答のたびに実際の記録状態を渡す
         self.nod = nod                # 話している途中の相づちを打つか（agent.py の CIEL_NOD）
         self._minutes_context: str | None = None   # 会話の後ろに最後に置いた議事録の状態（TURN_CONTEXT=items）
+        self._clock_line: str | None = None   # 会話の後ろに最後に置いた「今」（clock.py。日付か時間帯が変わったら置き直す）
         self._thinking = False   # アプリに「考えています」と知らせている（_set_thinking）
         self.encoder: speakers.Encoder | None = None
         # touch.TouchReactions（話しながら触れたときの知らせ）。会話が始まってから作るので、agent.py があとでつなぐ
@@ -469,6 +471,13 @@ class TurnReplies:
         await self._generate_reply(extra)
 
     async def _generate_reply(self, extra: dict) -> None:
+        # 今の日付・時間帯（clock.py）。変わったときだけ会話の後ろに置く（置けなければ今回の指示に足す）
+        now = clock.now_line()
+        if now != self._clock_line:
+            if TURN_CONTEXT == 'items' and await self._add_context(now):
+                self._clock_line = now
+            else:
+                extra['instructions'] = '\n\n'.join(filter(None, (now, extra.get('instructions'))))
         if self.initiative is not None:
             # シエルの今の心の状態を会話の後ろに置く（変わったときだけ。置けなければ今回の指示に足す）
             note = self.initiative.state_note()
