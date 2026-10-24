@@ -71,6 +71,7 @@ RECOVER = float(os.environ.get('CIEL_SPK_RECOVER', '0.50'))
 RECOVER_OWNER = float(os.environ.get('CIEL_SPK_RECOVER_OWNER', '0.42'))   # ひとり・身近な人のときの持ち主
 RECOVER_MIN = 3             # まとめて比べる発言の数（これより少なければ比べない）
 RECOVER_RECENT = 5
+GREETING_NOTES = 5          # あいさつに添える、持ち主について覚えていることの数（最近の分）
 MERGE_PRINTS = 3            # アプリで覚えている人にまとめたとき、DB の見本に足す数
 DEVICE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
 
@@ -262,6 +263,7 @@ class SpeakerBook:
         self.private = None            # その場にいる人がひとり・身近な人か（引数なしで呼ぶ。agent.py がつなぐ）
         self.owner_id: int | None = None   # 端末の持ち主（覚えている人の番号。アプリの hello で決まる）
         self.channel: str | None = None    # 声の経路（端末ごと。見本に印を付ける）
+        self.device_known = asyncio.Event()   # アプリの hello を受け取った（あいさつの前に、持ち主が分かるのを少し待つ）
 
     async def load(self) -> None:
         if self.store is not None:
@@ -449,6 +451,35 @@ class SpeakerBook:
         sure = score >= (OWNER_SURE if owner else SURE)
         log.info('話者：知らない人の声が覚えている人 #%d に近いので、まとめた（%.2f、%d 回分）', k.person_id, score, len(recent))
         return dst, score, sure
+
+    @property
+    def owner_name(self) -> str:
+        return next((k.name for k in self.known if k.person_id == self.owner_id), '') if self.owner_id is not None else ''
+
+    async def greeting_context(self, private: bool) -> str:
+        """会話の始めのあいさつに添える、端末の持ち主のこと（ひとり・身近な人のときだけ。無ければ空）。
+        声ではまだ確かめていないので「たぶん」とする。覚えていること（同意があり、忘れる依頼の処理中でないもの）は
+        最近の分だけ、シエルとの関係は口調の下敷きとして渡す。本人の声だと分かったら、いつもどおり identify_parts が渡す"""
+        k = next((k for k in self.known if k.person_id == self.owner_id), None) if self.owner_id is not None else None
+        if not private or k is None:
+            return ''
+        about = f'[アプリを開いた人：たぶん{k.name}さん（この端末の持ち主。声ではまだ確かめていない）'
+        if k.last_seen is not None:
+            about += f'。前に話したのは{jst(k.last_seen)}'
+        about += f'。今日は{datetime.now(JST).strftime("%Y-%m-%d")}]'
+        if not k.notes_ok or self.store is None or not hasattr(self.store, 'memory_snapshot'):
+            return about
+        try:
+            snapshot = await self.store.memory_snapshot(k.person_id)
+        except Exception as e:
+            log.warning('話者：あいさつの前に記憶を読めない error=%s', type(e).__name__)
+            return about
+        if snapshot is None or snapshot['blocked'] or not snapshot['consent']:
+            return about
+        notes = [t for _, t in snapshot['notes']][-GREETING_NOTES:]
+        if notes:
+            about += f'\n[{k.name}さんについて覚えていること：' + '／'.join(notes) + ']'
+        return about + relationship.context(k.name, snapshot['relationship'], k.last_seen, private=True)
 
     @staticmethod
     def label(j: 'Judgment | None') -> str:
@@ -1040,16 +1071,21 @@ class SpeakerBook:
         device_id, secret = msg.get('device_id'), msg.get('secret')
         if not isinstance(device_id, str) or not DEVICE_ID.match(device_id) \
                 or not isinstance(secret, str) or not 16 <= len(secret) <= 256:
+            if action == 'hello':
+                self.device_known.set()
             return 'invalid_device'
         # 経路の印は端末 ID そのものではなく、そのハッシュの頭（DB の見本に端末 ID を残さない）
         self.channel = 'device:' + hashlib.sha256(device_id.encode()).hexdigest()[:16]
         if self.store is None:
+            if action == 'hello':
+                self.device_known.set()
             return 'storage_unavailable'
         secret_hash = hashlib.sha256(secret.encode()).hexdigest()
         if action == 'hello':
             pid = await self.store.device_owner(device_id, secret_hash)
             self.owner_id = pid if any(k.person_id == pid for k in self.known) else None
             log.info('話者：端末の持ち主 %s', '#%d' % self.owner_id if self.owner_id is not None else 'なし')
+            self.device_known.set()
             return 'owner' if self.owner_id is not None else 'no_owner'
         if action == 'pair':
             sp = self._by_id(msg.get('speaker_id'))

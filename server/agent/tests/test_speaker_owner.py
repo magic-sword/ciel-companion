@@ -230,5 +230,42 @@ class MergePersistTests(unittest.IsolatedAsyncioTestCase):
         store.add_voiceprints.assert_not_called()
 
 
+class GreetingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from speaker_store import Relationship
+        self.snapshot = {'blocked': False, 'consent': True, 'notes': [(i, f'note{i}') for i in range(8)],
+                         'relationship': Relationship(2, 'feeling', 'mood', 3, 1)}
+        self.store = SimpleNamespace(memory_snapshot=AsyncMock(side_effect=lambda pid: self.snapshot))
+        self.book = SpeakerBook(self.store)
+        self.book.known = [Known(1, 'ハカセ', [axis(0)], notes_ok=True, note_count=8)]
+        self.book.owner_id = 1
+
+    async def test_owner_name_recent_notes_and_relationship_when_private(self):
+        about = await self.book.greeting_context(True)
+        self.assertIn('たぶんハカセさん', about)
+        self.assertIn('note7', about)
+        self.assertNotIn('note2', about)   # only the recent ones
+        self.assertIn('関係', about)
+
+    async def test_nothing_in_public_or_without_owner(self):
+        self.assertEqual(await self.book.greeting_context(False), '')
+        self.book.owner_id = None
+        self.assertEqual(await self.book.greeting_context(True), '')
+
+    async def test_no_notes_without_consent_or_while_forgetting(self):
+        self.snapshot['blocked'] = True
+        about = await self.book.greeting_context(True)
+        self.assertIn('ハカセ', about)
+        self.assertNotIn('note', about)
+        self.book.known[0].notes_ok = False
+        self.snapshot['blocked'] = False
+        self.assertNotIn('note', await self.book.greeting_context(True))
+
+    async def test_hello_marks_the_device_known_even_when_it_fails(self):
+        book = SpeakerBook(None)
+        await book.app_control({'action': 'hello', 'device_id': 'bad id', 'secret': ''})
+        self.assertTrue(book.device_known.is_set())
+
+
 if __name__ == '__main__':
     unittest.main()

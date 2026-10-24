@@ -78,6 +78,8 @@ EAGERNESS = os.environ.get('CIEL_EAGERNESS', 'medium')
 REASONING = os.environ.get('CIEL_REASONING', 'minimal')
 # 返事の声ができるまでの相づち（aizuchi.py）。0 で流さない
 AIZUCHI = VOICE == 'irodori' and os.environ.get('CIEL_AIZUCHI', '1') != '0'
+# あいさつの前に、アプリの端末の hello（持ち主が誰か）を待つ秒数
+OWNER_WAIT = float(os.environ.get('CIEL_OWNER_WAIT', '2.5'))
 # 相手が長く話している途中の息つぎにも相づちを打つか（turns.py）。0 で打たない
 NOD = os.environ.get('CIEL_NOD', '1') != '0'
 # シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py。CIEL_INTERRUPT_SECONDS=0 で以前のやり方）
@@ -308,6 +310,10 @@ async def entrypoint(ctx: JobContext) -> None:
     logger.info('指示 %d 字・道具 %d 個', len(agent.instructions), len(agent.tools))
     debug_log.record('settings', persona_sha256=agent.persona.fingerprint, instructions_chars=len(agent.instructions),
                      tools=[getattr(t, 'id', str(t)) for t in agent.tools])
+    # アプリは、会話サーバーが部屋に入るとすぐ、会話のしかたと端末の持ち主の hello を送る。受け損ねないように、入る前に受け口を作る
+    ctx.room.on('data_received', style.on_data)
+    if book is not None:
+        ctx.room.on('data_received', book.on_data)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # アプリの「まとめをとる」で選べるテンプレート（minutes.py）
@@ -325,20 +331,37 @@ async def entrypoint(ctx: JobContext) -> None:
             logger.warning('中断の差し替えができなかった（今までどおり、話し始めた瞬間に止める）')
     session.on('user_state_changed', toucher.on_user_state)
     ctx.room.on('data_received', toucher.on_data)
-    # 会話のしかたの切り替え（mode.py。Unity が知らせる）
-    ctx.room.on('data_received', style.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
-    # 参加者パネルからの名前の直し（speakers.py。この会話の間だけ）
+    # 参加者パネル（speakers.py。受け口は session.start の前に作った）
     if book is not None:
-        ctx.room.on('data_received', book.on_data)
         book.notify()
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
-    await session.generate_reply(instructions=agent.persona.greeting)
+    # アプリが部屋に入った直後に送った知らせは、会話サーバーの受け取りの準備ができる前で、届かないことがある
+    # （2026-10-24、開発用の試験で 3 回に 2 回、hello か会話のしかたが届かなかった）。準備ができたので、もう一度送ってもらう
+    await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})
+    # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
+    await session.generate_reply(instructions=await greeting(agent, book, style), tool_choice='none')
     talker.start()
     if AIZUCHI:
         await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく
+
+
+async def greeting(agent, book, style) -> str:
+    """会話の始めのあいさつの指示。アプリの hello で端末の持ち主が分かれば（ひとり・身近な人のとき）、名前を呼んであいさつする。
+    hello は会話サーバーが部屋に入ってからアプリが送るので、少しだけ待つ（古いアプリは送らないので、待ちすぎない）"""
+    if book is None:
+        return agent.persona.greeting
+    try:
+        await asyncio.wait_for(book.device_known.wait(), OWNER_WAIT)
+    except asyncio.TimeoutError:
+        logger.info('端末の hello が %.1f 秒で届かなかった（ふつうのあいさつ）', OWNER_WAIT)
+        return agent.persona.greeting
+    about = await book.greeting_context(style.presence in ('solo', 'close'))
+    if not about:
+        return agent.persona.greeting
+    return agent.persona.greeting_owner.replace('{name}', book.owner_name) + '\n\n' + about
 
 
 if __name__ == '__main__':
