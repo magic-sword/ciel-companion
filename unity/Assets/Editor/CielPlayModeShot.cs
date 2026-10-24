@@ -12,6 +12,9 @@
 // "summary" を含めると、合成のまとめ（ciel.summary）を流し込み、まとめの帯とパネルを縦長で撮る：
 // summary-strip.png（記録中の帯）、summary-panel.png（帯をタップして開いたパネル）、summary-glow.png（項目が増えて光る）、
 // summary-closed.png（帯をもう一度タップして閉じたあと）、
+// "research" を含めると、合成の調べもの（ciel.research）を 3 件流し込み、調べたこと・出典のパネルのページ送りを撮る：
+// research-latest.png（開くと最新 3/3）、research-prev.png（「‹ 前」で 2/3）、research-stay.png（前のページを読んでいるあいだに
+// 新しい調べものが届いても 2/4 のまま）、research-pending.png（調べものの札から、調べている最中の 4/4）。research.txt にページを書く。
 // summary-done.png（終えたあと：送った結果と、種類を選ぶボタン）。パネルの部品の数を summary.txt に書く。
 using System.IO;
 using UnityEditor;
@@ -55,7 +58,8 @@ namespace Ciel.EditorTools
                 // 縦長で撮るときは、再生を始める前に Game ビューの大きさを変える（再生中に変えると Live2D が描かれなくなる）
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
-                    || request.Contains("people") || request.Contains("summary") || request.Contains("status"))
+                    || request.Contains("people") || request.Contains("summary") || request.Contains("status")
+                    || request.Contains("research"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -87,6 +91,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("touch"))
             {
                 TouchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("research"))
+            {
+                ResearchShots(step);
                 return;
             }
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("status"))
@@ -542,6 +551,68 @@ namespace Ciel.EditorTools
                 ui.GetType().GetMethod("ShowSummary", flags).Invoke(ui, new object[] { true });
             }
             if (step == 7) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
+        static void SendResearch(Ciel.Conversation.CielConversation c, int id, string question, bool done)
+        {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var receive = typeof(Ciel.Conversation.CielConversation).GetMethod("OnResearchData", flags);
+            void Send(string json) => receive.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json) });
+            var text = done ? $"## 確認できたこと\\n- **{question}** について、公式の発表を確かめました [1]。\\n- 対象は 2026-10 時点の情報です。" : "";
+            Send($"{{\"v\":1,\"type\":\"research.result\",\"id\":{id},\"question\":\"{question}\",\"checked_at\":{(done ? "\"2026-10-24T10:00:00+09:00\"" : "null")},"
+                + $"\"status\":\"{(done ? "completed" : "pending")}\",\"clipped\":false,\"part_count\":{(done ? 1 : 0)}}}");
+            if (done)
+            {
+                Send($"{{\"v\":1,\"type\":\"research.text\",\"id\":{id},\"part\":0,\"text\":\"{text}\"}}");
+                Send($"{{\"v\":1,\"type\":\"research.source\",\"id\":{id},\"source\":{{\"number\":1,\"title\":\"公式の発表 {id}\",\"url\":\"https://example.org/{id}\"}}}}");
+            }
+            Send($"{{\"v\":1,\"type\":\"research.complete\",\"id\":{id}}}");
+        }
+
+        static void ResearchShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var log = Path.Combine(OutDir, "research.txt");
+            var panel = ui == null ? null : ui.transform.Find("ConversationCanvas/SafeArea/ResearchPanel");
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                typeof(Ciel.Conversation.CielConversation).GetProperty("Status").GetSetMethod(true)
+                    .Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                SendResearch(c, 1, "PHPの脆弱性", true);
+                SendResearch(c, 2, "最近のAIの動向", true);
+                SendResearch(c, 3, "冬の星空の撮り方", true);
+                ui.GetType().GetMethod("OpenResearch", flags).Invoke(ui, new object[] { -1 });
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "research-latest", "research-prev", "research-stay", "research-pending" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                var page = panel.Find("Pager/Page").GetComponent<UnityEngine.UI.Text>().text;
+                var question = panel.Find("Viewport/Content/Question").GetComponent<UnityEngine.UI.Text>().text;
+                File.AppendAllText(log, $"{name}: {page}・{question}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.5) return;
+            _captured = false;
+            if (step == 3) panel.Find("Pager/Prev").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            if (step == 4) SendResearch(c, 4, "会場の設備", false);
+            if (step == 5)
+            {
+                panel.gameObject.SetActive(false);
+                ui.transform.Find("ConversationCanvas/SafeArea/Tasks/Research").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            }
+            if (step == 6) { FinishUiShots(); return; }
             Next(step + 1);
         }
 

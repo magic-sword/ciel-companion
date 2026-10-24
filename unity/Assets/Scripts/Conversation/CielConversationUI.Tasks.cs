@@ -25,9 +25,11 @@ namespace Ciel.Conversation
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
             _researchTask = TaskChip("Research", ResearchGlass, Cyan, () =>
             {
-                ShowPerson(null);
-                _summaryPanel.SetActive(false);
-                _researchPanel.SetActive(true);
+                // 調べている最中のページを開く
+                var results = _conversation.ResearchResults;
+                var id = -1;
+                for (int i = results.Count - 1; i >= 0 && id < 0; i--) if (results[i].status == "pending") id = results[i].id;
+                OpenResearch(id);
             });
             _summaryTask = TaskChip("Summary", AmberGlass, Amber, () => ShowSummary(true));
         }
