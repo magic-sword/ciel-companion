@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """返事の速さを測る：試験用の参加者が、合成した声で話しかけ、話し終わりからシエルの声が届くまでを測る。
 
+【料金がかかる】OpenAI・LiveKit を使う。1 回（--rounds 1）で約 0.05〜0.1 ドル。回す前に scripts/server/paid-checks.py と docs/paid-checks-ja.md を見る。
+
 本番の会話サーバーは入らない部屋を作り、agent_name を付けた試験用の会話サーバー（CIEL_AGENT_NAME）だけを呼ぶ。
 声は読み上げサービス（Irodori-TTS）で、シエルとは違う声（大人の男性）で作る。
 

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """内なる考えの質の評価（initiative.py）。決まった会話の場面を考える係に通し、できた考えを別のモデルに採点させる。
 
+【料金がかかる】OpenAI・LiveKit を使う。全場面 1 回で約 2〜3.5 ドル（採点の gpt-5.4 が 7 割）。--only で 1 場面なら約 0.3〜0.5 ドル。回す前に scripts/server/paid-checks.py と docs/paid-checks-ja.md を見る。
+
 声の試験（bench_thoughts.py）は 1 回に数分かかり、毎回会話が違うので、考えの質を比べにくい。ここでは場面（SCENARIOS）を
 固定し、相手が話すたびに（切れ端も含めて文字起こしのとおりに）考える係を呼んで、その時点の考えと知りたいことを、
 審査のモデル（config/prompts/eval_thought_judge.md）に 1〜5 で採点させる。直す前と後で同じ場面を流して比べる。

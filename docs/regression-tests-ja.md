@@ -2,6 +2,8 @@
 
 入口はGit管理の `scripts/server/run-regression.py`。PowerShellからは `scripts/server/test-regression.ps1` でも実行できる。実行場所によらずリポジトリのテストを見つける。
 
+この回帰テストは料金がかからない（API キー・LiveKit・読み上げの接続先を外して動かす）。OpenAI・LiveKit を使う試験（`eval_*`・`bench_*`）は別にして、関係するところを変えたときだけ回す。[料金のかかる試験](paid-checks-ja.md)。
+
 ## 初回の準備
 
 Python 3.11または3.12で、テスト用の仮想環境を作る。音声モデル・GPU・Unity・APIキーは不要。通常テストには外部サービスの資格情報を渡さず、テスト内のモックと合成データを使う。

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """内なる考えの試験：おしゃべりにして少し話し、黙ったあと、シエルがいつ自分から話しかけるかを見る（initiative.py）。
 
+【料金がかかる】OpenAI・LiveKit を使う。1 回で約 0.1〜0.3 ドル（会話モデル数回と、考える係。黙る時間が長いほど考える係が増える）。回す前に scripts/server/paid-checks.py と docs/paid-checks-ja.md を見る。
+
 bench_latency.py と同じく、試験用の参加者が部屋に入り、名前を付けた会話サーバー（--agent。既定 ciel-dev）だけを呼ぶ。
 アプリと同じ知らせ（ciel.style）で、おしゃべり度を「おしゃべり」にする。LINES を 1 つずつ話して返事を待ち、
 そのあと --silence 秒黙って、シエルの声（相づちを除く）が始まった時刻を記録する。

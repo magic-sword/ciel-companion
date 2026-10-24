@@ -139,12 +139,14 @@ def temporary_database():
 
 def run_suite(suite, directory, db_url=None, timeout=300):
     environment = dict(os.environ)
-    for key in ('CIEL_DB_URL', 'CIEL_TEST_DB_URL', 'OPENAI_API_KEY', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET',
-                'CIEL_MINUTES_DISCORD_WEBHOOK'):
+    # These suites are free: no paid API is reachable. Paid checks are listed separately (scripts/server/paid-checks.py).
+    for key in ('CIEL_DB_URL', 'CIEL_TEST_DB_URL', 'OPENAI_API_KEY', 'LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET',
+                'CIEL_TTS_URL', 'CIEL_MINUTES_DISCORD_WEBHOOK'):
         environment.pop(key, None)
     if db_url:
         environment['CIEL_TEST_DB_URL'] = db_url
-    environment.update(PYTHONUTF8='1', HF_HUB_OFFLINE='1')
+    # A test that forgets to mock OpenAI fails fast instead of being billed
+    environment.update(PYTHONUTF8='1', HF_HUB_OFFLINE='1', OPENAI_BASE_URL='http://127.0.0.1:9/v1')
     output = directory / (suite + '.json')
     try:
         completed = subprocess.run([sys.executable, str(Path(__file__).resolve()), '--worker', suite,

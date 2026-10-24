@@ -1,0 +1,39 @@
+# 料金のかかる試験の一覧（scripts/server/paid-checks.py が読む）。説明は docs/paid-checks-ja.md。
+# 回帰テスト（scripts/server/run-regression.py）は API を使わないので無料。ここに並べるものは OpenAI・LiveKit を使う。
+# cost：1 回の目安（2026-10 の単価。docs/paid-checks-ja.md の計算）。covers：このファイルを変えたら回す候補（server/agent からの相対パス、前方一致）。
+# command：開発用の会話サーバー（ciel-dev-agent-dev-1）の中で動かす。
+
+[eval_thoughts]
+what = "内なる考えの質（決まった場面を考える係に通し、gpt-5.4 が採点する）"
+cost = "全場面 1 回で約 2〜3.5 ドル（採点の gpt-5.4 が 7 割）。--only で 1 場面なら約 0.3〜0.5 ドル"
+cost_max_usd = 3.5
+command = "docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--only 場面] > 結果.json"
+covers = ["initiative.py", "eval_thoughts.py", "config/prompts/inner_thoughts.md", "config/prompts/eval_thought_judge.md"]
+
+[bench_thoughts]
+what = "内なる考えの話しかける頃合い（声で話して黙り、シエルがいつ話しかけるか）"
+cost = "1 回で約 0.1〜0.3 ドル（会話モデル数回と、考える係。黙る時間が長いほど考える係が増える）"
+cost_max_usd = 0.3
+command = "docker exec ciel-dev-agent-dev-1 python bench_thoughts.py [--silence 150]"
+covers = ["initiative.py", "turns.py", "tools/thoughts.py", "config/prompts/inner_thoughts", "config/prompts/talk_"]
+
+[bench_latency]
+what = "返事の速さ（話し終わりからシエルの声まで）"
+cost = "1 回（--rounds 1）で約 0.05〜0.1 ドル"
+cost_max_usd = 0.1
+command = "docker exec ciel-dev-agent-dev-1 python bench_latency.py --agent ciel-dev [--rounds 1]"
+covers = ["turns.py", "agent.py", "aizuchi.py", "emotion.py", "irodori_tts.py", "latency.py"]
+
+[bench_interrupt]
+what = "話の中断（物音・咳・相づちで止まらず、本当の割り込みで止まるか）"
+cost = "1 回で約 0.1 ドル"
+cost_max_usd = 0.15
+command = "docker exec ciel-dev-agent-dev-1 python bench_interrupt.py"
+covers = ["interruptions.py", "turns.py"]
+
+[bench_stall]
+what = "返事が止まる件の再現（議事録をとりながら、返事の依頼が重なる話し方）"
+cost = "1 回で約 0.1〜0.3 ドル（議事録のライブと清書を含む）"
+cost_max_usd = 0.3
+command = "docker exec ciel-dev-agent-dev-1 python bench_stall.py [--rounds 1]"
+covers = ["turns.py", "minutes.py", "summaries/", "agent.py"]

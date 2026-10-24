@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """話の中断の試験：シエルが話している途中に、物音・咳・相づち・本当の割り込みを入れ、シエルの声が止まるかを測る。
 
+【料金がかかる】OpenAI・LiveKit を使う。1 回で約 0.1 ドル。回す前に scripts/server/paid-checks.py と docs/paid-checks-ja.md を見る。
+
 bench_latency.py と同じく、試験用の参加者が部屋に入り、名前を付けた会話サーバー（--agent。既定 ciel-dev）だけを呼ぶ。
 シエルに長めに話してもらい、話し始めて STIMULUS_AFTER 秒たったら、次のどれかを送る：
   quiet   … 何も送らない（比べる基準。話し続けるはず）
