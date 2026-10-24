@@ -203,6 +203,67 @@ class ThinkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(i.thoughts, [])
 
 
+class StalenessTests(unittest.TestCase):
+    def setUp(self):
+        self.h = Conversation()
+        self.i = make(history=self.h)
+
+    def say(self, text, role='user'):
+        t = self.h.reserve(role=role)
+        self.h.complete(t, text)
+        return t.id
+
+    def test_reaction_expires_after_the_conversation_moves_on(self):
+        first = self.say('ねえ、シエル。')
+        called = Thought('呼ばれたのです、何か用かな？', 'comment', 4.0, created=0.0, anchor=first)
+        wish = Thought('使っているカメラを知りたい', 'question', 4.0, created=0.0, anchor=first)
+        self.i.thoughts = [called, wish]
+        self.say('はい、なんでしょう？', role='assistant')
+        self.say('昨日、星空を撮りに行ったんだ。')
+        self.assertTrue(self.i.alive(called, 1.0))     # one user turn later: still alive
+        self.say('オリオン座がきれいだった。')
+        self.assertFalse(self.i.alive(called, 1.0))    # two user turns later: done
+        self.assertTrue(self.i.alive(wish, 1.0))       # questions from unknowns live on
+
+    def test_offer_only_thoughts_fresh_to_the_current_topic(self):
+        first = self.say('星空を撮りに行ったんだ。')
+        old = Thought('星空、すてき', 'question', 5.0, created=0.0, anchor=0)
+        self.i.thoughts = [old]
+        self.say('寒かったよ。')
+        self.assertIsNone(self.i.offer())              # two user turns since its anchor
+        fresh = Thought('寒さは大丈夫？', 'question', 4.0, anchor=first)
+        self.i.thoughts.append(fresh)
+        self.assertIn('寒さは大丈夫？', self.i.offer())
+
+    def test_unreviewed_thoughts_sink_and_reviewed_ones_reanchor(self):
+        kept = Thought('流れ星の話を聞きたい', 'question', 4.0)
+        ignored = Thought('なんとなく', 'comment', 4.0)
+        self.i.thoughts = [kept, ignored]
+        self.i._seen_id = 7
+        self.i.apply({'rescore': [{'id': kept.id, 'motivation': 4}]}, 1.0, reviewed={kept.id, ignored.id})
+        self.assertEqual(kept.motivation, 4.0)
+        self.assertEqual(kept.anchor, 7)
+        self.assertEqual(ignored.motivation, 3.0)
+
+    def test_fragments_of_one_speaker_are_joined_for_the_thinker(self):
+        self.say('オリオン座がきれいに撮れたよ。')
+        self.say('でも、')
+        self.say('寒くて手がかじかんじゃった。')
+        self.say('大変でしたね。', role='assistant')
+        lines = self.i._conversation()
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]['text'], 'オリオン座がきれいに撮れたよ。でも、寒くて手がかじかんじゃった。')
+        self.assertEqual(lines[1]['speaker'], 'シエル')
+
+    def test_waits_while_the_user_keeps_talking(self):
+        self.say('ねえ、シエル。')
+        self.i._last = 100.0
+        self.i._watch_history(100.0)
+        self.i._last = 102.0                            # still producing speech
+        self.assertFalse(self.i._should_think(100.0 + initiative.THINK_SETTLE_SECONDS))
+        self.assertTrue(self.i._should_think(102.0 + initiative.THINK_SETTLE_SECONDS))
+
+
 class ReplyOfferTests(unittest.IsolatedAsyncioTestCase):
     async def test_reply_carries_the_offered_thought(self):
         from turns import TurnReplies

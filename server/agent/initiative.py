@@ -72,6 +72,11 @@ SATIETY_HALF_LIFE = float(os.environ.get('CIEL_THOUGHT_SATIETY_HALF_LIFE', '90')
 SATE_SPEAK = 1.0              # 自分から 1 回話したときに上がる量
 SATE_UNANSWERED = 0.5         # 前に話しかけて返事が無いまま、また話したときに足す量（気まずさ）
 UNUSED_OFFER_LOSS = 1.0       # 返事に添えるよう渡したのに使われなかった考えの気持ちを下げる量
+# 用済みの考えを残さない（2026-10-24、会話の始めの「呼ばれたのです、何か用かな？」が後まで残り、返事に添えられた）。
+# 古さは時間だけでなく、会話の進み方で決める：考えには、きっかけの発言（anchor。考えたときに確定していた最後の発言 ID）を持たせる
+REACTIVE_KINDS = ('comment', 'correction')   # その発言への反応。相手がそのあと REACTIVE_TURNS 回話したら用済み
+REACTIVE_TURNS = 2
+UNREVIEWED_LOSS = 1.0         # 考える係が、前の考えを付け直しも捨てもしなかったら、気持ちをこれだけ下げる
 MAX_THOUGHTS = 12
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
@@ -89,6 +94,7 @@ class Thought:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:6])
     expressed: bool = False
     offered: bool = False   # 返事に添えるよう渡して、実際に話したかをまだ確かめていない
+    anchor: int = 0         # きっかけの発言 ID（考えた・付け直したときに確定していた最後の発言）
 
 
 class Initiative:
@@ -181,7 +187,10 @@ class Initiative:
             return False
         if now - self._thought_at < THINK_MIN_SECONDS:
             return False
-        if self._new_at is not None and now - self._new_at >= THINK_SETTLE_SECONDS and not self._user_busy:
+        # 相手が話し続けているあいだ（文字起こしが一言ずつ確定する）は、最後に声がしてから待つ。
+        # 「ねえ、シエル。」だけで考え始めると、その一言に反応した考えができる
+        if (self._new_at is not None and not self._user_busy
+                and now - max(self._new_at, self._last) >= THINK_SETTLE_SECONDS):
             return True
         # 静かなあいだにも考える（おしゃべりのときだけ。返事が無いほど間をあける）
         idle = min(IDLE_THINK_SECONDS * 2 ** self.unanswered, IDLE_THINK_MAX)
@@ -208,9 +217,20 @@ class Initiative:
         return (done is not None and self._last <= done and not self._user_busy
                 and CONTINUE_AFTER <= now - done <= CONTINUE_WINDOW)
 
+    def turns_since(self, anchor: int) -> int:
+        """きっかけの発言のあとに、相手が話した回数"""
+        if self.history is None:
+            return 0
+        return sum(1 for t in self.history.between(anchor) if t.role == 'user' and t.text)
+
+    def alive(self, t: Thought, now: float) -> bool:
+        """まだ話す意味がある考えか（話した・時間がたちすぎた・反応した発言から会話が進みすぎた、なら用済み）"""
+        return (not t.expressed and now - t.created < DROP_SECONDS
+                and not (t.kind in REACTIVE_KINDS and self.turns_since(t.anchor) >= REACTIVE_TURNS))
+
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
-        self.thoughts = [t for t in self.thoughts if now - t.created < DROP_SECONDS and not t.expressed]
+        self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
         candidates = [t for t in self.thoughts if not t.offered]   # 返事に添えたばかりの考えは、話したか分かるまで待つ
         silence = now - self._last
         talk = self.style.talk
@@ -235,9 +255,10 @@ class Initiative:
         now = time.monotonic()
         if any(t.offered for t in self.thoughts):
             return None   # 前に渡した考えを話したか、まだ確かめていない
-        fresh = [t for t in self.thoughts if not t.expressed and t.kind != 'correction' and now - t.created < DROP_SECONDS]
-        best = max(fresh, key=lambda t: t.motivation, default=None)
-        if best is None or best.motivation - self.satiety_at(now) < THRESHOLD:
+        # 今の話題に新しい考えだけ：きっかけの発言のあと、相手が話したのは今答えようとしている 1 回だけ
+        fresh = [t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction' and self.turns_since(t.anchor) <= 1]
+        best = max(fresh, key=lambda t: self.score(t, now), default=None)
+        if best is None or self.score(best, now) < THRESHOLD:
             return None
         # 実際に話したかは、次に考えるときに会話から確かめる（apply の spoken）。話していれば満腹度を上げる
         best.offered = True
@@ -263,7 +284,8 @@ class Initiative:
             return 'invalid'
         if any(t.text == text for t in self.thoughts):
             return 'already_kept'
-        self.thoughts.append(Thought(text, kind if kind in KINDS and kind != 'correction' else 'question', 4.0))
+        self.thoughts.append(Thought(text, kind if kind in KINDS and kind != 'correction' else 'question', 4.0,
+                                     anchor=self.history.settled_through() if self.history is not None else 0))
         self.thoughts = sorted(self.thoughts, key=lambda t: -t.motivation)[:MAX_THOUGHTS]
         log.info('内なる考え：会話モデルが考えを預けた（%s）', kind)
         debug_log.record('thought_kept', thought_kind=kind, text=text)
@@ -320,12 +342,22 @@ class Initiative:
         if self.history is None:
             return []
         rows = [t for t in self.history.between(through=self.history.settled_through()) if t.text][-CONVERSATION_TURNS:]
-        return [{'speaker': t.name, 'text': t.text[:400]} for t in rows]
+        # 同じ人の続けての発言は 1 つにつなぐ（文字起こしは「でも、」「寒くて…」のように切れて届き、切れ端に反応した
+        # 考え（「『でも、』の続きが気になる」）ができた。2026-10-24）
+        lines: list[dict] = []
+        for t in rows:
+            if lines and lines[-1]['speaker'] == t.name:
+                lines[-1]['text'] = (lines[-1]['text'] + t.text)[:800]
+            else:
+                lines.append({'speaker': t.name, 'text': t.text[:400]})
+        return lines
 
     async def _think(self, now: float) -> None:
         if self.history is not None:
             self._seen_id = self.history.settled_through()
         self._new_at = None
+        self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
+        sent = list(self.thoughts)
         wall = datetime.now(JST)
         request = {
             'now': f'{wall:%Y-%m-%d %H:%M}（{"月火水木金土日"[wall.weekday()]}）',
@@ -333,7 +365,7 @@ class Initiative:
             'silence_seconds': round(max(0.0, now - self._last)),
             'conversation': self._conversation(),
             'thoughts': [{'id': t.id, 'text': t.text, 'kind': t.kind, 'motivation': t.motivation,
-                          **({'offered': True} if t.offered else {})} for t in self.thoughts if not t.expressed],
+                          **({'offered': True} if t.offered else {})} for t in sent],
             'expressed': self.expressed,
             'unknowns': self.unknowns,
         }
@@ -346,12 +378,14 @@ class Initiative:
         except Exception as e:   # 考えられなくても、会話は続ける
             log.warning('内なる考え：考えられない：%s', type(e).__name__)
             return
-        self.apply(result, time.monotonic())
+        self.apply(result, time.monotonic(), reviewed={t.id for t in sent})
 
-    def apply(self, result, now: float) -> None:
-        """モデルの答え（config/prompts/inner_thoughts.md の形）を、貯めている考えに当てる"""
+    def apply(self, result, now: float, reviewed: set[str] | None = None) -> None:
+        """モデルの答え（config/prompts/inner_thoughts.md の形）を、貯めている考えに当てる。
+        reviewed は、見直しを頼んだ前の考えの id（付け直しも捨てもされなかったものは、気持ちを下げる）"""
         if not isinstance(result, dict):
             return
+        anchor = self._seen_id
         by_id = {t.id: t for t in self.thoughts}
         # 返事に添えるよう渡した考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
         spoken = {i for i in result.get('spoken') or [] if isinstance(i, str)}
@@ -371,9 +405,16 @@ class Initiative:
         for d in result.get('drop') or []:
             if d in by_id:
                 self.thoughts.remove(by_id.pop(d))
+        touched = set(spoken) | {d for d in result.get('drop') or [] if isinstance(d, str)}
         for r in result.get('rescore') or []:
             if isinstance(r, dict) and r.get('id') in by_id:
-                by_id[r['id']].motivation = _motivation(r.get('motivation'), by_id[r['id']].motivation)
+                t = by_id[r['id']]
+                t.motivation = _motivation(r.get('motivation'), t.motivation)
+                t.anchor = anchor   # 今の会話で見直された：きっかけを今に付け直す
+                touched.add(t.id)
+        for t in self.thoughts:
+            if reviewed and t.id in reviewed and t.id not in touched:
+                t.motivation = max(1.0, t.motivation - UNREVIEWED_LOSS)   # 見直されずに放っておかれた考えは沈める
         added = 0
         for raw in result.get('thoughts') or []:
             if added >= 3:
@@ -384,7 +425,7 @@ class Initiative:
             if any(t.text == text for t in self.thoughts) or text in self.expressed:
                 continue
             kind = raw.get('kind') if raw.get('kind') in KINDS else 'comment'
-            self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now))
+            self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor))
             added += 1
         self.thoughts = sorted(self.thoughts, key=lambda t: -t.motivation)[:MAX_THOUGHTS]
         unknowns = result.get('unknowns')
