@@ -99,6 +99,7 @@ namespace Ciel.Conversation
             public string question, checkedAt, status;
             public bool clipped;
             public string[] parts;
+            public float startedAt;   // 調べ始めの知らせが届いた時刻（Time.unscaledTime。調べている秒数を出す）
             public readonly List<ResearchSource> sources = new List<ResearchSource>();
             public string Summary => parts == null ? "" : string.Concat(parts);
         }
@@ -189,6 +190,17 @@ namespace Ciel.Conversation
         public bool Summarizing => Summary != null && (Summary.updating || Summary.stage == "queued" || Summary.stage == "building");
         /// Web で調べている（調べた記録のうち、まだ終わっていないものがある）
         public bool ResearchPending => _researchResults.Exists(r => r.status == "pending");
+        /// いちばん前から調べているものの、調べ始めてからの秒数（調べていなければ -1）
+        public float ResearchSeconds
+        {
+            get
+            {
+                var first = -1f;
+                foreach (var r in _researchResults)
+                    if (r.status == "pending" && (first < 0 || r.startedAt < first)) first = r.startedAt;
+                return first < 0 ? -1f : Time.unscaledTime - first;
+            }
+        }
         /// 選べるまとめの種類（会話サーバーが会話の始めに送る）
         public IReadOnlyList<SummaryTemplate> SummaryTemplates => _summaryTemplates;
         readonly List<SummaryTemplate> _summaryTemplates = new List<SummaryTemplate>();
@@ -1003,9 +1015,10 @@ namespace Ciel.Conversation
             if (p.type == "research.result")
             {
                 if (p.part_count < 0 || p.part_count > 4 || (p.question?.Length ?? 0) > 1200) return;
+                var startedAt = r?.startedAt ?? Time.unscaledTime;   // 結果が届いても、調べ始めの時刻は変えない
                 if (r != null) _researchResults.Remove(r);
                 r = new ResearchResult { id = p.id, question = p.question, checkedAt = p.checked_at,
-                    status = p.status, clipped = p.clipped, parts = new string[p.part_count] };
+                    status = p.status, clipped = p.clipped, parts = new string[p.part_count], startedAt = startedAt };
                 _researchResults.Add(r);
                 if (_researchResults.Count > 20) _researchResults.RemoveAt(0);
             }

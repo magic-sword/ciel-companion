@@ -571,7 +571,9 @@ namespace Ciel.EditorTools
                 var name = new[] { "status-listening", "status-thinking", "status-research", "status-speaking" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 string Text(string path) => ui.transform.Find("ConversationCanvas/SafeArea/" + path).GetComponent<UnityEngine.UI.Text>().text;
-                File.AppendAllText(log, $"{name}: {Text("Status")}｜{Text("Activity")}｜{Text("Caption")}\n");
+                var tasks = string.Join("・", System.Linq.Enumerable.Select(
+                    ui.transform.Find("ConversationCanvas/SafeArea/Tasks").GetComponentsInChildren<UnityEngine.UI.Text>(), t => t.text));
+                File.AppendAllText(log, $"{name}: {Text("Status")}｜札 {tasks}｜{Text("Caption")}\n");
                 _captured = true;
                 _mark = now;
                 return;

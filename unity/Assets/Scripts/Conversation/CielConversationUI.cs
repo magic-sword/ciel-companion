@@ -6,6 +6,7 @@
 // 画面の部品は実行時にコードで作る（シーンに置くのは、このコンポーネントだけ）。
 // このファイルはふだんの画面。設定画面は CielConversationUI.Settings.cs、調べたこと・出典は CielConversationUI.Research.cs、
 // 参加者の札と名前の直しは CielConversationUI.People.cs、会話のまとめ（議事録など）は CielConversationUI.Summary.cs、
+// 裏で進んでいる仕事の札（調べもの・まとめ）は CielConversationUI.Tasks.cs、
 // 部品を作る道具は CielConversationUI.Parts.cs、部品に付ける動きは CielUIComponents.cs。
 // 寸法はモックアップ（390×844）の値。上下の位置は、端末の切り欠きを除いた範囲（Screen.safeArea）から測る。
 using System.Collections.Generic;
@@ -41,7 +42,7 @@ namespace Ciel.Conversation
         // 声の様子と状態
         readonly List<RectTransform> _bars = new List<RectTransform>();
         readonly List<Image> _barImages = new List<Image>();
-        Text _status, _caption, _activity;
+        Text _status, _caption;
         // マイク
         Button _micButton;
         Image _micHex, _micGlow, _micIcon, _ringBreath, _ringDots;
@@ -214,13 +215,8 @@ namespace Ciel.Conversation
             _caption = Txt("Caption", root, 9, WithAlpha(TextSub, 0.55f), TextAnchor.MiddleCenter);
             Place(_caption.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 6), new Vector2(200, 14));
 
-            // 裏で進んでいること（まとめを作っている・話しながら調べている）。声の様子のすぐ上に細く
-            _activity = Txt("Activity", root, 12, Amber, TextAnchor.MiddleCenter);
-            _activity.supportRichText = false;
-            Place(_activity.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 216), new Vector2(360, 18));
-            var activityShadow = _activity.gameObject.AddComponent<Shadow>();
-            activityShadow.effectColor = new Color(0, 0.08f, 0.16f, 0.8f);
-            activityShadow.effectDistance = new Vector2(0, -1f);
+            // 裏で進んでいる仕事の札（調べもの・まとめ）。声の様子のすぐ上（CielConversationUI.Tasks.cs）
+            BuildTasks(root);
         }
 
         void BuildBottomRow(RectTransform root)
@@ -397,10 +393,10 @@ namespace Ciel.Conversation
         // 会話サーバーが返事を考えている（返事を頼んでから、声が出るまで）
         static bool Thinking(CielConversation c) => c.Thinking;
 
-        // シエルの状態（マイクの上）と、裏で進んでいること（声の様子の上）。利用者の声やシエルの声の始まり・終わりでも変わるので、
-        // 毎フレーム見る（変わったときだけ書き換える）。上から順に優先する：
-        // 話しています（声が出ている）→ 調べています（Web で調べている）→ 考えています（返事を頼んでから声が出るまで）
-        // → 聞いています（利用者の声が届いている）→ 話しかけてください
+        // 会話の番（マイクの上。いつも 1 つ）と、裏で進んでいる仕事の札（声の様子の上）。利用者の声やシエルの声の始まり・終わりでも
+        // 変わるので、毎フレーム見る（変わったときだけ書き換える）。会話の番は上から順に優先する：
+        // 話しています（声が出ている）→ 考えています（返事を頼んでから声が出るまで）→ 聞いています（利用者の声が届いている）
+        // → 考えています（Web で調べ終わるのを待っている。調べていることは札で出す）→ 話しかけてください
         void UpdateStatusLine()
         {
             var c = _conversation;
@@ -414,17 +410,14 @@ namespace Ciel.Conversation
                 CielConversation.State.Failed => ("接続できませんでした", ""),
                 CielConversation.State.Disconnected => ("接続していません", ""),
                 _ when speaking => ("話しています", "S P E A K I N G"),
-                _ when research => ("調べています…", "S E A R C H I N G"),
                 _ when Thinking(c) => ("考えています…", "T H I N K I N G"),   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
                 _ when listening => ("聞いています…", "L I S T E N I N G"),
+                _ when research => ("考えています…", "T H I N K I N G"),
                 _ => (c.MicEnabled ? "話しかけてください" : "マイクを入れると話せます", c.MicEnabled ? "L I S T E N I N G" : ""),
             };
             if (_status.text != status) _status.text = status;
             if (_caption.text != caption) _caption.text = caption;
-            var activity = connected && c.Summarizing ? c.Summary.label + "をまとめています…" : "";
-            if (research && speaking)   // 話しながら調べているときは、裏のこととして出す
-                activity = activity == "" ? "調べています…" : activity + "・調べています…";
-            if (_activity.text != activity) _activity.text = activity;
+            UpdateTasks(connected);
         }
 
         // ---- 動き ----
