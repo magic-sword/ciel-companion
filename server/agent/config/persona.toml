@@ -16,6 +16,7 @@ talk_chatty_nudge_file = "prompts/talk_chatty_nudge.md"
 # 内なる考え（initiative.py）：会話の裏でシエルの考えを作り、話したい気持ちを決める係への指示と、ふつうのときの言い直しの合図
 inner_thoughts_instructions_file = "prompts/inner_thoughts.md"
 talk_correction_nudge_file = "prompts/talk_correction_nudge.md"
+talk_offer_instructions_file = "prompts/talk_offer.md"
 # その場にいる人（mode.py）：覚えていることの出し方
 presence_solo_instructions_file = "prompts/presence_solo.md"
 presence_close_instructions_file = "prompts/presence_close.md"

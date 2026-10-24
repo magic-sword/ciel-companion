@@ -243,7 +243,9 @@ async def entrypoint(ctx: JobContext) -> None:
     # シエルの内なる考え：会話の裏で考えを作り、話したい気持ちが強い考えを、会話が途切れたときに話す（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge, history=history,
                                    instructions=agent.persona.inner_thoughts_instructions,
-                                   correction_nudge=agent.persona.talk_correction_nudge)
+                                   correction_nudge=agent.persona.talk_correction_nudge,
+                                   offer_note=agent.persona.talk_offer_instructions)
+    replies.initiative = talker   # 相手への返事に、話したかった考えを添える
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:

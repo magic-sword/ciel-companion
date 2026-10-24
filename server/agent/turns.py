@@ -132,6 +132,8 @@ class TurnReplies:
         self.touch = None
         # interruptions.InterruptionGate（シエルが話している途中の短い声を、中断にしない）。会話が始まってから作る
         self.overlap = None
+        # initiative.Initiative（シエルの内なる考え）。返事に添える考えをもらう。agent.py があとでつなぐ
+        self.initiative = None
         self._speaking = False
         self._started_at: float | None = None   # まだ返事を作らせていない発言の、最初の話し始め
         self._ended_at: float | None = None     # その最後の話し終わり
@@ -467,6 +469,9 @@ class TurnReplies:
         await self._generate_reply(extra)
 
     async def _generate_reply(self, extra: dict) -> None:
+        offer = self.initiative.offer() if self.initiative is not None else None
+        if offer is not None:   # 話したかった考えを、流れに合えば返事の最後に添えさせる
+            extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), offer)))
         if self.minutes is not None:
             context = self.minutes.context()
             if TURN_CONTEXT == 'items':

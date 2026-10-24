@@ -13,18 +13,58 @@ from initiative import Initiative, Thought
 def make(talk='chatty', history=None):
     session = SimpleNamespace(generate_reply=Mock())
     style = SimpleNamespace(talk=talk)
-    i = Initiative(session, style, 'NUDGE', history=history, instructions='THINK', correction_nudge='FIX')
+    i = Initiative(session, style, 'NUDGE', history=history, instructions='THINK', correction_nudge='FIX',
+                   offer_note='OFFER')
     i._agent_busy = False
     return i
 
 
+def agent_finished(i, at):
+    """Ciel finished speaking her reply at time `at`."""
+    i._last = at
+    i._agent_done_at = at
+
+
 class DecisionTests(unittest.TestCase):
-    def test_speaks_strong_thought_only_after_a_pause(self):
+    def test_continues_right_after_her_reply_when_nobody_speaks(self):
         i = make()
-        i.thoughts = [Thought('星空の写真を見たい', 'comment', 4.0, created=100.0)]
-        i._last = 100.0
-        self.assertIsNone(i.pick(100.0 + initiative.PAUSE_SECONDS - 1))
-        self.assertEqual(i.pick(100.0 + initiative.PAUSE_SECONDS).text, '星空の写真を見たい')
+        i.thoughts = [Thought('星空の写真を見たい', 'comment', 5.0, created=100.0)]
+        agent_finished(i, 100.0)
+        self.assertIsNone(i.pick(100.0 + initiative.CONTINUE_AFTER - 0.5))
+        self.assertEqual(i.pick(100.0 + initiative.CONTINUE_AFTER).text, '星空の写真を見たい')
+        # past the window: wait for the long-silence fallback instead
+        self.assertIsNone(i.pick(100.0 + initiative.CONTINUE_WINDOW + 1))
+        self.assertIsNotNone(i.pick(100.0 + initiative.FALLBACK_SECONDS))
+
+    def test_continuation_needs_a_strong_thought_and_shares_the_cooldown(self):
+        i = make()
+        i.thoughts = [Thought('ふつうの考え', 'comment', 4.0, created=100.0)]
+        agent_finished(i, 100.0)
+        self.assertIsNone(i.pick(102.0))   # 4 waits for the next reply instead
+        i.thoughts = [Thought('とても話したい', 'comment', 5.0, created=100.0)]
+        i._added_at = 90.0                 # just offered one in the reply
+        self.assertIsNone(i.pick(102.0))
+        i._added_at = 100.0 - initiative.ADD_COOLDOWN
+        self.assertIsNotNone(i.pick(102.0))
+
+    def test_no_continuation_when_the_user_started_talking(self):
+        i = make()
+        i.thoughts = [Thought('星空の写真を見たい', 'comment', 5.0, created=100.0)]
+        agent_finished(i, 100.0)
+        i.on_user_state(SimpleNamespace(new_state='speaking'))
+        i._last = 101.0
+        i.on_user_state(SimpleNamespace(new_state='listening'))
+        i._last = 101.0
+        self.assertIsNone(i.pick(102.0))
+
+    def test_no_continuation_after_her_own_initiative(self):
+        i = make()
+        i._spoke_at = 90.0   # she started this talk herself
+        i.on_agent_state(SimpleNamespace(old_state='speaking', new_state='listening'))
+        self.assertIsNone(i._agent_done_at)
+        i._spoke_at = None
+        i.on_agent_state(SimpleNamespace(old_state='speaking', new_state='listening'))
+        self.assertIsNotNone(i._agent_done_at)
 
     def test_weak_thought_needs_long_silence(self):
         i = make()
@@ -32,6 +72,18 @@ class DecisionTests(unittest.TestCase):
         i._last = 0.0
         self.assertIsNone(i.pick(20.0))
         self.assertIsNotNone(i.pick(60.0))   # +1.0 after 60 s of silence
+
+    def test_offer_adds_one_strong_thought_with_cooldown(self):
+        i = make()
+        i.thoughts = [Thought('どんなカメラで撮ったのかな', 'question', 4.0), Thought('弱い', 'comment', 2.0)]
+        note = i.offer()
+        self.assertTrue(note.startswith('OFFER'))
+        self.assertIn('[言えたら添えたいこと（相手に聞きたいこと）] どんなカメラで撮ったのかな', note)
+        i.thoughts.append(Thought('次の考え', 'comment', 5.0))
+        self.assertIsNone(i.offer())   # cooldown
+        i._added_at -= initiative.ADD_COOLDOWN
+        self.assertIn('次の考え', i.offer())
+        self.assertIsNone(make('normal').offer())
 
     def test_old_thoughts_fade_and_unanswered_raises_the_bar(self):
         i = make()
@@ -120,6 +172,18 @@ class ThinkTests(unittest.IsolatedAsyncioTestCase):
         i._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(side_effect=RuntimeError))))
         await i._think(0.0)
         self.assertEqual(i.thoughts, [])
+
+
+class ReplyOfferTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reply_carries_the_offered_thought(self):
+        from turns import TurnReplies
+        session = SimpleNamespace(generate_reply=Mock())
+        style = SimpleNamespace(talk='chatty', presence='close', publish=None)
+        r = TurnReplies(session, None, None, style, '')
+        r.initiative = SimpleNamespace(offer=lambda: 'OFFER [言えたら添えたいこと（感想）] x')
+        await r._generate_reply({'instructions': '[発言者：ミナ]'})
+        self.assertEqual(session.generate_reply.call_args.kwargs['instructions'],
+                         '[発言者：ミナ]\n\nOFFER [言えたら添えたいこと（感想）] x')
 
 
 if __name__ == '__main__':

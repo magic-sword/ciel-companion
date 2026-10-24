@@ -55,7 +55,8 @@ NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/1400
 | 考えるきっかけ（新しい発言・静かなとき） | `Initiative._should_think` |
 | 考えを作り、8 つの観点で気持ちを付ける・知らないことを更新する | `Initiative._think` → `config/prompts/inner_thoughts.md`（軽いモデル）→ `Initiative.apply` |
 | 気持ちの今の強さ（沈黙・古さ・返事が無いとき） | `Initiative.score` |
-| 今話す考えを選ぶ（モードごと） | `Initiative.pick` |
+| 今話す考えを選ぶ（話し終えた直後に続ける・長い沈黙・モードごと） | `Initiative.pick`・`continuing` |
+| 相手への返事に添える | `Initiative.offer` → `turns.py` の `_generate_reply`（`config/prompts/talk_offer.md`） |
 | 話したいことを会話に置いて話しかけさせる | `Initiative._express`・`_say`（system の項目）→ `config/prompts/talk_chatty_nudge.md` |
 | 試験 | `server/agent/bench_thoughts.py`（開発用の会話サーバー）、`server/agent/tests/test_initiative.py` |
 
@@ -67,7 +68,7 @@ NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/1400
 - **人の会話の間は短い**（Stivers ほか、2009、[PNAS](https://www.pnas.org/doi/10.1073/pnas.0903616106)）：10 の言語で、話し手が替わる間はおおむね 0〜200 ms ほど。日本語はとくに短い。何秒も待つのは、人の会話の間としては長すぎる。
 - **話す頃合いを予測する**（Voice Activity Projection、Ekstedt ほか、[arXiv:2401.04868](https://arxiv.org/abs/2401.04868)）：声の様子から、この先 2 秒のあいだに誰が話しそうかを連続して予測する。相手が続けて話しそうか、話し終えたかを見分けられる。
 
-いまのシエル（第 1 段階）は、8 秒の沈黙のあとで話しかける。10 秒も黙っていれば、たいてい人のほうから話しかけるので、沈黙を待つやり方は頃合いとして弱い。話す頃合いの決め方は、[決定記録](decisions/inner-thoughts-ja.md) の「これから」で見直している。
+シエルは最初、8 秒の沈黙のあとで話しかけていた。10 秒も黙っていれば、たいてい人のほうから話しかけるので、沈黙を待つやり方は頃合いとして弱い。そこで今は、沈黙を待たず、シエルに話す番が来た瞬間に話す：(1) 相手への返事の最後に一言添える、(2) 返事を話し終えて相手が 1.5 秒話し始めなければ続けて話す（上の規則の (c)）、(3) 30 秒誰も話さなければ話しかける（最後の手段）。詳しくは [決定記録](decisions/inner-thoughts-ja.md) の「話す頃合いの作り直し」。
 
 ## 5. 用語
 

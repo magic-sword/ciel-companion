@@ -9,8 +9,17 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   あわせて「話している相手について、まだ知らないこと」（unknowns）を持ち、知りたいことを考えのもとにする
   （好奇心を、でたらめな話題ではなく、はっきりした知らないことに結び付ける）。
 - 考えは貯めておく（MAX_THOUGHTS 個まで）。話したら印を付け、繰り返さない。
-- 話す：おしゃべりのとき、PAUSE_SECONDS 以上静かで、気持ちが THRESHOLD 以上の考えがあれば、それを話題に話しかける
-  （config/prompts/talk_chatty_nudge.md）。気持ちは、静かな時間が長いほど少し上がり、考えが古くなるほど下がる。
+- 話す頃合い：沈黙を待たない（人の会話では、話し手が替わる間はほぼ 0.2 秒以内。何秒も黙っていれば人のほうが話す。
+  Inner Thoughts の論文も、沈黙は頃合いの手がかりとして当てにならないと書いている）。シエルに話す番が来た瞬間に話す：
+  1. 返事に添える：シエルが相手に返事をするとき、気持ちが THRESHOLD 以上の考えを「言えたら添えたいこと」として渡し、
+     流れに合えば返事の最後に一言添えさせる（offer。turns.py が返事を頼むときに呼ぶ。
+     config/prompts/talk_offer.md）。
+  2. 話し終えた直後に続ける：シエルが相手への返事を話し終えて、CONTINUE_AFTER〜CONTINUE_WINDOW 秒のあいだ相手が
+     話し始めなければ、気持ちが CONTINUE_THRESHOLD（5）以上の考えを続けて話す（話し手交替の規則の「誰も話し始めなければ、
+     今の話し手が続けてよい」。Sacks ほか 1974）。シエルが自分から話しかけたあとには続けない（ひとりで話し続けない）。
+  1・2 は合わせて ADD_COOLDOWN に 1 回まで（毎回の返事に足すと多すぎた。2026-10-24、bench_thoughts.py）。
+  3. 長い沈黙：FALLBACK_SECONDS 誰も話さなければ、話しかける（最後の手段）。
+  気持ちは、静かな時間が長いほど少し上がり、考えが古くなるほど下がる（config/prompts/talk_chatty_nudge.md）。
   話しかけても返事が無ければ、話すための気持ちを上げていく（しつこくしない）。人が話したら元に戻す。
   ふつうのときは、急ぎの言い直し（correction）で気持ちが 5 のものだけ（config/prompts/talk_correction_nudge.md）。
   ひかえめのときは話さないし、考えもしない。
@@ -36,13 +45,17 @@ from jst import JST
 log = logging.getLogger('ciel-agent.initiative')
 
 MODEL = os.environ.get('CIEL_THOUGHT_MODEL', 'gpt-5.4-mini')
-CHECK_SECONDS = 2.0
+CHECK_SECONDS = 0.5
 THINK_SETTLE_SECONDS = 3.0    # 新しい発言のあと、続きを待ってから考える
 THINK_MIN_SECONDS = 20.0      # 考えるのは、この秒数に 1 回まで
 IDLE_THINK_SECONDS = 60.0     # 静かなあいだに考える間隔（返事が無ければ倍にしていく）
 IDLE_THINK_MAX = 600.0
 THINK_TIMEOUT = 20.0
-PAUSE_SECONDS = 8.0           # これだけ静かなら、話しかけてよい
+CONTINUE_AFTER = 1.5          # シエルが話し終えて、相手がこれだけ話し始めなければ、続けて話してよい
+CONTINUE_WINDOW = 4.0         # 続けて話すのは、話し終えてからこの秒数まで（過ぎたら、長い沈黙を待つ）
+FALLBACK_SECONDS = 30.0       # 誰もこれだけ話さなければ、話しかける（最後の手段）
+ADD_COOLDOWN = 45.0           # 返事に添える・続けて話すのは、合わせてこの秒数に 1 回まで（毎回の返事に足さない）
+CONTINUE_THRESHOLD = float(os.environ.get('CIEL_THOUGHT_CONTINUE_THRESHOLD', '5.0'))   # 続けて話す気持ちの強さ
 CORRECTION_PAUSE_SECONDS = 3.0
 THRESHOLD = float(os.environ.get('CIEL_THOUGHT_THRESHOLD', '4.0'))
 SILENCE_STEP = 15.0           # 静かな時間がこれだけ続くごとに、気持ちを少し上げる
@@ -73,11 +86,12 @@ class Thought:
 
 class Initiative:
     def __init__(self, session: AgentSession, style, nudge: str, *, history=None, instructions: str = '',
-                 correction_nudge: str = '', client=None) -> None:
+                 correction_nudge: str = '', offer_note: str = '', client=None) -> None:
         self.session = session
         self.style = style   # mode.ConversationStyle
         self.nudge = nudge
         self.correction_nudge = correction_nudge
+        self.offer_note = offer_note   # 返事に添えるときの指示（config/prompts/talk_offer.md）
         self.history = history   # conversation.Conversation（最近の発言）
         self.instructions = instructions
         self._client = client
@@ -95,6 +109,8 @@ class Initiative:
         self._spoke_at: float | None = None   # 自分から話しかけた時刻（そのあと人が話したかで、返事を見る）
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
+        self._agent_done_at: float | None = None   # シエルが相手への返事を話し終えた時刻（続けて話してよいかを見る）
+        self._added_at = -1e9   # 最後に返事に添えた・続けて話した時刻
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -109,6 +125,11 @@ class Initiative:
     def on_agent_state(self, ev) -> None:
         self._agent_busy = ev.new_state in ('thinking', 'speaking', 'initializing')
         self._last = time.monotonic()
+        if getattr(ev, 'old_state', None) == 'speaking' and ev.new_state != 'speaking':
+            # 相手への返事を話し終えた（自分から話しかけたあとは、続けない）
+            self._agent_done_at = self._last if self._spoke_at is None else None
+        elif ev.new_state == 'speaking':
+            self._agent_done_at = None
 
     @property
     def client(self):
@@ -171,21 +192,54 @@ class Initiative:
         """話しかけて返事が無かった回数。前に話しかけて、まだ返事を待っているあいだも 1 回と数える"""
         return self.unanswered + (1 if self._spoke_at is not None else 0)
 
+    def continuing(self, now: float) -> bool:
+        """シエルが相手への返事を話し終えて、相手がまだ話し始めていない（続けて話してよい）"""
+        done = self._agent_done_at
+        return (done is not None and self._last <= done and not self._user_busy
+                and CONTINUE_AFTER <= now - done <= CONTINUE_WINDOW)
+
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
         self.thoughts = [t for t in self.thoughts if now - t.created < DROP_SECONDS and not t.expressed]
         silence = now - self._last
         talk = self.style.talk
         if talk == 'chatty':
-            if silence < PAUSE_SECONDS:
+            if silence >= FALLBACK_SECONDS:
+                threshold = THRESHOLD
+            elif self.continuing(now) and now - self._added_at >= ADD_COOLDOWN:
+                # 続けて話すのは、とても話したいことだけ（気持ち 4 の考えは、次の返事に添える）
+                threshold = CONTINUE_THRESHOLD
+            else:
                 return None
             best = max(self.thoughts, key=lambda t: self.score(t, now), default=None)
-            return best if best is not None and self.score(best, now) >= THRESHOLD else None
+            return best if best is not None and self.score(best, now) >= threshold else None
         if talk == 'normal' and silence >= CORRECTION_PAUSE_SECONDS:
             return next((t for t in self.thoughts if t.kind == 'correction' and t.motivation >= 5), None)
         return None
 
+    def offer(self) -> str | None:
+        """相手への返事に添える考え（turns.py が返事を頼むときに呼ぶ）。添えるなら、返事ごとの指示に足す 1 段落"""
+        if self.style.talk != 'chatty' or not self.offer_note:
+            return None
+        now = time.monotonic()
+        if now - self._added_at < ADD_COOLDOWN:
+            return None
+        fresh = [t for t in self.thoughts if not t.expressed and t.kind != 'correction' and now - t.created < DROP_SECONDS]
+        best = max(fresh, key=lambda t: t.motivation, default=None)
+        if best is None or best.motivation < THRESHOLD:
+            return None
+        # 使われたかは分からないので、渡したら話したことにする（同じ考えを何度も渡さない）
+        best.expressed = True
+        self.expressed = (self.expressed + [best.text])[-8:]
+        self._added_at = now
+        log.info('内なる考え：返事に添える（%s、気持ち %.1f）', best.kind, best.motivation)
+        debug_log.record('thought_offered', thought_kind=best.kind, text=best.text, motivation=best.motivation)
+        return f'{self.offer_note}\n[言えたら添えたいこと（{KIND_LABELS[best.kind]}）] {best.text}'
+
     def _express(self, t: Thought, now: float) -> None:
+        if self.continuing(now):
+            self._added_at = now
+        self._agent_done_at = None   # 続けて話すのは 1 回だけ
         t.expressed = True
         self.expressed = (self.expressed + [t.text])[-8:]
         if self._spoke_at is not None:
