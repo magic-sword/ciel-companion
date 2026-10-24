@@ -78,6 +78,7 @@ UNUSED_OFFER_LOSS = 0.5       # 心の状態に載せたのに話されなかっ
 REACTIVE_KINDS = ('comment', 'correction')   # その発言への反応。相手がそのあと REACTIVE_TURNS 回話したら用済み
 REACTIVE_TURNS = 2
 UNREVIEWED_LOSS = 1.0         # 考える係が、前の考えを付け直しも捨てもしなかったら、気持ちをこれだけ下げる
+TOPIC_SHIFT_LOSS = 1.0        # 話題が移ったとき、前の話題の聞きたいこと・戻りたいことの気持ちを下げる量
 MAX_THOUGHTS = 12
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
@@ -97,16 +98,19 @@ class Thought:
     offered: bool = False   # 心の状態に載せて、実際に話したかをまだ確かめていない
     anchor: int = 0         # きっかけの発言 ID（考えた・付け直したときに確定していた最後の発言）
     shown_id: int = 0       # 心の状態に載せたときの最後の発言 ID（話したかは、これより後のシエルの発言だけで判定する）
+    topic: str = ''         # 考えたときの話題（話題が移ったら、その話題への反応は用済み）
+    stimulus: str = ''      # 何をきっかけにした考えか（相手の発言の中身・覚えていること・知りたいこと）
 
 
 class Initiative:
     def __init__(self, session: AgentSession, style, nudge: str, *, history=None, instructions: str = '',
-                 correction_nudge: str = '', state_header: str = '', client=None) -> None:
+                 correction_nudge: str = '', state_header: str = '', memories=None, client=None) -> None:
         self.session = session
         self.style = style   # mode.ConversationStyle
         self.nudge = nudge
         self.correction_nudge = correction_nudge
         self.state_header = state_header   # 心の状態の項目の頭（config/prompts/talk_inner_state.md）
+        self.memories = memories   # 今話している人について覚えていること（呼ぶと文字列の一覧。使ってよいときだけ。agent.py がつなぐ）
         self._state_item_id: str | None = None   # 会話の後ろに置いた心の状態の項目
         self._state_text: str | None = None
         self.history = history   # conversation.Conversation（最近の発言）
@@ -115,6 +119,7 @@ class Initiative:
         self.thoughts: list[Thought] = []
         self.expressed: list[str] = []   # 最近話した考え（繰り返さないため）
         self.unknowns: list[str] = []
+        self.topic = ''                  # 今の話題（考える係の解釈）
         self.unanswered = 0              # 話しかけたのに返事が無かった回数
         self._last = time.monotonic()    # 最後に誰かが話していた時刻
         self._user_busy = False
@@ -385,6 +390,16 @@ class Initiative:
 
     # ---- 考える ----
 
+    def _memories(self) -> list[str]:
+        """今話している人について覚えていること（使ってよいときだけ。agent.py の memories）"""
+        if self.memories is None:
+            return []
+        try:
+            return [m.strip()[:200] for m in self.memories() if isinstance(m, str) and m.strip()][:15]
+        except Exception as e:
+            log.warning('内なる考え：覚えていることを読めない: %s', type(e).__name__)
+            return []
+
     def _ciel_since(self, after: int) -> list[str]:
         """心の状態に載せたあとのシエルの発言（載せた考えを話したかは、これだけで判定させる）"""
         if self.history is None:
@@ -411,6 +426,7 @@ class Initiative:
         self._new_at = None
         self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
         sent = list(self.thoughts)
+        memories = self._memories()
         wall = datetime.now(JST)
         request = {
             'now': f'{wall:%Y-%m-%d %H:%M}（{"月火水木金土日"[wall.weekday()]}）',
@@ -421,6 +437,8 @@ class Initiative:
                           **({'offered': True} if t.offered else {})} for t in sent],
             'expressed': self.expressed,
             'unknowns': self.unknowns,
+            **({'topic': self.topic} if self.topic else {}),
+            **({'memories': memories} if memories else {}),
             **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
                if any(t.offered for t in sent) else {}),
         }
@@ -443,7 +461,8 @@ class Initiative:
         anchor = self._seen_id
         by_id = {t.id: t for t in self.thoughts}
         # 心の状態に載せた考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
-        spoken = {i for i in result.get('spoken') or [] if isinstance(i, str)}
+        spoken = _ids(result.get('spoken'))
+        dropped = _ids(result.get('drop'))
         for t in list(self.thoughts):
             # 載せたあと、シエルがまだ話していなければ、判定は保留（載せる前の発言で「話した」にしない）
             pending = t.offered and self.history is not None and not self._ciel_since(t.shown_id)
@@ -459,10 +478,10 @@ class Initiative:
             elif t.offered and not pending:
                 t.offered = False
                 t.motivation = max(1.0, t.motivation - UNUSED_OFFER_LOSS)
-        for d in result.get('drop') or []:
+        for d in dropped:
             if d in by_id:
                 self.thoughts.remove(by_id.pop(d))
-        touched = set(spoken) | {d for d in result.get('drop') or [] if isinstance(d, str)}
+        touched = spoken | dropped
         for r in result.get('rescore') or []:
             if isinstance(r, dict) and r.get('id') in by_id:
                 t = by_id[r['id']]
@@ -472,17 +491,35 @@ class Initiative:
         for t in self.thoughts:
             if reviewed and t.id in reviewed and t.id not in touched:
                 t.motivation = max(1.0, t.motivation - UNREVIEWED_LOSS)   # 見直されずに放っておかれた考えは沈める
+        # 相手の最新の発言の解釈（研究 Inner Thoughts の「考える前に解釈する」）。話題が移ったら、前の話題への反応は用済み、
+        # 前の話題の聞きたいこと・戻りたいことは気持ちを下げる。あいさつ・言いかけの切れ端からは新しい考えを作らない
+        interpretation = result.get('interpretation') if isinstance(result.get('interpretation'), dict) else {}
+        content = interpretation.get('content')
+        topic = interpretation.get('topic').strip()[:40] if isinstance(interpretation.get('topic'), str) else ''
+        if interpretation.get('topic_shift') is True and topic:
+            for t in list(self.thoughts):
+                if t.topic and t.topic != topic and t.id not in touched:
+                    if t.kind in REACTIVE_KINDS:
+                        self.thoughts.remove(t)
+                    else:
+                        t.motivation = max(1.0, t.motivation - TOPIC_SHIFT_LOSS)
+        if topic:
+            self.topic = topic
         added = 0
         for raw in result.get('thoughts') or []:
-            if added >= 3:
+            if added >= 3 or content in ('greeting', 'fragment'):
                 break
             if not isinstance(raw, dict) or not isinstance(raw.get('text'), str) or not raw['text'].strip():
                 continue
+            stimulus = raw.get('stimulus').strip()[:120] if isinstance(raw.get('stimulus'), str) else ''
+            if not stimulus:
+                continue   # きっかけを言えない考えは作らない（漠然とした考えを防ぐ）
             text = raw['text'].strip()[:80]
             if any(t.text == text for t in self.thoughts) or text in self.expressed:
                 continue
             kind = raw.get('kind') if raw.get('kind') in KINDS else 'comment'
-            self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor))
+            self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor,
+                                         topic=self.topic, stimulus=stimulus))
             added += 1
         self.thoughts = sorted(self.thoughts, key=lambda t: -t.motivation)[:MAX_THOUGHTS]
         unknowns = result.get('unknowns')
@@ -491,8 +528,17 @@ class Initiative:
         top = max((t.motivation for t in self.thoughts), default=0)
         log.info('内なる考え：%d 個足した（貯めている %d 個、いちばん強い気持ち %.0f、知りたいこと %d 個）',
                  added, len(self.thoughts), top, len(self.unknowns))
-        debug_log.record('thoughts', thoughts=[{'text': t.text, 'kind': t.kind, 'motivation': t.motivation}
-                                                for t in self.thoughts], unknowns=self.unknowns)
+        debug_log.record('thoughts', thoughts=[{'text': t.text, 'kind': t.kind, 'motivation': t.motivation,
+                                                 'stimulus': t.stimulus} for t in self.thoughts],
+                         unknowns=self.unknowns, interpretation=interpretation)
+
+
+def _ids(value) -> set[str]:
+    """考えの id の一覧。モデルは文字列のほかに {"id": …} で返すこともある（2026-10-24、評価で見つけた）"""
+    if not isinstance(value, list):
+        return set()
+    return {v if isinstance(v, str) else v.get('id') for v in value
+            if isinstance(v, str) or (isinstance(v, dict) and isinstance(v.get('id'), str))}
 
 
 def _motivation(value, default: float) -> float:

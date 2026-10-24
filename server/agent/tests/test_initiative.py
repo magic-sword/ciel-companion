@@ -167,9 +167,9 @@ class DecisionTests(unittest.TestCase):
         keep = Thought('残す考え', 'comment', 2.0, created=0.0)
         i.thoughts = [old, keep]
         i.apply({'drop': [old.id], 'rescore': [{'id': keep.id, 'motivation': 9}],
-                 'thoughts': [{'text': '新しい', 'kind': 'weird', 'motivation': 'x'},
-                              {'text': '残す考え', 'kind': 'comment', 'motivation': 5},
-                              {'text': '  '}, {'text': '聞きたい', 'kind': 'question', 'motivation': 4}],
+                 'thoughts': [{'text': '新しい', 'kind': 'weird', 'motivation': 'x', 'stimulus': 's'},
+                              {'text': '残す考え', 'kind': 'comment', 'motivation': 5, 'stimulus': 's'},
+                              {'text': '  ', 'stimulus': 's'}, {'text': '聞きたい', 'kind': 'question', 'motivation': 4, 'stimulus': 's'}],
                  'unknowns': ['好きな季節', 3, '']}, 1.0)
         texts = {t.text: t for t in i.thoughts}
         self.assertNotIn('古い考え', texts)
@@ -185,7 +185,8 @@ class ThinkTests(unittest.IsolatedAsyncioTestCase):
         h = Conversation()
         i = make(history=h)
         reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(
-            {'thoughts': [{'text': '星空いいな', 'kind': 'comment', 'motivation': 4}], 'unknowns': ['住んでいる地域']})))])
+            {'thoughts': [{'text': '星空いいな', 'kind': 'comment', 'motivation': 4, 'stimulus': '冬の星空を撮った'}],
+             'unknowns': ['住んでいる地域']})))])
         i._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(return_value=reply))))
         t = h.reserve()
         h.complete(t, '冬の星空を撮りに行ったんだ')
@@ -276,6 +277,13 @@ class StalenessTests(unittest.TestCase):
         self.i.apply({'spoken': []}, 2.0)                 # now judged on her later line: not spoken
         self.assertFalse(orion.offered)
 
+    def test_ids_may_come_back_as_objects(self):
+        t = Thought('古い', 'comment', 3.0)
+        u = Thought('話した', 'comment', 3.0)
+        self.i.thoughts = [t, u]
+        self.i.apply({'drop': [{'id': t.id}, 5, None], 'spoken': [{'id': u.id}]}, 1.0)
+        self.assertEqual(self.i.thoughts, [])
+
     def test_waits_while_the_user_keeps_talking(self):
         self.say('ねえ、シエル。')
         self.i._last = 100.0
@@ -283,6 +291,63 @@ class StalenessTests(unittest.TestCase):
         self.i._last = 102.0                            # still producing speech
         self.assertFalse(self.i._should_think(100.0 + initiative.THINK_SETTLE_SECONDS))
         self.assertTrue(self.i._should_think(102.0 + initiative.THINK_SETTLE_SECONDS))
+
+
+class QualityTests(unittest.IsolatedAsyncioTestCase):
+    def test_no_new_thoughts_from_greetings_or_fragments(self):
+        i = make()
+        for content in ('greeting', 'fragment'):
+            i.apply({'interpretation': {'content': content},
+                     'thoughts': [{'text': 'なにを話すのかな', 'kind': 'comment', 'stimulus': '呼びかけ', 'motivation': 4}]}, 1.0)
+        self.assertEqual(i.thoughts, [])
+        i.apply({'interpretation': {'content': 'substantive', 'topic': '星空の撮影'},
+                 'thoughts': [{'text': 'どんなカメラかな', 'kind': 'question', 'stimulus': 'オリオン座を撮った', 'motivation': 4}]}, 1.0)
+        self.assertEqual([(t.text, t.topic, t.stimulus) for t in i.thoughts], [('どんなカメラかな', '星空の撮影', 'オリオン座を撮った')])
+
+    def test_thought_without_a_stimulus_is_not_kept(self):
+        i = make()
+        i.apply({'thoughts': [{'text': '今日は何を話したいのかな', 'kind': 'question', 'motivation': 4},
+                              {'text': 'カメラが気になる', 'kind': 'question', 'stimulus': ' ', 'motivation': 4}]}, 1.0)
+        self.assertEqual(i.thoughts, [])
+
+    def test_topic_shift_retires_reactions_and_weakens_old_questions(self):
+        i = make()
+        i.topic = 'カレー'
+        reaction = Thought('スパイスの香りがよさそう', 'comment', 4.0, topic='カレー')
+        question = Thought('どこでスパイスを買うのかな', 'question', 4.0, topic='カレー')
+        kept = Thought('辛さはどのくらいかな', 'question', 4.0, topic='カレー')
+        i.thoughts = [reaction, question, kept]
+        i.apply({'interpretation': {'content': 'substantive', 'topic': 'プレゼン', 'topic_shift': True},
+                 'rescore': [{'id': kept.id, 'motivation': 4}]}, 1.0, reviewed={kept.id})
+        self.assertNotIn(reaction, i.thoughts)
+        self.assertEqual(question.motivation, 4.0 - initiative.TOPIC_SHIFT_LOSS)
+        self.assertEqual(kept.motivation, 4.0)          # still relevant according to the thinker
+        self.assertEqual(i.topic, 'プレゼン')
+
+    async def test_memories_are_given_to_the_thinker_only_when_provided(self):
+        h = Conversation()
+        t = h.reserve()
+        h.complete(t, '今朝も走ってきたよ')
+        reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{}'))])
+        create = AsyncMock(return_value=reply)
+        i = make(history=h)
+        i._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+        i.memories = lambda: ['来月フルマラソン', '  ', 3]
+        await i._think(0.0)
+        request = json.loads(create.await_args.kwargs['messages'][1]['content'])
+        self.assertEqual(request['memories'], ['来月フルマラソン'])
+        i.memories = lambda: []
+        await i._think(0.0)
+        self.assertNotIn('memories', json.loads(create.await_args.kwargs['messages'][1]['content']))
+
+    def test_speaker_notes_follow_the_pushed_context(self):
+        from speakers import SessionSpeaker
+        sp = SessionSpeaker(label='x')
+        self.assertEqual(sp.notes(), [])
+        sp.notes_context = '[ハカセさんについて覚えていること（今日は2026-10-24）：来月マラソン／右膝を痛めた]'
+        self.assertEqual(sp.notes(), ['来月マラソン', '右膝を痛めた'])
+        sp.memory_suppressed = True
+        self.assertEqual(sp.notes(), [])
 
 
 class InnerStateTests(unittest.IsolatedAsyncioTestCase):

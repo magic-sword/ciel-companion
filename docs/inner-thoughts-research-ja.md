@@ -54,6 +54,34 @@ NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/1400
 - **言っていること**：今の LLM エージェントの「探索」は、多くが好奇心ではなく、でたらめに選んでいるだけ。好奇心には、何を知らないかのはっきりしたモデルが要る。
 - **シエルでの使い方**：好奇心を「なんとなく話題を出す」にしないため、知らないことを一覧（unknowns）として持たせ、それに結び付いた考えだけを「聞きたいこと」にする。
 
+### 2.6 好奇心の情報ギャップ理論
+
+George Loewenstein、「The Psychology of Curiosity」、Psychological Bulletin、1994 年。[概要](https://stafforini.com/works/loewenstein-1994-psychology-curiosity-review/)
+
+- **言っていること**：好奇心は、知っていることと知りたいことの間に、埋められそうな隙間を感じたときに湧く。何も知らないことには好奇心は湧かない。
+- **シエルで使ったもの**：知りたいこと（unknowns）は、相手がもう話したことのすぐ隣の隙間から作らせる（「オリオン座を撮った」→「どんなカメラで撮ったのか」）。「何を話したい？」のような手がかりの無い問いは作らせない。
+
+### 2.7 良い質問の価値（EVPI）
+
+Sudha Rao・Hal Daumé III、「Learning to Ask Good Questions」、ACL 2018。[論文](https://alphaxiv.org/abs/1805.04655)
+
+- **言っていること**：質問の価値は、その答えが返ってきたらどれだけ役に立つか（完全情報の期待値、EVPI）で測れる。
+- **シエルで使ったもの**：聞きたいことの気持ちに「答えを聞いたら、その人に合った話や手助けができるようになるか」の観点を入れた。
+
+### 2.8 能動的な対話の調査論文
+
+Yang Deng ほか、「A Survey on Proactive Dialogue Systems」、IJCAI 2023。[arXiv:2305.02750](https://arxiv.org/abs/2305.02750v2)
+
+- **言っていること**：能動的な対話を、話題の移り変わりの検出・話題の計画・話題を踏まえた返事に分けて整理している。
+- **シエルで使ったもの**：考える係に話題と、話題が移ったかを判定させ、移ったら前の話題への反応を用済みにする。
+
+### 2.9 長期記憶を持つ会話（MemoryBank・MemGPT）
+
+MemoryBank（AAAI 2024、[論文](https://ojs.aaai.org/index.php/AAAI/article/view/29946)）、MemGPT（[プロジェクト](https://sky.cs.berkeley.edu/project/memgpt/)）。
+
+- **言っていること**：会話を越えて記憶を持ち、関係・新しさ・重要さ（MemoryBank は忘却曲線も）で呼び出して返事に使う。多くは聞かれたときに呼び出す作りで、記憶を自分から話題にする研究は少ない。
+- **シエルで使ったもの**：その人について覚えているメモ（本人の同意があり、人前でないときだけ）を考えの材料にし、今の話とつながる記憶を、自分から思い出す考えにする（「前に来月マラソンだと言っていた。調子はどうかな」）。
+
 ## 3. 考えとコードの対応
 
 | 考え | 場所 |
@@ -68,7 +96,9 @@ NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/1400
 | 心の状態に載せた考えを話したかの判定 | `Initiative.apply` の `spoken`（載せたあとのシエルの発言だけで、考える係が判定） |
 | 会話モデルが心の中を読む・預ける | `tools/thoughts.py` の `read_inner_thoughts`・`keep_thought`（`config/prompts/inner_thoughts_voice.md`） |
 | 話したいことを会話に置いて話しかけさせる | `Initiative._express`・`_say`（system の項目）→ `config/prompts/talk_chatty_nudge.md` |
-| 試験 | `server/agent/bench_thoughts.py`（開発用の会話サーバー）、`server/agent/tests/test_initiative.py` |
+| 考える前の解釈・きっかけ・話題の移り変わり | `Initiative.apply` の `interpretation`・`stimulus`・`topic`（`config/prompts/inner_thoughts.md`） |
+| 覚えていることを材料にする | `Initiative._memories` ← `agent.py` の `memories`（`SessionSpeaker.notes`） |
+| 試験・評価 | `server/agent/bench_thoughts.py`（声の試験）、`server/agent/eval_thoughts.py`（決まった場面の採点）、`server/agent/tests/test_initiative.py` |
 
 ## 4. 話す頃合い（ターンテイキング）についての知見
 

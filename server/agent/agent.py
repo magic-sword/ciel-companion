@@ -245,7 +245,9 @@ async def entrypoint(ctx: JobContext) -> None:
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge, history=history,
                                    instructions=agent.persona.inner_thoughts_instructions,
                                    correction_nudge=agent.persona.talk_correction_nudge,
-                                   state_header=agent.persona.talk_inner_state_instructions)
+                                   state_header=agent.persona.talk_inner_state_instructions,
+                                   memories=lambda: book.last.notes() if book is not None and book.last is not None
+                                   and book.last_sure and style.presence in ('solo', 'close') else [])
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
     session.on('user_state_changed', talker.on_user_state)

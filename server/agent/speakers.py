@@ -165,6 +165,14 @@ class SessionSpeaker:
     relation_context: dict[bool, str] = field(default_factory=dict)
     memory_suppressed: bool = False
 
+    def notes(self) -> list[str]:
+        """この会話で渡してよいことになった、その人について覚えていること（notes_context の中身。無ければ空）。
+        notes_context は、その場にいる人がひとり・身近な人で、本人の同意があるときだけ作られる（identify_parts）"""
+        if self.memory_suppressed or '：' not in self.notes_context:
+            return []
+        body = self.notes_context.split('：', 1)[1].rstrip().rstrip(']')
+        return [n for n in body.split('／') if n.strip()]
+
     def add(self, e: np.ndarray) -> None:
         self.embeddings.append(e)
         del self.embeddings[:-MAX_SESSION_EMBEDDINGS]
