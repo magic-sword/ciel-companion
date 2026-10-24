@@ -16,7 +16,8 @@
 | `server/agent/config/prompts/talk_quiet.md` | おしゃべり度「ひかえめ」で足す、答える・黙る（`[silent]`）の決まり。処理は `mode.py`（2026-10-17 に `group.md` から） |
 | `server/agent/config/prompts/talk_quiet_turn.md` | ひかえめのとき、返事を作らせるたびに `generate_reply` の instructions として添える短い念押し。処理は `turns.py`（2026-10-17 に `group_turn.md` から） |
 | `server/agent/config/prompts/talk_chatty.md` | おしゃべり度「おしゃべり」で足す、自分から話しかけるときの決まり |
-| `server/agent/config/prompts/talk_chatty_nudge.md` | おしゃべりのとき、しばらく静かなら `generate_reply` の instructions として渡す合図。処理は `initiative.py` |
+| `server/agent/config/prompts/talk_chatty_nudge.md` | おしゃべりのとき、話したい考えがあれば `generate_reply` の instructions として渡す合図。処理は `initiative.py` |
+| `server/agent/config/prompts/inner_thoughts.md`・`talk_correction_nudge.md` | シエルの内なる考え（会話の裏で考えを作り、話したい気持ちを決める係への指示）と、ふつうのときの言い直しの合図。処理は `initiative.py`。[内なる考え](inner-thoughts-ja.md) |
 | `server/agent/config/prompts/presence_solo.md`・`presence_close.md`・`presence_public.md` | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、人についての道具の使い方（2 人でも多人数でも。`CIEL_VOICE=irodori` で Realtime API のとき）。処理は `speakers.py`・`tools/people.py` |
 | `server/agent/config/prompts/notes.md` | 会話の裏でメモを書く記録係（別の文字のモデル）への指示。処理は `notes.py`。[メモの決定記録](person-notes-ja.md) |
@@ -34,7 +35,7 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 ## 読み込みと反映
 
 - `CIEL_PERSONA_CONFIG` が未指定または空の場合、`server/agent/config/persona.toml` を使う。環境変数の相対パスは `server/agent/` 基準。
-- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`talk_quiet_instructions_file`、`talk_quiet_turn_instructions_file`、`talk_chatty_instructions_file`、`talk_chatty_nudge_file`、`presence_solo_instructions_file`、`presence_close_instructions_file`、`presence_public_instructions_file`、`speaker_instructions_file`、`notes_instructions_file`、`relationship_instructions_file`、`minutes_instructions_file`、`minutes_live_instructions_file`、`minutes_voice_instructions_file`、`conversation_instructions_file`、`research_instructions_file`、`research_voice_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
+- TOML 内の `instructions_file`、`greeting_file`、`emotion_instructions_file`、`touch_instructions_file`、`talk_quiet_instructions_file`、`talk_quiet_turn_instructions_file`、`talk_chatty_instructions_file`、`talk_chatty_nudge_file`、`inner_thoughts_instructions_file`、`talk_correction_nudge_file`、`presence_solo_instructions_file`、`presence_close_instructions_file`、`presence_public_instructions_file`、`speaker_instructions_file`、`notes_instructions_file`、`relationship_instructions_file`、`minutes_instructions_file`、`minutes_live_instructions_file`、`minutes_voice_instructions_file`、`conversation_instructions_file`、`research_instructions_file`、`research_voice_instructions_file` は必須。相対パスは選んだ TOML のディレクトリ基準。絶対パスも利用できる。
 - 会話開始時に設定された本文ファイル一式を読み込み、その会話の指示と初回あいさつに同じ設定を使う。会話中の再読み込みはしない。
 - 人物像とあいさつは共通。感情タグの指示は `CIEL_VOICE=irodori` の場合だけ人物像に追加する。タッチの指示はどの声の方式でも追加する。その場にいる人の指示（話者の識別を使うとき）と、おしゃべり度の指示（ひかえめは `CIEL_VOICE=irodori` のときだけ。ふつうは足さない）を最後に追加する。
 - 設定・本文の欠落、不正な TOML、不正な UTF-8、空の本文はエラーにする。別のキャラクターへ自動で切り替えない。
