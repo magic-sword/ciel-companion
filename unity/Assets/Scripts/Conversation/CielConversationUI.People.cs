@@ -2,6 +2,8 @@
 // 中身は CielConversation.Speakers（会話サーバーの speakers.py が、聞き分けた人と最後に話した人を送る）。
 // 最後に話したと判定した人の札は、しばらく光る（「たぶん」の判定は弱く光り、名前に「？」を付ける）。
 // パネルでは、この会話の間だけの名前を付ける・同じ人にまとめる・さっきの発言を分けるができる（声や名前は保存しない）。
+// 声を覚えている人は、この端末の持ち主にできる（直前に話した人だけ。ひとり・身近な人のとき、その人の声を優先して聞き分ける）。
+// 持ち主の札には家の印を付ける。
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -132,6 +134,12 @@ namespace Ciel.Conversation
             label.supportRichText = false;
             label.horizontalOverflow = HorizontalWrapMode.Overflow;
             label.text = s.name;
+            if (s.id == _conversation.OwnerId)
+            {
+                var home = Rect("Owner", r, Center, Center, Vector2.zero, Vector2.zero);
+                home.gameObject.AddComponent<LayoutElement>().preferredWidth = 12;
+                Icon(home, "home", 11, WithAlpha(Mint, 0.9f));
+            }
             var button = chip.AddComponent<Button>();
             button.targetGraphic = bg;
             var id = s.id;
@@ -171,7 +179,8 @@ namespace Ciel.Conversation
             var c = _conversation;
 
             Note(_peopleContent, person.remembered
-                ? "シエルが声を覚えている人です。名前を変えるときは、ご本人がシエルに頼んでください。"
+                ? (person.id == c.OwnerId ? "この端末の持ち主です。" : "")
+                  + "シエルが声を覚えている人です。名前を変えるときは、ご本人がシエルに頼んでください。"
                 : person.named
                     ? "この会話の間だけの名前です（声や名前は保存しません）。"
                     : "まだ名前を知らない人です。名前を付けると、シエルもその名前で呼びます（この会話の間だけ）。");
@@ -237,6 +246,23 @@ namespace Ciel.Conversation
                 }
             }
 
+            if (person.id == c.OwnerId)
+            {
+                PanelLabel("この端末の持ち主");
+                Note(_peopleContent, "ひとりや身近な人と話すとき、シエルはこの人の声を優先して聞き分けます。");
+                var b = PanelButton(Row(_peopleContent, 40), "持ち主をやめる", TextAnchor.MiddleLeft);
+                b.onClick.AddListener(() => { c.UnpairDevice(); ShowPerson(null); });
+            }
+            else if (c.PairableId == person.id)
+            {
+                PanelLabel("この端末の持ち主");
+                Note(_peopleContent, string.IsNullOrEmpty(c.OwnerName)
+                    ? "この端末をいつも使う人にすると、話し始めからすぐ聞き分けられるようになります（ひとりや身近な人と話すとき）。"
+                    : $"いまの持ち主は{c.OwnerName}さんです。{person.name}さんに替えます。");
+                var b = PanelButton(Row(_peopleContent, 40), $"{person.name}さんをこの端末の持ち主にする", TextAnchor.MiddleLeft);
+                b.onClick.AddListener(() => { c.PairDevice(person.id); ShowPerson(null); });
+            }
+
             if (c.CorrectableId == person.id)
             {
                 PanelLabel("人違い");
@@ -249,8 +275,10 @@ namespace Ciel.Conversation
         // パネルの中身を決めるもの（名簿の名前と種類、人違いを分けられる人）
         string PanelKey(string id)
         {
-            var key = new System.Text.StringBuilder(_conversation.CorrectableId == id ? "c" : "-");
-            foreach (var s in _conversation.Speakers) key.Append('|').Append(s.id).Append(s.name).Append(s.named).Append(s.remembered);
+            var c = _conversation;
+            var key = new System.Text.StringBuilder(c.CorrectableId == id ? "c" : "-");
+            key.Append(c.OwnerId == id ? 'o' : '-').Append(c.PairableId == id ? 'p' : '-').Append(c.OwnerName);
+            foreach (var s in c.Speakers) key.Append('|').Append(s.id).Append(s.name).Append(s.named).Append(s.remembered);
             return FindSpeaker(id) == null ? null : key.ToString();
         }
 

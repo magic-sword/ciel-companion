@@ -5,11 +5,14 @@
 - voiceprints：声の特徴（192 次元、人ごとに複数、多すぎたら古いものから消す）
 - person_notes：その人について覚えておくメモ（短い文、人ごとに上限あり。notes.py が書く）
 - person_relationship：シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分。relationship.py が書く）
+- device_owners：端末の持ち主（アプリの端末 ID と、端末だけが持つ合言葉のハッシュ）。合言葉そのものは置かない
+- voiceprints.channel：その見本を録った経路（端末の ID など。マイクや経路で声の特徴が変わるので、同じ経路の見本を優先して比べる）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
 人を消すと、声の特徴もメモも関係も一緒に消える。管理（一覧・削除）は speaker_admin.py。
 """
 import asyncio
 import functools
+import hmac
 import logging
 import os
 from dataclasses import dataclass
@@ -22,7 +25,8 @@ from pgvector.psycopg import register_vector_async
 log = logging.getLogger('ciel-agent.speaker_store')
 
 DIM = 192
-MAX_VOICEPRINTS = 30   # 1 人あたりの見本の上限
+MAX_VOICEPRINTS = 60   # 1 人あたりの見本の上限（経路ごとの上限とは別に）
+MAX_CHANNEL_VOICEPRINTS = 20   # 1 人・1 経路あたりの見本の上限（ほかの経路の見本を押し出さない）
 
 SCHEMA = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -104,6 +108,13 @@ DO $$ BEGIN
     END IF;
 END $$;
 INSERT INTO memory_versions(person_id) SELECT id FROM people ON CONFLICT DO NOTHING;
+ALTER TABLE voiceprints ADD COLUMN IF NOT EXISTS channel text;
+CREATE TABLE IF NOT EXISTS device_owners (
+    device_id text PRIMARY KEY,
+    secret_hash text NOT NULL,
+    person_id bigint NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
 """
 MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
 
@@ -176,6 +187,25 @@ class Store:
             people.setdefault(pid, (name, seen, notes_ok, n_notes, []))[4].append(np.asarray(emb, dtype=np.float32))
         return [(pid, name, embs, seen, notes_ok, n) for pid, (name, seen, notes_ok, n, embs) in people.items()]
 
+    # ---- 端末の持ち主（合言葉はハッシュだけを置く。照らし合わせは時間の差が出ない比べ方で） ----
+
+    async def pair_device(self, device_id: str, secret_hash: str, person_id: int) -> None:
+        await self.conn.execute(
+            'INSERT INTO device_owners (device_id, secret_hash, person_id) VALUES (%s, %s, %s) '
+            'ON CONFLICT (device_id) DO UPDATE SET secret_hash = EXCLUDED.secret_hash, person_id = EXCLUDED.person_id, '
+            'created_at = now()', (device_id, secret_hash, person_id))
+
+    async def device_owner(self, device_id: str, secret_hash: str) -> int | None:
+        row = await (await self.conn.execute(
+            'SELECT secret_hash, person_id FROM device_owners WHERE device_id = %s', (device_id,))).fetchone()
+        return row[1] if row is not None and hmac.compare_digest(row[0], secret_hash) else None
+
+    async def unpair_device(self, device_id: str, secret_hash: str) -> bool:
+        if await self.device_owner(device_id, secret_hash) is None:
+            return False
+        await self.conn.execute('DELETE FROM device_owners WHERE device_id = %s', (device_id,))
+        return True
+
     async def set_notes_consent(self, person_id: int) -> None:
         await self.conn.execute('UPDATE people SET notes_consented_at = now() WHERE id = %s', (person_id,))
 
@@ -220,14 +250,15 @@ class Store:
         row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()
         return row[0]
 
-    async def remember_person(self, name: str, embeddings: list[np.ndarray], person_id: int | None = None) -> int:
+    async def remember_person(self, name: str, embeddings: list[np.ndarray], person_id: int | None = None,
+                              channel: str | None = None) -> int:
         """名前・声・同意を一括保存する。途中の失敗で半端な登録を残さない。"""
         async with self.conn.transaction():
             if person_id is None:
                 person_id = await self.add_person(name)
             else:
                 await self.rename(person_id, name)
-            await self.add_voiceprints(person_id, embeddings, None)
+            await self.add_voiceprints(person_id, embeddings, None, channel)
             await self.set_notes_consent(person_id)
         return person_id
 
@@ -241,14 +272,20 @@ class Store:
     async def rename(self, person_id: int, name: str) -> None:
         await self.conn.execute('UPDATE people SET name = %s WHERE id = %s', (name, person_id))
 
-    async def add_voiceprints(self, person_id: int, embeddings: list[np.ndarray], seconds: float | None) -> list[int]:
-        """見本を足し、足した行の番号を返す（人違いだと分かったときに消せるように）"""
+    async def add_voiceprints(self, person_id: int, embeddings: list[np.ndarray], seconds: float | None,
+                              channel: str | None = None) -> list[int]:
+        """見本を足し、足した行の番号を返す（人違いだと分かったときに消せるように）。channel は録った経路"""
         ids = []
         async with self.conn.cursor() as cur:
             for e in embeddings:
-                await cur.execute('INSERT INTO voiceprints (person_id, embedding, seconds) VALUES (%s, %s, %s) RETURNING id',
-                                  (person_id, e, seconds))
+                await cur.execute('INSERT INTO voiceprints (person_id, embedding, seconds, channel) VALUES (%s, %s, %s, %s) '
+                                  'RETURNING id', (person_id, e, seconds, channel))
                 ids.append((await cur.fetchone())[0])
+            if channel is not None:
+                await cur.execute(
+                    'DELETE FROM voiceprints WHERE person_id = %s AND channel = %s AND id NOT IN '
+                    '(SELECT id FROM voiceprints WHERE person_id = %s AND channel = %s ORDER BY id DESC LIMIT %s)',
+                    (person_id, channel, person_id, channel, MAX_CHANNEL_VOICEPRINTS))
             await cur.execute(
                 'DELETE FROM voiceprints WHERE person_id = %s AND id NOT IN '
                 '(SELECT id FROM voiceprints WHERE person_id = %s ORDER BY id DESC LIMIT %s)',

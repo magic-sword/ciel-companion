@@ -428,7 +428,8 @@ namespace Ciel.EditorTools
                     + "{\"id\":\"p2\",\"name\":\"ミナ\",\"named\":true,\"remembered\":false},"
                     + "{\"id\":\"p3\",\"name\":\"知らない人A\",\"named\":false,\"remembered\":false},"
                     + "{\"id\":\"p4\",\"name\":\"知らない人B\",\"named\":false,\"remembered\":false}],"
-                    + "\"speaking\":\"p1\",\"speaking_sure\":true,\"heard\":1,\"correctable\":\"p1\"}";
+                    + "\"speaking\":\"p1\",\"speaking_sure\":true,\"heard\":1,\"correctable\":\"p1\","
+                    + "\"owner\":\"p1\",\"owner_name\":\"ハカセ\",\"pairable\":\"\"}";   // ハカセはこの端末の持ち主（家の印）
                 typeof(Ciel.Conversation.CielConversation).GetMethod("OnSpeakers", flags)
                     .Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json) });
                 Next(3);

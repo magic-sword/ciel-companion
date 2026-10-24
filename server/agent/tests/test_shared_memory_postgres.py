@@ -92,3 +92,24 @@ class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
             await renaming
         self.assertEqual(await self.a.notes(self.pid), [])
         self.assertEqual((await self.b.identity(self.pid))['name'], 'Renamed')
+
+    async def test_device_owner_is_checked_by_secret_hash_and_removed_with_the_person(self):
+        await self.a.pair_device('test-device-1', 'hash-a', self.pid)
+        self.assertEqual(await self.b.device_owner('test-device-1', 'hash-a'), self.pid)
+        self.assertIsNone(await self.b.device_owner('test-device-1', 'hash-b'))
+        self.assertFalse(await self.b.unpair_device('test-device-1', 'hash-b'))
+        self.assertTrue(await self.b.unpair_device('test-device-1', 'hash-a'))
+        self.assertIsNone(await self.a.device_owner('test-device-1', 'hash-a'))
+        other = await self.a.remember_person('Synthetic other', [np.ones(192)])
+        await self.a.pair_device('test-device-2', 'hash-c', other)
+        await self.a.delete_person(other)
+        self.assertIsNone(await self.b.device_owner('test-device-2', 'hash-c'))
+
+    async def test_voiceprints_of_one_channel_do_not_push_out_the_others(self):
+        rng = np.random.default_rng(0)
+        for _ in range(3):
+            await self.a.add_voiceprints(self.pid, [rng.standard_normal(192) for _ in range(10)], 2.0, channel='device:x')
+        rows = await (await self.a.conn.execute(
+            'SELECT channel, count(*) FROM voiceprints WHERE person_id=%s GROUP BY channel ORDER BY channel NULLS FIRST',
+            (self.pid,))).fetchall()
+        self.assertEqual(rows, [(None, 1), ('device:x', 20)])

@@ -15,7 +15,7 @@ class IdentityTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.rows = {}
 
-        async def save(name, embeddings, pid=None):
+        async def save(name, embeddings, pid=None, channel=None):
             pid = pid or 1
             self.rows[pid] = {'name': name, 'notes_consented': True, 'voice_sample_count': len(embeddings)}
             return pid
@@ -82,10 +82,10 @@ class IdentityTests(unittest.IsolatedAsyncioTestCase):
         started, release = asyncio.Event(), asyncio.Event()
         save = self.store.remember_person.side_effect
 
-        async def delayed(*args):
+        async def delayed(*args, **kw):
             started.set()
             await release.wait()
-            return await save(*args)
+            return await save(*args, **kw)
 
         async def rename(pid, name):
             self.rows[pid]['name'] = name
@@ -153,8 +153,8 @@ class IdentityTests(unittest.IsolatedAsyncioTestCase):
     async def test_save_confirmation_failure_is_not_reported_as_saved(self):
         real_save = self.store.remember_person.side_effect
 
-        async def save(*args):
-            pid = await real_save(*args)
+        async def save(*args, **kw):
+            pid = await real_save(*args, **kw)
             self.store.identity.side_effect = RuntimeError
             return pid
 
@@ -180,7 +180,7 @@ class IdentityTransactionTests(unittest.IsolatedAsyncioTestCase):
         store.add_voiceprints = AsyncMock()
         store.set_notes_consent = AsyncMock()
         self.assertEqual(await store.remember_person('Alice', []), 8)
-        store.add_voiceprints.assert_awaited_once_with(8, [], None)
+        store.add_voiceprints.assert_awaited_once_with(8, [], None, None)
         store.set_notes_consent.assert_awaited_once_with(8)
         self.assertIsNone(tx.__aexit__.call_args.args[0])
 

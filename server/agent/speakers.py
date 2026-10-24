@@ -9,15 +9,21 @@
   覚える（DB に保存する）のは、本人が同意したときだけ。知らない人の声の特徴は、この会話の間だけメモリーに持つ。
 - アプリの参加者パネルへ、名簿と最後に話した人を知らせる（state、topic ciel.event の speakers.state）。
   アプリからは、この会話の間だけの名前・同じ人にまとめる・人違いを分けるができる（on_data、topic ciel.speakers）。
-  保存（DB）に触れる操作は、アプリからはできない。
+  保存（DB）に触れる操作は、アプリからはできない（端末の持ち主にする・やめる と、まとめた声を覚えている人の見本に足すことだけ）。
+- 端末の持ち主：アプリで「この端末の持ち主」にした覚えている人。アプリは接続のたびに端末の ID と合言葉を送り（hello）、
+  会話サーバーは合言葉のハッシュで持ち主を確かめる。その場にいる人がひとり・身近な人のときは、持ち主の声を優先して当てる
+  （初めの数回の発言で「知らない人」にならないように）。この経路（端末）で当たった声は、経路の印を付けて見本に足す。
+- 人違いからの回復：この会話の知らない人の声が、何回か分まとめて覚えている人に近ければ、その人だったとまとめる。
 - 声の特徴は 192 次元のベクトル（録音そのものではない）。それでも個人を識別できる情報なので、名前や特徴をログに出さない。
   決めたことは docs/decisions/speaker-identification-ja.md。
 """
 import asyncio
 import collections
+import hashlib
 import json
 import logging
 import os
+import re
 import string
 import time
 import uuid
@@ -53,6 +59,20 @@ MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
 MODEL_REVISION = '0f99f2d0ebe89ac095bcc5903c4dd8f72b367286'   # Dockerfile と同じ版
 MODEL_DIR = os.environ.get('CIEL_ECAPA_DIR', '/opt/ecapa')
 APP_TOPIC = 'ciel.speakers'   # アプリの参加者パネルからの直し
+# 端末の持ち主（ひとり・身近な人のとき）。別の経路で録った見本とは 0.4〜0.5 くらいにしかならないことがあるので、
+# 持ち主だけは低めでも「たぶん持ち主」にして、知らない人を作らない。「確か」（メモを渡す）は高めのまま
+OWNER_MAYBE = float(os.environ.get('CIEL_SPK_OWNER_MAYBE', '0.30'))
+OWNER_SURE = float(os.environ.get('CIEL_SPK_OWNER_SURE', '0.50'))
+OWNER_ADAPT = float(os.environ.get('CIEL_SPK_OWNER_ADAPT', '0.50'))
+OWNER_BONUS = 0.10          # この会話の人・ほかの覚えている人より、これだけ低くても「たぶん持ち主」にする
+MAX_OWNER_ADAPT = 6         # 持ち主は、この経路の見本を早く集める
+# 人違いからの回復：この会話の知らない人の、最近の発言の声をまとめて、覚えている人と比べる
+RECOVER = float(os.environ.get('CIEL_SPK_RECOVER', '0.50'))
+RECOVER_OWNER = float(os.environ.get('CIEL_SPK_RECOVER_OWNER', '0.42'))   # ひとり・身近な人のときの持ち主
+RECOVER_MIN = 3             # まとめて比べる発言の数（これより少なければ比べない）
+RECOVER_RECENT = 5
+MERGE_PRINTS = 3            # アプリで覚えている人にまとめたとき、DB の見本に足す数
+DEVICE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
 
 
 class Encoder:
@@ -186,6 +206,7 @@ class Judgment:
     e: np.ndarray | None = None          # 声の特徴（人違いを直すとき・見本に足すときに使う）
     seconds: float = 0.0                 # 声のある長さ
     score: float = -1.0                  # 類似度
+    owner: bool = False                  # 端末の持ち主として当てた（ひとり・身近な人のとき）
 
 
 @dataclass
@@ -238,6 +259,9 @@ class SpeakerBook:
         self._heard_count = 0
         self._published: dict | None = None
         self._app_tasks: set[asyncio.Task] = set()
+        self.private = None            # その場にいる人がひとり・身近な人か（引数なしで呼ぶ。agent.py がつなぐ）
+        self.owner_id: int | None = None   # 端末の持ち主（覚えている人の番号。アプリの hello で決まる）
+        self.channel: str | None = None    # 声の経路（端末ごと。見本に印を付ける）
 
     async def load(self) -> None:
         if self.store is not None:
@@ -263,6 +287,8 @@ class SpeakerBook:
                                     disputed=old[pid].disputed if pid in old else False, notes_ok=ok, note_count=n)
                               for pid, name, embs, seen, ok, n in rows]
                 live = {k.person_id: k for k in self.known}
+                if self.owner_id is not None and self.owner_id not in live:
+                    self.owner_id = None
                 for sp in self.speakers:
                     pid = sp.person_id
                     if pid is None or pid not in changed:
@@ -341,10 +367,17 @@ class SpeakerBook:
             log.info('話者：短い発言（声 %.1f 秒）', seconds)
             return Judgment(None, False, e, seconds)
         k_score, k, s_score, s, runner_up = self._scores(e)
+        owner = self._owner_judge(e, seconds, s_score, s)
+        if owner is not None:
+            return owner
         if s is not None and s_score >= MAYBE and s_score >= k_score:
             sure = s_score >= MATCH
             if sure:
                 s.add(e)   # 「たぶん」の声は見本に足さない（別の人の声が混ざらないように）
+                recovered = self._recover(s)
+                if recovered is not None:
+                    dst, score, rsure = recovered
+                    return Judgment(dst, rsure, e, seconds, score, owner=dst.person_id == self.owner_id)
             log.info('話者：この会話の %s（%.2f%s）', '名前を聞いた人' if s.name else s.label, s_score,
                      '' if sure else '、たぶん')
             return Judgment(s, sure, e, seconds, s_score)
@@ -360,6 +393,62 @@ class SpeakerBook:
         self.speakers.append(sp)
         log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
         return Judgment(sp, True, e, seconds, max(k_score, s_score))
+
+    def _is_private(self) -> bool:
+        try:
+            return bool(self.private and self.private())
+        except Exception:
+            return False
+
+    def _owner(self) -> 'Known | None':
+        """ひとり・身近な人のときの、端末の持ち主（人違いだと言われていなければ）"""
+        if self.owner_id is None or not self._is_private():
+            return None
+        return next((k for k in self.known if k.person_id == self.owner_id and not k.disputed), None)
+
+    def _owner_judge(self, e: np.ndarray, seconds: float, s_score: float,
+                     s: 'SessionSpeaker | None') -> 'Judgment | None':
+        """端末の持ち主を優先して当てる。ほかの人（この会話の人・覚えている人）より OWNER_BONUS 低くても「たぶん持ち主」。
+        「確か」は OWNER_SURE 以上で、ほかの人より MARGIN 以上近いときだけ（メモを渡すので、家族などを取り違えない）。
+        人違いだと言われて分けた人がよく当たるなら、持ち主にしない"""
+        owner = self._owner()
+        if owner is None or (s is not None and s.split and s_score >= MATCH):
+            return None
+        o_score = best_score(e, owner.embeddings)
+        other = max([s_score] + [best_score(e, x.embeddings) for x in self.known if x is not owner])
+        if o_score < OWNER_MAYBE or o_score + OWNER_BONUS < other:
+            return None
+        sure = o_score >= OWNER_SURE and o_score - other >= MARGIN
+        sp = self._session_for(owner)
+        sp.add(e)
+        log.info('話者：端末の持ち主（%.2f、ほかとの差 %.2f%s）', o_score, o_score - other, '' if sure else '、たぶん')
+        return Judgment(sp, sure, e, seconds, o_score, owner=True)
+
+    def _recover(self, sp: 'SessionSpeaker') -> 'tuple[SessionSpeaker, float, bool] | None':
+        """この会話の知らない人が、実は覚えている人だったら、その人にまとめる（一度「知らない人」になると、
+        その人の新しい声のほうが覚えている見本より近くなり、ずっと知らない人のままになっていた。2026-10-24）。
+        最近の発言の声をまとめて比べる（1 回分より確か）。会議などで、その覚えている人がこの会話ですでに別に話して
+        いるなら、まとめない（似た声の別の人）。ひとり・身近な人のときの持ち主は、少し低くてもまとめる"""
+        if sp.person_id is not None or sp.name is not None or sp.split or len(sp.embeddings) < RECOVER_MIN:
+            return None
+        recent = sp.embeddings[-RECOVER_RECENT:]
+        private = self._is_private()
+        heard = {s.person_id for s in self.speakers if s.person_id is not None and s.embeddings}
+        scored = sorted(((float(np.mean([best_score(x, k.embeddings) for x in recent])), k)
+                         for k in self.known if not k.disputed and k.embeddings), key=lambda x: -x[0])
+        if not scored:
+            return None
+        score, k = scored[0]
+        runner_up = scored[1][0] if len(scored) > 1 else -1.0
+        owner = private and k.person_id == self.owner_id
+        if (score < (RECOVER_OWNER if owner else RECOVER) or score - runner_up < MARGIN
+                or (k.person_id in heard and not private)):
+            return None
+        dst = self._session_for(k)
+        self._merge(sp, dst)
+        sure = score >= (OWNER_SURE if owner else SURE)
+        log.info('話者：知らない人の声が覚えている人 #%d に近いので、まとめた（%.2f、%d 回分）', k.person_id, score, len(recent))
+        return dst, score, sure
 
     @staticmethod
     def label(j: 'Judgment | None') -> str:
@@ -408,13 +497,17 @@ class SpeakerBook:
             return f'[発言者：{k.name}（保存情報は現在確認できないため、以前のメモは使わない）]', ''
 
         # 覚えている人
-        if (sure and score >= ADAPT and seconds >= 2.0 and not k.disputed
-                and self._adapted < MAX_ADAPT_PER_SESSION and self.store):
-            # よく当たった声を見本に足して、マイクや部屋が変わっても当たるようにしていく
+        if j.owner:
+            adapt, limit = OWNER_ADAPT, MAX_OWNER_ADAPT
+        else:
+            adapt, limit = ADAPT, MAX_ADAPT_PER_SESSION
+        if (sure and score >= adapt and seconds >= 2.0 and not k.disputed
+                and self._adapted < limit and self.store):
+            # よく当たった声を見本に足して、マイクや部屋が変わっても当たるようにしていく。どの経路（端末）の声かの印を付ける
             # （人違いだと言われたら、split で消せるように、足した行を覚えておく）
             self._adapted += 1
             k.embeddings.append(e)
-            self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds)
+            self.last_rows = await self.store.add_voiceprints(k.person_id, [e], seconds, channel=self.channel)
         if self.store:
             await self.store.touch(k.person_id)
         self.last_sure = sure
@@ -642,7 +735,7 @@ class SpeakerBook:
         if not sp.embeddings:
             return {**await self.speaker_status(sp), 'status': 'need_voice_sample'}
         try:
-            pid = await self.store.remember_person(name, list(sp.embeddings), sp.person_id)
+            pid = await self.store.remember_person(name, list(sp.embeddings), sp.person_id, channel=self.channel)
         except Exception as e:
             log.warning('話者：名前と声を保存できない error=%s', type(e).__name__)
             return {**await self.speaker_status(sp), 'status': 'save_failed'}
@@ -786,6 +879,8 @@ class SpeakerBook:
         if self.store is not None:
             await self.store.delete_person(pid)
         self.known = [k for k in self.known if k.person_id != pid]
+        if self.owner_id == pid:
+            self.owner_id = None   # 端末の持ち主の登録も、DB では一緒に消える
         self.speakers.remove(sp)
         for entry in self.name_registrations.values():
             if entry.speaker_id == sp.speaker_id:
@@ -803,6 +898,7 @@ class SpeakerBook:
         """アプリへ送る名簿。名前のほかは、声を覚えている人か・名前を聞いたかだけ（声の特徴や DB の番号は送らない）"""
         heard = self.heard.sp if self.heard is not None else None
         last = self.last
+        owner = next((k for k in self.known if k.person_id == self.owner_id), None) if self.owner_id is not None else None
         return {
             'v': 1, 'type': 'speakers.state',
             'speakers': [{'id': s.speaker_id, 'name': s.name or s.label, 'named': s.name is not None,
@@ -813,6 +909,11 @@ class SpeakerBook:
             # 人違いを分けられるのは、直前の発言者で、名前の分かっている人だけ（split と同じ条件）
             'correctable': last.speaker_id if last is not None and self.last_embedding is not None
             and (last.name is not None or last.person_id is not None) else '',
+            # 端末の持ち主（名前と、この会話での話者）。持ち主にできるのは、直前の発言者で、確かに当てた覚えている人だけ
+            'owner_name': owner.name if owner is not None else '',
+            'owner': next((s.speaker_id for s in self.speakers if owner is not None and s.person_id == owner.person_id), ''),
+            'pairable': last.speaker_id if last is not None and self.last_sure and last.person_id is not None
+            and last.person_id != self.owner_id and self.store is not None else '',
         }
 
     def notify(self) -> None:
@@ -845,16 +946,20 @@ class SpeakerBook:
         task.add_done_callback(self._app_tasks.discard)
 
     async def app_control(self, msg: dict) -> str:
-        """アプリの参加者パネルからの直し。どれもこの会話の間だけで、DB には書かない。
+        """アプリの参加者パネルからの直し。名前と分けるは、この会話の間だけで、DB には書かない。
         name：名前を付ける・直す（声を覚えている人の名前は、本人が声で頼んだときだけ直せるので、ここでは直さない）。
-        merge：別の人として聞いていた 2 人を、同じ人にまとめる。split：直前の発言を、その人から分ける"""
+        merge：別の人として聞いていた 2 人を、同じ人にまとめる（覚えている人にまとめたら、その声を見本に少し足す）。
+        split：直前の発言を、その人から分ける。
+        hello・pair・unpair：端末の持ち主を確かめる・持ち主にする・やめる（_device_control）"""
         action = msg.get('action')
         try:
             async with self._identity_lock:
                 if action == 'name':
                     status = self._app_name(self._by_id(msg.get('speaker_id')), msg.get('name'))
                 elif action == 'merge':
-                    status = self._app_merge(self._by_id(msg.get('speaker_id')), self._by_id(msg.get('into')))
+                    status = await self._app_merge(self._by_id(msg.get('speaker_id')), self._by_id(msg.get('into')))
+                elif action in ('hello', 'pair', 'unpair'):
+                    status = await self._device_control(action, msg)
                 elif action == 'split':
                     sp = self._by_id(msg.get('speaker_id'))
                     if sp is None or sp is not self.last or self.state()['correctable'] != sp.speaker_id:
@@ -891,16 +996,26 @@ class SpeakerBook:
                 entry.speaker_id, entry.stage = sp.speaker_id, 'session_named'
         return 'session_named'
 
-    def _app_merge(self, src: SessionSpeaker | None, dst: SessionSpeaker | None) -> str:
+    async def _app_merge(self, src: SessionSpeaker | None, dst: SessionSpeaker | None) -> str:
         if src is None or dst is None or src is dst:
             return 'speaker_not_found'
         if src.person_id is not None and dst.person_id is not None:
             return 'both_remembered'
         if src.person_id is not None:
             src, dst = dst, src   # 声を覚えている人のほうを残す
+        voices = list(src.embeddings)
+        self._merge(src, dst)
+        k = next((k for k in self.known if k.person_id == dst.person_id), None) if dst.person_id is not None else None
+        if k is not None and voices and not k.disputed and self.store is not None:
+            # 人がまとめたので確か。次の会話から当たるように、最近の声を少しだけ DB の見本に足す
+            await self.store.add_voiceprints(k.person_id, voices[-MERGE_PRINTS:], None, channel=self.channel)
+        return 'merged'
+
+    def _merge(self, src: SessionSpeaker, dst: SessionSpeaker) -> None:
+        """src を dst にまとめる（アプリでまとめたとき・人違いから回復したとき）"""
         if dst.name is None and dst.person_id is None:
             dst.name = src.name
-        # まとめた声で、この会話の間は同じ人として当てる（覚えている人も、DB の見本には足さない）
+        # まとめた声で、この会話の間は同じ人として当てる
         dst.embeddings = (dst.embeddings + src.embeddings)[-MAX_SESSION_EMBEDDINGS:]
         if dst.person_id is not None:
             k = next((k for k in self.known if k.person_id == dst.person_id), None)
@@ -917,4 +1032,35 @@ class SpeakerBook:
                 entry.speaker_id = dst.speaker_id
         if self.on_merge:
             self.on_merge(src, dst)
-        return 'merged'
+
+    async def _device_control(self, action: str, msg: dict) -> str:
+        """端末の持ち主。端末 ID と合言葉はアプリが端末の中で作って持つ。サーバーは合言葉のハッシュだけを置く。
+        hello：接続のたびに、経路の印を決め、持ち主を確かめる。pair：直前の発言者（確かに当てた覚えている人）を持ち主にする。
+        unpair：持ち主をやめる（合言葉が合うときだけ）"""
+        device_id, secret = msg.get('device_id'), msg.get('secret')
+        if not isinstance(device_id, str) or not DEVICE_ID.match(device_id) \
+                or not isinstance(secret, str) or not 16 <= len(secret) <= 256:
+            return 'invalid_device'
+        # 経路の印は端末 ID そのものではなく、そのハッシュの頭（DB の見本に端末 ID を残さない）
+        self.channel = 'device:' + hashlib.sha256(device_id.encode()).hexdigest()[:16]
+        if self.store is None:
+            return 'storage_unavailable'
+        secret_hash = hashlib.sha256(secret.encode()).hexdigest()
+        if action == 'hello':
+            pid = await self.store.device_owner(device_id, secret_hash)
+            self.owner_id = pid if any(k.person_id == pid for k in self.known) else None
+            log.info('話者：端末の持ち主 %s', '#%d' % self.owner_id if self.owner_id is not None else 'なし')
+            return 'owner' if self.owner_id is not None else 'no_owner'
+        if action == 'pair':
+            sp = self._by_id(msg.get('speaker_id'))
+            if sp is None or sp is not self.last or not self.last_sure or sp.person_id is None:
+                return 'not_current_speaker'
+            await self.store.pair_device(device_id, secret_hash, sp.person_id)
+            self.owner_id = sp.person_id
+            log.info('話者：#%d を端末の持ち主にした', sp.person_id)
+            return 'paired'
+        if not await self.store.unpair_device(device_id, secret_hash):
+            return 'not_paired'
+        self.owner_id = None
+        log.info('話者：端末の持ち主をやめた')
+        return 'unpaired'

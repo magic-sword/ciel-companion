@@ -21,6 +21,8 @@
 // 中身は ciel.summary で分けて届き（Summary）、選べる種類は summary.templates で届く（SummaryTemplates）。
 // 参加者：会話サーバー（server/agent/speakers.py）が聞き分けた人と最後に話した人を speakers.state で知らせる（Speakers）。
 // 画面からの名前の直しは FixSpeaker で送る（topic ciel.speakers。この会話の間だけ）。
+// 端末の持ち主：端末の ID と合言葉をこの端末の中で作って持ち（PlayerPrefs）、つないだとき・会話サーバーが入ってきたときに
+// 送る（hello）。会話サーバーは合言葉のハッシュで持ち主を確かめ、ひとり・身近な人のときは持ち主の声を優先して聞き分ける。
 // 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
 // つなぐ部屋にする。トークンを頼むときに「ciel-dev を呼ぶ」部屋の設定（room_config）を添える。本番の会話サーバーはその部屋に入らない。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
@@ -126,7 +128,7 @@ namespace Ciel.Conversation
         sealed class SpeakersPacket
         {
             public Speaker[] speakers;
-            public string speaking, correctable;
+            public string speaking, correctable, owner, owner_name, pairable;
             public bool speaking_sure;
             public int heard;
         }
@@ -134,7 +136,7 @@ namespace Ciel.Conversation
         sealed class SpeakerFix
         {
             public int v = 1;
-            public string type = "speakers.control", action, speaker_id, name, into;
+            public string type = "speakers.control", action, speaker_id, name, into, device_id, secret;
         }
         /// 会話のまとめ（議事録など。会話サーバーの minutes.py が ciel.summary で分けて送る）
         [Serializable]
@@ -215,6 +217,10 @@ namespace Ciel.Conversation
         public float SpeakingAt { get; private set; } = -1f;
         /// 「さっきの発言はこの人じゃない」と直せる人（直前の発言者）
         public string CorrectableId { get; private set; } = "";
+        /// この端末の持ち主（名前と、この会話での話者）。持ち主にできる人（直前に話した、声を覚えている人）
+        public string OwnerName { get; private set; } = "";
+        public string OwnerId { get; private set; } = "";
+        public string PairableId { get; private set; } = "";
         public int SpeakersRevision { get; private set; }
         int _heard = -1;
 
@@ -455,6 +461,7 @@ namespace Ciel.Conversation
             }
             SendStyle();
             SendVolume();
+            SendDeviceHello();
         }
 
         [System.Serializable]
@@ -634,6 +641,7 @@ namespace Ciel.Conversation
         {
             SendStyle();
             SendVolume();
+            SendDeviceHello();
         }
 
         // 会話サーバーの様子が変わったら、画面に知らせる（考えている間を「考えています…」と見せる）
@@ -987,6 +995,9 @@ namespace Ciel.Conversation
             SpeakingId = p.speaking ?? "";
             SpeakingSure = p.speaking_sure;
             CorrectableId = p.correctable ?? "";
+            OwnerName = p.owner_name ?? "";
+            OwnerId = p.owner ?? "";
+            PairableId = p.pairable ?? "";
             SpeakersRevision++;
             Changed?.Invoke();
         }
@@ -995,8 +1006,52 @@ namespace Ciel.Conversation
         /// action：name（名前を付ける・直す）・merge（into の人と同じ人）・split（さっきの発言はこの人じゃない）
         public void FixSpeaker(string action, string speakerId, string name = null, string into = null)
         {
+            SendSpeakerControl(new SpeakerFix { action = action, speaker_id = speakerId, name = name, into = into });
+        }
+
+        /// 直前に話した、声を覚えている人を、この端末の持ち主にする（会話サーバーが確かめてから DB に置く）
+        public void PairDevice(string speakerId) => SendDevice("pair", speakerId);
+
+        /// この端末の持ち主をやめる
+        public void UnpairDevice() => SendDevice("unpair", null);
+
+        void SendDeviceHello() => SendDevice("hello", null);
+
+        void SendDevice(string action, string speakerId)
+        {
+            var (deviceId, secret) = DeviceCredentials();
+            SendSpeakerControl(new SpeakerFix { action = action, speaker_id = speakerId, device_id = deviceId, secret = secret });
+        }
+
+        // 端末の ID と合言葉。初めて使うときに作り、この端末にだけ置く（会話サーバーには合言葉のハッシュだけが残る）
+        static (string deviceId, string secret) DeviceCredentials()
+        {
+            const string IdKey = "ciel.device.id", SecretKey = "ciel.device.secret";
+            var id = PlayerPrefs.GetString(IdKey, "");
+            var secret = PlayerPrefs.GetString(SecretKey, "");
+            if (id.Length < 8 || secret.Length < 16)
+            {
+                id = RandomHex(16);
+                secret = RandomHex(32);
+                PlayerPrefs.SetString(IdKey, id);
+                PlayerPrefs.SetString(SecretKey, secret);
+                PlayerPrefs.Save();
+            }
+            return (id, secret);
+        }
+
+        static string RandomHex(int bytes)
+        {
+            var b = new byte[bytes];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(b);
+            return BitConverter.ToString(b).Replace("-", "").ToLowerInvariant();
+        }
+
+        void SendSpeakerControl(SpeakerFix fix)
+        {
             if (_room == null || Status != State.Connected) return;
-            var json = JsonUtility.ToJson(new SpeakerFix { action = action, speaker_id = speakerId, name = name, into = into });
+            var json = JsonUtility.ToJson(fix);
+            var action = fix.action;
             try
             {
                 _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.speakers");
@@ -1118,7 +1173,7 @@ namespace Ciel.Conversation
             _summarySeq = -1;
             _summaryParts = null;
             _speakers.Clear();
-            SpeakingId = CorrectableId = "";
+            SpeakingId = CorrectableId = OwnerName = OwnerId = PairableId = "";
             SpeakingAt = -1f;
             _heard = -1;
             SpeakersRevision++;

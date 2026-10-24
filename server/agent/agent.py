@@ -279,6 +279,8 @@ async def entrypoint(ctx: JobContext) -> None:
         book.on_merge = history.on_merge
         # アプリの参加者パネル（speakers.py の state）。名簿・最後に話した人が変わるたびに知らせる
         book.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
+        # ひとり・身近な人のときは、端末の持ち主の声を優先して当てる（speakers.py の _owner_judge）
+        book.private = lambda: style.presence in ('solo', 'close')
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)
