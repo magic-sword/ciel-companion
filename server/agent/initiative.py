@@ -11,14 +11,15 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
 - 考えは貯めておく（MAX_THOUGHTS 個まで）。話したら印を付け、繰り返さない。
 - 話す頃合い：沈黙を待たない（人の会話では、話し手が替わる間はほぼ 0.2 秒以内。何秒も黙っていれば人のほうが話す。
   Inner Thoughts の論文も、沈黙は頃合いの手がかりとして当てにならないと書いている）。シエルに話す番が来た瞬間に話す：
-  1. 返事に添える：シエルが相手に返事をするとき、気持ちが THRESHOLD 以上の考えを「言えたら添えたいこと」として渡し、
-     流れに合えば返事の最後に一言添えさせる（offer。turns.py が返事を頼むときに呼ぶ。
-     config/prompts/talk_offer.md）。
+  1. 返事に気持ちを混ぜる：シエルが相手に返事をするとき、今の心の状態（気になっていること・知りたいこと・話したい
+     気持ちの満たされ具合）を会話の後ろに置いておき、流れに合えば自然に話題にさせる（state_note・place_state。
+     turns.py が返事を頼むときに呼ぶ。config/prompts/talk_inner_state.md）。「言えたら添えて」という用事として
+     渡していたときは、会話モデルがほとんど使わなかった。
   2. 話し終えた直後に続ける：シエルが相手への返事を話し終えて、CONTINUE_AFTER〜CONTINUE_WINDOW 秒のあいだ相手が
      話し始めなければ、気持ちが CONTINUE_THRESHOLD（5）以上の考えを続けて話す（話し手交替の規則の「誰も話し始めなければ、
      今の話し手が続けてよい」。Sacks ほか 1974）。シエルが自分から話しかけたあとには続けない（ひとりで話し続けない）。
   回数の上限は持たず、話したい欲の満腹度で決める（SATIETY_HALF_LIFE の説明）。自分から話すたびに満腹度が上がり、
-  時間とともに下がる。返事に添えた考えは、次に考えるときに会話から「実際に話したか」を確かめ（spoken）、話していれば
+  時間とともに下がる。心の状態に載せた考えは、次に考えるときに会話から「実際に話したか」を確かめ（spoken）、話していれば
   満腹度を上げ、話していなければ気持ちを下げて残す（毎回の返事に足すと多すぎた。2026-10-24、bench_thoughts.py）。
   3. 長い沈黙：FALLBACK_SECONDS 誰も話さなければ、話しかける（最後の手段）。
   気持ちは、静かな時間が長いほど少し上がり、考えが古くなるほど下がる（config/prompts/talk_chatty_nudge.md）。
@@ -66,12 +67,12 @@ STALE_SECONDS = 180.0         # これより古い考えは、気持ちを下げ
 STALE_LOSS = 0.5              # STALE_SECONDS ごとに下げる量
 DROP_SECONDS = 900.0          # これより古い考えは捨てる
 # 話したい欲の満腹度（欲求と恒常性。社会的ロボット Kismet（Breazeal 2003）などの作り）。シエルが自分から話す
-# （話しかける・続ける・返事に添えた考えを実際に話す）たびに上がり、時間とともに半分ずつ下がる。話す条件は
+# （話しかける・続ける・心の状態に載せた考えを実際に話す）たびに上がり、時間とともに半分ずつ下がる。話す条件は
 # 「気持ち − 満腹度 ≥ 基準」なので、話した直後は話しにくく、時間がたてばまた話せる。回数の上限は持たない
 SATIETY_HALF_LIFE = float(os.environ.get('CIEL_THOUGHT_SATIETY_HALF_LIFE', '90'))
 SATE_SPEAK = 1.0              # 自分から 1 回話したときに上がる量
 SATE_UNANSWERED = 0.5         # 前に話しかけて返事が無いまま、また話したときに足す量（気まずさ）
-UNUSED_OFFER_LOSS = 1.0       # 返事に添えるよう渡したのに使われなかった考えの気持ちを下げる量
+UNUSED_OFFER_LOSS = 0.5       # 心の状態に載せたのに話されなかった考えの気持ちを下げる量（何度か載るので小さめ）
 # 用済みの考えを残さない（2026-10-24、会話の始めの「呼ばれたのです、何か用かな？」が後まで残り、返事に添えられた）。
 # 古さは時間だけでなく、会話の進み方で決める：考えには、きっかけの発言（anchor。考えたときに確定していた最後の発言 ID）を持たせる
 REACTIVE_KINDS = ('comment', 'correction')   # その発言への反応。相手がそのあと REACTIVE_TURNS 回話したら用済み
@@ -93,18 +94,21 @@ class Thought:
     created: float = field(default_factory=time.monotonic)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:6])
     expressed: bool = False
-    offered: bool = False   # 返事に添えるよう渡して、実際に話したかをまだ確かめていない
+    offered: bool = False   # 心の状態に載せて、実際に話したかをまだ確かめていない
     anchor: int = 0         # きっかけの発言 ID（考えた・付け直したときに確定していた最後の発言）
+    shown_id: int = 0       # 心の状態に載せたときの最後の発言 ID（話したかは、これより後のシエルの発言だけで判定する）
 
 
 class Initiative:
     def __init__(self, session: AgentSession, style, nudge: str, *, history=None, instructions: str = '',
-                 correction_nudge: str = '', offer_note: str = '', client=None) -> None:
+                 correction_nudge: str = '', state_header: str = '', client=None) -> None:
         self.session = session
         self.style = style   # mode.ConversationStyle
         self.nudge = nudge
         self.correction_nudge = correction_nudge
-        self.offer_note = offer_note   # 返事に添えるときの指示（config/prompts/talk_offer.md）
+        self.state_header = state_header   # 心の状態の項目の頭（config/prompts/talk_inner_state.md）
+        self._state_item_id: str | None = None   # 会話の後ろに置いた心の状態の項目
+        self._state_text: str | None = None
         self.history = history   # conversation.Conversation（最近の発言）
         self.instructions = instructions
         self._client = client
@@ -231,14 +235,14 @@ class Initiative:
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
         self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
-        candidates = [t for t in self.thoughts if not t.offered]   # 返事に添えたばかりの考えは、話したか分かるまで待つ
+        candidates = [t for t in self.thoughts if not t.offered]   # 心の状態に載せた考えは、話したか分かるまで待つ
         silence = now - self._last
         talk = self.style.talk
         if talk == 'chatty':
             if silence >= FALLBACK_SECONDS:
                 threshold = THRESHOLD
             elif self.continuing(now):
-                # 続けて話すのは、とても話したいことだけ（気持ち 4 の考えは、次の返事に添える）
+                # 続けて話すのは、とても話したいことだけ（気持ち 4 の考えは、心の状態として次の返事に混ぜる）
                 threshold = CONTINUE_THRESHOLD
             else:
                 return None
@@ -248,23 +252,66 @@ class Initiative:
             return next((t for t in candidates if t.kind == 'correction' and t.motivation >= 5), None)
         return None
 
-    def offer(self) -> str | None:
-        """相手への返事に添える考え（turns.py が返事を頼むときに呼ぶ）。添えるなら、返事ごとの指示に足す 1 段落"""
-        if self.style.talk != 'chatty' or not self.offer_note:
+    def state_note(self) -> str | None:
+        """会話の後ろに置く、シエルの今の心の状態（turns.py が返事を頼むときに呼ぶ）。前に置いたものと同じなら None。
+        「言えたら添えて」という用事として渡すと、会話モデルは目の前の返事を優先してほとんど使わなかった（2026-10-24）。
+        気持ちとして置いておき、流れに合うときに自然に使わせる。載せるのは今の話題に新しく、気持ち − 満腹度が基準を
+        超えた考えだけ（満腹度が高いほど少なく、満ちていれば載せない）"""
+        if self.style.talk != 'chatty' or not self.state_header:
             return None
         now = time.monotonic()
-        if any(t.offered for t in self.thoughts):
-            return None   # 前に渡した考えを話したか、まだ確かめていない
+        satiety = self.satiety_at(now)
+        if satiety >= 1.5:
+            drive, limit = '自分から話したばかりで満ちている。今は相手の話を聞きたい', 0
+        elif satiety >= 0.5:
+            drive, limit = 'すこし満たされている', 1
+        else:
+            drive, limit = 'ふつう', 2
         # 今の話題に新しい考えだけ：きっかけの発言のあと、相手が話したのは今答えようとしている 1 回だけ
-        fresh = [t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction' and self.turns_since(t.anchor) <= 1]
-        best = max(fresh, key=lambda t: self.score(t, now), default=None)
-        if best is None or self.score(best, now) < THRESHOLD:
+        fresh = sorted((t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction'
+                        and self.turns_since(t.anchor) <= 1 and self.score(t, now) >= THRESHOLD),
+                       key=lambda t: -self.score(t, now))[:limit]
+        last_id = self.history.last_id if self.history is not None else 0
+        for t in fresh:
+            if not t.offered:
+                t.offered, t.shown_id = True, last_id   # 見せた。話したかは、次に考えるときに確かめる（apply の spoken）
+        lines = [self.state_header,
+                 'いま気になっていること：' + ('、'.join(f'{t.text}（{KIND_LABELS[t.kind]}）' for t in fresh) or '特になし'),
+                 *(['知りたいこと：' + '、'.join(self.unknowns[:3])] if self.unknowns and limit else []),
+                 '話したい気持ち：' + drive]
+        note = '\n'.join(lines)
+        if note == self._state_text:
             return None
-        # 実際に話したかは、次に考えるときに会話から確かめる（apply の spoken）。話していれば満腹度を上げる
-        best.offered = True
-        log.info('内なる考え：返事に添える（%s、気持ち %.1f、満腹度 %.1f）', best.kind, best.motivation, self.satiety_at(now))
-        debug_log.record('thought_offered', thought_kind=best.kind, text=best.text, motivation=best.motivation)
-        return f'{self.offer_note}\n[言えたら添えたいこと（{KIND_LABELS[best.kind]}）] {best.text}'
+        log.info('内なる考え：心の状態を置く（気になっていること %d 個、満腹度 %.1f）', len(fresh), satiety)
+        debug_log.record('inner_state', text=note)
+        return note
+
+    async def place_state(self, note: str) -> bool:
+        """心の状態を会話の後ろに system の項目として置く（前に置いた項目は消して置き換える）。置けなければ False
+        （呼んだ側が、今回の返事の指示に足す）。置いたと確かめる返事は待たない（turns.py の _add_context と同じ）"""
+        agent = getattr(self.session, 'current_agent', None)
+        if agent is None:
+            return False
+        try:
+            ctx = agent.chat_ctx.copy()
+            remote = getattr(agent, 'realtime_llm_session', None)
+            local_ids = {item.id for item in ctx.items}
+            if remote is not None and any(item.id not in local_ids for item in remote.chat_ctx.items):
+                return False   # 会話モデルの側にだけある項目（まだ手元に届いていない発言）を消してしまうので、置かない
+            if self._state_item_id is not None:
+                ctx.items[:] = [item for item in ctx.items if item.id != self._state_item_id]
+            message = ctx.add_message(role='system', content=note)
+        except Exception as e:
+            log.warning('心の状態を会話に置けない（返事ごとの指示に足す）: %s', type(e).__name__)
+            return False
+        task = asyncio.create_task(agent.update_chat_ctx(ctx))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        await asyncio.sleep(0)   # 項目を作る知らせを送るところまで進める
+        if task.done() and not task.cancelled() and task.exception() is not None:
+            return False
+        self._state_item_id, self._state_text = message.id, note
+        return True
 
     def snapshot(self) -> dict:
         """道具 read_inner_thoughts の答え：話したい気持ちの強い考え・知りたいこと・満たされ具合（数字は出さない）"""
@@ -338,6 +385,12 @@ class Initiative:
 
     # ---- 考える ----
 
+    def _ciel_since(self, after: int) -> list[str]:
+        """心の状態に載せたあとのシエルの発言（載せた考えを話したかは、これだけで判定させる）"""
+        if self.history is None:
+            return []
+        return [t.text[:400] for t in self.history.between(after) if t.role == 'assistant' and t.text]
+
     def _conversation(self) -> list[dict]:
         if self.history is None:
             return []
@@ -368,6 +421,8 @@ class Initiative:
                           **({'offered': True} if t.offered else {})} for t in sent],
             'expressed': self.expressed,
             'unknowns': self.unknowns,
+            **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
+               if any(t.offered for t in sent) else {}),
         }
         try:
             r = await self.client.chat.completions.create(
@@ -387,19 +442,21 @@ class Initiative:
             return
         anchor = self._seen_id
         by_id = {t.id: t for t in self.thoughts}
-        # 返事に添えるよう渡した考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
+        # 心の状態に載せた考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
         spoken = {i for i in result.get('spoken') or [] if isinstance(i, str)}
         for t in list(self.thoughts):
-            if t.id in spoken:
+            # 載せたあと、シエルがまだ話していなければ、判定は保留（載せる前の発言で「話した」にしない）
+            pending = t.offered and self.history is not None and not self._ciel_since(t.shown_id)
+            if t.id in spoken and not pending:
                 t.expressed = True
                 self.expressed = (self.expressed + [t.text])[-8:]
                 if t.offered:
                     self._sate(now, SATE_SPEAK)
-                    log.info('内なる考え：返事に添えた考えを話した（%s）', t.kind)
+                    log.info('内なる考え：心の状態に載せた考えを話した（%s）', t.kind)
                     debug_log.record('thought_spoken', thought_kind=t.kind, text=t.text)
                 self.thoughts.remove(t)
                 by_id.pop(t.id, None)
-            elif t.offered:
+            elif t.offered and not pending:
                 t.offered = False
                 t.motivation = max(1.0, t.motivation - UNUSED_OFFER_LOSS)
         for d in result.get('drop') or []:

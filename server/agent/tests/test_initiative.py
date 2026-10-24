@@ -15,7 +15,7 @@ def make(talk='chatty', history=None):
     session = SimpleNamespace(generate_reply=Mock())
     style = SimpleNamespace(talk=talk)
     i = Initiative(session, style, 'NUDGE', history=history, instructions='THINK', correction_nudge='FIX',
-                   offer_note='OFFER')
+                   state_header='STATE')
     i._agent_busy = False
     return i
 
@@ -81,38 +81,43 @@ class DecisionTests(unittest.TestCase):
         self.assertIsNone(i.pick(20.0))
         self.assertIsNotNone(i.pick(60.0))   # +1.0 after 60 s of silence
 
-    def test_offer_then_confirm_whether_it_was_spoken(self):
+    def test_state_shows_strong_thoughts_then_confirms_whether_spoken(self):
         i = make()
         camera = Thought('どんなカメラで撮ったのかな', 'question', 4.0)
         i.thoughts = [camera, Thought('弱い', 'comment', 2.0)]
-        note = i.offer()
-        self.assertTrue(note.startswith('OFFER'))
-        self.assertIn('[言えたら添えたいこと（相手に聞きたいこと）] どんなカメラで撮ったのかな', note)
+        i.unknowns = ['使っているカメラ']
+        note = i.state_note()
+        self.assertEqual(note.split('\n'), ['STATE', 'いま気になっていること：どんなカメラで撮ったのかな（相手に聞きたいこと）',
+                                              '知りたいこと：使っているカメラ', '話したい気持ち：ふつう'])
         self.assertTrue(camera.offered)
-        i.thoughts.append(Thought('次の考え', 'comment', 5.0))
-        self.assertIsNone(i.offer())            # waits until we know whether the first was spoken
-        self.assertEqual(i.satiety, 0.0)        # offering alone does not sate
+        i._state_text = note
+        self.assertIsNone(i.state_note())       # unchanged: nothing to place again
+        self.assertEqual(i.satiety, 0.0)        # showing alone does not sate
         i.apply({'spoken': [camera.id]}, 1.0)   # it was spoken
         self.assertNotIn(camera, i.thoughts)
         self.assertGreater(i.satiety_at(1.0), 0.9)
-        self.assertIsNone(make('normal').offer())
+        self.assertIsNone(make('normal').state_note())
 
-    def test_unused_offer_stays_but_weaker(self):
+    def test_unused_shown_thought_stays_but_weaker(self):
         i = make()
         t = Thought('星の話', 'comment', 4.5)
         i.thoughts = [t]
-        i.offer()
+        i.state_note()
         i.apply({'spoken': []}, 1.0)
         self.assertIn(t, i.thoughts)
         self.assertFalse(t.offered)
-        self.assertEqual(t.motivation, 3.5)
+        self.assertEqual(t.motivation, 4.5 - initiative.UNUSED_OFFER_LOSS)
         self.assertEqual(i.satiety, 0.0)
 
-    def test_sated_drive_blocks_offers(self):
+    def test_sated_drive_shows_no_thoughts(self):
         i = make()
-        i.thoughts = [Thought('話したい', 'comment', 4.0)]
-        i._sate(time.monotonic(), 1.0)
-        self.assertIsNone(i.offer())
+        i.thoughts = [Thought('話したい', 'comment', 5.0)]
+        i.unknowns = ['好きな星座']
+        i._sate(time.monotonic(), 2.0)
+        note = i.state_note()
+        self.assertIn('いま気になっていること：特になし', note)
+        self.assertIn('満ちている', note)
+        self.assertNotIn('知りたいこと', note)
 
     def test_old_thoughts_fade(self):
         i = make()
@@ -225,15 +230,15 @@ class StalenessTests(unittest.TestCase):
         self.assertFalse(self.i.alive(called, 1.0))    # two user turns later: done
         self.assertTrue(self.i.alive(wish, 1.0))       # questions from unknowns live on
 
-    def test_offer_only_thoughts_fresh_to_the_current_topic(self):
+    def test_state_only_shows_thoughts_fresh_to_the_current_topic(self):
         first = self.say('星空を撮りに行ったんだ。')
         old = Thought('星空、すてき', 'question', 5.0, created=0.0, anchor=0)
         self.i.thoughts = [old]
         self.say('寒かったよ。')
-        self.assertIsNone(self.i.offer())              # two user turns since its anchor
+        self.assertIn('いま気になっていること：特になし', self.i.state_note())   # two user turns since its anchor
         fresh = Thought('寒さは大丈夫？', 'question', 4.0, anchor=first)
         self.i.thoughts.append(fresh)
-        self.assertIn('寒さは大丈夫？', self.i.offer())
+        self.assertIn('寒さは大丈夫？', self.i.state_note())
 
     def test_unreviewed_thoughts_sink_and_reviewed_ones_reanchor(self):
         kept = Thought('流れ星の話を聞きたい', 'question', 4.0)
@@ -255,6 +260,22 @@ class StalenessTests(unittest.TestCase):
         self.assertEqual(lines[0]['text'], 'オリオン座がきれいに撮れたよ。でも、寒くて手がかじかんじゃった。')
         self.assertEqual(lines[1]['speaker'], 'シエル')
 
+    def test_spoken_counts_only_after_the_thought_was_shown(self):
+        self.say('オリオン座が撮れたよ。')
+        self.say('オリオン座、きれいなのです！', role='assistant')   # said before the thought was shown
+        orion = Thought('オリオン座、きれいに撮れたのですね', 'comment', 4.0, anchor=self.h.last_id)
+        self.i.thoughts = [orion]
+        self.i.state_note()
+        self.assertEqual(orion.shown_id, self.h.last_id)
+        self.i.apply({'spoken': [orion.id]}, 1.0)
+        self.assertIn(orion, self.i.thoughts)            # pending: Ciel has not spoken since it was shown
+        self.assertTrue(orion.offered)
+        self.assertEqual(self.i.satiety, 0.0)
+        self.say('寒さは大丈夫でしたか？', role='assistant')
+        self.assertEqual(self.i._ciel_since(orion.shown_id), ['寒さは大丈夫でしたか？'])
+        self.i.apply({'spoken': []}, 2.0)                 # now judged on her later line: not spoken
+        self.assertFalse(orion.offered)
+
     def test_waits_while_the_user_keeps_talking(self):
         self.say('ねえ、シエル。')
         self.i._last = 100.0
@@ -264,17 +285,36 @@ class StalenessTests(unittest.TestCase):
         self.assertTrue(self.i._should_think(102.0 + initiative.THINK_SETTLE_SECONDS))
 
 
-class ReplyOfferTests(unittest.IsolatedAsyncioTestCase):
-    async def test_reply_carries_the_offered_thought(self):
+class InnerStateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reply_falls_back_to_instructions_when_the_state_cannot_be_placed(self):
         from turns import TurnReplies
         session = SimpleNamespace(generate_reply=Mock())
         style = SimpleNamespace(talk='chatty', presence='close', publish=None)
         r = TurnReplies(session, None, None, style, '')
-        r.initiative = SimpleNamespace(offer=lambda: 'OFFER [言えたら添えたいこと（感想）] x')
+        r.initiative = SimpleNamespace(state_note=lambda: 'STATE x', place_state=AsyncMock(return_value=False))
         await r._generate_reply({'instructions': '[発言者：ミナ]'})
-        self.assertEqual(session.generate_reply.call_args.kwargs['instructions'],
-                         '[発言者：ミナ]\n\nOFFER [言えたら添えたいこと（感想）] x')
+        self.assertEqual(session.generate_reply.call_args.kwargs['instructions'], '[発言者：ミナ]\n\nSTATE x')
+        r.initiative = SimpleNamespace(state_note=lambda: 'STATE y', place_state=AsyncMock(return_value=True))
+        await r._generate_reply({'instructions': '[発言者：ミナ]'})
+        self.assertEqual(session.generate_reply.call_args.kwargs['instructions'], '[発言者：ミナ]')
 
+    async def test_state_item_is_replaced_in_place(self):
+        from livekit.agents.llm import ChatContext
+        ctx = ChatContext.empty()
+        ctx.add_message(role='user', content='星空を撮ったよ')
+
+        async def update(new_ctx):
+            agent.chat_ctx = new_ctx
+        agent = SimpleNamespace(chat_ctx=ctx, realtime_llm_session=None)
+        agent.update_chat_ctx = update
+        i = make()
+        i.session.current_agent = agent
+        self.assertTrue(await i.place_state('STATE 1'))
+        await asyncio.gather(*list(i._tasks))
+        self.assertTrue(await i.place_state('STATE 2'))
+        await asyncio.gather(*list(i._tasks))
+        texts = [item.text_content for item in agent.chat_ctx.items]
+        self.assertEqual(texts, ['星空を撮ったよ', 'STATE 2'])
 
 
 class ToolTests(unittest.IsolatedAsyncioTestCase):

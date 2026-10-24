@@ -469,9 +469,11 @@ class TurnReplies:
         await self._generate_reply(extra)
 
     async def _generate_reply(self, extra: dict) -> None:
-        offer = self.initiative.offer() if self.initiative is not None else None
-        if offer is not None:   # 話したかった考えを、流れに合えば返事の最後に添えさせる
-            extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), offer)))
+        if self.initiative is not None:
+            # シエルの今の心の状態を会話の後ろに置く（変わったときだけ。置けなければ今回の指示に足す）
+            note = self.initiative.state_note()
+            if note is not None and not await self.initiative.place_state(note):
+                extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), note)))
         if self.minutes is not None:
             context = self.minutes.context()
             if TURN_CONTEXT == 'items':
