@@ -16,7 +16,7 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   ひかえめのときは話さないし、考えもしない。
 - 人が話している最中、シエルが考え中・話している最中は話しかけない。会話の始めのあいさつの前も話しかけない。
 - ログには考えの中身を出さない（数と気持ちの強さだけ）。中身はデバッグ用の会話ログ（debug_log、thoughts）にだけ残す。
-決めたことは docs/decisions/inner-thoughts-ja.md。
+決めたことは docs/decisions/inner-thoughts-ja.md、参考にした研究と設計の原点は docs/inner-thoughts-research-ja.md。
 """
 import asyncio
 import json
