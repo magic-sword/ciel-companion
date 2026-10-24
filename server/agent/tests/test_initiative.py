@@ -304,6 +304,25 @@ class QualityTests(unittest.IsolatedAsyncioTestCase):
                  'thoughts': [{'text': 'どんなカメラかな', 'kind': 'question', 'stimulus': 'オリオン座を撮った', 'motivation': 4}]}, 1.0)
         self.assertEqual([(t.text, t.topic, t.stimulus) for t in i.thoughts], [('どんなカメラかな', '星空の撮影', 'オリオン座を撮った')])
 
+    def test_answered_thoughts_are_dropped(self):
+        i = make()
+        where = Thought('どこのキャンプ場かな', 'question', 4.0)
+        gear = Thought('道具はどうしたのかな', 'question', 4.0)
+        i.thoughts = [where, gear]
+        i.apply({'answered': [where.id, {'id': gear.id}],
+                 'rescore': [{'id': gear.id, 'motivation': 4}]}, 1.0, reviewed={where.id, gear.id})
+        self.assertEqual(i.thoughts, [])
+
+    def test_similar_thoughts_on_one_topic_are_capped(self):
+        i = make()
+        i.topic = 'AI'
+        i.thoughts = [Thought(f'研究の視点{n}', 'comment', 3.0 + n / 10, topic='AI') for n in range(4)]
+        i.thoughts.append(Thought('実用例を聞きたい', 'question', 4.0, topic='AI'))
+        i.apply({}, 1.0)
+        comments = sorted(t.text for t in i.thoughts if t.kind == 'comment')
+        self.assertEqual(comments, ['研究の視点2', '研究の視点3'])
+        self.assertIn('実用例を聞きたい', [t.text for t in i.thoughts])
+
     def test_thought_without_a_stimulus_is_not_kept(self):
         i = make()
         i.apply({'thoughts': [{'text': '今日は何を話したいのかな', 'kind': 'question', 'motivation': 4},

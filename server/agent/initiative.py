@@ -80,6 +80,7 @@ REACTIVE_TURNS = 2
 UNREVIEWED_LOSS = 1.0         # 考える係が、前の考えを付け直しも捨てもしなかったら、気持ちをこれだけ下げる
 TOPIC_SHIFT_LOSS = 1.0        # 話題が移ったとき、前の話題の聞きたいこと・戻りたいことの気持ちを下げる量
 MAX_THOUGHTS = 12
+PER_TOPIC_KIND = 2             # 同じ話題・同じ種類の考えを持つ数
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
 # 話しかけるときに添える、考えの種類（シエルが考えと違う話をしないように）
@@ -462,7 +463,12 @@ class Initiative:
         by_id = {t.id: t for t in self.thoughts}
         # 心の状態に載せた考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
         spoken = _ids(result.get('spoken'))
-        dropped = _ids(result.get('drop'))
+        # 相手の発言で答えが出た考え（聞きたいこと・戻りたいこと）は捨てる。もう答えた質問が残り、
+        # 話題に出ることがあった（2026-10-24、評価の AI の動向の場面）
+        answered = _ids(result.get('answered')) - spoken
+        dropped = _ids(result.get('drop')) | answered
+        if answered & set(by_id):
+            log.info('内なる考え：答えが出た考えを捨てた（%d 個）', len(answered & set(by_id)))
         for t in list(self.thoughts):
             # 載せたあと、シエルがまだ話していなければ、判定は保留（載せる前の発言で「話した」にしない）
             pending = t.offered and self.history is not None and not self._ciel_since(t.shown_id)
@@ -521,7 +527,16 @@ class Initiative:
             self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor,
                                          topic=self.topic, stimulus=stimulus))
             added += 1
-        self.thoughts = sorted(self.thoughts, key=lambda t: -t.motivation)[:MAX_THOUGHTS]
+        # 同じ話題・同じ種類の考えは、気持ちの強いものから PER_TOPIC_KIND 個まで（言い方を変えただけの似た考えが
+        # 積み重なった。2026-10-24、評価の AI の動向の場面）
+        kept, count = [], {}
+        for t in sorted(self.thoughts, key=lambda t: -t.motivation):
+            key = (t.topic, t.kind)
+            if t.topic and count.get(key, 0) >= PER_TOPIC_KIND:
+                continue
+            count[key] = count.get(key, 0) + 1
+            kept.append(t)
+        self.thoughts = kept[:MAX_THOUGHTS]
         unknowns = result.get('unknowns')
         if isinstance(unknowns, list):
             self.unknowns = [u.strip()[:60] for u in unknowns if isinstance(u, str) and u.strip()][:8]
