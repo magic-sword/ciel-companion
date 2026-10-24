@@ -24,6 +24,7 @@ class Persona:
     inner_thoughts_instructions: str
     talk_correction_nudge: str
     talk_offer_instructions: str
+    inner_thoughts_voice_instructions: str
     presence_solo_instructions: str
     presence_close_instructions: str
     presence_public_instructions: str
@@ -44,7 +45,7 @@ class Persona:
             [self.instructions, self.emotion_instructions, self.greeting, self.touch_instructions,
              self.talk_quiet_instructions, self.talk_quiet_turn_instructions, self.talk_chatty_instructions,
              self.talk_chatty_nudge, self.inner_thoughts_instructions, self.talk_correction_nudge,
-             self.talk_offer_instructions,
+             self.talk_offer_instructions, self.inner_thoughts_voice_instructions,
              self.presence_solo_instructions, self.presence_close_instructions,
              self.presence_public_instructions, self.speaker_instructions, self.notes_instructions,
              self.relationship_instructions, self.minutes_instructions, self.minutes_live_instructions,
@@ -70,7 +71,7 @@ def load_persona() -> Persona:
     for key in ('instructions', 'emotion_instructions', 'greeting', 'touch_instructions',
                 'talk_quiet_instructions', 'talk_quiet_turn_instructions', 'talk_chatty_instructions',
                 'talk_chatty_nudge', 'inner_thoughts_instructions', 'talk_correction_nudge',
-                'talk_offer_instructions',
+                'talk_offer_instructions', 'inner_thoughts_voice_instructions',
                 'presence_solo_instructions', 'presence_close_instructions',
                 'presence_public_instructions', 'speaker_instructions', 'notes_instructions', 'relationship_instructions',
                 'minutes_instructions', 'minutes_live_instructions', 'minutes_voice_instructions',

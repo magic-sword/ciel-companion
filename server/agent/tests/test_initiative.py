@@ -1,6 +1,7 @@
 """Inner thoughts: think in the background, speak only when the motivation is high enough."""
 import asyncio
 import json
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock
@@ -36,16 +37,23 @@ class DecisionTests(unittest.TestCase):
         self.assertIsNone(i.pick(100.0 + initiative.CONTINUE_WINDOW + 1))
         self.assertIsNotNone(i.pick(100.0 + initiative.FALLBACK_SECONDS))
 
-    def test_continuation_needs_a_strong_thought_and_shares_the_cooldown(self):
+    def test_continuation_needs_a_strong_thought_and_an_unsated_drive(self):
         i = make()
         i.thoughts = [Thought('ふつうの考え', 'comment', 4.0, created=100.0)]
         agent_finished(i, 100.0)
         self.assertIsNone(i.pick(102.0))   # 4 waits for the next reply instead
         i.thoughts = [Thought('とても話したい', 'comment', 5.0, created=100.0)]
-        i._added_at = 90.0                 # just offered one in the reply
+        i._sate(95.0, initiative.SATE_SPEAK)   # she just spoke on her own
         self.assertIsNone(i.pick(102.0))
-        i._added_at = 100.0 - initiative.ADD_COOLDOWN
+        i.satiety = 0.0                        # time has passed: hungry again
         self.assertIsNotNone(i.pick(102.0))
+
+    def test_satiety_halves_over_time(self):
+        i = make()
+        i._sate(0.0, 2.0)
+        self.assertAlmostEqual(i.satiety_at(initiative.SATIETY_HALF_LIFE), 1.0)
+        i._sate(initiative.SATIETY_HALF_LIFE, 1.0)
+        self.assertAlmostEqual(i.satiety_at(initiative.SATIETY_HALF_LIFE * 2), 1.0)
 
     def test_no_continuation_when_the_user_started_talking(self):
         i = make()
@@ -73,24 +81,43 @@ class DecisionTests(unittest.TestCase):
         self.assertIsNone(i.pick(20.0))
         self.assertIsNotNone(i.pick(60.0))   # +1.0 after 60 s of silence
 
-    def test_offer_adds_one_strong_thought_with_cooldown(self):
+    def test_offer_then_confirm_whether_it_was_spoken(self):
         i = make()
-        i.thoughts = [Thought('どんなカメラで撮ったのかな', 'question', 4.0), Thought('弱い', 'comment', 2.0)]
+        camera = Thought('どんなカメラで撮ったのかな', 'question', 4.0)
+        i.thoughts = [camera, Thought('弱い', 'comment', 2.0)]
         note = i.offer()
         self.assertTrue(note.startswith('OFFER'))
         self.assertIn('[言えたら添えたいこと（相手に聞きたいこと）] どんなカメラで撮ったのかな', note)
+        self.assertTrue(camera.offered)
         i.thoughts.append(Thought('次の考え', 'comment', 5.0))
-        self.assertIsNone(i.offer())   # cooldown
-        i._added_at -= initiative.ADD_COOLDOWN
-        self.assertIn('次の考え', i.offer())
+        self.assertIsNone(i.offer())            # waits until we know whether the first was spoken
+        self.assertEqual(i.satiety, 0.0)        # offering alone does not sate
+        i.apply({'spoken': [camera.id]}, 1.0)   # it was spoken
+        self.assertNotIn(camera, i.thoughts)
+        self.assertGreater(i.satiety_at(1.0), 0.9)
         self.assertIsNone(make('normal').offer())
 
-    def test_old_thoughts_fade_and_unanswered_raises_the_bar(self):
+    def test_unused_offer_stays_but_weaker(self):
+        i = make()
+        t = Thought('星の話', 'comment', 4.5)
+        i.thoughts = [t]
+        i.offer()
+        i.apply({'spoken': []}, 1.0)
+        self.assertIn(t, i.thoughts)
+        self.assertFalse(t.offered)
+        self.assertEqual(t.motivation, 3.5)
+        self.assertEqual(i.satiety, 0.0)
+
+    def test_sated_drive_blocks_offers(self):
+        i = make()
+        i.thoughts = [Thought('話したい', 'comment', 4.0)]
+        i._sate(time.monotonic(), 1.0)
+        self.assertIsNone(i.offer())
+
+    def test_old_thoughts_fade(self):
         i = make()
         t = Thought('前の話', 'recall', 4.0, created=0.0)
         self.assertLess(i.score(t, initiative.STALE_SECONDS * 3), 4.0)
-        i.unanswered = 2
-        self.assertEqual(i.score(Thought('x', 'comment', 4.0, created=10.0), 10.0), 3.0)
 
     def test_normal_mode_only_urgent_corrections(self):
         i = make('normal')
@@ -113,12 +140,14 @@ class DecisionTests(unittest.TestCase):
         t = Thought('冬の星空の写真を見たい', 'comment', 5.0, created=0.0)
         i._express(t, 10.0)
         self.assertIn('[話したいこと（感想）] 冬の星空の写真を見たい', i.session.generate_reply.call_args.kwargs['instructions'])
-        # waiting for an answer already makes the next talk harder
-        self.assertEqual(i.score(Thought('次', 'comment', 4.0, created=10.0), 10.0), 3.5)
+        # speaking sates the drive, so the next talk is harder
+        self.assertEqual(i.score(Thought('次', 'comment', 4.0, created=10.0), 10.0), 4.0 - initiative.SATE_SPEAK)
         self.assertTrue(i.session.generate_reply.call_args.kwargs['instructions'].startswith('NUDGE'))
         self.assertTrue(t.expressed)
         i._express(Thought('もう一つ', 'comment', 5.0, created=0.0), 30.0)
         self.assertEqual(i.unanswered, 1)
+        # unanswered talk adds embarrassment on top
+        self.assertGreater(i.satiety_at(30.0), initiative.SATE_SPEAK * 1.5)
         i.on_user_state(SimpleNamespace(new_state='speaking'))
         self.assertEqual(i.unanswered, 0)
 
@@ -184,6 +213,26 @@ class ReplyOfferTests(unittest.IsolatedAsyncioTestCase):
         await r._generate_reply({'instructions': '[発言者：ミナ]'})
         self.assertEqual(session.generate_reply.call_args.kwargs['instructions'],
                          '[発言者：ミナ]\n\nOFFER [言えたら添えたいこと（感想）] x')
+
+
+
+class ToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_read_and_keep_thoughts(self):
+        from tools.thoughts import keep_thought, read_inner_thoughts
+        i = make()
+        i.thoughts = [Thought('星空の写真を見たい', 'comment', 5.0)]
+        i.unknowns = ['使っているカメラ']
+        ctx = SimpleNamespace(userdata=SimpleNamespace(initiative=i))
+        data = json.loads(await read_inner_thoughts(ctx))
+        self.assertEqual(data['thoughts'][0], {'text': '星空の写真を見たい', 'kind': '感想', 'want': 'とても話したい'})
+        self.assertEqual(data['unknowns'], ['使っているカメラ'])
+        self.assertEqual(data['talk_drive'], 'ふつう')
+        self.assertNotIn('motivation', json.dumps(data))
+        self.assertEqual(json.loads(await keep_thought(ctx, 'あとで流れ星の話を聞きたい'))['status'], 'kept')
+        self.assertEqual(json.loads(await keep_thought(ctx, 'あとで流れ星の話を聞きたい'))['status'], 'already_kept')
+        self.assertEqual(i.thoughts[-1].kind, 'question')
+        none = SimpleNamespace(userdata=SimpleNamespace(initiative=None))
+        self.assertEqual(json.loads(await read_inner_thoughts(none))['status'], 'unavailable')
 
 
 if __name__ == '__main__':

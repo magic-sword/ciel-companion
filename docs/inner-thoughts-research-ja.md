@@ -40,7 +40,14 @@ Joon Sung Park ほか、2023 年。[arXiv:2304.03442](https://arxiv.org/abs/2304
 - **言っていること**：出来事を記憶の流れに貯め、新しさ・関係・重要さで呼び出す。大事な出来事がたまったら振り返り（reflection）、高いレベルの考えにまとめて、次の行動を計画する。
 - **シエルで使うもの（第 3 段階）**：会話の終わりに振り返り、「次に会ったら聞きたいこと・話したいこと」を残す。その人についての記憶なので、人のメモと同じく本人の同意がある人だけ。
 
-### 2.4 Sampling Is Not Curiosity：LLM の探索は好奇心ではない
+### 2.4 Kismet：欲求と恒常性（話したい欲の満腹度）
+
+Cynthia Breazeal、社会的ロボット Kismet（MIT、2003 年ごろの一連の研究。「Emotion and sociable humanoid robots」など）。
+
+- **言っていること**：ロボットに「人と関わりたい」「刺激がほしい」などの欲求（drive）を持たせる。欲求は満たされると下がり、時間とともにまた上がり、ちょうどよい範囲（恒常性）に保たれるよう振る舞いを選ぶ。
+- **シエルで使ったもの**：話したい欲の満腹度。自分から話すたびに上がり、時間とともに半分ずつ下がる。話す条件は「気持ち − 満腹度 ≥ 基準」。回数の上限の代わり。
+
+### 2.5 Sampling Is Not Curiosity：LLM の探索は好奇心ではない
 
 NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/140072)
 
@@ -57,6 +64,9 @@ NeurIPS 2026 の発表。[ページ](https://neurips.cc/virtual/2026/poster/1400
 | 気持ちの今の強さ（沈黙・古さ・返事が無いとき） | `Initiative.score` |
 | 今話す考えを選ぶ（話し終えた直後に続ける・長い沈黙・モードごと） | `Initiative.pick`・`continuing` |
 | 相手への返事に添える | `Initiative.offer` → `turns.py` の `_generate_reply`（`config/prompts/talk_offer.md`） |
+| 話したい欲の満腹度 | `Initiative.satiety_at`・`_sate`（自分から話すと上がり、時間で下がる） |
+| 返事に添えた考えを話したかの判定 | `Initiative.apply` の `spoken`（考える係が会話から判定） |
+| 会話モデルが心の中を読む・預ける | `tools/thoughts.py` の `read_inner_thoughts`・`keep_thought`（`config/prompts/inner_thoughts_voice.md`） |
 | 話したいことを会話に置いて話しかけさせる | `Initiative._express`・`_say`（system の項目）→ `config/prompts/talk_chatty_nudge.md` |
 | 試験 | `server/agent/bench_thoughts.py`（開発用の会話サーバー）、`server/agent/tests/test_initiative.py` |
 

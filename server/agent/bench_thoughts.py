@@ -6,7 +6,7 @@ bench_latency.py と同じく、試験用の参加者が部屋に入り、名前
 そのあと --silence 秒黙って、シエルの声（相づちを除く）が始まった時刻を記録する。
 考えの中身と話しかけた言葉は、開発用のデバッグログ（thoughts・thought_expressed・item）で見る。
 
-  python bench_thoughts.py [--agent ciel-dev] [--silence 150]
+  python bench_thoughts.py [--agent ciel-dev] [--silence 150] [--ask]
 必要な環境変数：LIVEKIT_URL・LIVEKIT_API_KEY・LIVEKIT_API_SECRET（.env）、CIEL_TTS_URL。
 """
 import argparse
@@ -27,6 +27,7 @@ load_dotenv()
 LINES = ['ねえシエル、昨日の夜、冬の星空を撮りに山の方まで行ってきたんだ。',
          'オリオン座がすごくきれいに撮れたよ。でも寒くて手がかじかんじゃった。',
          '今度は流れ星も撮ってみたいんだよね。']
+ASK = 'シエル、今なに考えてたの？'   # --ask：最後に心の中を聞く（道具 read_inner_thoughts を使うか）
 QUIET = 2.5
 
 
@@ -34,6 +35,7 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--agent', default='ciel-dev')
     ap.add_argument('--silence', type=float, default=150)
+    ap.add_argument('--ask', action='store_true')
     args = ap.parse_args()
     room_name = f'bench-{uuid.uuid4().hex[:8]}'
     lk = api.LiveKitAPI()
@@ -42,7 +44,7 @@ async def main() -> None:
     token = (api.AccessToken().with_identity('bench-user').with_name('bench')
              .with_grants(api.VideoGrants(room_join=True, room=room_name)).to_jwt())
     async with aiohttp.ClientSession() as http:
-        pcm = {t: await synth(http, t) for t in LINES}
+        pcm = {t: await synth(http, t) for t in [*LINES, ASK]}
 
     room = rtc.Room()
     voice, aizuchi = Listener(), Listener()
@@ -99,6 +101,11 @@ async def main() -> None:
     # 声のかたまりは文ごとに分かれるので、5 秒以上あいたものを 1 回の話しかけとして数える
     talks = [s for i, s in enumerate(starts) if i == 0 or s - starts[i - 1] > 5]
     print(f'SUMMARY 黙ってから話しかけた時刻（秒）：{talks}  部屋：{room_name}', flush=True)
+    if args.ask:
+        await wait_quiet()
+        await say(ASK)
+        await asyncio.sleep(1.0)
+        await wait_quiet(60)
     pump_task.cancel()
     await room.disconnect()
     await lk.room.delete_room(api.DeleteRoomRequest(room=room_name))

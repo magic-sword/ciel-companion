@@ -143,7 +143,8 @@ class Ciel(Agent):
             # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
             parts.append(p.speaker_instructions)
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
-        parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions]
+        parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions,
+                  p.inner_thoughts_voice_instructions]
         if SPEAKERS:
             parts.append({'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
                           'public': p.presence_public_instructions}[presence])
@@ -246,6 +247,7 @@ async def entrypoint(ctx: JobContext) -> None:
                                    correction_nudge=agent.persona.talk_correction_nudge,
                                    offer_note=agent.persona.talk_offer_instructions)
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
+    session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:

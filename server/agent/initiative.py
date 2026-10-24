@@ -17,7 +17,9 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   2. 話し終えた直後に続ける：シエルが相手への返事を話し終えて、CONTINUE_AFTER〜CONTINUE_WINDOW 秒のあいだ相手が
      話し始めなければ、気持ちが CONTINUE_THRESHOLD（5）以上の考えを続けて話す（話し手交替の規則の「誰も話し始めなければ、
      今の話し手が続けてよい」。Sacks ほか 1974）。シエルが自分から話しかけたあとには続けない（ひとりで話し続けない）。
-  1・2 は合わせて ADD_COOLDOWN に 1 回まで（毎回の返事に足すと多すぎた。2026-10-24、bench_thoughts.py）。
+  回数の上限は持たず、話したい欲の満腹度で決める（SATIETY_HALF_LIFE の説明）。自分から話すたびに満腹度が上がり、
+  時間とともに下がる。返事に添えた考えは、次に考えるときに会話から「実際に話したか」を確かめ（spoken）、話していれば
+  満腹度を上げ、話していなければ気持ちを下げて残す（毎回の返事に足すと多すぎた。2026-10-24、bench_thoughts.py）。
   3. 長い沈黙：FALLBACK_SECONDS 誰も話さなければ、話しかける（最後の手段）。
   気持ちは、静かな時間が長いほど少し上がり、考えが古くなるほど下がる（config/prompts/talk_chatty_nudge.md）。
   話しかけても返事が無ければ、話すための気持ちを上げていく（しつこくしない）。人が話したら元に戻す。
@@ -54,7 +56,6 @@ THINK_TIMEOUT = 20.0
 CONTINUE_AFTER = 1.5          # シエルが話し終えて、相手がこれだけ話し始めなければ、続けて話してよい
 CONTINUE_WINDOW = 4.0         # 続けて話すのは、話し終えてからこの秒数まで（過ぎたら、長い沈黙を待つ）
 FALLBACK_SECONDS = 30.0       # 誰もこれだけ話さなければ、話しかける（最後の手段）
-ADD_COOLDOWN = 45.0           # 返事に添える・続けて話すのは、合わせてこの秒数に 1 回まで（毎回の返事に足さない）
 CONTINUE_THRESHOLD = float(os.environ.get('CIEL_THOUGHT_CONTINUE_THRESHOLD', '5.0'))   # 続けて話す気持ちの強さ
 CORRECTION_PAUSE_SECONDS = 3.0
 THRESHOLD = float(os.environ.get('CIEL_THOUGHT_THRESHOLD', '4.0'))
@@ -64,8 +65,13 @@ SILENCE_GAIN_MAX = 1.0
 STALE_SECONDS = 180.0         # これより古い考えは、気持ちを下げていく
 STALE_LOSS = 0.5              # STALE_SECONDS ごとに下げる量
 DROP_SECONDS = 900.0          # これより古い考えは捨てる
-UNANSWERED_STEP = 0.5         # 話しかけて返事が無いたびに、話すための気持ちを上げる量
-UNANSWERED_MAX = 1.5
+# 話したい欲の満腹度（欲求と恒常性。社会的ロボット Kismet（Breazeal 2003）などの作り）。シエルが自分から話す
+# （話しかける・続ける・返事に添えた考えを実際に話す）たびに上がり、時間とともに半分ずつ下がる。話す条件は
+# 「気持ち − 満腹度 ≥ 基準」なので、話した直後は話しにくく、時間がたてばまた話せる。回数の上限は持たない
+SATIETY_HALF_LIFE = float(os.environ.get('CIEL_THOUGHT_SATIETY_HALF_LIFE', '90'))
+SATE_SPEAK = 1.0              # 自分から 1 回話したときに上がる量
+SATE_UNANSWERED = 0.5         # 前に話しかけて返事が無いまま、また話したときに足す量（気まずさ）
+UNUSED_OFFER_LOSS = 1.0       # 返事に添えるよう渡したのに使われなかった考えの気持ちを下げる量
 MAX_THOUGHTS = 12
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
@@ -82,6 +88,7 @@ class Thought:
     created: float = field(default_factory=time.monotonic)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:6])
     expressed: bool = False
+    offered: bool = False   # 返事に添えるよう渡して、実際に話したかをまだ確かめていない
 
 
 class Initiative:
@@ -110,7 +117,8 @@ class Initiative:
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
         self._agent_done_at: float | None = None   # シエルが相手への返事を話し終えた時刻（続けて話してよいかを見る）
-        self._added_at = -1e9   # 最後に返事に添えた・続けて話した時刻
+        self.satiety = 0.0                 # 話したい欲の満腹度（_satiated_at の時点の値。satiety_at で今の値）
+        self._satiated_at = time.monotonic()
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -181,16 +189,18 @@ class Initiative:
                 and now - self._last >= idle and now - self._thought_at >= idle)
 
     def score(self, t: Thought, now: float) -> float:
-        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、返事が無いほど話しにくくなる"""
+        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）"""
         silence = max(0.0, now - self._last)
         gain = min(SILENCE_GAIN * int(silence // SILENCE_STEP), SILENCE_GAIN_MAX)
         loss = STALE_LOSS * max(0.0, (now - t.created) - STALE_SECONDS) / STALE_SECONDS
-        return t.motivation + gain - loss - min(UNANSWERED_STEP * self.pressure, UNANSWERED_MAX)
+        return t.motivation + gain - loss - self.satiety_at(now)
 
-    @property
-    def pressure(self) -> int:
-        """話しかけて返事が無かった回数。前に話しかけて、まだ返事を待っているあいだも 1 回と数える"""
-        return self.unanswered + (1 if self._spoke_at is not None else 0)
+    def satiety_at(self, now: float) -> float:
+        return self.satiety * 0.5 ** (max(0.0, now - self._satiated_at) / SATIETY_HALF_LIFE)
+
+    def _sate(self, now: float, amount: float) -> None:
+        self.satiety = self.satiety_at(now) + amount
+        self._satiated_at = now
 
     def continuing(self, now: float) -> bool:
         """シエルが相手への返事を話し終えて、相手がまだ話し始めていない（続けて話してよい）"""
@@ -201,20 +211,21 @@ class Initiative:
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
         self.thoughts = [t for t in self.thoughts if now - t.created < DROP_SECONDS and not t.expressed]
+        candidates = [t for t in self.thoughts if not t.offered]   # 返事に添えたばかりの考えは、話したか分かるまで待つ
         silence = now - self._last
         talk = self.style.talk
         if talk == 'chatty':
             if silence >= FALLBACK_SECONDS:
                 threshold = THRESHOLD
-            elif self.continuing(now) and now - self._added_at >= ADD_COOLDOWN:
+            elif self.continuing(now):
                 # 続けて話すのは、とても話したいことだけ（気持ち 4 の考えは、次の返事に添える）
                 threshold = CONTINUE_THRESHOLD
             else:
                 return None
-            best = max(self.thoughts, key=lambda t: self.score(t, now), default=None)
+            best = max(candidates, key=lambda t: self.score(t, now), default=None)
             return best if best is not None and self.score(best, now) >= threshold else None
         if talk == 'normal' and silence >= CORRECTION_PAUSE_SECONDS:
-            return next((t for t in self.thoughts if t.kind == 'correction' and t.motivation >= 5), None)
+            return next((t for t in candidates if t.kind == 'correction' and t.motivation >= 5), None)
         return None
 
     def offer(self) -> str | None:
@@ -222,32 +233,54 @@ class Initiative:
         if self.style.talk != 'chatty' or not self.offer_note:
             return None
         now = time.monotonic()
-        if now - self._added_at < ADD_COOLDOWN:
-            return None
+        if any(t.offered for t in self.thoughts):
+            return None   # 前に渡した考えを話したか、まだ確かめていない
         fresh = [t for t in self.thoughts if not t.expressed and t.kind != 'correction' and now - t.created < DROP_SECONDS]
         best = max(fresh, key=lambda t: t.motivation, default=None)
-        if best is None or best.motivation < THRESHOLD:
+        if best is None or best.motivation - self.satiety_at(now) < THRESHOLD:
             return None
-        # 使われたかは分からないので、渡したら話したことにする（同じ考えを何度も渡さない）
-        best.expressed = True
-        self.expressed = (self.expressed + [best.text])[-8:]
-        self._added_at = now
-        log.info('内なる考え：返事に添える（%s、気持ち %.1f）', best.kind, best.motivation)
+        # 実際に話したかは、次に考えるときに会話から確かめる（apply の spoken）。話していれば満腹度を上げる
+        best.offered = True
+        log.info('内なる考え：返事に添える（%s、気持ち %.1f、満腹度 %.1f）', best.kind, best.motivation, self.satiety_at(now))
         debug_log.record('thought_offered', thought_kind=best.kind, text=best.text, motivation=best.motivation)
         return f'{self.offer_note}\n[言えたら添えたいこと（{KIND_LABELS[best.kind]}）] {best.text}'
 
+    def snapshot(self) -> dict:
+        """道具 read_inner_thoughts の答え：話したい気持ちの強い考え・知りたいこと・満たされ具合（数字は出さない）"""
+        now = time.monotonic()
+        top = sorted((t for t in self.thoughts if not t.expressed), key=lambda t: -self.score(t, now))[:5]
+        satiety = self.satiety_at(now)
+        return {'thoughts': [{'text': t.text, 'kind': KIND_LABELS[t.kind],
+                              'want': 'とても話したい' if t.motivation >= 5 else '話したい' if t.motivation >= 4 else 'すこし'}
+                             for t in top],
+                'unknowns': self.unknowns,
+                'talk_drive': '話したばかりで満たされている' if satiety >= 1.5 else 'すこし満たされている' if satiety >= 0.5 else 'ふつう'}
+
+    def keep(self, text, kind: str = 'question') -> str:
+        """道具 keep_thought：会話モデルが、あとで話したいことを考えとして預ける"""
+        text = text.strip()[:80] if isinstance(text, str) else ''
+        if not text:
+            return 'invalid'
+        if any(t.text == text for t in self.thoughts):
+            return 'already_kept'
+        self.thoughts.append(Thought(text, kind if kind in KINDS and kind != 'correction' else 'question', 4.0))
+        self.thoughts = sorted(self.thoughts, key=lambda t: -t.motivation)[:MAX_THOUGHTS]
+        log.info('内なる考え：会話モデルが考えを預けた（%s）', kind)
+        debug_log.record('thought_kept', thought_kind=kind, text=text)
+        return 'kept'
+
     def _express(self, t: Thought, now: float) -> None:
-        if self.continuing(now):
-            self._added_at = now
         self._agent_done_at = None   # 続けて話すのは 1 回だけ
         t.expressed = True
         self.expressed = (self.expressed + [t.text])[-8:]
         if self._spoke_at is not None:
             self.unanswered += 1   # 前に話しかけたあと、誰も話さなかった
+        self._sate(now, SATE_SPEAK + (SATE_UNANSWERED if self._spoke_at is not None else 0.0))
         self._spoke_at = now
         self._last = now
         nudge = self.correction_nudge if t.kind == 'correction' and self.style.talk != 'chatty' else self.nudge
-        log.info('内なる考え：話しかける（%s、気持ち %.1f、返事なし %d 回）', t.kind, t.motivation, self.unanswered)
+        log.info('内なる考え：話しかける（%s、気持ち %.1f、返事なし %d 回、満腹度 %.1f）',
+                 t.kind, t.motivation, self.unanswered, self.satiety_at(now))
         debug_log.record('thought_expressed', thought_kind=t.kind, text=t.text, motivation=t.motivation)
         note = f'[話したいこと（{KIND_LABELS[t.kind]}）] {t.text}'
         if getattr(self.session, 'current_agent', None) is None:
@@ -299,8 +332,8 @@ class Initiative:
             'talk': self.style.talk,
             'silence_seconds': round(max(0.0, now - self._last)),
             'conversation': self._conversation(),
-            'thoughts': [{'id': t.id, 'text': t.text, 'kind': t.kind, 'motivation': t.motivation}
-                         for t in self.thoughts if not t.expressed],
+            'thoughts': [{'id': t.id, 'text': t.text, 'kind': t.kind, 'motivation': t.motivation,
+                          **({'offered': True} if t.offered else {})} for t in self.thoughts if not t.expressed],
             'expressed': self.expressed,
             'unknowns': self.unknowns,
         }
@@ -320,6 +353,21 @@ class Initiative:
         if not isinstance(result, dict):
             return
         by_id = {t.id: t for t in self.thoughts}
+        # 返事に添えるよう渡した考えを、シエルが実際に話したか（話していれば満腹度を上げる。話していなければ気持ちを下げる）
+        spoken = {i for i in result.get('spoken') or [] if isinstance(i, str)}
+        for t in list(self.thoughts):
+            if t.id in spoken:
+                t.expressed = True
+                self.expressed = (self.expressed + [t.text])[-8:]
+                if t.offered:
+                    self._sate(now, SATE_SPEAK)
+                    log.info('内なる考え：返事に添えた考えを話した（%s）', t.kind)
+                    debug_log.record('thought_spoken', thought_kind=t.kind, text=t.text)
+                self.thoughts.remove(t)
+                by_id.pop(t.id, None)
+            elif t.offered:
+                t.offered = False
+                t.motivation = max(1.0, t.motivation - UNUSED_OFFER_LOSS)
         for d in result.get('drop') or []:
             if d in by_id:
                 self.thoughts.remove(by_id.pop(d))
