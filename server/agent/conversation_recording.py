@@ -4,6 +4,7 @@ import logging
 
 import emotion
 import speakers
+import turns
 
 
 log = logging.getLogger('ciel-agent.conversation')
@@ -60,9 +61,11 @@ class ConversationRecorder:
         except Exception:
             j = None
             log.warning('会話履歴：話者の判定を取得できない')
+        if turns.echoes_prompt(text):
+            text = ''   # 文字起こしがヒントの文を書き出しただけ（物音など）。履歴にもメモにも残さない
         self.history.complete(turn, text, j.sp if j else None,
                               speakers.SpeakerBook.label(j), j.sure if j else False)
-        if self.note_taker is not None and not (j is not None and j.enroll):
+        if self.note_taker is not None and text and not (j is not None and j.enroll):
             self.note_taker.on_turn(turn)   # 声の登録の読み上げ（画面の文）は、その人のメモの元にしない
 
     async def flush(self) -> None:

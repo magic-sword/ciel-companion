@@ -65,10 +65,20 @@ SHORT_SECONDS = 1.2
 GRACE_SECONDS = 0.6
 # 会話モデルの側が発言を区切ったのに、文字起こしが確定しない（失敗した）ときに、それでも作らせるまでの時間
 NO_TEXT_SECONDS = 5.0
-# ひかえめのとき、これが文字起こしにあれば、シエルが呼ばれたかもしれないとして返事を作らせる
-CALL_WORDS = ('シエル', 'しえる', 'AI', 'ＡＩ', 'エーアイ')
-# ひかえめのとき、シエルが質問で終わる返事をしてから、その答えを待つ時間
+# ひかえめのとき、これが文字起こしにあれば、シエルが呼ばれたかもしれないとして返事を作らせる。
+# 「AI」「エーアイ」も入れていたが、AI の話をする会議では何度も出て、呼ばれていないのに話し出したので外した（2026-10-25）
+CALL_WORDS = ('シエル', 'しえる')
+# ひかえめのとき、シエルが質問で終わる返事をしてから、その答えを待つ時間。答えとみなすのは、シエルが答えた相手と
+# 同じ人の発言だけ（会議でほかの人どうしが話し続けると、その発言にも答えてしまった。2026-10-25）
 FOLLOW_SECONDS = 20.0
+# 文字起こしのモデルが、物音や小さな声のときに、ヒントとして渡した文（agent.py の transcription）をそのまま書き出すことが
+# ある（「AI キャラクター「シエル」との会話。出てくる名前：…」）。これは何も話していないとみなす（呼ばれたことにしない）
+PROMPT_ECHOES = ('キャラクター「シエル」との会話', '出てくる名前：')
+
+
+def echoes_prompt(text: str) -> bool:
+    """文字起こしが、ヒントの文を書き出しただけのものか"""
+    return any(p in text for p in PROMPT_ECHOES)
 TAGS = re.compile(r'\[[a-z]+\]')
 # ふつう・おしゃべりのとき、区切りのあと、続きを話し始めないかを見る時間（会話モデルの側は、読点の間で区切ったあと
 # 0.05〜0.3 秒で次の話し始めを知らせた）。短い発言（「シエル、」）は続きがあることが多いので長めに見る。
@@ -142,6 +152,7 @@ class TurnReplies:
         self._pending = False                   # 文字起こしは確定したが、次を話していたので待たせている
         self._texts: list[str] = []             # その文字起こし（多人数のとき、呼ばれたかを見る）
         self._asked_at: float | None = None     # シエルが質問で終わる返事をした時刻
+        self._asked_to = None                   # その質問をした相手（speakers.SessionSpeaker）
         self._later: asyncio.TimerHandle | None = None   # 待たせている返事を作らせる時計
         self._no_text: asyncio.TimerHandle | None = None
         self._early: asyncio.Task | None = None   # 区切りのあと、続きを見てから作らせる（ふつう・おしゃべり）
@@ -270,23 +281,27 @@ class TurnReplies:
                     self._no_text = asyncio.get_running_loop().call_later(NO_TEXT_SECONDS, self._text_failed)
             return
         self._cancel_no_text()
+        text = ev.transcript
+        if echoes_prompt(text):
+            log.info('文字起こしがヒントの文を書き出しただけなので、何も話していないとみなす')
+            text = ''
         latency.mark('文字起こし')
-        if self.backchannel is not None and ev.transcript.strip():
-            self.backchannel.heard(ev.transcript)   # 質問なら、考えるときの相づちにする
+        if self.backchannel is not None and text.strip():
+            self.backchannel.heard(text)   # 質問なら、考えるときの相づちにする
         if self.style.talk != 'quiet':
             # ふつう・おしゃべり：返事は区切りで作らせている。物音かもしれず待っていた発言だけ、文字になったら作らせる
             if self._await_text:
                 self._await_text = False
-                if ev.transcript.strip():
+                if text.strip():
                     self._reply_now()
                 else:
                     self._forget()
             return
-        if not ev.transcript.strip():
+        if not text.strip():
             if not self._pending:
                 self._forget()   # 文字にならない音だった。返事は作らせない
             return
-        self._texts.append(ev.transcript)
+        self._texts.append(text)
         if self._speaking:
             self._pending = True   # 読点の間などで区切られた。続きと合わせて 1 回にする
             log.info('発言の続きを待つ')
@@ -396,25 +411,52 @@ class TurnReplies:
         if getattr(ev.item, 'role', None) != 'assistant':
             return
         text = TAGS.sub('', ev.item.text_content or '').strip()
-        self._asked_at = time.time() if text.endswith(('？', '?')) else None
+        asked = text.endswith(('？', '?'))
+        self._asked_at = time.time() if asked else None
+        # 質問した相手（シエルが答えていた人）。その人の発言だけを答えとみなす
+        self._asked_to = self.book.last if asked and self.book is not None else None
 
-    def _called(self, text: str) -> bool:
+    def _called(self, text: str) -> str | None:
+        """ひかえめのとき、シエルへの発言か。name：名前で呼ばれた。follow：シエルが質問してから FOLLOW_SECONDS 以内
+        （答えた相手と同じ人の発言かは、声の判定を待って _reply_if_answer が確かめる）"""
         if any(w in text.upper() for w in CALL_WORDS):
-            return True
-        return self._asked_at is not None and time.time() - self._asked_at < FOLLOW_SECONDS
+            return 'name'
+        if self._asked_at is not None and time.time() - self._asked_at < FOLLOW_SECONDS:
+            return 'follow'
+        return None
 
     def _reply_now(self) -> None:
         self._cancel_later()
         start, end, text = self._started_at, self._ended_at, ''.join(self._texts)
         self._forget()
         touched = self.touch is not None and self.touch.pending is not None
-        if self.style.talk == 'quiet' and not self._called(text) and not touched:
+        called = self._called(text) if self.style.talk == 'quiet' else 'name'
+        if not called and not touched:
             log.info('ひかえめ：呼ばれていないので、返事を作らせない')
             return
         now = time.time()
-        t = asyncio.create_task(self._reply(start or now, end or now))
+        if called == 'follow' and not touched and self._asked_to is not None:
+            reply = self._reply_if_answer(start or now, end or now)
+        else:
+            reply = self._reply(start or now, end or now)
+        t = asyncio.create_task(reply)
         self._tasks.add(t)
         t.add_done_callback(self._tasks.discard)
+
+    async def _reply_if_answer(self, start: float, end: float) -> None:
+        """ひかえめで、シエルが質問したあとの発言：質問した相手と同じ人なら答えとして返事を作らせる。
+        ほかの人どうしの話なら作らせない（会議で、続く人どうしの話にも答えてしまった。2026-10-25）"""
+        asked_to = self._asked_to
+        if self.book is None or self.encoder is None:
+            await self._reply(start, end)   # 声で人を分けられないときは、今までどおり答えとみなす
+            return
+        j = await self._judgment_for(start, end)
+        same = j is not None and j.sp is not None and (
+            j.sp is asked_to or (j.sp.person_id is not None and j.sp.person_id == asked_to.person_id))
+        if not same:
+            log.info('ひかえめ：シエルが質問した相手とは別の人の発言なので、返事を作らせない')
+            return
+        await self._reply(start, end)
 
     def _forget(self) -> None:
         self._started_at = self._ended_at = None
