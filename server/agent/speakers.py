@@ -278,6 +278,7 @@ class SpeakerBook:
         self.recent: SessionSpeaker | None = None   # 最後に分かった話者と、その確かさ（短い返事を比べる相手）
         self.recent_sure = False
         self.recent_at = -1e9
+        self.last_short = False
         self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
         self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
         self.on_split = None           # 人違いを直したとき呼ぶ（conversation.Conversation.on_split）
@@ -554,7 +555,7 @@ class SpeakerBook:
                     en.sp.person_id, en.sp.name = pid, en.name
                     if self.on_notes_consent:
                         self.on_notes_consent(pid)
-                self.last, self.last_sure = en.sp, True
+                self.last, self.last_sure, self.last_short = en.sp, True, False
                 self.recent, self.recent_sure, self.recent_at = en.sp, True, time.monotonic()
                 status = 'saved'
                 log.info('話者：声の登録で #%d の声を覚えた（見本 %d）', pid, len(en.embeddings))
@@ -732,6 +733,7 @@ class SpeakerBook:
         e, sp, sure, score, seconds = j.e, j.sp, j.sure, j.score, j.seconds
         self.last_embedding, self.last_rows, self.last_sure = e, [], False
         self.last = sp
+        self.last_short = j.short   # 短い返事で、直前の人とみなしただけ（新しい名前は付けない。_confirm_name・_name）
         k = next((k for k in self.known if k.person_id == sp.person_id), None) if sp.person_id is not None else None
         if k is None:
             # この会話で聞いた、まだ覚えていない人（判定のあとで名前を聞いた人も）
@@ -923,6 +925,10 @@ class SpeakerBook:
         sp = self.last
         if sp is None or not self.last_sure:
             return {'status': 'pending_identity', **info, 'identity_certain': False}
+        if self.last_short and entry.speaker_id != sp.speaker_id:
+            # 短い発言（「田中です」）は、直前の人の声とみなしただけで、別の人が初めて名乗ったのかもしれない。
+            # まだ誰にも結び付けていない名前は、短い発言の人には付けない（結び付けたあとの「いいよ」はよい）
+            return {'status': 'pending_identity', **info, 'identity_certain': False}
         if entry.source == 'introduced' and entry.introduced_by == sp.speaker_id:
             return {'status': 'introduced_person_must_confirm', **info}
         if entry.speaker_id is not None and entry.speaker_id != sp.speaker_id:
@@ -959,7 +965,9 @@ class SpeakerBook:
             return {'status': 'speaker_not_found' if label else 'no_speaker'}
         if sp is not self.last:
             return {'status': 'not_current_speaker', 'speaker_id': sp.speaker_id}
-        if not self.last_sure:
+        new_name = sp.name is None or plain_name(sp.name) != name
+        if not self.last_sure or (self.last_short and new_name):
+            # 短い発言で直前の人とみなしただけのときは、新しい名前を付けない（別の人が名乗ったのかもしれない）
             if not remember:
                 entry, status = self._propose_name(name, True)
                 return {'status': 'pending_identity', **entry.view()} if entry else {'status': status}

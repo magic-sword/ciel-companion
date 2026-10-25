@@ -113,5 +113,22 @@ class ShortConsentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved['args'][0], '田中')
 
 
+    async def test_short_self_introduction_is_not_given_to_the_previous_unnamed_speaker(self):
+        book = SpeakerBook(None)
+        a = book.judge(axis(0), 2.0)              # 知らない人A
+        await book.identify_parts(a)
+        await book.identify_parts(book.judge(near(3, 0.9, 61), 0.6))   # a newcomer: 「田中です」 (short)
+        result = await book.register_name('田中', self_introduction=True)
+        self.assertEqual(result['status'], 'pending_identity')
+        self.assertIsNone(a.sp.name)
+        # once 田中 speaks long enough, the name is bound to them
+        t = book.judge(axis(3), 1.5)
+        await book.identify_parts(t)
+        result = await book.confirm_name(result['registration_id'], '田中')
+        self.assertEqual(result['status'], 'session_named')
+        self.assertEqual(t.sp.name, '田中')
+        self.assertIsNone(a.sp.name)
+
+
 if __name__ == '__main__':
     unittest.main()
