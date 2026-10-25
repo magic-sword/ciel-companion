@@ -73,7 +73,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_merge_joins_two_voices_and_their_history(self):
         a = self.book.judge(voice(0), 2.0)
-        b = self.book.judge(voice(1), 2.0)
+        b = self.book.judge(voice(1), 3.0)
         ta, tb = self.turn(a), self.turn(b)
         self.book.last = b.sp
         await self.book.app_control({'action': 'name', 'speaker_id': a.sp.speaker_id, 'name': 'ハカセ'})
@@ -90,7 +90,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
         k = Known(1, 'ハカセ', [voice(0)])
         self.book.known.append(k)
         remembered = self.book.judge(voice(0), 2.0).sp
-        unknown = self.book.judge(voice(1), 2.0).sp
+        unknown = self.book.judge(voice(1), 3.0).sp
         status = await self.book.app_control({'action': 'merge', 'speaker_id': remembered.speaker_id,
                                               'into': unknown.speaker_id})
         self.assertEqual(status, 'merged')

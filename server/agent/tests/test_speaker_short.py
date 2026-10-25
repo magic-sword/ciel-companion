@@ -28,7 +28,7 @@ class ShortReplyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_short_reply_in_the_previous_voice_keeps_the_speaker_and_certainty(self):
         a = await self.speak(axis(0), 2.0)   # 知らない人A, sure
-        b = await self.speak(axis(1), 2.0)   # 知らない人B
+        b = await self.speak(axis(1), 3.0)   # 知らない人B
         await self.speak(near(0, 0.8, 50), 2.0)   # A again
         j = await self.speak(near(0, 0.45, 51), 0.5)   # 「いいよ」
         self.assertTrue(j.short)
@@ -42,7 +42,7 @@ class ShortReplyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_short_reply_closer_to_someone_else_is_unknown(self):
         await self.speak(axis(0), 2.0)
-        b = await self.speak(axis(1), 2.0)
+        b = await self.speak(axis(1), 3.0)
         await self.speak(axis(0), 2.0)   # A spoke last
         j = await self.speak(near(1, 0.6, 52), 0.5)   # B answers for A
         self.assertIsNone(j.sp)
@@ -51,7 +51,7 @@ class ShortReplyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_short_voice_that_cannot_be_checked_still_counts_as_the_reply(self):
         a = await self.speak(axis(0), 2.0)
-        await self.speak(axis(1), 2.0)
+        await self.speak(axis(1), 3.0)
         await self.speak(axis(0), 2.0)
         j = await self.speak(near(0, 0.2, 57), 0.5)   # short voices score only about 0.2 even for the same person
         self.assertIs(j.sp, a.sp)
@@ -121,12 +121,14 @@ class ShortConsentTests(unittest.IsolatedAsyncioTestCase):
         result = await book.register_name('田中', self_introduction=True)
         self.assertEqual(result['status'], 'pending_identity')
         self.assertIsNone(a.sp.name)
-        # once 田中 speaks long enough, the name is bound to them
+        # once 田中 speaks long enough, the name is bound to them (a held voice becomes a person when they confirm)
         t = book.judge(axis(3), 1.5)
         await book.identify_parts(t)
+        self.assertIsNotNone(t.pending)
         result = await book.confirm_name(result['registration_id'], '田中')
         self.assertEqual(result['status'], 'session_named')
-        self.assertEqual(t.sp.name, '田中')
+        self.assertEqual(book.last.name, '田中')
+        self.assertEqual([s.name for s in book.speakers], [None, '田中'])
         self.assertIsNone(a.sp.name)
 
 

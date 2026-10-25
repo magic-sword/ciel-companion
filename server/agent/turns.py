@@ -250,7 +250,8 @@ class TurnReplies:
             # 話者の判定を調べるための数字（区間・声の長さ・全員との類似度・結果）。声そのものは save_audio だけ
             debug_log.record('speaker_judgment', start=round(start, 3), end=round(end, 3), voiced=round(seconds, 2),
                              clip=clip, scores=scores,
-                             speaker=speakers.SpeakerBook.label(j), short=j.short, score=round(j.score, 3))
+                             speaker=speakers.SpeakerBook.label(j), short=j.short, pending=j.pending is not None,
+                             score=round(j.score, 3))
         return j
 
     async def _judgment_for(self, start: float, end: float) -> 'speakers.Judgment | None':

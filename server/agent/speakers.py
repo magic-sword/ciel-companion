@@ -14,6 +14,8 @@
   会話サーバーは合言葉のハッシュで持ち主を確かめる。その場にいる人がひとり・身近な人のときは、持ち主の声を優先して当てる
   （初めの数回の発言で「知らない人」にならないように）。この経路（端末）で当たった声は、経路の印を付けて見本に足す。
 - 人違いからの回復：この会話の知らない人の声が、何回か分まとめて覚えている人に近ければ、その人だったとまとめる。
+- 長い会議で人を増やしすぎない：だれにも似ていない短めの声と、まだ出ていない覚えている人に「たぶん」似ただけの声は保留にし、
+  似た声がもう一度来たら参加者にする。知らない人どうしの声が近づいたら、同じ人にまとめ直す。
 - 声の特徴は 192 次元のベクトル（録音そのものではない）。それでも個人を識別できる情報なので、名前や特徴をログに出さない。
   決めたことは docs/decisions/speaker-identification-ja.md。
 """
@@ -80,6 +82,15 @@ RECOVER = float(os.environ.get('CIEL_SPK_RECOVER', '0.50'))
 RECOVER_OWNER = float(os.environ.get('CIEL_SPK_RECOVER_OWNER', '0.42'))   # ひとり・身近な人のときの持ち主
 RECOVER_MIN = 3             # まとめて比べる発言の数（これより少なければ比べない）
 RECOVER_RECENT = 5
+# まだこの会話に出ていない覚えている人にまとめるときは、高めにする（その場にいない人にまとめないように。2026-10-26）
+RECOVER_ABSENT = float(os.environ.get('CIEL_SPK_RECOVER_ABSENT', '0.55'))
+# 保留の声：だれにも似ていない声で、新しい人をすぐには作らない（長い会議で知らない人が 30 人ほどに増えた。2026-10-26）。
+# 笑い声・小声・声の重なり・物音で、同じ人でも類似度が下がった発言のたびに、新しい人ができていた
+NEW_SECONDS = float(os.environ.get('CIEL_SPK_NEW_SECONDS', '2.5'))   # 声がこれ以上あれば、1 回で新しい人にする
+PENDING_SECONDS = 300.0     # 保留の声を持っておく秒数
+MAX_PENDING = 20
+# 知らない人どうしのまとめ直し：声の平均どうしがこれ以上なら同じ人とみなす
+REGROUP = float(os.environ.get('CIEL_SPK_REGROUP', '0.55'))
 GREETING_NOTES = 5          # あいさつに添える、持ち主について覚えていることの数（最近の分）
 MERGE_PRINTS = 3            # アプリで覚えている人にまとめたとき、DB の見本に足す数
 DEVICE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
@@ -225,6 +236,16 @@ class Judgment:
     owner: bool = False                  # 端末の持ち主として当てた（ひとり・身近な人のとき）
     short: bool = False                  # 短い返事で、直前の人と同じかだけを確かめた（_judge_short）
     enroll: bool = False                 # 声の登録の読み上げ（返事をしない・メモの元にしない）
+    pending: 'PendingVoice | None' = None   # 保留の声（だれにも決めなかった。sp は None）
+
+
+@dataclass
+class PendingVoice:
+    """保留の声：人を決めなかった発言の声。似た声がもう一度来たら、その人を参加者にする"""
+    e: np.ndarray
+    seconds: float
+    at: float                            # time.monotonic
+    person_id: int | None = None         # まだこの会話に出ていない覚えている人に「たぶん」似ていた（その人の番号）
 
 
 @dataclass
@@ -274,6 +295,8 @@ class SpeakerBook:
         self.last_at = -1e9   # 最後に話した人が話した時刻（time.monotonic。turns.py が付ける。touch.py が使う）
         self._unknown_count = 0
         self._adapted = 0
+        self.pending: list[PendingVoice] = []   # 保留の声（参加者にも議事録にも出さない）
+        self.pending_last: PendingVoice | None = None   # 直前の発言が保留の声なら、それ（名乗ったときに人を作る）
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
         self.recent: SessionSpeaker | None = None   # 最後に分かった話者と、その確かさ（短い返事を比べる相手）
         self.recent_sure = False
@@ -388,6 +411,7 @@ class SpeakerBook:
 
     def judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
         j = self._enroll_judge(e, seconds) if self.enrolling is not None else self._judge(e, seconds)
+        self.pending_last = j.pending
         if j.sp is not None:   # 短くて分からない発言では、光らせる人を変えない
             self.heard = j
             self._heard_count += 1
@@ -400,8 +424,10 @@ class SpeakerBook:
         （別々に計算すると、同じ発言でも食い違うことがあったため。2026-10-18）。
         - この会話で聞いた人（まだ覚えていない人）：MATCH 以上なら同じ人。MAYBE 以上なら「たぶん」その人（新しい人を作らない）。
         - 覚えている人：SURE 以上で、次に近い人との差が MARGIN 以上なら「確か」。MAYBE 以上なら「たぶん」。
-        - どちらにも近くなければ、初めての声として、この会話の知らない人を作る。
-        - 短い・声の特徴が無い発言は「不明」（sp が None）。"""
+          まだこの会話に出ていない人は、「確か」か、「たぶん」が 2 回あったときだけ参加者にする（1 回目は保留）。
+        - どちらにも近くなければ初めての声。NEW_SECONDS 以上の声か、まだだれもいないときは、この会話の知らない人を作る。
+          それより短ければ保留にして、似た声がもう一度来たら知らない人を作る。
+        - 短い・声の特徴が無い発言・保留の声は「不明」（sp が None）。"""
         if e is None or seconds < SHORT_VOICED:
             log.info('話者：短い発言（声 %.1f 秒）', seconds)
             return Judgment(None, False, e, seconds)
@@ -415,6 +441,7 @@ class SpeakerBook:
             sure = s_score >= MATCH
             if sure:
                 s.add(e)   # 「たぶん」の声は見本に足さない（別の人の声が混ざらないように）
+                s = self._regroup(s)
                 recovered = self._recover(s)
                 if recovered is not None:
                     dst, score, rsure = recovered
@@ -422,18 +449,101 @@ class SpeakerBook:
             log.info('話者：この会話の %s（%.2f%s）', '名前を聞いた人' if s.name else s.label, s_score,
                      '' if sure else '、たぶん')
             return Judgment(s, sure, e, seconds, s_score)
+        self._drop_old_pending()
         if k is not None and k_score >= MAYBE:
             sure = k_score >= SURE and k_score - runner_up >= MARGIN
+            here = any(x.person_id == k.person_id for x in self.speakers)
+            before = None
+            if not here and not sure:
+                # まだこの会話に出ていない人に「たぶん」似ているだけ。その場にいない人を参加者にしないように、
+                # 前にも「たぶん」その人だった保留の声があるときだけ参加者にする
+                before = next((p for p in reversed(self.pending) if p.person_id == k.person_id), None)
+                if before is None:
+                    p = self._hold(e, seconds, k.person_id)
+                    log.info('話者：まだ出ていない覚えている人 #%d に、たぶん似ている（%.2f）→ 保留', k.person_id, k_score)
+                    return Judgment(None, False, e, seconds, k_score, pending=p)
+                self.pending.remove(before)
             sp = self._session_for(k)
+            if before is not None:
+                sp.add(before.e)
             sp.add(e)
-            log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s）', k.person_id, k_score, k_score - runner_up,
-                     '' if sure else '、たぶん')
+            log.info('話者：覚えている人 #%d（%.2f、次点との差 %.2f%s%s）', k.person_id, k_score, k_score - runner_up,
+                     '' if sure else '、たぶん', '、2 回目なので参加者にした' if before is not None else '')
             return Judgment(sp, sure, e, seconds, k_score)
+        best = max(k_score, s_score)
+        if seconds < NEW_SECONDS and self.speakers:
+            # 短めの初めての声は、外れた声（笑い声・小声・声の重なり・物音）かもしれない。似た保留の声があれば新しい人にする
+            scored = [(float(p.e @ e), p) for p in self.pending]
+            score, before = max(scored, key=lambda x: x[0], default=(-1.0, None))
+            if before is None or score < MATCH:
+                p = self._hold(e, seconds)
+                log.info('話者：初めての声（声 %.1f 秒、一番近い %.2f）→ 保留', seconds, best)
+                return Judgment(None, False, e, seconds, best, pending=p)
+            self.pending.remove(before)
+            sp = self._new_speaker([before.e, e])
+            log.info('話者：保留の声に似た声（%.2f）→ %s', score, sp.label)
+            return Judgment(sp, True, e, seconds, best)
+        sp = self._new_speaker([e])
+        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, best)
+        return Judgment(sp, True, e, seconds, best)
+
+    def _new_speaker(self, embeddings: list[np.ndarray]) -> SessionSpeaker:
         sp = SessionSpeaker(label=self._new_unknown_label())
-        sp.add(e)
+        for x in embeddings:
+            sp.add(x)
         self.speakers.append(sp)
-        log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
-        return Judgment(sp, True, e, seconds, max(k_score, s_score))
+        return sp
+
+    def _hold(self, e: np.ndarray, seconds: float, person_id: int | None = None) -> PendingVoice:
+        p = PendingVoice(e, seconds, time.monotonic(), person_id)
+        self.pending.append(p)
+        del self.pending[:-MAX_PENDING]
+        return p
+
+    def _drop_old_pending(self) -> None:
+        now = time.monotonic()
+        self.pending = [p for p in self.pending if now - p.at <= PENDING_SECONDS]
+
+    def _promote_pending(self) -> None:
+        """直前の発言が保留の声で、その人が名乗った：その声で、この会話の知らない人を作る（名前を付けられるように）。
+        短い返事や、まだ出ていない覚えている人に似ていた声からは作らない"""
+        p = self.pending_last
+        if p is None or self.last is not None or p.person_id is not None or p.seconds < MIN_VOICED:
+            return
+        self.pending_last = None
+        if p in self.pending:
+            self.pending.remove(p)
+        sp = self._new_speaker([p.e])
+        self.last, self.last_sure, self.last_short, self.last_embedding, self.last_rows = sp, True, False, p.e, []
+        self.recent, self.recent_sure, self.recent_at = sp, True, time.monotonic()
+        log.info('話者：保留の声の人が名乗ったので %s にした', sp.label)
+        self.notify()
+
+    @staticmethod
+    def _centroid(sp: SessionSpeaker) -> np.ndarray:
+        c = np.mean(np.stack(sp.embeddings), axis=0)
+        return c / (np.linalg.norm(c) + 1e-9)
+
+    def _regroup(self, sp: SessionSpeaker) -> SessionSpeaker:
+        """知らない人どうしのまとめ直し：sp の声の平均が、ほかの知らない人の声の平均に近ければ、同じ人としてまとめる
+        （一度ふたりに分かれた人が、話すほど似てきたとき）。名前の違う人どうし・人違いだと言われて分けた人はまとめない。
+        残った人を返す"""
+        if sp.person_id is not None or sp.split or not sp.embeddings:
+            return sp
+        c = self._centroid(sp)
+        scored = sorted(((float(self._centroid(t) @ c), t) for t in self.speakers
+                         if t is not sp and t.person_id is None and not t.split and t.embeddings
+                         and (t.name is None or sp.name is None or plain_name(t.name) == plain_name(sp.name))),
+                        key=lambda x: -x[0])
+        if not scored or scored[0][0] < REGROUP:
+            return sp
+        score, t = scored[0]
+        # 名前を聞いた人か、先に聞いた人のほうに残す
+        first = self.speakers.index(t) < self.speakers.index(sp)
+        dst, src = (t, sp) if (t.name is not None or (sp.name is None and first)) else (sp, t)
+        log.info('話者：知らない人どうしの声が近いので、まとめた（%.2f）', score)
+        self._merge(src, dst)
+        return dst
 
     # ---- 声の登録（アプリの「声を登録する」。docs/speaker-recognition-research-ja.md の案 A） ----
 
@@ -642,7 +752,8 @@ class SpeakerBook:
         """この会話の知らない人が、実は覚えている人だったら、その人にまとめる（一度「知らない人」になると、
         その人の新しい声のほうが覚えている見本より近くなり、ずっと知らない人のままになっていた。2026-10-24）。
         最近の発言の声をまとめて比べる（1 回分より確か）。会議などで、その覚えている人がこの会話ですでに別に話して
-        いるなら、まとめない（似た声の別の人）。ひとり・身近な人のときの持ち主は、少し低くてもまとめる"""
+        いるなら、まとめない（似た声の別の人）。まだこの会話に出ていない人には、高め（RECOVER_ABSENT）でないとまとめない
+        （その場にいない人にしないように）。ひとり・身近な人のときの持ち主は、少し低くてもまとめる"""
         if sp.person_id is not None or sp.name is not None or sp.split or len(sp.embeddings) < RECOVER_MIN:
             return None
         recent = sp.embeddings[-RECOVER_RECENT:]
@@ -655,7 +766,8 @@ class SpeakerBook:
         score, k = scored[0]
         runner_up = scored[1][0] if len(scored) > 1 else -1.0
         owner = private and k.person_id == self.owner_id
-        if (score < (RECOVER_OWNER if owner else RECOVER) or score - runner_up < MARGIN
+        need = RECOVER_OWNER if owner else RECOVER if k.person_id in heard else max(RECOVER, RECOVER_ABSENT)
+        if (score < need or score - runner_up < MARGIN
                 or (k.person_id in heard and not private)):
             return None
         dst = self._session_for(k)
@@ -922,6 +1034,7 @@ class SpeakerBook:
         info = entry.view()
         if plain_name(confirmed_name) != entry.name:
             return {'status': 'name_mismatch', **info}
+        self._promote_pending()
         sp = self.last
         if sp is None or not self.last_sure:
             return {'status': 'pending_identity', **info, 'identity_certain': False}
@@ -954,6 +1067,8 @@ class SpeakerBook:
             return await self._name(label, name, remember)
 
     async def _name(self, label: str, name: str, remember: bool) -> dict:
+        if not label:
+            self._promote_pending()
         sp = self.find(label) if label else self.last
         name = plain_name(name)
         if not name or len(name) > 100:
