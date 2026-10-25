@@ -42,7 +42,16 @@ SR = 16000
 BUFFER_SECONDS = 30          # 発言の声を取り出すために、届いた声をためておく長さ
 LEAD_SECONDS = 0.8           # 「話し始めた」の知らせは実際より遅れて届くので、少し前から取る
 MAX_SECONDS = 8.0            # 長い発言は最後の 8 秒だけ使う（計算を軽くする）
-MIN_VOICED = float(os.environ.get('CIEL_SPK_MIN_SECONDS', '1.0'))   # これより短い発言は「不明」
+# これより短い発言では、人を決めない（新しい人を作らない）。1.0 秒では「私は田中です」も無音を除くと届かず、
+# 複数人のときに名乗りが「不明」になって、名前の確認・同意が進まなかった（2026-10-25）
+MIN_VOICED = float(os.environ.get('CIEL_SPK_MIN_SECONDS', '0.8'))
+# MIN_VOICED より短い返事（「いいよ」「はい」）は、これ以上あれば声の特徴を取り、直前の人と同じかだけを確かめる（_judge_short）
+SHORT_VOICED = float(os.environ.get('CIEL_SPK_SHORT_SECONDS', '0.3'))
+# 短い返事が「ほかの人の声だ」と言える類似度（直前の人より MARGIN 以上近いことも要る）。短い声（0.4〜0.7 秒）は、
+# 会話サーバーで同じ声どうしでも 0.18〜0.26 にしかならず（2026-10-25、読み上げの声を 1 回で作って切り分けて流した）、
+# 声で本人を確かめることはできない。なので、ほかの人だとはっきり分かるときだけ断り、それ以外は直前の人の返事とみなす
+SHORT_MATCH = float(os.environ.get('CIEL_SPK_SHORT_MATCH', '0.35'))
+SHORT_WITHIN = 30.0   # 直前の人が話してからこの秒数を過ぎた短い発言は、返事とみなさない
 # コサイン類似度の基準（Zoom を通した声で測って決める。docs/decisions/speaker-identification-ja.md）
 MATCH = float(os.environ.get('CIEL_SPK_MATCH', '0.45'))   # この会話で聞いた（まだ覚えていない）人は、これ以上なら同じ人
 # 覚えている人は、これ以上なら「確か」（メモの元にしてよい）。0.45 では、覚えている人しかいない会話の最初に、
@@ -208,6 +217,7 @@ class Judgment:
     seconds: float = 0.0                 # 声のある長さ
     score: float = -1.0                  # 類似度
     owner: bool = False                  # 端末の持ち主として当てた（ひとり・身近な人のとき）
+    short: bool = False                  # 短い返事で、直前の人と同じかだけを確かめた（_judge_short）
 
 
 @dataclass
@@ -245,6 +255,9 @@ class SpeakerBook:
         self._unknown_count = 0
         self._adapted = 0
         self.last_embedding: np.ndarray | None = None   # 直前の発言の声の特徴（人違いを直すとき使う）
+        self.recent: SessionSpeaker | None = None   # 最後に分かった話者と、その確かさ（短い返事を比べる相手）
+        self.recent_sure = False
+        self.recent_at = -1e9
         self.last_sure = False                           # 直前の発言者を、自信を持って判定したか（メモを読むときに使う）
         self.on_notes_consent = None   # お話を覚えることに同意したとき呼ぶ（notes.NoteTaker.on_consent。agent.py がつなぐ）
         self.on_split = None           # 人違いを直したとき呼ぶ（conversation.Conversation.on_split）
@@ -365,9 +378,11 @@ class SpeakerBook:
         - 覚えている人：SURE 以上で、次に近い人との差が MARGIN 以上なら「確か」。MAYBE 以上なら「たぶん」。
         - どちらにも近くなければ、初めての声として、この会話の知らない人を作る。
         - 短い・声の特徴が無い発言は「不明」（sp が None）。"""
-        if e is None or seconds < MIN_VOICED:
+        if e is None or seconds < SHORT_VOICED:
             log.info('話者：短い発言（声 %.1f 秒）', seconds)
             return Judgment(None, False, e, seconds)
+        if seconds < MIN_VOICED:
+            return self._judge_short(e, seconds)
         k_score, k, s_score, s, runner_up = self._scores(e)
         owner = self._owner_judge(e, seconds, s_score, s)
         if owner is not None:
@@ -395,6 +410,34 @@ class SpeakerBook:
         self.speakers.append(sp)
         log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
         return Judgment(sp, True, e, seconds, max(k_score, s_score))
+
+    def _voice_of(self, sp: 'SessionSpeaker') -> list[np.ndarray]:
+        """その人の声の見本（この会話の声と、覚えている人なら DB の見本）"""
+        k = next((k for k in self.known if k.person_id == sp.person_id), None) if sp.person_id is not None else None
+        return sp.embeddings + (k.embeddings if k is not None else [])
+
+    def _judge_short(self, e: np.ndarray, seconds: float) -> 'Judgment':
+        """短い返事（「いいよ」「はい」）：直前に話した人（SHORT_WITHIN 秒以内）の返事とみなし、直前の判定の確かさを
+        引き継ぐ（名乗った人に「覚えていい？」と聞いた返事を、その人の同意として受け付けられるように。2026-10-25 まで、
+        短い返事は「不明」になり、複数人のときに同意が受け付けられず聞き直しが続いた）。
+        短い声では本人かを確かめられないので、ほかの人の声だとはっきり分かるときだけ「不明」にする。
+        新しい人は作らず、見本にも足さない"""
+        last = self.recent
+        if last is not None and time.monotonic() - self.recent_at > SHORT_WITHIN:
+            last = None   # 直前の人が話してから時間がたった（返事ではない）
+        if last is None or not self._voice_of(last):
+            log.info('話者：短い発言（声 %.1f 秒。比べる直前の人がいない）', seconds)
+            return Judgment(None, False, e, seconds, short=True)
+        score = best_score(e, self._voice_of(last))
+        others = [best_score(e, self._voice_of(s)) for s in self.speakers if s is not last and self._voice_of(s)]
+        others += [best_score(e, k.embeddings) for k in self.known
+                   if k.person_id != last.person_id and not any(s.person_id == k.person_id for s in self.speakers)]
+        other = max(others, default=-1.0)
+        if other >= SHORT_MATCH and other - score >= MARGIN:
+            log.info('話者：短い発言（声 %.1f 秒。直前の人 %.2f、ほかの人 %.2f）→ ほかの人の声なので不明', seconds, score, other)
+            return Judgment(None, False, e, seconds, score, short=True)
+        log.info('話者：短い発言は直前の人の返事とみなす（声 %.1f 秒、%.2f、ほかの人 %.2f）', seconds, score, other)
+        return Judgment(last, self.recent_sure, e, seconds, score, short=True)
 
     def _is_private(self) -> bool:
         try:
@@ -497,6 +540,9 @@ class SpeakerBook:
     async def identify_parts(self, j: 'Judgment | None', solo: bool = False,
                              push_notes: bool = False) -> tuple[str, str] | None:
         parts = await self._identify_parts(j, solo, push_notes)
+        if self.last is not None:
+            # 短い返事を比べる相手（_judge_short）。間に短い物音（「不明」）が入っても、直前に分かった人を残しておく
+            self.recent, self.recent_sure, self.recent_at = self.last, self.last_sure, time.monotonic()
         self.notify()   # 人違いを分けられる人（直前の発言者）が変わる
         return parts
 
@@ -605,6 +651,8 @@ class SpeakerBook:
         new.add(e)
         self.speakers.append(new)
         self.last, self.last_rows = new, []
+        if self.recent is sp:
+            self.recent = new   # 分けた人の短い返事は、分けたあとの人と比べる
         if self.heard is not None and self.heard.sp is sp and self.heard.e is e:
             self.heard.sp = new
         if self.on_split:
@@ -913,6 +961,8 @@ class SpeakerBook:
         if self.owner_id == pid:
             self.owner_id = None   # 端末の持ち主の登録も、DB では一緒に消える
         self.speakers.remove(sp)
+        if self.recent is sp:
+            self.recent = None
         for entry in self.name_registrations.values():
             if entry.speaker_id == sp.speaker_id:
                 entry.speaker_id, entry.stage = None, 'pending_identity'
@@ -1056,6 +1106,8 @@ class SpeakerBook:
         self.speakers = [s for s in self.speakers if s is not src]
         if self.last is src:
             self.last = dst
+        if self.recent is src:
+            self.recent = dst
         if self.heard is not None and self.heard.sp is src:
             self.heard.sp = dst
         for entry in self.name_registrations.values():

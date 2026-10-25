@@ -424,7 +424,7 @@ class TurnReplies:
             return 0.0, None
         audio = speakers.voiced(self.tap.window(start - speakers.LEAD_SECONDS, end))
         seconds = len(audio) / speakers.SR
-        if seconds < speakers.MIN_VOICED:
+        if seconds < speakers.SHORT_VOICED:   # 短い返事も、直前の人と同じかを確かめるために計算する（speakers._judge_short）
             return seconds, None
         return seconds, asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)
 
