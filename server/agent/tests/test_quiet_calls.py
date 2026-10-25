@@ -45,6 +45,12 @@ class QuietCallTests(unittest.IsolatedAsyncioTestCase):
         await self.say('うーん、賛成かな', speaker=self.a)
         self.r._reply.assert_awaited_once()
 
+    async def test_a_question_to_everyone_accepts_anyones_answer(self):
+        self.book.last = self.a
+        self.r.on_item(SimpleNamespace(item=SimpleNamespace(role='assistant', text_content='みなさんはどう思いますか？')))
+        await self.say('私は賛成です', speaker=self.b)
+        self.r._reply.assert_awaited_once()
+
     async def test_follow_window_expires(self):
         self.book.last = self.a
         self.r.on_item(SimpleNamespace(item=SimpleNamespace(role='assistant', text_content='どう思う？')))

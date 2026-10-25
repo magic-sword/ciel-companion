@@ -71,6 +71,8 @@ CALL_WORDS = ('シエル', 'しえる')
 # ひかえめのとき、シエルが質問で終わる返事をしてから、その答えを待つ時間。答えとみなすのは、シエルが答えた相手と
 # 同じ人の発言だけ（会議でほかの人どうしが話し続けると、その発言にも答えてしまった。2026-10-25）
 FOLLOW_SECONDS = 20.0
+# シエルの質問にこれが入っていれば、みんなへの質問として、だれの答えも受け付ける
+GROUP_WORDS = ('みんな', 'みなさん', '皆さん', '皆様', 'みなさま', 'どなたか', 'だれか', '誰か', 'ほかの方', '他の方')
 # 文字起こしのモデルが、物音や小さな声のときに、ヒントとして渡した文（agent.py の transcription）をそのまま書き出すことが
 # ある（「AI キャラクター「シエル」との会話。出てくる名前：…」）。これは何も話していないとみなす（呼ばれたことにしない）
 PROMPT_ECHOES = ('キャラクター「シエル」との会話', '出てくる名前：')
@@ -413,8 +415,10 @@ class TurnReplies:
         text = TAGS.sub('', ev.item.text_content or '').strip()
         asked = text.endswith(('？', '?'))
         self._asked_at = time.time() if asked else None
-        # 質問した相手（シエルが答えていた人）。その人の発言だけを答えとみなす
-        self._asked_to = self.book.last if asked and self.book is not None else None
+        # 質問した相手（シエルが答えていた人）。その人の発言だけを答えとみなす。
+        # みんなへの質問（「みなさんはどうですか？」）なら、相手を決めず、だれの答えも受け付ける
+        to_all = any(w in text for w in GROUP_WORDS)
+        self._asked_to = self.book.last if asked and not to_all and self.book is not None else None
 
     def _called(self, text: str) -> str | None:
         """ひかえめのとき、シエルへの発言か。name：名前で呼ばれた。follow：シエルが質問してから FOLLOW_SECONDS 以内
