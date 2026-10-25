@@ -155,6 +155,7 @@ class TurnReplies:
         self._heard_at = time.time()   # 会話モデルの側から、最後に区切り・文字起こしが届いた時刻（返事が止まった見張り）
         self._unheard = 0              # そのあと手元で話し終わった回数
         self._stall_reported = False
+        self._clip_name: str | None = None   # 調べるときに残した、直前の発言の声のファイル名（debug_log.save_audio）
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -222,14 +223,21 @@ class TurnReplies:
 
     async def _judge(self, start: float, end: float) -> 'speakers.Judgment | None':
         seconds, pending = self._embed(start, end)
+        clip = self._clip_name   # _embed が残した声のファイル名（待つ前に受け取る。ほかの発言の判定が上書きする）
         try:
             e = await pending if pending is not None else None
         except Exception:
             log.exception('発言の声の特徴を計算できない')
             return None
         await self.book.refresh()
+        scores = self.book.debug_scores(e) if e is not None and debug_log.enabled() else None
         j = self.book.judge(e, seconds)
         self.style.on_voices(len(self.book.speakers))   # ひかえめで返事をしないときも、ほかの人の声に気づく
+        if debug_log.enabled():
+            # 話者の判定を調べるための数字（区間・声の長さ・全員との類似度・結果）。声そのものは save_audio だけ
+            debug_log.record('speaker_judgment', start=round(start, 3), end=round(end, 3), voiced=round(seconds, 2),
+                             clip=clip, scores=scores,
+                             speaker=speakers.SpeakerBook.label(j), short=j.short, score=round(j.score, 3))
         return j
 
     async def _judgment_for(self, start: float, end: float) -> 'speakers.Judgment | None':
@@ -422,8 +430,15 @@ class TurnReplies:
         """その発言の声の長さと、声の特徴の計算（裏で始める。短すぎる・ECAPA が無いときは None）"""
         if self.book is None or self.encoder is None:
             return 0.0, None
-        audio = speakers.voiced(self.tap.window(start - speakers.LEAD_SECONDS, end))
+        window = self.tap.window(start - speakers.LEAD_SECONDS, end)
+        audio = speakers.voiced(window)
         seconds = len(audio) / speakers.SR
+        # 試験用の会話サーバーで調べるとき：取り出した区間（前に足した分を含む）と、声の部分だけにしたものを残す
+        self._clip_name = None
+        if debug_log.enabled():
+            name = f'{start:.2f}'
+            self._clip_name = debug_log.save_audio(name + '-window', window, speakers.SR)
+            debug_log.save_audio(name + '-voiced', audio, speakers.SR)
         if seconds < speakers.SHORT_VOICED:   # 短い返事も、直前の人と同じかを確かめるために計算する（speakers._judge_short）
             return seconds, None
         return seconds, asyncio.get_running_loop().run_in_executor(None, self.encoder.embed, audio)

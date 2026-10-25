@@ -5,7 +5,8 @@
 - 入れ方：環境変数 CIEL_DEBUG_LOG=1（試験用の会話サーバー）か、data/debug/ON のファイルがあるとき（本番。
   再起動しなくても、次に始まる会話から入る）。切り替えと取り出しは scripts/server/debug-log.sh。
 - 残すもの：発言の文字起こし・シエルの返事の文字・返事ごとに足した 1 行（話者・議事録の状態など）・道具の呼び出しと結果・
-  Unity からの知らせ・状態の変化・返事の速さ・トークン数。音声は残さない。会議につないでいるときも残す。
+  Unity からの知らせ・状態の変化・返事の速さ・トークン数・話者の判定の数字。音声は残さない（例外：CIEL_DEBUG_AUDIO=1 の
+  試験用の会話サーバーだけ、判定に使った声を WAV で残す。save_audio）。会議につないでいるときも残す。
 - 置き場所：data/debug/（自宅サーバーの中だけ。Git・デプロイ・クラウドには出さない）。会話ごとに 1 ファイル（JSON Lines）。
 - CIEL_DEBUG_LOG_DAYS（既定 7）日より古いファイルは、会話が始まるたびに消す（入れていないときも消す）。
 
@@ -59,16 +60,44 @@ def record(kind: str, **data) -> None:
         log.exception('デバッグ用の会話ログを書けない')
 
 
+def save_audio(name: str, pcm, sample_rate: int) -> str | None:
+    """話者の判定に使った声を WAV で残す（CIEL_DEBUG_AUDIO=1 か、data/debug/AUDIO のファイルがあるときだけ。
+    試験用の会話サーバーで、読み上げの声を流して調べる間だけ入れる。実際の人の声が残るので、調べ終えたら消す。本番では入れない）。
+    置き場所は、この会話のログと同じ名前のフォルダー。残したファイル名を返す"""
+    if _path is None or not (os.environ.get('CIEL_DEBUG_AUDIO', '') == '1' or (DIR / 'AUDIO').exists()):
+        return None
+    import wave
+    import numpy as np
+    folder = _path.with_suffix('')
+    try:
+        folder.mkdir(exist_ok=True)
+        with wave.open(str(folder / f'{name}.wav'), 'wb') as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(sample_rate)
+            w.writeframes((np.clip(pcm, -1, 1) * 32767).astype('<i2').tobytes())
+    except OSError:
+        log.exception('デバッグ用の声を書けない')
+        return None
+    return f'{folder.name}/{name}.wav'
+
+
 def cleanup() -> None:
     if not DIR.is_dir():
         return
     limit = time.time() - DAYS * 86400
-    for p in DIR.glob('*.jsonl'):
+    for p in [*DIR.glob('*.jsonl'), *DIR.glob('*/*.wav')]:
         try:
             if p.stat().st_mtime < limit:
                 p.unlink()
         except OSError:
             pass
+    for d in DIR.iterdir():
+        if d.is_dir() and not any(d.iterdir()):
+            try:
+                d.rmdir()
+            except OSError:
+                pass
 
 
 def _clip(v):

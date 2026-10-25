@@ -411,6 +411,13 @@ class SpeakerBook:
         log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
         return Judgment(sp, True, e, seconds, max(k_score, s_score))
 
+    def debug_scores(self, e: np.ndarray) -> dict[str, float]:
+        """調べるとき（デバッグ用の会話ログ）：この会話の人・覚えている人それぞれとの類似度"""
+        out = {(s.name or s.label): round(best_score(e, self._voice_of(s)), 3) for s in self.speakers if self._voice_of(s)}
+        out.update({k.name: round(best_score(e, k.embeddings), 3) for k in self.known
+                    if k.embeddings and not any(s.person_id == k.person_id for s in self.speakers)})
+        return out
+
     def _voice_of(self, sp: 'SessionSpeaker') -> list[np.ndarray]:
         """その人の声の見本（この会話の声と、覚えている人なら DB の見本）"""
         k = next((k for k in self.known if k.person_id == sp.person_id), None) if sp.person_id is not None else None
