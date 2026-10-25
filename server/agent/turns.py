@@ -461,6 +461,12 @@ class TurnReplies:
             return
         t0 = time.perf_counter()
         j = await self._judgment_for(start, end)
+        if getattr(j, 'enroll', False) or getattr(self.book, 'enrolling', None) is not None:
+            # 声の登録の読み上げ（アプリの「声を登録する」）には返事をしない。終わったら speakers.py がひとこと言わせる
+            log.info('声の登録の途中なので、返事を作らせない')
+            if self.backchannel is not None:
+                self.backchannel.stop()
+            return
         self.book.current_turns = [s.turn for s in self._recent
                                    if start - 0.01 <= s.start and s.end <= end + 0.01 and s.turn is not None]
         if not self.book.current_turns and self.history is not None:

@@ -217,6 +217,16 @@ namespace Ciel.Conversation
         public float SpeakingAt { get; private set; } = -1f;
         /// 「さっきの発言はこの人じゃない」と直せる人（直前の発言者）
         public string CorrectableId { get; private set; } = "";
+        /// 声の登録の様子（会話サーバーの speakers.py の enroll.state）。active の間は、画面の文を読んでもらっている
+        [Serializable]
+        public sealed class EnrollState
+        {
+            public bool active;
+            public string name, speaker_id, status;
+            public int accepted, needed;
+        }
+        public EnrollState Enroll { get; private set; }
+        public int EnrollRevision { get; private set; }
         /// この端末の持ち主（名前と、この会話での話者）。持ち主にできる人（直前に話した、声を覚えている人）
         public string OwnerName { get; private set; } = "";
         public string OwnerId { get; private set; } = "";
@@ -924,6 +934,14 @@ namespace Ciel.Conversation
             }
             else if (e.type == "speakers.state")
                 OnSpeakers(data);
+            else if (e.type == "enroll.state")
+            {
+                try { Enroll = JsonUtility.FromJson<EnrollState>(System.Text.Encoding.UTF8.GetString(data)); }
+                catch (Exception) { return; }
+                EnrollRevision++;
+                Debug.Log($"[CielConversation] 声の登録：{Enroll.status}（{Enroll.accepted}/{Enroll.needed}）");
+                Changed?.Invoke();
+            }
             else if (e.type == "device.hello_request")
             {
                 // 会話サーバーが入った直後に送った知らせは届かないことがあるので、準備ができたと言われたら送り直す
@@ -1022,6 +1040,13 @@ namespace Ciel.Conversation
 
         /// この端末の持ち主をやめる
         public void UnpairDevice() => SendDevice("unpair", null);
+
+        /// 声の登録を始める（本人が画面で名前を入れ、同意のボタンを押したとき）。speakerId は、札から始めたときのその人（無ければ空）
+        public void StartEnroll(string speakerId, string name) =>
+            SendSpeakerControl(new SpeakerFix { action = "enroll_start", speaker_id = speakerId ?? "", name = name });
+
+        /// 声の登録をやめる
+        public void CancelEnroll() => SendSpeakerControl(new SpeakerFix { action = "enroll_cancel" });
 
         void SendDeviceHello() => SendDevice("hello", null);
 
@@ -1182,6 +1207,8 @@ namespace Ciel.Conversation
             _summaryParts = null;
             _speakers.Clear();
             SpeakingId = CorrectableId = OwnerName = OwnerId = PairableId = "";
+            Enroll = null;
+            EnrollRevision++;
             SpeakingAt = -1f;
             _heard = -1;
             SpeakersRevision++;

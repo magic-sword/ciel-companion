@@ -62,8 +62,8 @@ class ConversationRecorder:
             log.warning('会話履歴：話者の判定を取得できない')
         self.history.complete(turn, text, j.sp if j else None,
                               speakers.SpeakerBook.label(j), j.sure if j else False)
-        if self.note_taker is not None:
-            self.note_taker.on_turn(turn)
+        if self.note_taker is not None and not (j is not None and j.enroll):
+            self.note_taker.on_turn(turn)   # 声の登録の読み上げ（画面の文）は、その人のメモの元にしない
 
     async def flush(self) -> None:
         await asyncio.gather(*list(self._tasks), return_exceptions=True)

@@ -8,6 +8,8 @@ research_voice_instructions_file = "prompts/research_voice.md"
 greeting_file = "prompts/greeting.md"
 # 端末の持ち主が分かっているときのあいさつ（ひとり・身近な人のとき。speakers.py の greeting_context）
 greeting_owner_file = "prompts/greeting_owner.md"
+# アプリの「声を登録する」で登録できたときのひとこと（speakers.py の on_enrolled）
+enroll_done_file = "prompts/enroll_done.md"
 emotion_instructions_file = "prompts/emotion.md"
 touch_instructions_file = "prompts/touch.md"
 # おしゃべり度（mode.py）：ひかえめ（呼ばれたら答える）・おしゃべり（自分からも話しかける）。ふつうは足さない

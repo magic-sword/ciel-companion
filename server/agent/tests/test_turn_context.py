@@ -102,6 +102,12 @@ class TurnContextTests(unittest.IsolatedAsyncioTestCase):
         r.on_user_state(SimpleNamespace(new_state='speaking', old_state='listening', created_at=7.0))
         self.assertEqual(len(sent), 3)   # 知らせていないときは、取り消しを重ねて送らない
 
+    async def test_no_reply_while_enrolling_a_voice(self):
+        r = self.replies(FakeAgent())
+        r.book.enrolling = object()
+        await r._reply(1, 2)
+        self.session.generate_reply.assert_not_called()
+
     async def test_falls_back_to_instructions_when_the_conversation_rejects_items(self):
         r = self.replies(FakeAgent(fail=True))
         await r._reply(1, 2)

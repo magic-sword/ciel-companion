@@ -284,6 +284,18 @@ async def entrypoint(ctx: JobContext) -> None:
         book.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
         # ひとり・身近な人のときは、端末の持ち主の声を優先して当てる（speakers.py の _owner_judge）
         book.private = lambda: style.presence in ('solo', 'close')
+        # 声の登録（アプリの「声を登録する」）：様子をアプリへ知らせ、その間はシエルから話しかけない。登録できたらひとこと言う
+        book.on_enroll = lambda state: asyncio.create_task(send('ciel.event', state))
+        async def enrolled(name: str) -> None:
+            # 最後の文を読み終えるまで待ってから言う（読んでいる途中に話し始めて、止められたことがあった）
+            await asyncio.sleep(1.0)
+            for _ in range(40):
+                if session.user_state != 'speaking':
+                    break
+                await asyncio.sleep(0.25)
+            session.generate_reply(instructions=agent.persona.enroll_done.replace('{name}', name), tool_choice='none')
+        book.on_enrolled = lambda name: asyncio.create_task(enrolled(name))
+        talker.paused = lambda: book.enrolling is not None
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)

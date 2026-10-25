@@ -17,6 +17,7 @@ class Persona:
     emotion_instructions: str
     greeting: str
     greeting_owner: str
+    enroll_done: str
     touch_instructions: str
     talk_quiet_instructions: str
     talk_quiet_turn_instructions: str
@@ -43,7 +44,7 @@ class Persona:
     def fingerprint(self) -> str:
         """本文をログに残さず、読み込んだプロンプト一式を識別する。"""
         content = json.dumps(
-            [self.instructions, self.emotion_instructions, self.greeting, self.greeting_owner, self.touch_instructions,
+            [self.instructions, self.emotion_instructions, self.greeting, self.greeting_owner, self.enroll_done, self.touch_instructions,
              self.talk_quiet_instructions, self.talk_quiet_turn_instructions, self.talk_chatty_instructions,
              self.talk_chatty_nudge, self.inner_thoughts_instructions, self.talk_correction_nudge,
              self.talk_inner_state_instructions, self.inner_thoughts_voice_instructions,
@@ -69,7 +70,7 @@ def load_persona() -> Persona:
         raise ValueError(f'キャラクター設定を読み込めません: {path}: {exc}') from exc
 
     values = {}
-    for key in ('instructions', 'emotion_instructions', 'greeting', 'greeting_owner', 'touch_instructions',
+    for key in ('instructions', 'emotion_instructions', 'greeting', 'greeting_owner', 'enroll_done', 'touch_instructions',
                 'talk_quiet_instructions', 'talk_quiet_turn_instructions', 'talk_chatty_instructions',
                 'talk_chatty_nudge', 'inner_thoughts_instructions', 'talk_correction_nudge',
                 'talk_inner_state_instructions', 'inner_thoughts_voice_instructions',

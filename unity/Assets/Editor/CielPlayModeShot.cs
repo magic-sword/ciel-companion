@@ -108,7 +108,7 @@ namespace Ciel.EditorTools
                 SummaryShots(step);
                 return;
             }
-            if (step >= 2 && step < 8 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("people"))
+            if (step >= 2 && step < 10 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("people"))
             {
                 PeopleShots(step);
                 return;
@@ -438,7 +438,8 @@ namespace Ciel.EditorTools
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = new[] { "people-row", "people-remembered", "people-unknown", "people-duplicate" }[step - 3];
+                var name = new[] { "people-row", "people-remembered", "people-unknown", "people-duplicate", "people-enroll-consent",
+                                   "people-enroll-reading" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 var panel = ui.transform.Find("ConversationCanvas/SafeArea/PeoplePanel");
                 var buttons = panel.GetComponentsInChildren<UnityEngine.UI.Button>().Length;
@@ -461,7 +462,25 @@ namespace Ciel.EditorTools
                 panel.GetComponentInChildren<UnityEngine.UI.InputField>().text = "ミナさん";
                 panel.Find("Viewport/Content/Row/Set").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             }
-            if (step == 6) { FinishUiShots(); return; }
+            if (step == 6)
+            {
+                // 知らない人Bの声の登録：同意の画面
+                ui.GetType().GetMethod("ShowEnroll", flags).Invoke(ui, new object[] { "p4", "", false });
+            }
+            if (step == 7)
+            {
+                // 同意して始めたあと、1 つ目を受け付け、2 つ目でほかの人の声が入った
+                var panel = ui.transform.Find("ConversationCanvas/SafeArea/PeoplePanel");
+                panel.GetComponentInChildren<UnityEngine.UI.InputField>().text = "タロウ";
+                foreach (var b in panel.GetComponentsInChildren<UnityEngine.UI.Button>())
+                    if (b.GetComponentInChildren<UnityEngine.UI.Text>()?.text == "同意して始める") b.onClick.Invoke();
+                const string enroll = "{\"v\":1,\"type\":\"enroll.state\",\"active\":true,\"name\":\"タロウ\",\"speaker_id\":\"p4\","
+                    + "\"accepted\":1,\"needed\":4,\"status\":\"other_voice\"}";
+                var receive = typeof(Ciel.Conversation.CielConversation).GetMethod("OnDataReceived", flags);
+                var kind = System.Activator.CreateInstance(receive.GetParameters()[2].ParameterType);
+                receive.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(enroll), null, kind, "ciel.event" });
+            }
+            if (step == 8) { FinishUiShots(); return; }
             Next(step + 1);
         }
 

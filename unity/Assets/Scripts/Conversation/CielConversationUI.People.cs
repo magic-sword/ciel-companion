@@ -94,6 +94,7 @@ namespace Ciel.Conversation
             _peopleRow.gameObject.SetActive(c.Status == CielConversation.State.Connected && c.Speakers.Count > 0);
             // 右上の「調査・出典」のボタンが出ていなければ、右端まで使う
             _peopleRow.offsetMax = new Vector2(_researchButton.gameObject.activeSelf ? -152 : -16, -58);
+            RefreshEnroll();   // 声の登録の画面（CielConversationUI.Enroll.cs）
             if (_peopleRevision == c.SpeakersRevision) return;
             _peopleRevision = c.SpeakersRevision;
             foreach (Transform child in _peopleChips) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
@@ -167,6 +168,7 @@ namespace Ciel.Conversation
         // 札をタップしたときのパネル。id が null なら閉じる
         void ShowPerson(string id)
         {
+            CloseEnroll();
             var person = id == null ? null : FindSpeaker(id);
             _peopleSelected = person?.id;
             _peopleShown = person == null ? null : PanelKey(person.id);
@@ -189,26 +191,7 @@ namespace Ciel.Conversation
             {
                 PanelLabel(person.named ? "名前を直す" : "名前を付ける");
                 var row = Row(_peopleContent, 40);
-                var field = Rect("NameField", row, Center, Center, Vector2.zero, Vector2.zero);
-                Stretch(field);
-                field.offsetMax = new Vector2(-80, 0);
-                Rounded(field, new Color(1f, 1f, 1f, 0.08f), 8, raycast: true);
-                var text = Txt("Text", field, 14, TextMain, TextAnchor.MiddleLeft);
-                text.supportRichText = false;
-                Stretch(text.rectTransform);
-                text.rectTransform.offsetMin = new Vector2(10, 0);
-                text.rectTransform.offsetMax = new Vector2(-10, 0);
-                var placeholder = Txt("Placeholder", field, 14, TextNote, TextAnchor.MiddleLeft);
-                placeholder.text = "名前を入れる";
-                Stretch(placeholder.rectTransform);
-                placeholder.rectTransform.offsetMin = text.rectTransform.offsetMin;
-                placeholder.rectTransform.offsetMax = text.rectTransform.offsetMax;
-                var input = field.gameObject.AddComponent<InputField>();
-                input.textComponent = text;
-                input.placeholder = placeholder;
-                input.characterLimit = 40;
-                input.lineType = InputField.LineType.SingleLine;
-                input.text = person.named ? person.name : "";
+                var input = NameField(row, person.named ? person.name : "", 80);
                 var warning = Txt("Warning", _peopleContent, 11, Amber, TextAnchor.UpperLeft);
                 warning.gameObject.SetActive(false);
                 var ok = Rect("Set", row, new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(72, 40));
@@ -229,6 +212,19 @@ namespace Ciel.Conversation
                     c.FixSpeaker("name", target, name: name);
                     ShowPerson(null);
                 });
+            }
+
+            // 声の登録（画面の文を読んでもらい、名前と声を覚える）。声を覚えている人は、直前に話したときだけ声を足せる
+            if (!person.remembered || c.CorrectableId == person.id)
+            {
+                PanelLabel(person.remembered ? "声を登録し直す" : "声を登録する");
+                Note(_peopleContent, person.remembered
+                    ? "この端末で、声の見本を足します。話し始めからすぐ分かるようになります。"
+                    : "画面の短い文をいくつか読むと、名前と声を覚えて、次からも声で分かるようになります。");
+                var target = person.id;
+                var name = person.remembered || person.named ? person.name : "";
+                var b = PanelButton(Row(_peopleContent, 40), person.remembered ? "声を登録し直す" : "声を登録する", TextAnchor.MiddleLeft);
+                b.onClick.AddListener(() => ShowEnroll(target, name, person.remembered));
             }
 
             var others = new List<CielConversation.Speaker>();
@@ -302,6 +298,32 @@ namespace Ciel.Conversation
             foreach (var suffix in new[] { "さん", "ちゃん", "くん", "君", "様" })
                 if (name.EndsWith(suffix) && name.Length > suffix.Length) return name.Substring(0, name.Length - suffix.Length).Trim();
             return name;
+        }
+
+        // 名前の入力欄（row の左側。右に rightSpace だけボタンの場所をあける）
+        InputField NameField(RectTransform row, string value, float rightSpace)
+        {
+            var field = Rect("NameField", row, Center, Center, Vector2.zero, Vector2.zero);
+            Stretch(field);
+            field.offsetMax = new Vector2(-rightSpace, 0);
+            Rounded(field, new Color(1f, 1f, 1f, 0.08f), 8, raycast: true);
+            var text = Txt("Text", field, 14, TextMain, TextAnchor.MiddleLeft);
+            text.supportRichText = false;
+            Stretch(text.rectTransform);
+            text.rectTransform.offsetMin = new Vector2(10, 0);
+            text.rectTransform.offsetMax = new Vector2(-10, 0);
+            var placeholder = Txt("Placeholder", field, 14, TextNote, TextAnchor.MiddleLeft);
+            placeholder.text = "名前を入れる";
+            Stretch(placeholder.rectTransform);
+            placeholder.rectTransform.offsetMin = text.rectTransform.offsetMin;
+            placeholder.rectTransform.offsetMax = text.rectTransform.offsetMax;
+            var input = field.gameObject.AddComponent<InputField>();
+            input.textComponent = text;
+            input.placeholder = placeholder;
+            input.characterLimit = 40;
+            input.lineType = InputField.LineType.SingleLine;
+            input.text = value;
+            return input;
         }
 
         void PanelLabel(string text)

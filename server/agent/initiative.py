@@ -125,6 +125,7 @@ class Initiative:
         self._last = time.monotonic()    # 最後に誰かが話していた時刻
         self._user_busy = False
         self._agent_busy = True          # あいさつが終わるまでは話しかけない
+        self.paused = None               # 呼ぶと True のあいだ考えも話しかけもしない（声の登録の途中。agent.py がつなぐ）
         self._seen_id = 0                # 考えに使った最後の発言 ID
         self._new_at: float | None = None   # まだ考えに使っていない発言が確定した時刻
         self._thought_at = -1e9          # 最後に考えた時刻
@@ -172,6 +173,8 @@ class Initiative:
     # ---- 1 回分の見回り（テストから時刻を渡して呼べる） ----
 
     def step(self, now: float) -> None:
+        if self.paused is not None and self.paused():
+            return   # 声の登録の途中など、シエルから話しかけない間（agent.py がつなぐ）
         talk = self.style.talk
         if talk == 'quiet':
             return

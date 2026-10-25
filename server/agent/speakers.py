@@ -83,6 +83,12 @@ RECOVER_RECENT = 5
 GREETING_NOTES = 5          # あいさつに添える、持ち主について覚えていることの数（最近の分）
 MERGE_PRINTS = 3            # アプリで覚えている人にまとめたとき、DB の見本に足す数
 DEVICE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
+# 声の登録（アプリの「声を登録する」。画面の文を読んでもらい、その声で見本を作る。_enroll_judge）
+ENROLL_NEEDED = 4            # 受け付ける読み上げの数
+ENROLL_MIN_SECONDS = 1.2     # これより短い読み上げは、もう一度読んでもらう
+ENROLL_SAME = float(os.environ.get('CIEL_SPK_ENROLL_SAME', '0.35'))   # これまでの読み上げとこれ未満なら、別の人の声とみなす
+ENROLL_TIMEOUT = 180.0       # 始めてからこの秒数で、終わっていなければやめる
+ENROLL_GAP = 1.2             # 前の読み上げからこの秒数以内に始まった発言は、同じ文の続き
 
 
 class Encoder:
@@ -218,6 +224,20 @@ class Judgment:
     score: float = -1.0                  # 類似度
     owner: bool = False                  # 端末の持ち主として当てた（ひとり・身近な人のとき）
     short: bool = False                  # 短い返事で、直前の人と同じかだけを確かめた（_judge_short）
+    enroll: bool = False                 # 声の登録の読み上げ（返事をしない・メモの元にしない）
+
+
+@dataclass
+class Enrollment:
+    """声の登録の途中（アプリの「声を登録する」）。名前と同意は、アプリの画面で本人が入れて押したもの"""
+    name: str
+    sp: 'SessionSpeaker'                 # 登録する人（この会話での話者）
+    person_id: int | None = None         # 覚えている人の声を足すとき
+    embeddings: list = field(default_factory=list)
+    readings: int = 0                    # 受け付けた文の数（1 つの文が区切られても 1 つ）
+    last_at: float = 0.0                 # 最後に受け付けた時刻（time.monotonic、判定したとき）
+    status: str = 'listening'            # listening・short・other_voice・saving・saved・failed・cancelled・timeout
+    started: float = field(default_factory=time.monotonic)
 
 
 @dataclass
@@ -277,6 +297,9 @@ class SpeakerBook:
         self.owner_id: int | None = None   # 端末の持ち主（覚えている人の番号。アプリの hello で決まる）
         self.channel: str | None = None    # 声の経路（端末ごと。見本に印を付ける）
         self.device_known = asyncio.Event()   # アプリの hello を受け取った（あいさつの前に、持ち主が分かるのを少し待つ）
+        self.enrolling: Enrollment | None = None   # 声の登録の途中（その間は返事をしない。turns.py・initiative.py が見る）
+        self.on_enroll = None          # 登録の様子が変わったとき呼ぶ（引数は enroll_state()。agent.py がアプリへ送る）
+        self.on_enrolled = None        # 登録できたとき呼ぶ（引数は名前。agent.py がシエルにひとこと言わせる）
 
     async def load(self) -> None:
         if self.store is not None:
@@ -363,7 +386,7 @@ class SpeakerBook:
         return sp
 
     def judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
-        j = self._judge(e, seconds)
+        j = self._enroll_judge(e, seconds) if self.enrolling is not None else self._judge(e, seconds)
         if j.sp is not None:   # 短くて分からない発言では、光らせる人を変えない
             self.heard = j
             self._heard_count += 1
@@ -410,6 +433,144 @@ class SpeakerBook:
         self.speakers.append(sp)
         log.info('話者：初めての声 → %s（一番近い %.2f）', sp.label, max(k_score, s_score))
         return Judgment(sp, True, e, seconds, max(k_score, s_score))
+
+    # ---- 声の登録（アプリの「声を登録する」。docs/speaker-recognition-research-ja.md の案 A） ----
+
+    def enroll_state(self) -> dict:
+        en = self.enrolling
+        return {'v': 1, 'type': 'enroll.state', 'active': en is not None and en.status not in ('saved', 'failed'),
+                'name': en.name if en else '', 'speaker_id': en.sp.speaker_id if en else '',
+                'accepted': en.readings if en else 0, 'needed': ENROLL_NEEDED, 'status': en.status if en else ''}
+
+    def _enroll_notify(self) -> None:
+        if self.on_enroll is not None:
+            try:
+                self.on_enroll(self.enroll_state())
+            except Exception:
+                log.exception('話者：登録の様子をアプリへ知らせられない')
+
+    def _enroll_start(self, speaker_id, name) -> str:
+        """登録を始める。名前と同意は、本人がアプリの画面で入れて押したもの。
+        声を覚えている人の声を足すのは、その人が直前に確かに話したときだけ（ほかの人の声を足さないように）"""
+        if self.store is None:
+            return 'storage_unavailable'
+        if self.enrolling is not None:
+            return 'already_enrolling'
+        sp = self._by_id(speaker_id) if speaker_id else None
+        if speaker_id and sp is None:
+            return 'speaker_not_found'
+        person_id = None
+        if sp is not None and sp.person_id is not None:
+            if sp is not self.last or not self.last_sure:
+                return 'not_current_speaker'
+            person_id, name = sp.person_id, sp.name or name
+        name = plain_name(name) if isinstance(name, str) else ''
+        if not name or len(name) > 40:
+            return 'invalid_name'
+        if sp is None:
+            sp = SessionSpeaker(label=self._new_unknown_label())
+            self.speakers.append(sp)
+        self.enrolling = Enrollment(name, sp, person_id)
+        log.info('話者：声の登録を始めた（%s）', '覚えている人 #%d' % person_id if person_id else 'まだ覚えていない人')
+        self._enroll_notify()
+        return 'enrolling'
+
+    def _enroll_cancel(self, status: str = 'cancelled') -> str:
+        en = self.enrolling
+        if en is None:
+            return 'not_enrolling'
+        en.status = status
+        self._enroll_notify()
+        self.enrolling = None
+        if not en.sp.embeddings and en.sp.person_id is None and en.sp in self.speakers:
+            self.speakers.remove(en.sp)   # 1 回も読まなかった人の札は残さない
+        log.info('話者：声の登録をやめた（%s）', status)
+        return status
+
+    def _enroll_judge(self, e: np.ndarray | None, seconds: float) -> 'Judgment':
+        """登録の途中の発言：読み上げとして受け付ける。短い発言はもう一度読んでもらう。これまでの読み上げ（すでに声を
+        聞いている人なら、その声）と違う声は、別の人の声として受け付けない。返事はしない（enroll）"""
+        en = self.enrolling
+        if time.monotonic() - en.started > ENROLL_TIMEOUT:
+            self._enroll_cancel('timeout')
+            return self._judge(e, seconds)
+        if en.status == 'saving':
+            return Judgment(None, False, e, seconds, enroll=True)
+        if e is None or seconds < ENROLL_MIN_SECONDS:
+            # 文の切れ端（「シエル、」のように、文の途中で区切られたもの）。知らせずに読み流す
+            return Judgment(None, False, e, seconds, enroll=True)
+        reference = en.embeddings or (en.sp.embeddings if en.person_id is None else [])
+        score = best_score(e, reference) if reference else 1.0
+        if score < ENROLL_SAME:
+            en.status = 'other_voice'
+            log.info('話者：登録の読み上げが、これまでと違う声（%.2f）', score)
+            self._enroll_notify()
+            return Judgment(None, False, e, seconds, score, enroll=True)
+        now = time.monotonic()
+        # 1 つの文が、途中の息つぎで 2〜3 個に区切られることがある（2026-10-25、開発用の試験）。前に受け付けた読み上げの
+        # すぐあと（ENROLL_GAP 秒以内）に始まったものは、同じ文の続きとして、声は見本に足し、数は増やさない
+        same_reading = en.readings > 0 and now - seconds - en.last_at < ENROLL_GAP
+        en.embeddings.append(e)
+        en.sp.add(e)
+        en.last_at = now
+        if not same_reading:
+            en.readings += 1
+        en.status = 'listening'
+        log.info('話者：登録の読み上げ %d/%d（声 %.1f 秒、%.2f%s）', en.readings, ENROLL_NEEDED, seconds, score,
+                 '、同じ文の続き' if same_reading else '')
+        if en.readings >= ENROLL_NEEDED:
+            en.status = 'saving'
+            task = asyncio.get_running_loop().create_task(self._enroll_save())
+            self._app_tasks.add(task)
+            task.add_done_callback(self._app_tasks.discard)
+        self._enroll_notify()
+        return Judgment(en.sp, True, e, seconds, score, enroll=True)
+
+    async def _enroll_save(self) -> None:
+        """読み上げた声で、名前と声を保存する（同意はアプリの画面で取った。お話のメモの同意も含む文面）。
+        同じ名前の覚えている人がいれば、声が近いときだけその人に足す（別の人が名前を名乗って声を足さないように）"""
+        en = self.enrolling
+        status = 'failed'
+        try:
+            async with self._identity_lock:
+                pid = en.person_id
+                if pid is None:
+                    same = next((k for k in self.known if k.name == en.name), None)
+                    if same is not None:
+                        score = float(np.mean([best_score(x, same.embeddings) for x in en.embeddings]))
+                        if score < ENROLL_SAME:
+                            raise LookupError('name_taken')
+                        pid = same.person_id
+                if pid is not None:
+                    await self.store.add_voiceprints(pid, list(en.embeddings), None, channel=self.channel)
+                    k = next((k for k in self.known if k.person_id == pid), None)
+                    if k is not None:
+                        k.embeddings.extend(en.embeddings)
+                        k.disputed = False
+                    en.sp.person_id, en.sp.name = pid, k.name if k is not None else en.name
+                else:
+                    pid = await self.store.remember_person(en.name, list(en.embeddings), None, channel=self.channel)
+                    self.known.append(Known(pid, en.name, list(en.embeddings), notes_ok=True))
+                    en.sp.person_id, en.sp.name = pid, en.name
+                    if self.on_notes_consent:
+                        self.on_notes_consent(pid)
+                self.last, self.last_sure = en.sp, True
+                self.recent, self.recent_sure, self.recent_at = en.sp, True, time.monotonic()
+                status = 'saved'
+                log.info('話者：声の登録で #%d の声を覚えた（見本 %d）', pid, len(en.embeddings))
+        except LookupError:
+            status = 'name_taken'
+        except Exception as ex:
+            log.warning('話者：声の登録を保存できない error=%s', type(ex).__name__)
+        en.status = status
+        self._enroll_notify()
+        self.enrolling = None
+        self.notify()
+        if status == 'saved' and self.on_enrolled is not None:
+            try:
+                self.on_enrolled(en.sp.name or en.name)
+            except Exception:
+                log.exception('話者：登録できたことをシエルに伝えられない')
 
     def debug_scores(self, e: np.ndarray) -> dict[str, float]:
         """調べるとき（デバッグ用の会話ログ）：この会話の人・覚えている人それぞれとの類似度"""
@@ -1048,6 +1209,13 @@ class SpeakerBook:
                     status = await self._app_merge(self._by_id(msg.get('speaker_id')), self._by_id(msg.get('into')))
                 elif action in ('hello', 'pair', 'unpair'):
                     status = await self._device_control(action, msg)
+                elif action == 'enroll_start':
+                    status = self._enroll_start(msg.get('speaker_id'), msg.get('name'))
+                    if status != 'enrolling' and self.on_enroll is not None:
+                        # 始められなかったわけを、アプリの登録の画面に出す
+                        self.on_enroll({**self.enroll_state(), 'active': False, 'status': status})
+                elif action == 'enroll_cancel':
+                    status = self._enroll_cancel()
                 elif action == 'split':
                     sp = self._by_id(msg.get('speaker_id'))
                     if sp is None or sp is not self.last or self.state()['correctable'] != sp.speaker_id:
