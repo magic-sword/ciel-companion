@@ -79,4 +79,17 @@ async def summarize_past_minutes(context: RunContext, last_minutes: int = 0, fir
     return json.dumps(data)
 
 
-TOOLS = [start_minutes, finish_minutes, summarize_past_minutes, get_minutes_status, read_minutes]
+@function_tool
+async def choose_minutes_destination(context: RunContext, name: str = ''):
+    """まとめ（議事録など）の送り先を切り替える（「議事録は仕事用に送って」）。nameは登録済みの送り先の名前。
+    空なら今の送り先と登録済みの名前を返す。送り先の登録・削除はアプリの設定画面でだけできる。"""
+    minutes = context.userdata.minutes
+    if minutes is None:
+        return NO_MINUTES
+    data = minutes.choose_destination(name)
+    log.info('議事録ツール action=destination status=%s count=%d', data['status'], len(data['destinations']))
+    return json.dumps(data, ensure_ascii=False)
+
+
+TOOLS = [start_minutes, finish_minutes, summarize_past_minutes, get_minutes_status, read_minutes,
+         choose_minutes_destination]

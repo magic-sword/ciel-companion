@@ -268,6 +268,9 @@ async def entrypoint(ctx: JobContext) -> None:
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
+    # 声で送り先を切り替えたら、アプリの端末に覚えさせる（次につないだときも同じ送り先にする）
+    minute_taker.on_destination = lambda name: asyncio.create_task(
+        send('ciel.event', {'v': 1, 'type': 'minutes.destination', 'selected': name}))
     minute_taker.busy = talker.busy   # 送り終えたことは、話の切れ目で伝える
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く

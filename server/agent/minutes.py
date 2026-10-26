@@ -13,9 +13,12 @@
 - 清書：終えたら、強いモデル（既定 gpt-5.4、CIEL_MINUTES_MODEL）が、ライブの一覧と発言から下書きに仕上げる
   （config/prompts/minutes.md）。発言が全部残っていて多すぎなければ全部を見直し、多ければ続きだけを合わせる。
 - 共通履歴（conversation.py）の開始・終了 ID と処理位置を持つ。独自の全文は持たない。
-- 下書きは Discord の Webhook（CIEL_MINUTES_DISCORD_WEBHOOK。利用者だけが見るチャンネル）へ送る（summaries/export.py）。
+- 下書きは Discord の Webhook（利用者だけが見るチャンネル）へ送る（summaries/export.py）。送り先はアプリの端末ごとに
+  設定画面で登録し、つないだとき・変えたときに知らせてくる（ciel.minutes の destinations）。声でも切り替えられる
+  （道具 choose_minutes_destination）。端末に登録が無ければ、CIEL_MINUTES_DISCORD_WEBHOOK（既定の送り先）へ送る。
+  Webhook の URL はログにもモデルにも出さない（名前だけ）。
   自動で共有先へは出さない：利用者が確かめてから共有する（聞き間違い・外に出したくない発言が混ざることがあるため）。
-- 送れなかったとき（Webhook が無い・失敗）だけ、下書きを data/minutes/ に保存する。
+- 送れなかったとき（送り先が無い・失敗）だけ、下書きを data/minutes/ に保存する。
 - 会話が終わるときにとっている途中なら、そこまでで終える。共通履歴は会話が終わると消える。
 - ログには会話もまとめの中身も出さない（行数・文字数だけ）。決めたことは docs/decisions/meeting-minutes-ja.md。
 """
@@ -23,6 +26,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -48,6 +52,11 @@ TOPIC = 'ciel.minutes'
 MODEL = os.environ.get('CIEL_MINUTES_MODEL', 'gpt-5.4')
 WEBHOOK = os.environ.get('CIEL_MINUTES_DISCORD_WEBHOOK', '')
 SAVE_DIR = Path(__file__).resolve().parent / 'data' / 'minutes'
+# アプリの端末が登録した送り先。Discord の Webhook の URL だけを受け付ける（会話サーバーから、ほかの宛先へ送らせない）
+DESTINATION_URL = re.compile(r'https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d{1,25}/[A-Za-z0-9_-]{1,100}')
+MAX_DESTINATIONS = 10
+DESTINATION_NAME_CHARS = 30
+DEFAULT_DESTINATION = '既定の送り先'   # 端末に登録が無いときの CIEL_MINUTES_DISCORD_WEBHOOK
 RECENT_EXPORTS = 5
 DRAFT_CACHE_CHARS = 40_000
 READ_CHARS = 6000
@@ -113,6 +122,7 @@ class Meeting:
     draft: str | None = None
     draft_clipped: bool = False
     error: str | None = None
+    destination: str | None = None                             # 送った（送ろうとした）送り先の名前
     updated_at: float = field(default_factory=time.monotonic)   # 前のライブの更新（time.monotonic。更新の間隔を決める）
     updated_wall: float | None = None                          # 前のライブの更新（アプリに「何秒前」と出す）
     research_seen: int = 0                                     # ライブに渡した調べた記録の最後の ID
@@ -146,6 +156,9 @@ class Minutes:
         self._announcing: set[asyncio.Task] = set()   # 送り終えたことを知らせるのを待っている
         self._note: str | None = None   # 話している最中で知らせられなかった結果（次の返事の指示に足す）
         self._closing = False           # 会話が終わるところ（もう知らせない）
+        self.destinations: dict[str, str] = {}   # 送り先の名前 → Webhook の URL（アプリの端末が知らせる）
+        self.destination: str | None = None      # 選んでいる送り先の名前（登録が無ければ None）
+        self.on_destination: Callable[[str], None] | None = None   # 声で切り替えたとき（アプリの端末に覚えさせる）
         self._client = openai.AsyncOpenAI()
 
     @property
@@ -169,6 +182,8 @@ class Minutes:
             'incomplete': m is not None and (m.incomplete or m.first_id < self.history.dropped_through
                                            or any(t.clipped for t in rows)),
             'latest_export': self._export_status(self._exports[-1]) if self._exports else None,
+            'destination': self.destination_label(),
+            'destinations': list(self.destinations),
             'recent_exports': [{'meeting_id': e.export_id, 'stage': e.stage} for e in self._exports],
         }
 
@@ -181,7 +196,9 @@ class Minutes:
             'meeting_id': m.export_id if m is not None else None,
             'template': m.template.name if m is not None else None,
             'template_label': (m or latest).template.label if (m or latest) is not None else None,
-            'latest_export': {'meeting_id': latest.export_id, 'stage': latest.stage} if latest else None,
+            'latest_export': {'meeting_id': latest.export_id, 'stage': latest.stage,
+                              'destination': latest.destination} if latest else None,
+            'destination': self.destination_label(),
         }, ensure_ascii=False)
 
     @staticmethod
@@ -189,7 +206,7 @@ class Minutes:
         return {'meeting_id': m.export_id, 'template': m.template.name, 'stage': m.stage,
                 'started_at': m.started.isoformat(), 'ended_at': m.ended.isoformat() if m.ended else None,
                 'incomplete': m.incomplete, 'draft_available': m.draft is not None,
-                'error': m.error}
+                'destination': m.destination, 'error': m.error}
 
     def read(self, meeting_id: str = '') -> dict:
         """本文は要求時だけ、有界で返す。新しい要約や外部への送信はしない。"""
@@ -258,7 +275,7 @@ class Minutes:
             except Exception:
                 log.exception('まとめの進み具合をアプリへ送れない')
 
-    # ---- 始め・終わり ----
+    # ---- アプリから ----
 
     def on_data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != TOPIC:
@@ -277,6 +294,8 @@ class Minutes:
             self.finish()
         elif action == 'refresh':
             self.refresh()
+        elif action == 'destinations':
+            self.set_destinations(msg.get('items'), msg.get('selected'))
         else:
             log.warning('議事録の知らない操作: %s', action)
 
@@ -286,6 +305,53 @@ class Minutes:
                 self.on_change(what)
             except Exception:
                 log.exception('議事録の知らせを送れない')
+
+    # ---- 送り先 ----
+
+    def set_destinations(self, items, selected) -> None:
+        """アプリの端末に登録した送り先を受け取る（つないだとき・変えたとき）。おかしなものは捨てる"""
+        found: dict[str, str] = {}
+        for item in items if isinstance(items, list) else []:
+            name, url = (item.get('name'), item.get('url')) if isinstance(item, dict) else (None, None)
+            if not isinstance(name, str) or not isinstance(url, str):
+                continue
+            name = name.strip()
+            if (name and len(name) <= DESTINATION_NAME_CHARS and DESTINATION_URL.fullmatch(url)
+                    and name not in found and len(found) < MAX_DESTINATIONS):
+                found[name] = url
+        self.destinations = found
+        self.destination = selected if isinstance(selected, str) and selected in found else next(iter(found), None)
+        log.info('議事録：端末の送り先 %d 件（受け取った %d 件）', len(found), len(items) if isinstance(items, list) else 0)
+
+    def destination_label(self) -> str | None:
+        """いまの送り先の名前。端末に登録が無ければ既定の送り先、それも無ければ None（サーバーに保存する）"""
+        return self.destination or (DEFAULT_DESTINATION if WEBHOOK else None)
+
+    def choose_destination(self, name: str = '') -> dict:
+        """声で送り先を切り替える（name は登録済みの名前。大文字小文字・空白の違いは見ない）。空なら今の送り先を返すだけ"""
+        names = list(self.destinations)
+        status = 'ok'
+        if name:
+            key = ''.join(name.split()).casefold()
+            found = next((n for n in names if ''.join(n.split()).casefold() == key), None)
+            if found is None:
+                status = 'not_found' if names else 'none_registered'
+            else:
+                status, self.destination = 'switched', found
+                log.info('議事録：送り先を切り替えた')
+                if self.on_destination is not None:
+                    try:
+                        self.on_destination(found)
+                    except Exception:
+                        log.exception('送り先をアプリへ知らせられない')
+        return {'status': status, 'destination': self.destination_label(), 'destinations': names}
+
+    def _target(self) -> tuple[str, str] | None:
+        if self.destination in self.destinations:
+            return self.destination, self.destinations[self.destination]
+        return (DEFAULT_DESTINATION, WEBHOOK) if WEBHOOK else None
+
+    # ---- 始め・終わり ----
 
     def start(self, lookback_minutes: int = 0, template: str = summary_templates.DEFAULT) -> str:
         if type(lookback_minutes) is not int or not 0 <= lookback_minutes <= 1440:
@@ -589,16 +655,18 @@ class Minutes:
                 text += '\n※ 書き起こし未完了または履歴の保持上限により、一部の発言が欠けています。\n'
             m.draft, m.draft_clipped = text[:DRAFT_CACHE_CHARS], len(text) > DRAFT_CACHE_CHARS
         name = f'{m.template.name}-{m.started:%Y%m%d-%H%M%S}-{m.export_id}.md'
-        if WEBHOOK:
+        target = self._target()
+        if target is not None:
+            m.destination = target[0]
             try:
-                await asyncio.to_thread(post_discord, WEBHOOK, text, name, m.template.label)
+                await asyncio.to_thread(post_discord, target[1], text, name, m.template.label)
                 m.stage = 'sent'
-                log.info('議事録：下書きを Discord に送った')
+                log.info('議事録：下書きを Discord に送った（%s）', '既定' if target[0] == DEFAULT_DESTINATION else '端末の送り先')
                 return
             except Exception as e:
                 log.warning('議事録を Discord に送れない：%s', type(e).__name__)
         else:
-            log.warning('議事録：CIEL_MINUTES_DISCORD_WEBHOOK が無い')
+            log.warning('議事録：送り先が無い（端末の登録も CIEL_MINUTES_DISCORD_WEBHOOK も無い）')
         SAVE_DIR.mkdir(parents=True, exist_ok=True)
         (SAVE_DIR / name).write_text(text, encoding='utf-8')
         m.stage = 'saved_locally'

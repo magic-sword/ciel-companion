@@ -1,6 +1,6 @@
 // 会話の画面（CielConversationUI）のうち、設定画面（下からすべり出る）。
 // タブ：声と会話（シエルの声の大きさ・おしゃべり度・その場にいる人）、背景（CielBackground）、
-// そのほか（PC ではマイクとスピーカー、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
+// 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、そのほか（PC ではマイクとスピーカー、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -26,6 +26,10 @@ namespace Ciel.Conversation
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
         Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob;
+        RectTransform _destList;
+        InputField _destName, _destUrl;
+        Text _destError;
+        int _destRevision = -1;
 
         void BuildSheet(RectTransform root)
         {
@@ -100,6 +104,7 @@ namespace Ciel.Conversation
             {
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
+                ("議事録", BuildMinutesSection),
                 ("そのほか", c => { BuildDevicesSection(c); BuildDevSection(c); }),
             };
             for (int i = 0; i < pages.Length; i++)
@@ -282,6 +287,74 @@ namespace Ciel.Conversation
             _presenceNote = Txt("Note", sec, 12, TextSub, TextAnchor.UpperLeft);
         }
 
+        // 議事録の送り先（Discord の Webhook）。選んだものへ下書きを送る。声でも「議事録は〇〇に送って」と切り替えられる
+        void BuildMinutesSection(RectTransform content)
+        {
+            var sec = Section(content);
+            SectionLabel(Row(sec, 20), "議事録の送り先");
+            _destList = Section(sec);
+            Note(sec, "選んでいる送り先へ、議事録などのまとめの下書きを送ります。声でも「議事録は〇〇に送って」と切り替えられます。"
+                + "登録しなければ、サーバーの既定の送り先へ送ります（無ければサーバーに保存します）");
+
+            var add = Section(content);
+            SectionLabel(Row(add, 20), "送り先を足す");
+            _destName = NameField(Row(add, 40), "", 0, "名前（例：仕事）", CielConversation.MaxMinutesDestinationName);
+            _destUrl = NameField(Row(add, 40), "", 0, "Webhook の URL", 200);
+            _destUrl.keyboardType = TouchScreenKeyboardType.URL;
+            var button = PanelButton(Row(add, 40), "足す", TextAnchor.MiddleCenter);
+            button.onClick.AddListener(() =>
+            {
+                _destError.text = _conversation.AddMinutesDestination(_destName.text, _destUrl.text) ?? "";
+                if (_destError.text.Length == 0) _destName.text = _destUrl.text = "";
+            });
+            _destError = Txt("Error", add, 11, Amber, TextAnchor.UpperLeft);
+            Note(add, "Discord のチャンネルの設定 → 連携サービス → ウェブフック で作った URL を貼ります。"
+                + "利用者だけが見るチャンネルにしてください。送り先はこの端末にだけ保存し、会話サーバーには送るためだけに渡します");
+        }
+
+        // 送り先の一覧（変わったときだけ作り直す）。押すと選び、右の「消す」で消す
+        void RefreshMinutesDestinations()
+        {
+            var c = _conversation;
+            if (_destRevision == c.MinutesDestinationsRevision) return;
+            _destRevision = c.MinutesDestinationsRevision;
+            foreach (Transform child in _destList) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
+            var items = c.MinutesDestinations;
+            var selected = c.SelectedMinutesDestination;
+            if (items.Count == 0)
+            {
+                var none = Txt("None", Row(_destList, 24), 13, TextSub, TextAnchor.MiddleLeft);
+                Stretch(none.rectTransform);
+                none.text = "まだありません（サーバーの既定の送り先へ送ります）";
+                return;
+            }
+            foreach (var d in items)
+            {
+                var name = d.name;
+                var sel = name == selected;
+                var row = Row(_destList, 44);
+                var hit = Rounded(row, sel ? WithAlpha(CyanDeep, 0.22f) : new Color(1f, 1f, 1f, 0.05f), 10, raycast: true);
+                Edge(row, sel ? Cyan : WithAlpha(Cyan, 0.25f));
+                var mark = Rect("Mark", row, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(20, 20));
+                Img(mark, sel ? "circle" : "circle_outline", sel ? CyanDeep : WithAlpha(Cyan, 0.5f));
+                if (sel) Icon(mark, "check", 11, Ink);
+                var label = Txt("Name", row, 14, sel ? TextMain : TextSub, TextAnchor.MiddleLeft, sel);
+                label.supportRichText = false;
+                label.horizontalOverflow = HorizontalWrapMode.Overflow;
+                Stretch(label.rectTransform);
+                label.rectTransform.offsetMin = new Vector2(42, 0);
+                label.rectTransform.offsetMax = new Vector2(-76, 0);
+                label.text = name;
+                var b = row.gameObject.AddComponent<Button>();
+                b.targetGraphic = hit;
+                b.transition = Selectable.Transition.None;
+                b.onClick.AddListener(() => c.SelectMinutesDestination(name));
+                var remove = Rect("Remove", row, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-6, 0), new Vector2(62, 32));
+                remove.pivot = new Vector2(1, 0.5f);
+                PanelButton(remove, "消す", TextAnchor.MiddleCenter).onClick.AddListener(() => c.RemoveMinutesDestination(name));
+            }
+        }
+
         // PC だけ：マイクとスピーカーの選択
         void BuildDevicesSection(RectTransform content)
         {
@@ -377,6 +450,7 @@ namespace Ciel.Conversation
             if (_exprPanel != null) _exprPanel.SetActive(expr);
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
+            RefreshMinutesDestinations();
         }
 
         static void RefreshDevices(Dropdown dd, List<string> guids, bool can, List<(string name, string guid)> devices,

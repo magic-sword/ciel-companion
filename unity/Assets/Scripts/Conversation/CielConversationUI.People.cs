@@ -301,7 +301,7 @@ namespace Ciel.Conversation
         }
 
         // 名前の入力欄（row の左側。右に rightSpace だけボタンの場所をあける）
-        InputField NameField(RectTransform row, string value, float rightSpace)
+        InputField NameField(RectTransform row, string value, float rightSpace, string hint = "名前を入れる", int limit = 40)
         {
             var field = Rect("NameField", row, Center, Center, Vector2.zero, Vector2.zero);
             Stretch(field);
@@ -313,14 +313,14 @@ namespace Ciel.Conversation
             text.rectTransform.offsetMin = new Vector2(10, 0);
             text.rectTransform.offsetMax = new Vector2(-10, 0);
             var placeholder = Txt("Placeholder", field, 14, TextNote, TextAnchor.MiddleLeft);
-            placeholder.text = "名前を入れる";
+            placeholder.text = hint;
             Stretch(placeholder.rectTransform);
             placeholder.rectTransform.offsetMin = text.rectTransform.offsetMin;
             placeholder.rectTransform.offsetMax = text.rectTransform.offsetMax;
             var input = field.gameObject.AddComponent<InputField>();
             input.textComponent = text;
             input.placeholder = placeholder;
-            input.characterLimit = 40;
+            input.characterLimit = limit;
             input.lineType = InputField.LineType.SingleLine;
             input.text = value;
             return input;

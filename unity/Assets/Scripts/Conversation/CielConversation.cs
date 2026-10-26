@@ -19,6 +19,9 @@
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会話のまとめ（議事録など）：StartSummary・FinishSummary・RefreshSummary（画面の「まとめ」のパネル）で、会話サーバー（server/agent/minutes.py）へ送る。
 // 中身は ciel.summary で分けて届き（Summary）、選べる種類は summary.templates で届く（SummaryTemplates）。
+// 議事録の送り先（Discord の Webhook）：この端末の中に名前と URL を持ち（PlayerPrefs。MinutesDestinations）、設定画面で足す・消す・選ぶ。
+// つないだとき・会話サーバーが入ってきたとき・変えたときに、一覧と選んでいる名前を会話サーバーへ送る（ciel.minutes の destinations）。
+// 声で切り替えられたら、会話サーバーが minutes.destination で知らせるので、選んでいる名前を覚え直す。
 // 参加者：会話サーバー（server/agent/speakers.py）が聞き分けた人と最後に話した人を speakers.state で知らせる（Speakers）。
 // 画面からの名前の直しは FixSpeaker で送る（topic ciel.speakers。この会話の間だけ）。
 // 端末の持ち主：端末の ID と合言葉をこの端末の中で作って持ち（PlayerPrefs）、つないだとき・会話サーバーが入ってきたときに
@@ -89,6 +92,17 @@ namespace Ciel.Conversation
         bool _userSpeaking;
         /// 会話サーバーが会議の議事録をとっているか（会話サーバーの知らせ minutes.state で変わる）
         public bool MinutesOn { get; private set; }
+        /// 議事録の送り先（この端末の中に持つ。会話サーバーの minutes.py と同じ決まりで確かめる）
+        [Serializable]
+        public sealed class MinutesDestination
+        {
+            public string name, url;
+        }
+        public const int MaxMinutesDestinations = 10, MaxMinutesDestinationName = 30;
+        public IReadOnlyList<MinutesDestination> MinutesDestinations => LoadMinutesDestinations().items;
+        /// 選んでいる送り先の名前（登録が無ければ空。会話サーバーの既定の送り先へ送る）
+        public string SelectedMinutesDestination => LoadMinutesDestinations().selected ?? "";
+        public int MinutesDestinationsRevision { get; private set; }
         [Serializable]
         public sealed class ResearchSource
         {
@@ -886,6 +900,7 @@ namespace Ciel.Conversation
             public string meeting_id;   // summary.progress
             public int pending_turns;
             public bool updating;
+            public string selected;   // minutes.destination
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -950,6 +965,13 @@ namespace Ciel.Conversation
                 SendVolume();
                 SendDeviceHello();
             }
+            else if (e.type == "minutes.destination")
+            {
+                // 声で送り先を切り替えた。次につないだときも同じ送り先にする
+                var d = LoadMinutesDestinations();
+                if (d.items.Exists(x => x.name == e.selected)) SaveMinutesDestinations(d.items, e.selected, send: false);
+                Changed?.Invoke();
+            }
             else if (e.type == "summary.progress" && Summary != null && Summary.meeting_id == e.meeting_id)
             {
                 Summary.pending_turns = e.pending_turns;
@@ -1000,6 +1022,74 @@ namespace Ciel.Conversation
 
         static string JsonString(string s) => "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
+        const string MinutesDestinationsKey = "ciel.minutes.destinations";
+        static readonly System.Text.RegularExpressions.Regex MinutesWebhook = new System.Text.RegularExpressions.Regex(
+            @"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d{1,25}/[A-Za-z0-9_-]{1,100}$");
+
+        [Serializable]
+        sealed class MinutesDestinationsJson
+        {
+            public int v = 1;
+            public string type = "minutes.control", action = "destinations", selected;
+            public List<MinutesDestination> items = new List<MinutesDestination>();
+        }
+
+        static MinutesDestinationsJson LoadMinutesDestinations()
+        {
+            MinutesDestinationsJson d = null;
+            try { d = JsonUtility.FromJson<MinutesDestinationsJson>(PlayerPrefs.GetString(MinutesDestinationsKey, "")); }
+            catch (Exception) { }
+            d = d ?? new MinutesDestinationsJson();
+            d.items = d.items ?? new List<MinutesDestination>();
+            if (!d.items.Exists(x => x.name == d.selected)) d.selected = d.items.Count > 0 ? d.items[0].name : null;
+            return d;
+        }
+
+        void SaveMinutesDestinations(List<MinutesDestination> items, string selected, bool send = true)
+        {
+            var d = new MinutesDestinationsJson { items = items, selected = selected };
+            PlayerPrefs.SetString(MinutesDestinationsKey, JsonUtility.ToJson(d));
+            PlayerPrefs.Save();
+            MinutesDestinationsRevision++;
+            if (send) SendMinutesDestinations();
+            Changed?.Invoke();
+        }
+
+        /// 送り先を足す（足したものを選ぶ）。だめなときは理由を返す（null なら足せた）
+        public string AddMinutesDestination(string name, string url)
+        {
+            name = (name ?? "").Trim();
+            url = (url ?? "").Trim();
+            var d = LoadMinutesDestinations();
+            if (name.Length == 0) return "名前を入れてください";
+            if (name.Length > MaxMinutesDestinationName) return $"名前は {MaxMinutesDestinationName} 文字までです";
+            if (d.items.Exists(x => x.name == name)) return "同じ名前の送り先があります";
+            if (d.items.Count >= MaxMinutesDestinations) return $"送り先は {MaxMinutesDestinations} 件までです";
+            if (!MinutesWebhook.IsMatch(url)) return "Discord の Webhook の URL（https://discord.com/api/webhooks/…）を入れてください";
+            d.items.Add(new MinutesDestination { name = name, url = url });
+            SaveMinutesDestinations(d.items, name);
+            return null;
+        }
+
+        public void RemoveMinutesDestination(string name)
+        {
+            var d = LoadMinutesDestinations();
+            d.items.RemoveAll(x => x.name == name);
+            SaveMinutesDestinations(d.items, d.selected == name ? null : d.selected);
+        }
+
+        public void SelectMinutesDestination(string name)
+        {
+            var d = LoadMinutesDestinations();
+            if (d.items.Exists(x => x.name == name)) SaveMinutesDestinations(d.items, name);
+        }
+
+        void SendMinutesDestinations()
+        {
+            var d = LoadMinutesDestinations();
+            SendMinutes(JsonUtility.ToJson(d));
+        }
+
         void SendMinutes(string json)
         {
             if (_room == null || Status != State.Connected) return;
@@ -1048,7 +1138,12 @@ namespace Ciel.Conversation
         /// 声の登録をやめる
         public void CancelEnroll() => SendSpeakerControl(new SpeakerFix { action = "enroll_cancel" });
 
-        void SendDeviceHello() => SendDevice("hello", null);
+        // 端末の持ち主と一緒に、この端末の議事録の送り先も知らせる（どちらも、つないだとき・会話サーバーが入ってきたとき）
+        void SendDeviceHello()
+        {
+            SendDevice("hello", null);
+            SendMinutesDestinations();
+        }
 
         void SendDevice(string action, string speakerId)
         {

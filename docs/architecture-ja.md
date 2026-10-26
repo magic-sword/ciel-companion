@@ -47,7 +47,7 @@
 | OpenAI Responses API | `web_search` による調査と引用出典の取得 | `gpt-5.4-mini`（`CIEL_RESEARCH_MODEL`）。既存の OpenAI キーを使用 |
 | Irodori-TTS | 返答テキストを音声に変換するローカル HTTP 接続 | `http://127.0.0.1:8766/synthesize` |
 | PostgreSQL | 人物・声の特徴・メモ・関係の永続化 | `127.0.0.1:5433`。`CIEL_DB_URL` は Compose が設定 |
-| Discord Webhook（任意） | 議事録の下書き送信。未設定・送信失敗時はサーバー側ファイルへ保存 | `CIEL_MINUTES_DISCORD_WEBHOOK` |
+| Discord Webhook（任意） | 議事録の下書き送信。送り先はアプリの端末ごとに登録して選ぶ（端末に無ければ既定の送り先）。未設定・送信失敗時はサーバー側ファイルへ保存 | アプリの設定画面・`CIEL_MINUTES_DISCORD_WEBHOOK`（既定） |
 | Seed-VC（予備） | OpenAI の音声の声質変換。通常は停止 | `ws://127.0.0.1:8765`、Compose の `vc` profile |
 
 OpenAI・LiveKit のキーはサーバーだけに置く。Hugging Face などからのモデル取得はビルド・モデル準備の経路であり、通常会話の音声通信経路とは別。キーや接続設定の実値は図に記載しない。
@@ -237,7 +237,7 @@ GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会
 | 設定 | 場所 | Git |
 |---|---|---|
 | OpenAI・LiveKit のキー、会話モデル、声の方式 | `server/agent/.env`（見本は `.env.example`） | 入れない |
-| 議事録の下書きを送る Discord の Webhook の URL | `server/agent/.env` の `CIEL_MINUTES_DISCORD_WEBHOOK` | 入れない |
+| 議事録の下書きを送る Discord の Webhook の URL | アプリの端末の中（PlayerPrefs）。既定の送り先は `server/agent/.env` の `CIEL_MINUTES_DISCORD_WEBHOOK` | 入れない |
 | 送れなかった議事録の下書き | 自宅サーバーの `server/agent/data/minutes/` | 入れない |
 | DB のパスワード | `server/.env`（見本は `server/.env.example`。無ければデプロイのときに自宅サーバーで作る） | 入れない |
 | 覚えている人（名前・声の特徴・その人のメモ。本人が同意した人だけ） | DB の `people`・`voiceprints`・`person_notes`。管理は `speaker_admin.py`（一覧・メモを見る・呼び名を直す・削除） | 入れない |
