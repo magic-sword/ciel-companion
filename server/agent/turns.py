@@ -561,6 +561,10 @@ class TurnReplies:
                     extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), context)))
             else:
                 extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), context)))
+            # 話の最中で伝えられなかった、議事録を送り終えた結果（minutes.py の _announce）。この返事で一度だけ伝える
+            note = self.minutes.take_note()
+            if note is not None:
+                extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), note)))
         self.session.generate_reply(**extra)
         self._set_thinking(True)
 

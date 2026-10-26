@@ -156,6 +156,10 @@ class Initiative:
         elif ev.new_state == 'speaking':
             self._agent_done_at = None
 
+    def busy(self) -> bool:
+        """だれかが話しているか、シエルが返事を考えている・話している最中か（議事録の送った結果を伝える切れ目を見る）"""
+        return self._user_busy or self._agent_busy
+
     @property
     def client(self):
         if self._client is None:

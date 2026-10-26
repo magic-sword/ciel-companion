@@ -85,13 +85,6 @@ OWNER_WAIT = float(os.environ.get('CIEL_OWNER_WAIT', '2.5'))
 NOD = os.environ.get('CIEL_NOD', '1') != '0'
 # シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py。CIEL_INTERRUPT_SECONDS=0 で以前のやり方）
 INTERRUPT_GATE = REALTIME and interruptions.CONFIRM_SECONDS > 0
-# 議事録を始めた・終えたときに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）
-MINUTES_LINES = {minutes.STARTED: '[議事録：とり始めた]', minutes.ALREADY: '[議事録：もうとっている]',
-                 minutes.FINISHED: '[議事録：まとめて送る]', minutes.NOT_RECORDING: '[議事録：とっていない]',
-                 minutes.PAST_QUEUED: '[議事録：ここまでをまとめて送る]',
-                 minutes.PAST_PARTIAL: '[議事録：残っている範囲をまとめて送る]',
-                 minutes.STARTED_EARLIER: '[議事録：さかのぼってとり始めた]',
-                 minutes.STARTED_PARTIAL: '[議事録：残っている範囲からとり始めた]'}
 
 
 def transcription(names: list[str]) -> AudioTranscription:
@@ -271,10 +264,11 @@ async def entrypoint(ctx: JobContext) -> None:
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        session.generate_reply(instructions=MINUTES_LINES[what] + '\n\n' + minute_taker.context())
+        session.generate_reply(instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
+    minute_taker.busy = talker.busy   # 送り終えたことは、話の切れ目で伝える
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
     if book is not None:

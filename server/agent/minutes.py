@@ -5,7 +5,8 @@
 - 始めと終わりは 3 つの口から：アプリ（topic ciel.minutes）と管理用のコマンド（minutes_admin.py）、
   声で頼まれたときは会話モデルが道具（tools/minutes.py の start_minutes・finish_minutes）を呼ぶ。
 - 始めた・終えたときは on_change で知らせる。agent.py が、シエルに一言告げさせ（config/prompts/minutes_voice.md）、
-  アプリへ記録中か（ciel.event の minutes.state）を送る。
+  アプリへ記録中か（ciel.event の minutes.state）を送る。下書きを送り終えたとき（送れた・保存した・作れなかった）も、
+  話の切れ目を待って on_change で知らせる（会話が終わるときは知らせない）。
 - ライブ：とっているあいだ、新しい発言がたまったら（summaries/live.py）軽いモデルで差分だけを作り
   （config/prompts/minutes_live.md）、ID の付いた項目の一覧（summaries/state.py）に当てる。
   変わるたびに on_state でアプリのパネルへ今の中身を送る（ciel.summary。packets で分けて送る）。
@@ -66,6 +67,27 @@ STARTED, ALREADY, FINISHED, NOT_RECORDING = 'started', 'already', 'finished', 'n
 PAST_QUEUED, PAST_PARTIAL = 'past_queued', 'past_partial'
 STARTED_EARLIER, STARTED_PARTIAL = 'started_earlier', 'started_partial'
 EMPTY, BUSY, INVALID_RANGE, UNKNOWN_TEMPLATE = 'empty', 'busy', 'invalid_range', 'unknown_template'
+# 下書きを作って送り終えたとき（on_change に渡す。会話が終わるときは知らせない）
+EXPORT_SENT, EXPORT_SAVED = 'export_sent', 'export_saved'
+EXPORT_FAILED, EXPORT_EMPTY = 'export_failed', 'export_empty'
+RESULTS = {'sent': EXPORT_SENT, 'saved_locally': EXPORT_SAVED, 'failed': EXPORT_FAILED, 'empty': EXPORT_EMPTY}
+# 出来事ごとに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）。
+# 受け付けたときは、まだ作っている途中なので、送れたらまた知らせると添える（作成中を失敗と取り違えて謝ったことがあった。2026-10-25）
+LINES = {STARTED: '[議事録：とり始めた]', ALREADY: '[議事録：もうとっている]',
+         FINISHED: '[議事録：まとめて送る（作るのに少しかかる。送れたらまた知らせる）]',
+         NOT_RECORDING: '[議事録：とっていない]',
+         PAST_QUEUED: '[議事録：ここまでをまとめて送る（作るのに少しかかる。送れたらまた知らせる）]',
+         PAST_PARTIAL: '[議事録：残っている範囲をまとめて送る（作るのに少しかかる。送れたらまた知らせる）]',
+         STARTED_EARLIER: '[議事録：さかのぼってとり始めた]',
+         STARTED_PARTIAL: '[議事録：残っている範囲からとり始めた]',
+         EXPORT_SENT: '[議事録：送った]',
+         EXPORT_SAVED: '[議事録：送れなかったので、サーバーに保存した]',
+         EXPORT_FAILED: '[議事録：作れなかった]',
+         EXPORT_EMPTY: '[議事録：発言が少なくて作らなかった]'}
+# 送り終えたとき、だれかが話している・シエルが話している最中なら、終わるまでこの秒数だけ待ってから知らせる。
+# 過ぎたら、次にシエルが返事をするときの指示に足す（take_note）
+ANNOUNCE_WAIT = 30.0
+ANNOUNCE_POLL = 0.5
 
 Line = Turn
 
@@ -114,12 +136,16 @@ class Minutes:
         self.history = history
         self.templates = templates if templates is not None else summary_templates.load()
         self.meeting: Meeting | None = None   # とっていないときは None
-        self.on_change: Callable[[str], None] | None = None   # 始めた・終えたとき（agent.py がつなぐ）
+        self.on_change: Callable[[str], None] | None = None   # 始めた・終えた・送り終えたとき（agent.py がつなぐ）
+        self.busy: Callable[[], bool] | None = None   # だれかか、シエルが話している最中か（agent.py がつなぐ）
         self.on_state: Callable[[dict], None] | None = None   # まとめの中身が変わったとき（アプリのパネル）
         self.on_progress: Callable[[dict], None] | None = None   # まだ反映していない発言の数が変わったとき
         self._tasks: set[asyncio.Task] = set()
         self._exports: list[Meeting] = []  # この接続で作成した直近5件。終了後も結果を照会できる
         self._shown: Meeting | None = None   # アプリのパネルに出しているまとめ（終えたあとも結果を見せる）
+        self._announcing: set[asyncio.Task] = set()   # 送り終えたことを知らせるのを待っている
+        self._note: str | None = None   # 話している最中で知らせられなかった結果（次の返事の指示に足す）
+        self._closing = False           # 会話が終わるところ（もう知らせない）
         self._client = openai.AsyncOpenAI()
 
     @property
@@ -347,6 +373,9 @@ class Minutes:
     async def flush(self) -> None:
         """会話が終わるとき：とっている途中なら、そこまでで議事録にする（もう誰もいないので、告げない）。
         会話サーバーの後片付けには上限があるので、清書は FLUSH_SECONDS で打ち切り、ライブの一覧で下書きにする"""
+        self._closing = True
+        for task in self._announcing:
+            task.cancel()
         self.finish(announce=False)
         deadline = time.monotonic() + FLUSH_SECONDS
         for m in self._exports:
@@ -455,6 +484,37 @@ class Minutes:
             m.snapshot = None
             log.info('議事録：処理結果 id=%s stage=%s', m.export_id, m.stage)
             self._publish(m)
+            if not self._closing and m.stage in RESULTS:
+                task = asyncio.create_task(self._announce(RESULTS[m.stage]))
+                self._announcing.add(task)
+                task.add_done_callback(self._announcing.discard)
+
+    def _busy(self) -> bool:
+        try:
+            return bool(self.busy and self.busy())
+        except Exception:
+            return False
+
+    async def _announce(self, what: str) -> None:
+        """送り終えたことをシエルに知らせる。だれかが話している最中なら、終わるまで待つ（割り込まない）。
+        ANNOUNCE_WAIT を過ぎても話が続いていれば、次の返事の指示に足す（take_note）"""
+        deadline = time.monotonic() + ANNOUNCE_WAIT
+        while self._busy() and time.monotonic() < deadline and not self._closing:
+            await asyncio.sleep(ANNOUNCE_POLL)
+        if self._closing:
+            return
+        if self._busy():
+            self._note = LINES[what]
+            log.info('議事録：送り終えたことを、次の返事で伝える（%s）', what)
+            return
+        self._note = None
+        log.info('議事録：送り終えたことを知らせる（%s）', what)
+        self._changed(what)
+
+    def take_note(self) -> str | None:
+        """話している最中で知らせられなかった、送り終えた結果の 1 行（一度だけ返す。turns.py が返事の指示に足す）"""
+        note, self._note = self._note, None
+        return note
 
     async def _summarize(self, started: datetime, ended: datetime, draft: dict | None, lines: list[Line],
                          template: Template | None = None, draft_through: int = 0,

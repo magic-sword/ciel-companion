@@ -89,6 +89,14 @@ class TurnContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.updates, [])
         self.assertIn('[発言者：ハカセ（声を覚えている人）]', self.session.generate_reply.call_args.kwargs['instructions'])
 
+    async def test_an_untold_minutes_result_goes_into_the_next_reply_once(self):
+        r = self.replies(FakeAgent())
+        self.m._note = minutes.LINES[minutes.EXPORT_SENT]
+        await r._reply(1, 2)
+        self.assertIn('[議事録：送った]', self.session.generate_reply.call_args.kwargs['instructions'])
+        await r._reply(3, 4)
+        self.assertNotIn('[議事録：送った]', self.session.generate_reply.call_args.kwargs.get('instructions') or '')
+
     async def test_tells_the_app_when_thinking_and_when_cancelled(self):
         r = self.replies(FakeAgent())
         sent = []
