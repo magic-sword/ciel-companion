@@ -6,7 +6,7 @@
 - 感動の瞬間の候補：曲の展開の変化（MERT の特徴の変わり目）と、盛り上がり（920〜4400 Hz の音量の増加。鳥肌の研究）
 - 個性：曲を通して繰り返すくせ（しゃくり・フォール・ビブラート）はほめる側に回す
 - 崩れ：ばらばらに揺れた伸ばす音と、外れて聞こえたかもしれない音だけを、提案の候補にする
-数値は手がかりで、点数にはしない。言葉にするのは会話サーバー（server/agent/singing.py）。
+ときめき度（tokimeki）は、正しさの点数ではなく、シエルの主観の点数。言葉にするのは会話サーバー（server/agent/singing.py）。
 """
 from dataclasses import dataclass
 
@@ -341,4 +341,50 @@ def analyze(audio: np.ndarray, f0: np.ndarray, periodicity: np.ndarray, aes: lis
             'off': [round(n.start, 1) for n in off_notes(notes, tuning, scale)][:5],
             'off_ratio': round(len(off_notes(notes, tuning, scale)) / len(notes), 2),
         }
+    result['tokimeki'] = tokimeki(result)
     return result
+
+
+# ---- ときめき度（シエルの主観の点数。仮の目盛り：本物の歌を何曲か聴いてから合わせ直す） ----
+TOKIMEKI_BASE = 40        # 聴かせてくれたことへの点。正しさの減点はしない
+TOKIMEKI_PARTS = (('響き', 25), ('ぐっときた瞬間', 15), ('表現', 12), ('伸び', 8))
+CE_LOW, CE_HIGH = 3.0, 7.0   # 心に響いた度（CE）をこの幅で 0〜1 にする。スマホのアカペラは 4〜5 くらい（合成の歌声で 4.2〜4.9）
+
+
+def ce_level(ce: float) -> float:
+    return float(np.clip((ce - CE_LOW) / (CE_HIGH - CE_LOW), 0.0, 1.0))
+
+
+def tokimeki(result: dict) -> dict:
+    """ときめき度（0〜100）と内わけ。いちばん響いた所・ぐっときた瞬間・表現の幅・伸ばす音の安定から足していく"""
+    aes, pitch = result.get('aesthetics'), result.get('pitch')
+    hibiki = ce_level(aes['ce_max']) if aes else 0.0
+    moment = min(1.0, sum(len(m['why']) for m in result.get('moments', [])) / 6)
+    dyn = result.get('dynamics_db') or 0.0
+    expression = (float(np.clip((dyn - 6) / 14, 0, 1)) * 0.5
+                  + 0.25 * bool(result.get('builds') or result.get('changes'))
+                  + 0.125 * min(2, len(pitch['habits']) if pitch else 0))
+    if pitch and pitch['long_notes']:
+        nobi = 1 - len(pitch['wobbles']) / pitch['long_notes']
+    else:
+        nobi = 0.5
+    values = (hibiki, moment, expression, nobi)
+    parts = [{'name': name, 'value': round(v * top), 'max': top} for (name, top), v in zip(TOKIMEKI_PARTS, values)]
+    return {'score': TOKIMEKI_BASE + sum(p['value'] for p in parts), 'parts': parts}
+
+
+def live(audio: np.ndarray, f0: np.ndarray, periodicity: np.ndarray, sr: int = SR) -> dict:
+    """歌っている途中の 10 秒の手がかり（心に響いた度・帯域の音量・MERT の特徴は server.py が足す）"""
+    db = frame_db(audio, sr)
+    on = voiced(db) & (db > -50)
+    band = band_db(audio, sr)
+    cents = to_cents(np.where(periodicity >= PERIODICITY, f0, 0.0))
+    notes = [describe_note(cents, a, b) for a, b in split_notes(cents)]
+    return {
+        'voiced': round(float(on.mean()), 2) if len(on) else 0.0,
+        'band_db': round(float(band[on].mean()), 1) if on.any() else None,
+        'notes': len(notes),
+        'scoops': sum(n.scoop for n in notes),
+        'vibratos': sum(n.vibrato is not None for n in notes),
+        'wobbles': sum(n.wobble for n in notes),
+    }

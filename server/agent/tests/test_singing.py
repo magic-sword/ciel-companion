@@ -93,7 +93,11 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(analysis.changes(emb, spans), [spans[3][0]])
 
 
-RESULT = {'duration': 95.0, 'sung_seconds': 80.0, 'offset': 0.4,
+LIVE = {'voiced': 0.8, 'band_db': -10.0, 'notes': 10, 'scoops': 0, 'vibratos': 0, 'wobbles': 0, 'ce': 4.5,
+        'embedding': [1.0, 0.0]}
+
+RESULT = {'tokimeki': {'score': 81, 'parts': [{'name': '響き', 'value': 20, 'max': 25}]},
+          'duration': 95.0, 'sung_seconds': 80.0, 'offset': 0.4,
           'aesthetics': {'ce_mean': 4.8, 'ce_max': 6.1, 'ce_min': 3.9, 'pq_mean': 7.0,
                          'windows': [{'start': 0.0, 'end': 10.0, 'ce': 3.9}, {'start': 60.0, 'end': 70.0, 'ce': 6.1}]},
           'moments': [{'start': 60.0, 'end': 70.0, 'ce': 6.1, 'why': ['響いた', '盛り上がり']}],
@@ -103,6 +107,41 @@ RESULT = {'duration': 95.0, 'sung_seconds': 80.0, 'offset': 0.4,
                     'vibrato': {'count': 4, 'rate_hz': 5.8, 'depth_cents': 30}, 'scoop_ratio': 0.42,
                     'fall_ratio': 0.05, 'habits': ['しゃくり', 'ビブラート'], 'wobbles': [72.4], 'off': [],
                     'off_ratio': 0.0}}
+
+
+class LiveTests(unittest.TestCase):
+    def test_cues_for_rise_and_change_and_comment_gap(self):
+        cues = singing.LiveCues()
+        base = {'band_db': -10.0, 'scoops': 0, 'vibratos': 0}
+        self.assertIsNone(cues.update({'voiced': 0.1}, 5))   # 声がほとんど無い所
+        events = [cues.update({**base, 'ce': 4.2, 'embedding': [1, 0]}, t) for t in (5, 10, 15)]
+        self.assertFalse(any(e['heart'] for e in events))
+        self.assertAlmostEqual(events[0]['meter'], 0.3)
+        e = cues.update({**base, 'ce': 5.0, 'band_db': -5.0, 'embedding': [1, 0]}, 20)
+        self.assertTrue(e['heart'])
+        self.assertIn(e['comment'], singing.COMMENTS['heart'])
+        self.assertEqual(e['expression'], 'excited')
+        e = cues.update({**base, 'ce': 4.0, 'vibratos': 1, 'embedding': [0, 1]}, 25)   # 12 秒あかないうちは、ひとことを出さない
+        self.assertTrue(e['heart'])   # 展開の変化
+        self.assertEqual(e['comment'], '')
+        e = cues.update({**base, 'ce': 4.0, 'vibratos': 1, 'embedding': [0, 1]}, 35)
+        self.assertIn(e['comment'], singing.COMMENTS['vibrato'])
+
+    def test_result_card(self):
+        card = singing.result_card(RESULT)
+        self.assertEqual(card['moments'][0]['why'], '響いた・盛り上がり')
+        self.assertEqual(card['habits'], 'しゃくり・ビブラート')
+        self.assertEqual((card['hint_kind'], card['hint_at']), ('wobble', 72.4))
+        self.assertEqual(singing.result_card({'duration': 5})['hint_at'], -1)
+
+    def test_tokimeki_is_subjective_points(self):
+        r = dict(RESULT, tokimeki=None)
+        r['aesthetics'] = dict(RESULT['aesthetics'], ce_max=6.1)
+        t = analysis.tokimeki(r)
+        self.assertEqual([p['name'] for p in t['parts']], ['響き', 'ぐっときた瞬間', '表現', '伸び'])
+        self.assertTrue(analysis.TOKIMEKI_BASE <= t['score'] <= 100)
+        low = analysis.tokimeki({'moments': [], 'dynamics_db': 5})
+        self.assertEqual(low['score'], analysis.TOKIMEKI_BASE + 4)   # 手がかりが無くても、聴かせてくれた点と伸びの半分
 
 
 class FactsTests(unittest.TestCase):
@@ -159,12 +198,15 @@ class FakeResponse:
 
 class FakeHttp:
     def __init__(self, data):
-        self.data, self.bodies, self.urls = data, [], []
+        self.data, self.bodies, self.urls, self.lives = data, [], [], []
 
     def post(self, url, data=None, headers=None, timeout=None):
         self.urls.append(url)
         if url == singing.TTS_RELEASE_URL:
             return FakeResponse({'reserved_after_mib': 3000})
+        if url == singing.LIVE_URL:
+            self.lives.append(len(data))
+            return FakeResponse(LIVE)
         self.bodies.append((data, headers))
         return FakeResponse(self.data)
 
@@ -205,13 +247,38 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
         await self.song._task
         self.assertEqual(self.session.audio, [False, True])
         self.assertEqual(self.tap.listeners, [])
-        self.assertEqual(self.song._http.urls, [singing.TTS_RELEASE_URL, singing.URL])   # 読み上げのメモリーを先に手放す
+        # 読み上げのメモリーを、歌い始め（歌の途中の分析のため）と分析の前に手放す
+        self.assertEqual(self.song._http.urls, [singing.TTS_RELEASE_URL, singing.TTS_RELEASE_URL, singing.URL])
         body, headers = self.song._http.bodies[0]
         self.assertEqual(len(body), 400 * 160 * 2)
         self.assertEqual(headers['X-Sample-Rate'], '16000')
         self.assertTrue(self.session.replies[-1].startswith('感想を言う\n聴き取りの手がかり'))
-        self.assertEqual([e['state'] for e in self.events], ['listening', 'analyzing', 'idle'])
+        self.assertEqual([e['state'] for e in self.events if e['type'] == 'song.state'], ['listening', 'analyzing', 'idle'])
+        card = [e for e in self.events if e['type'] == 'song.result'][0]
+        self.assertEqual(card['score'], 81)
+        self.assertEqual(card['hint_kind'], 'wobble')
+        self.assertIn('ときめき度', self.session.replies[-1])
         self.assertEqual(self.song._chunks, [])
+
+    async def test_live_cues_are_sent_while_singing(self):
+        old = singing.LIVE_EVERY
+        singing.LIVE_EVERY = 0.2
+        try:
+            self.song.start()
+            await self.ready()
+            await self.feed(4.0)
+            for _ in range(20):
+                await asyncio.sleep(0.05)
+                if any(e['type'] == 'song.live' for e in self.events):
+                    break
+            self.assertTrue(self.song._http.lives)
+            self.assertLessEqual(self.song._http.lives[0], int(singing.LIVE_WINDOW * 16000) * 2 + 320)
+            live = [e for e in self.events if e['type'] == 'song.live']
+            self.assertEqual(live[0]['meter'], 0.375)
+            self.assertEqual(self.session.replies, [singing.LINES[singing.STARTED]])   # 歌の途中は話さない
+            self.song.cancel()
+        finally:
+            singing.LIVE_EVERY = old
 
     async def test_short_song_is_not_sent(self):
         self.song.start()

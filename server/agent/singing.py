@@ -6,6 +6,11 @@
 歌い終わり（アプリの札のタップ、SILENCE_END 秒の静けさ、MAX_SECONDS）で、歌を聴くサービス（server/singing、
 同じマシンの HTTP）に渡し、返ってきた手がかりを文字にして、シエルに感想を言わせる（config/prompts/singing_feedback.md）。
 会話モデルへ渡すのは手がかりの文字だけ。歌声は感想を頼んだら捨てる（ファイル・ログ・DB に残さない）。
+
+歌っているあいだも LIVE_EVERY 秒ごとに、直近 LIVE_WINDOW 秒を歌を聴くサービスの /live に渡し、アプリへ song.live
+（ときめきメーター・♡・吹き出しのひとこと）と、シエルの表情を送る（LiveCues）。歌っている人の邪魔をしないよう、声は出さない。
+ひとことは決まった文から選ぶ（会話モデルを使わない。すぐ出せて、料金もかからない）。
+歌い終わって分析したら、ときめき度（シエルの主観の点数）と内わけを song.result でアプリへ送り、結果のカードを出す。
 """
 import asyncio
 import json
@@ -18,6 +23,7 @@ import numpy as np
 from livekit import rtc
 
 URL = os.environ.get('CIEL_SINGING_URL', 'http://127.0.0.1:8767/analyze')
+LIVE_URL = os.environ.get('CIEL_SINGING_LIVE_URL', 'http://127.0.0.1:8767/live')
 # 分析の前に、読み上げに作業用の GPU のメモリーを手放してもらう（同じ GPU に分析が入らないため。server/tts-irodori の /release）
 TTS_RELEASE_URL = os.environ.get('CIEL_TTS_RELEASE_URL', 'http://127.0.0.1:8766/release')
 TOPIC = 'ciel.song'
@@ -28,6 +34,21 @@ WAIT_START = 30.0         # 「どうぞ」から、これだけ歌が始まら�
 MAX_SECONDS = 600         # 長くてもここまで（分析の側も 10 分まで）
 MIN_SUNG = 3.0            # 歌声がこれより短ければ、聞こえなかったことにする
 ANALYZE_TIMEOUT = 120.0
+LIVE_EVERY = 5.0          # 歌っているあいだ、これだけごとに直近を見る（秒）
+LIVE_WINDOW = 10.0        # 見る長さ（心に響いた度は 10 秒ずつ見るモデル）
+LIVE_TIMEOUT = 15.0       # 最初の 1 回はモデルを載せるので 8 秒ほどかかる
+CE_LOW, CE_HIGH = 3.0, 7.0   # メーターの幅（server/singing/analysis.py の ce_level と同じ）
+BUILD_DB = 3.0            # 前の 2 回より、声の芯の帯域がこれだけ強くなったら「盛り上がり」
+COMMENT_GAP = 12.0        # ひとことは、これより間をあける（秒。歌の邪魔にならないように）
+# 歌っている途中のひとこと（画面の吹き出し。声には出さない）。同じものは続けて出さない
+COMMENTS = {
+    'heart': ['ぐっときた…！', 'いまの、すごく好き！', '胸がきゅっとしたのです'],
+    'build': ['盛り上がってきた！', '気持ちが乗ってきてる！'],
+    'change': ['雰囲気が変わった！', 'ここから空気が変わったのです'],
+    'vibrato': ['きれいなビブラート！', '伸ばす音、ゆらゆら素敵'],
+    'scoop': ['しゃくり、いい感じ！', '言葉に気持ちが乗ってる'],
+}
+EXPRESSIONS = {'heart': 'excited', 'build': 'happy', 'change': 'surprised', 'vibrato': 'relaxed', 'scoop': 'happy'}
 
 IDLE, LISTENING, ANALYZING = 'idle', 'listening', 'analyzing'
 STARTED, ALREADY, BUSY, EMPTY, FAILED, CANCELLED = 'started', 'already', 'busy', 'empty', 'failed', 'cancelled'
@@ -41,10 +62,79 @@ def clock(seconds: float) -> str:
     return f'{seconds // 60}分{seconds % 60:02d}秒'
 
 
+class LiveCues:
+    """歌っている途中の手がかり（/live の結果）から、メーター・♡・ひとこと・表情を決める。1 曲に 1 つ"""
+
+    def __init__(self) -> None:
+        self.ces: list[float] = []
+        self.bands: list[float] = []
+        self.dists: list[float] = []
+        self._emb: np.ndarray | None = None
+        self._comment_at = -1e9
+        self._last: dict[str, str] = {}
+
+    def update(self, data: dict, at: float) -> dict | None:
+        """at は歌い出しからの秒。声がほとんど無い所（息つぎ・間奏）は None"""
+        ce = data.get('ce')
+        if ce is None:
+            return None
+        reasons = []
+        if len(self.ces) >= 2 and ce >= max(self.ces) and ce - float(np.median(self.ces)) >= 0.3:
+            reasons.append('heart')
+        band = data.get('band_db')
+        if band is not None:
+            if len(self.bands) >= 2 and band - float(np.mean(self.bands[-2:])) >= BUILD_DB:
+                reasons.append('build')
+            self.bands.append(band)
+        emb = np.array(data.get('embedding') or [], np.float32)
+        if len(emb):
+            if self._emb is not None:
+                d = 1 - float(emb @ self._emb / (np.linalg.norm(emb) * np.linalg.norm(self._emb) + 1e-9))
+                if len(self.dists) >= 3 and d >= np.mean(self.dists) + np.std(self.dists) and d > 0:
+                    reasons.append('change')
+                self.dists.append(d)
+            self._emb = emb
+        if data.get('vibratos', 0) >= 1:
+            reasons.append('vibrato')
+        if data.get('scoops', 0) >= 2:
+            reasons.append('scoop')
+        self.ces.append(ce)
+        event = {'v': 1, 'type': 'song.live', 'at': round(at, 1),
+                 'meter': round(min(1.0, max(0.0, (ce - CE_LOW) / (CE_HIGH - CE_LOW))), 3),
+                 'heart': any(r in ('heart', 'build', 'change') for r in reasons), 'comment': '', 'expression': ''}
+        if reasons and at - self._comment_at >= COMMENT_GAP:
+            kind = reasons[0]
+            choices = [c for c in COMMENTS[kind] if c != self._last.get(kind)] or COMMENTS[kind]
+            event['comment'] = choices[len(self.ces) % len(choices)]
+            event['expression'] = EXPRESSIONS[kind]
+            self._last[kind] = event['comment']
+            self._comment_at = at
+        return event
+
+
+def result_card(result: dict) -> dict:
+    """歌い終わったときの結果のカード（アプリの song.result）"""
+    pitch = result.get('pitch') or {}
+    hint = None
+    if pitch.get('wobbles'):
+        hint = {'kind': 'wobble', 'at': pitch['wobbles'][0]}
+    elif pitch.get('off'):
+        hint = {'kind': 'off', 'at': pitch['off'][0]}
+    tokimeki = result.get('tokimeki') or {'score': 0, 'parts': []}
+    return {'v': 1, 'type': 'song.result', 'score': tokimeki['score'], 'parts': tokimeki['parts'],
+            'moments': [{'start': m['start'], 'end': m['end'], 'why': '・'.join(m['why'])} for m in result.get('moments', [])],
+            'habits': '・'.join(pitch.get('habits', [])), 'duration': result.get('duration', 0),
+            'hint_kind': hint['kind'] if hint else '', 'hint_at': hint['at'] if hint else -1}
+
+
 def facts(result: dict) -> str:
     """歌を聴くサービスの結果を、シエルに渡す手がかりの文にする（singing_feedback.md の {facts}）"""
     lines = ['聴き取りの手がかり（数値は手がかり。読み上げない。時刻は歌い出しから）：',
              f'- 長さ：{clock(result["duration"])}（声が出ていたのは {clock(result["sung_seconds"])}）']
+    if result.get('tokimeki'):
+        t = result['tokimeki']
+        lines.append(f'- ときめき度（シエルの主観の点数。画面にも出ている）：{t["score"]}点（'
+                     + '、'.join(f'{p["name"]} {p["value"]}/{p["max"]}' for p in t['parts']) + '）')
     aes = result.get('aesthetics')
     if aes:
         windows = aes['windows']
@@ -109,6 +199,8 @@ class SongListener:
         self._ready_at: float | None = None   # 「どうぞ」を言い終えた時刻。これより前の声は使わない（シエルの声が入る）
         self._task: asyncio.Task | None = None
         self._http: aiohttp.ClientSession | None = None
+        self._live: asyncio.Task | None = None
+        self._cues = LiveCues()
 
     @property
     def active(self) -> bool:
@@ -124,6 +216,7 @@ class SongListener:
         self.state = LISTENING
         self._chunks = []
         self._ready_at = None
+        self._cues = LiveCues()
         # ここから会話モデルへ声を送らない（歌声を外へ出さない。歌っているあいだに返事もしない）
         self.session.input.set_audio_enabled(False)
         self.tap.listeners.append(self._on_chunk)
@@ -180,8 +273,12 @@ class SongListener:
             # 「どうぞ」を言い終えてから聴く（言っているあいだの声は、シエルの声が混ざるので使わない）
             await self.session.generate_reply(instructions=LINES[STARTED], tool_choice='none')
             self._ready_at = time.time() + 0.3
+            if self._http is None:
+                self._http = aiohttp.ClientSession()
+            await self._release_tts()   # 歌っているあいだ、分析のモデルを GPU に載せておくため
             heard_at = None
             seen = 0
+            live_at = self._ready_at + LIVE_EVERY
             while self.state == LISTENING:
                 await asyncio.sleep(0.25)
                 now = time.time()
@@ -190,6 +287,9 @@ class SongListener:
                     if len(x) and 20 * np.log10(np.sqrt((x ** 2).mean()) + 1e-9) > VOICE_DB:
                         heard_at = now
                 seen = len(self._chunks)
+                if now >= live_at and (self._live is None or self._live.done()):
+                    live_at = now + LIVE_EVERY
+                    self._live = asyncio.create_task(self._live_step(now - self._ready_at))
                 if heard_at is None and now - self._ready_at > WAIT_START:
                     log.info('歌が始まらなかった')
                     self.finish()
@@ -210,6 +310,35 @@ class SongListener:
                 self._notify()
                 self._say(FAILED)
 
+    async def _live_step(self, at: float) -> None:
+        """直近 LIVE_WINDOW 秒を /live に渡し、アプリへ知らせる。失敗しても歌は聴き続ける"""
+        need, parts = int(LIVE_WINDOW * SR), []
+        for _, pcm in reversed(self._chunks):
+            parts.append(pcm)
+            need -= len(pcm)
+            if need <= 0:
+                break
+        if sum(len(p) for p in parts) < LIVE_EVERY * SR:
+            return
+        audio = np.concatenate(parts[::-1])
+        try:
+            async with self._http.post(LIVE_URL, data=audio.astype('<i2').tobytes(), headers={'X-Sample-Rate': str(SR)},
+                                       timeout=aiohttp.ClientTimeout(total=LIVE_TIMEOUT)) as r:
+                r.raise_for_status()
+                data = await r.json()
+        except Exception as e:
+            log.info('歌の途中の分析ができない error=%s', type(e).__name__)
+            return
+        if self.state != LISTENING:
+            return
+        event = self._cues.update(data, at)
+        if event is None or self.publish is None:
+            return
+        self.publish(event)
+        if event['expression']:
+            self.publish({'v': 1, 'type': 'character.expression', 'expression': event['expression'],
+                          'intensity': 1.0, 'ttl_ms': 3000})
+
     async def _analyze(self) -> None:
         chunks, self._chunks = self._chunks, []
         audio = np.concatenate([c for _, c in chunks]) if chunks else np.zeros(0, np.int16)
@@ -222,6 +351,8 @@ class SongListener:
             started = time.monotonic()
             if self._http is None:
                 self._http = aiohttp.ClientSession()
+            if self._live is not None:
+                await asyncio.wait([self._live], timeout=LIVE_TIMEOUT)   # 歌の途中の分析と重ねない
             await self._release_tts()
             async with self._http.post(URL, data=audio.astype('<i2').tobytes(), headers={'X-Sample-Rate': str(SR)},
                                        timeout=aiohttp.ClientTimeout(total=ANALYZE_TIMEOUT)) as r:
@@ -234,6 +365,8 @@ class SongListener:
                 return
             self.state = IDLE
             self._notify()
+            if self.publish is not None:
+                self.publish(result_card(result))
             self.session.generate_reply(instructions=self.feedback.replace('{facts}', facts(result)), tool_choice='none')
         except Exception as e:
             log.warning('歌を聴くサービスにつなげない error=%s', type(e).__name__)
@@ -263,6 +396,8 @@ class SongListener:
     async def close(self) -> None:
         if self._task is not None:
             self._task.cancel()
+        if self._live is not None:
+            self._live.cancel()
         if self.state == LISTENING:
             self._stop()
         self._chunks = []

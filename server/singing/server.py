@@ -3,11 +3,14 @@
 
 POST /analyze  本文 = PCM（int16、リトルエンディアン、モノラル）、ヘッダー X-Sample-Rate（既定 16000）
   → 200、本文 JSON（analysis.analyze の結果。トリムした頭の秒数 offset も足す）
+POST /live     歌っている途中の、直近 10 秒ほどの PCM（同じ形式）→ 200、本文 JSON（analysis.live に、心に響いた度 ce と
+  MERT の特徴 embedding を足したもの）。声がほとんど無ければ、モデルは使わずに voiced だけを返す
 GET /health    → 200 {"ok": true}
 歌声は受け取ったメモリーの中だけで扱い、ファイルにもログにも残さない。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
 GPU は読み上げ（tts-irodori）と分け合うので、分析は 1 つずつ順に行う。モデルは分析のたびに GPU に載せて、終わったら外す
 （自宅の RTX A2000 12GB は、読み上げが 10.8 GB を取っていて空きが約 1.1 GB だった。2026-10-27）。分析の前に、会話サーバーが
 読み上げに作業用のメモリーを手放してもらう（tts-irodori の /release）。載せるのは約 4 秒（RTX 2060、ディスクのキャッシュから）。
+歌っている途中（/live）は載せたままにし、/analyze を終えたとき、または IDLE_SECONDS 使われなかったときに外す。
 
 使うモデル（版は固定）：
 - Meta Audiobox Aesthetics（facebook/audiobox-aesthetics、CC-BY 4.0）… 区間ごとの「聴いて楽しい・心に響く」（CE）
@@ -48,6 +51,8 @@ MERT_LAYER = 7             # 中ほどの層（曲の構造・音色の両方が
 # （2026-10-27）。本物の歌で差が出たら full にする
 CREPE_MODEL = os.environ.get('SING_CREPE', 'tiny')
 KEEP = os.environ.get('SING_KEEP', '0') == '1'
+IDLE_SECONDS = 30          # /live のあと、これだけ使われなければモデルを外す（歌の途中で会話が切れたときなど）
+LIVE_MIN_VOICED = 0.2      # /live で、声の出ている割合がこれより少なければモデルを使わない
 LOCK = threading.Lock()
 
 
@@ -117,25 +122,66 @@ class Models:
         return result
 
 
+    def live(self, audio: np.ndarray) -> dict:
+        f0, periodicity = self.pitch(audio)
+        result = analysis.live(audio, f0, periodicity)
+        if result['voiced'] < LIVE_MIN_VOICED:
+            return result
+        span = [(0.0, len(audio) / analysis.SR)]
+        result['ce'] = round(self.aesthetics(audio, span)[0]['CE'], 2)
+        result['embedding'] = [round(float(x), 4) for x in self.embeddings(audio, span)[0]]
+        return result
+
+
 MODELS: Models | None = None
+USED_AT = 0.0   # 最後にモデルを使った時刻（LOCK の中で書く）
+
+
+def models() -> Models:
+    global MODELS, USED_AT
+    if MODELS is None:
+        MODELS = Models()
+    USED_AT = time.monotonic()
+    return MODELS
+
+
+def unload() -> None:
+    """モデルを外して GPU のメモリーを返す（LOCK の中で呼ぶ）"""
+    global MODELS
+    if MODELS is None or KEEP:
+        return
+    MODELS = None
+    if hasattr(torchcrepe.infer, 'model'):   # torchcrepe は読み込んだモデルを自分の中に持ったままにする
+        del torchcrepe.infer.model
+    gc.collect()
+    if DEVICE == 'cuda':
+        torch.cuda.empty_cache()
+    log.info('モデルを外した')
 
 
 def analyze(pcm: np.ndarray) -> dict:
-    """モデルを載せて分析し、KEEP でなければ外して GPU のメモリーを返す"""
-    global MODELS
-    models = MODELS or Models()
+    """歌い終わりの分析。終わったら、KEEP でなければモデルを外す"""
     try:
-        return models.analyze(pcm)
+        return models().analyze(pcm)
     finally:
-        if KEEP:
-            MODELS = models
-        else:
-            del models
-            if hasattr(torchcrepe.infer, 'model'):   # torchcrepe は読み込んだモデルを自分の中に持ったままにする
-                del torchcrepe.infer.model
-            gc.collect()
-            if DEVICE == 'cuda':
-                torch.cuda.empty_cache()
+        unload()
+
+
+def live(pcm: np.ndarray) -> dict:
+    db = analysis.frame_db(pcm)
+    on = analysis.voiced(db) & (db > -50)
+    share = round(float(on.mean()), 2) if len(on) else 0.0
+    if share < LIVE_MIN_VOICED:   # 息つぎ・間奏など。モデルを載せない
+        return {'voiced': share}
+    return models().live(pcm)
+
+
+def unload_when_idle() -> None:
+    while True:
+        time.sleep(5)
+        with LOCK:
+            if MODELS is not None and time.monotonic() - USED_AT > IDLE_SECONDS:
+                unload()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -146,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, {'ok': True, 'loaded': MODELS is not None})
 
     def do_POST(self) -> None:
-        if self.path != '/analyze':
+        if self.path not in ('/analyze', '/live'):
             self.send_error(404)
             return
         try:
@@ -156,7 +202,7 @@ class Handler(BaseHTTPRequestHandler):
             if sr != analysis.SR:
                 pcm = torchaudio.functional.resample(torch.from_numpy(pcm), sr, analysis.SR).numpy()
             with LOCK:
-                result = analyze(pcm)
+                result = analyze(pcm) if self.path == '/analyze' else live(pcm)
         except Exception as e:
             log.exception('分析できなかった')
             self._json(500, {'error': type(e).__name__})
@@ -178,5 +224,6 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     if KEEP:
         MODELS = Models()
+    threading.Thread(target=unload_when_idle, daemon=True).start()
     log.info('127.0.0.1:%d で待ち受けます', PORT)
     ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()

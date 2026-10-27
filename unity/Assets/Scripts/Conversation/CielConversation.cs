@@ -96,6 +96,39 @@ namespace Ciel.Conversation
         public string SongState { get; private set; } = "idle";
         /// 歌を聴き始めた時刻（Time.unscaledTime。聴いていなければ -1）
         public float SongSince { get; private set; } = -1f;
+        /// 歌っている途中のときめきメーター（0〜1。会話サーバーの song.live、5 秒ごと）
+        public float SongMeter { get; private set; }
+        /// 最後に ♡（ぐっときた）が届いた時刻・ひとことと、それが届いた時刻（Time.unscaledTime。無ければ -1）
+        public float SongHeartAt { get; private set; } = -1f;
+        public string SongComment { get; private set; } = "";
+        public float SongCommentAt { get; private set; } = -1f;
+        /// 歌い終わったときの結果（会話サーバーの song.result。まだ無ければ null）と、届くたびに増える番号
+        public SongResultJson SongResult { get; private set; }
+        public int SongResultRevision { get; private set; }
+
+        [Serializable]
+        public sealed class SongPart
+        {
+            public string name;
+            public int value, max;
+        }
+
+        [Serializable]
+        public sealed class SongMoment
+        {
+            public float start, end;
+            public string why;
+        }
+
+        [Serializable]
+        public sealed class SongResultJson
+        {
+            public int score;
+            public SongPart[] parts;
+            public SongMoment[] moments;
+            public string habits, hint_kind;
+            public float duration, hint_at;
+        }
         /// 議事録の送り先（この端末の中に持つ。会話サーバーの minutes.py と同じ決まりで確かめる）
         [Serializable]
         public sealed class MinutesDestination
@@ -366,7 +399,13 @@ namespace Ciel.Conversation
         void SetSongState(string state)
         {
             state = string.IsNullOrEmpty(state) ? "idle" : state;
-            if (state == "listening" && SongState != "listening") SongSince = Time.unscaledTime;
+            if (state == "listening" && SongState != "listening")
+            {
+                SongSince = Time.unscaledTime;
+                SongMeter = 0f;
+                SongHeartAt = SongCommentAt = -1f;
+                SongComment = "";
+            }
             else if (state != "listening") SongSince = -1f;
             SongState = state;
         }
@@ -928,6 +967,9 @@ namespace Ciel.Conversation
             public bool updating;
             public string selected;   // minutes.destination
             public string state;   // song.state
+            public float meter, at;   // song.live
+            public bool heart;
+            public string comment;
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -972,6 +1014,25 @@ namespace Ciel.Conversation
             {
                 SetMinutesRecording(e.recording);
                 Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
+                Changed?.Invoke();
+            }
+            else if (e.type == "song.live")
+            {
+                SongMeter = Mathf.Clamp01(e.meter);
+                if (e.heart) SongHeartAt = Time.unscaledTime;
+                if (!string.IsNullOrEmpty(e.comment))
+                {
+                    SongComment = e.comment;
+                    SongCommentAt = Time.unscaledTime;
+                }
+                Changed?.Invoke();
+            }
+            else if (e.type == "song.result")
+            {
+                try { SongResult = JsonUtility.FromJson<SongResultJson>(System.Text.Encoding.UTF8.GetString(data)); }
+                catch (Exception ex) { Debug.LogWarning($"[CielConversation] 歌の結果を読めない: {ex.Message}"); return; }
+                SongResultRevision++;
+                Debug.Log($"[CielConversation] 歌の結果：ときめき度 {SongResult.score}");
                 Changed?.Invoke();
             }
             else if (e.type == "song.state")

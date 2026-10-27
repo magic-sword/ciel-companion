@@ -113,6 +113,7 @@ namespace Ciel.Conversation
             BuildResearch(_safe);
             BuildPeople(_safe);
             BuildSummary(_safe);
+            BuildSong(_safe);
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -332,6 +333,7 @@ namespace Ciel.Conversation
             RefreshResearch();
             RefreshPeople();
             RefreshSummary();
+            RefreshSong();
             if (_micHex == null || _conversation == null) return;
             var c = _conversation;
             var connected = c.Status == CielConversation.State.Connected;
@@ -436,6 +438,7 @@ namespace Ciel.Conversation
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;
             UpdatePeople();
             UpdateSummary();
+            UpdateSong();
 
             if (on)
             {
