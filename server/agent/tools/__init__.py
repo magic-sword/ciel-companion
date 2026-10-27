@@ -22,8 +22,10 @@ class State:
     history: object | None = None   # conversation.Conversation（接続中だけの共通履歴）
     researcher: object | None = None   # web_research.WebResearcher（Web検索）
     initiative: object | None = None   # initiative.Initiative（シエルの内なる考え）
+    song: object | None = None   # singing.SongListener（歌を聴く係）
 
 
-from . import memory, minutes, people, conversation, research, thoughts, clock  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation, research, thoughts, clock, singing  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS, *research.TOOLS, *thoughts.TOOLS, *clock.TOOLS]
+TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS, *research.TOOLS, *thoughts.TOOLS, *clock.TOOLS,
+         *singing.TOOLS]

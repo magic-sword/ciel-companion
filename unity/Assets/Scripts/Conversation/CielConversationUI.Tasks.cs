@@ -1,6 +1,6 @@
 // 会話の画面（CielConversationUI）のうち、裏で進んでいる仕事の札（声の様子のすぐ上に並ぶ）。
 // 会話の番（聞いています・考えています・話しています）はマイクの上の大きな文字にいつも 1 つだけ出し、
-// 会話と並んで進む仕事（Web で調べている・まとめを更新・清書している）は、仕事ごとの札でいつも同じ場所に出す。
+// 会話と並んで進む仕事（Web で調べている・まとめを更新・清書している・歌を聴いている）は、仕事ごとの札でいつも同じ場所に出す。
 // 札をタップすると、その中身（調べたこと・出典のパネル、まとめのパネル）を開く。
 using System;
 using UnityEngine;
@@ -11,9 +11,10 @@ namespace Ciel.Conversation
     partial class CielConversationUI
     {
         static readonly Color ResearchGlass = new Color(0.04f, 0.30f, 0.40f, 0.72f);
+        static readonly Color MintGlass = new Color(0.04f, 0.32f, 0.24f, 0.72f);
 
         RectTransform _tasksRow;
-        (GameObject go, Text label, Image dot) _researchTask, _summaryTask;
+        (GameObject go, Text label, Image dot) _researchTask, _summaryTask, _songTask;
 
         void BuildTasks(RectTransform root)
         {
@@ -32,6 +33,11 @@ namespace Ciel.Conversation
                 OpenResearch(id);
             });
             _summaryTask = TaskChip("Summary", AmberGlass, Amber, () => ShowSummary(true));
+            // 歌を聴いているあいだ：タップで歌い終わり（会話サーバーの singing.py）
+            _songTask = TaskChip("Song", MintGlass, Mint, () =>
+            {
+                if (_conversation.SongState == "listening") _conversation.FinishSong();
+            });
         }
 
         (GameObject, Text, Image) TaskChip(string name, Color fill, Color edge, Action onClick)
@@ -75,9 +81,14 @@ namespace Ciel.Conversation
             var summarizing = connected && c.Summarizing;
             SetTask(_summaryTask, summarizing, !summarizing ? ""
                 : c.Summary.updating ? $"{c.Summary.label}を更新中" : $"{c.Summary.label}を清書しています");
+            var song = connected ? c.SongState : "idle";
+            SetTask(_songTask, song != "idle", song == "listening"
+                ? $"歌を聴いています {(int)(Time.unscaledTime - c.SongSince)}秒・歌い終わったらタップ"
+                : song == "analyzing" ? "歌を味わっています…" : "");
             var pulse = 0.45f + 0.55f * (Mathf.Sin(Time.unscaledTime * Mathf.PI * 2 / 1.4f) + 1) / 2;
             _researchTask.dot.color = WithAlpha(Cyan, pulse);
             _summaryTask.dot.color = WithAlpha(Amber, pulse);
+            _songTask.dot.color = WithAlpha(Mint, pulse);
         }
 
         static void SetTask((GameObject go, Text label, Image dot) task, bool on, string text)

@@ -1,0 +1,11 @@
+# 歌を聴くサービス（server.py）。PyTorch（CUDA 12.4 版）は Dockerfile で先に入れる
+# 版は公開から 2 週間以上たったものに固定する（2026-10-27 時点）。手元の RTX 2060 で、この組み合わせで動くことを確かめた
+audiobox_aesthetics==0.0.4
+torchcrepe==0.0.24
+transformers==4.46.3   # MERT の同梱コード（trust_remote_code）は 5 系で未確認
+nnAudio==0.3.3         # MERT の同梱コードが使う
+numpy==1.26.4
+scipy==1.17.1
+librosa==0.11.0
+huggingface_hub==0.36.2
+safetensors==0.8.0

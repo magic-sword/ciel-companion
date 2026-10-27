@@ -17,6 +17,7 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/decisions/conversation-history-ja.md) |
 | [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/decisions/meeting-minutes-ja.md) |
 | [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/decisions/web-research-ja.md) |
+| [singing_voice.md](config/prompts/singing_voice.md)・[singing_feedback.md](config/prompts/singing_feedback.md) | 歌を聴く道具の使い方と一言、聴き終えたときの感想の言い方（`{facts}` に分析の手がかりが入る）。処理は `singing.py`。[歌を聴く決定記録](../../docs/decisions/singing-ja.md) |
 | [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 

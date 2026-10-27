@@ -4,7 +4,7 @@
 #   docker compose logs -f agent          会話サーバーのログ
 # 秘密情報：agent/.env（OpenAI・LiveKit のキー）と、このフォルダの .env（DB のパスワード CIEL_DB_PASSWORD）。どちらも Git に入れない。
 # 会話サーバー・読み上げ・声質変換はホストのネットワークを使う（Docker の既定のネットワークでは名前解決ができなかった）。
-# 外から入る口は開かない：読み上げ（8766）・声質変換（8765）・DB（5433）は 127.0.0.1 でだけ待ち受ける。
+# 外から入る口は開かない：読み上げ（8766）・歌を聴く（8767）・声質変換（8765）・DB（5433）は 127.0.0.1 でだけ待ち受ける。
 # Docker Compose 2.18 で動かすため、include は使わずにここへまとめて書く。
 name: ciel
 
@@ -41,6 +41,21 @@ services:
     network_mode: host
     volumes:
       - ./tts-irodori/data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # 歌を聴く（server/singing）。歌声から印象の手がかりを出す。読み上げと GPU を分け合う（約 2 GB）
+  singing:
+    build:
+      context: ./singing
+      network: host
+    network_mode: host
     deploy:
       resources:
         reservations:

@@ -48,6 +48,7 @@
 | Irodori-TTS | 返答テキストを音声に変換するローカル HTTP 接続 | `http://127.0.0.1:8766/synthesize` |
 | PostgreSQL | 人物・声の特徴・メモ・関係の永続化 | `127.0.0.1:5433`。`CIEL_DB_URL` は Compose が設定 |
 | Discord Webhook（任意） | 議事録の下書き送信。送り先はアプリの端末ごとに登録して選ぶ（端末に無ければ既定の送り先）。未設定・送信失敗時はサーバー側ファイルへ保存 | アプリの設定画面・`CIEL_MINUTES_DISCORD_WEBHOOK`（既定） |
+| 歌を聴く | 歌声から印象の手がかり（心に響いた度・盛り上がり・くせ）を出すローカル HTTP 接続。歌声は外へ送らない | `http://127.0.0.1:8767/analyze`（`CIEL_SINGING_URL`） |
 | Seed-VC（予備） | OpenAI の音声の声質変換。通常は停止 | `ws://127.0.0.1:8765`、Compose の `vc` profile |
 
 OpenAI・LiveKit のキーはサーバーだけに置く。Hugging Face などからのモデル取得はビルド・モデル準備の経路であり、通常会話の音声通信経路とは別。キーや接続設定の実値は図に記載しない。
@@ -95,6 +96,7 @@ flowchart LR
 | LiveKit Cloud | 外部サービス | アプリと会話サーバーのあいだで、声（音声トラック）とデータのメッセージを中継する |
 | 会話サーバー | `server/agent/`（LiveKit Agents 1.8） | 部屋に入り、利用者の声を OpenAI へ送り、返事の文字から声を作ってアプリへ返す。表情・タッチ・会話のモードを扱う |
 | 読み上げサービス | `server/tts-irodori/` | Irodori-TTS で、文をシエルの声で読み上げる（GPU、16 ステップ） |
+| 歌を聴くサービス | `server/singing/` | Audiobox Aesthetics・MERT・CREPE で、歌声から感想の手がかりを出す（GPU、約 2 GB）。[歌を聴く決定記録](decisions/singing-ja.md) |
 | 声質変換サービス | `server/voice-conversion/` | Seed-VC で OpenAI の声をシエルの声へ変える。今は使っていない（品質を上げる候補） |
 | OpenAI Realtime API | 外部サービス | 声を聞いて返事を考える。既定は `gpt-realtime-2.1-mini`、返事は**文字だけ**作らせる。相手の発言の文字起こし（`gpt-4o-mini-transcribe`、日本語＋「シエル」と覚えている人の名前をヒントに）も同じ接続で作る |
 | OpenAI の文字のモデル | 外部サービス | 会話の裏の作業：その人について覚えておくメモ（`gpt-5.4-mini`）、議事録のまとめ（`gpt-5.4`） |
@@ -130,6 +132,7 @@ flowchart LR
 | `turns.py` | 話し終わりで返事を作らせる。先に話者を判定して「[発言者：…]」を足す（2 人でも多人数でも） |
 | `speakers.py` ＋ `speaker_store.py` | 話者の識別（ECAPA の声の特徴、照合、知らない人A・B）と、覚えている人の記録（DB）。[決定記録](decisions/speaker-identification-ja.md) |
 | `tools/` | 会話モデルが必要なときに呼ぶ道具（function calling）。人についての道具（`people.py`）と、その人のメモの道具（`memory.py`）、議事録を始める・終える道具（`minutes.py`）。[道具の決定記録](decisions/tools-ja.md) |
+| `singing.py` ＋ `tools/singing.py` | 歌を聴く。聴いているあいだは会話モデルへの声を止めてマイクの声をため、歌を聴くサービスの手がかりから感想を言わせる。[歌を聴く決定記録](decisions/singing-ja.md) |
 | `voice_conversion.py` | 声質変換サービスへの接続（`CIEL_VOICE=ciel` のとき） |
 | `conversation.py` ＋ `conversation_recording.py` | 接続中の共通会話履歴。人物メモ・議事録・会話検索が同じ発言を参照する。全文はメモリーに保持し、通常の全文ログ・DB 保存は行わない。[会話履歴](decisions/conversation-history-ja.md) |
 | `web_research.py` ＋ `research.py` ＋ `tools/research.py` | Web 検索、引用出典、接続中の調査記録、アプリへの結果通知。調査本文と実際の会話を分けて保持する。[Web 調査](decisions/web-research-ja.md) |

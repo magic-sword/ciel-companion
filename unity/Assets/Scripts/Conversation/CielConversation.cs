@@ -92,6 +92,10 @@ namespace Ciel.Conversation
         bool _userSpeaking;
         /// 会話サーバーが会議の議事録をとっているか（会話サーバーの知らせ minutes.state で変わる）
         public bool MinutesOn { get; private set; }
+        /// 歌を聴いているか（会話サーバーの知らせ song.state。idle・listening・analyzing）
+        public string SongState { get; private set; } = "idle";
+        /// 歌を聴き始めた時刻（Time.unscaledTime。聴いていなければ -1）
+        public float SongSince { get; private set; } = -1f;
         /// 議事録の送り先（この端末の中に持つ。会話サーバーの minutes.py と同じ決まりで確かめる）
         [Serializable]
         public sealed class MinutesDestination
@@ -359,6 +363,26 @@ namespace Ciel.Conversation
             Changed?.Invoke();
         }
 
+        void SetSongState(string state)
+        {
+            state = string.IsNullOrEmpty(state) ? "idle" : state;
+            if (state == "listening" && SongState != "listening") SongSince = Time.unscaledTime;
+            else if (state != "listening") SongSince = -1f;
+            SongState = state;
+        }
+
+        /// 歌い終わったことを会話サーバーへ知らせる（singing.py。聴くのをやめるときは cancel）
+        public void FinishSong() => SendSong("finish");
+        public void CancelSong() => SendSong("cancel");
+
+        void SendSong(string action)
+        {
+            if (_room == null || Status != State.Connected) return;
+            var json = $"{{\"v\":1,\"type\":\"song.control\",\"action\":{JsonString(action)}}}";
+            try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.song"); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 歌の操作を送れない: {e.Message}"); }
+        }
+
         void SetMinutesRecording(bool recording)
         {
             MinutesOn = recording;
@@ -401,6 +425,7 @@ namespace Ciel.Conversation
             if (room != _room) return;
             _userSpeaking = false;
             SetMinutesRecording(false);
+            SetSongState("idle");
             Changed?.Invoke();
         }
 
@@ -475,6 +500,7 @@ namespace Ciel.Conversation
             ApplySpeaker();
             ApplySpeakerphone();
             SetMinutesRecording(false);   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
+            SetSongState("idle");
             SetStatus(State.Connected);
             if (_restartAfterConnect)
             {
@@ -901,6 +927,7 @@ namespace Ciel.Conversation
             public int pending_turns;
             public bool updating;
             public string selected;   // minutes.destination
+            public string state;   // song.state
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -945,6 +972,12 @@ namespace Ciel.Conversation
             {
                 SetMinutesRecording(e.recording);
                 Debug.Log($"[CielConversation] 議事録：{(e.recording ? "とっている" : "とっていない")}");
+                Changed?.Invoke();
+            }
+            else if (e.type == "song.state")
+            {
+                SetSongState(e.state);
+                Debug.Log($"[CielConversation] 歌：{SongState}");
                 Changed?.Invoke();
             }
             else if (e.type == "speakers.state")
@@ -1272,6 +1305,7 @@ namespace Ciel.Conversation
         public void EndConversation()
         {
             SetMinutesRecording(false);
+            SetSongState("idle");
             DisposeVoice();
             DisposeAizuchi();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);

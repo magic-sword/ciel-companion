@@ -40,6 +40,7 @@ import minutes
 import mode
 import notes
 import relationship
+import singing
 import speaker_store
 import speakers
 import tools
@@ -141,6 +142,8 @@ class Ciel(Agent):
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions,
                   p.inner_thoughts_voice_instructions]
+        if VOICE == 'irodori':
+            parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
             parts.append({'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
                           'public': p.presence_public_instructions}[presence])
@@ -246,6 +249,12 @@ async def entrypoint(ctx: JobContext) -> None:
                                    and book.last_sure and style.presence in ('solo', 'close') else [])
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
+    # 歌を聴く（singing.py）。聴いているあいだは会話モデルへ声を送らず、シエルから話しかけない
+    song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
+    session.userdata.song = song
+    if song is not None:
+        song.publish = lambda msg: asyncio.create_task(send('ciel.event', msg))
+        talker.paused = lambda: song.active
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:
@@ -292,7 +301,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 await asyncio.sleep(0.25)
             session.generate_reply(instructions=agent.persona.enroll_done.replace('{name}', name), tool_choice='none')
         book.on_enrolled = lambda name: asyncio.create_task(enrolled(name))
-        talker.paused = lambda: book.enrolling is not None
+        talker.paused = lambda: book.enrolling is not None or (song is not None and song.active)
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)
@@ -303,6 +312,8 @@ async def entrypoint(ctx: JobContext) -> None:
         debug_log.record('end')
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await researcher.close()
+        if song is not None:
+            await song.close()   # 聴いている途中の歌声は捨てる
         async def memories() -> None:
             if note_taker is not None:
                 await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
@@ -343,6 +354,9 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', toucher.on_data)
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
+    # 歌を聴く（singing.py。アプリの札が「歌い終わった」を送る）
+    if song is not None:
+        ctx.room.on('data_received', song.on_data)
     # 参加者パネル（speakers.py。受け口は session.start の前に作った）
     if book is not None:
         book.notify()

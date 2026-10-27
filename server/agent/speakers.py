@@ -138,6 +138,7 @@ class AudioTap:
     def __init__(self) -> None:
         self._chunks: collections.deque[tuple[float, np.ndarray]] = collections.deque()
         self._task: asyncio.Task | None = None
+        self.listeners: list = []   # 届いた声を順に渡す先（時刻, int16）。歌を聴いているあいだの singing.py
 
     def attach(self, track: rtc.Track) -> None:
         if self._task is not None:
@@ -148,7 +149,10 @@ class AudioTap:
     async def _read(self, stream: rtc.AudioStream) -> None:
         async for ev in stream:
             now = time.time()
-            self._chunks.append((now, np.frombuffer(ev.frame.data, dtype=np.int16).copy()))
+            pcm = np.frombuffer(ev.frame.data, dtype=np.int16).copy()
+            self._chunks.append((now, pcm))
+            for listener in self.listeners:
+                listener(now, pcm)
             while self._chunks and now - self._chunks[0][0] > BUFFER_SECONDS:
                 self._chunks.popleft()
 
