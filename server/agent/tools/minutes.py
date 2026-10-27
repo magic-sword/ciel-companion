@@ -8,6 +8,8 @@ import json
 import logging
 import minutes as service
 
+from . import cut_preamble
+
 NO_MINUTES = '今は議事録をとれません。'
 log = logging.getLogger('ciel-agent.minutes-tools')
 
@@ -30,6 +32,7 @@ async def start_minutes(context: RunContext, lookback_minutes: int = 0, template
     status = minutes.start(lookback_minutes, template)
     if status in (service.INVALID_RANGE, service.UNKNOWN_TEMPLATE):
         return json.dumps({'status': status})
+    cut_preamble(context)   # 「とり始めますね」を前置きのあとまで待たせない
     return ToolResult(json.dumps(result(minutes, 'start', status)), reply_required=False)
 
 
@@ -40,6 +43,7 @@ async def finish_minutes(context: RunContext):
     if minutes is None:
         return NO_MINUTES
     status = minutes.finish()
+    cut_preamble(context)
     return ToolResult(json.dumps(result(minutes, 'finish', status)), reply_required=False)
 
 
@@ -75,6 +79,7 @@ async def summarize_past_minutes(context: RunContext, last_minutes: int = 0, fir
     status = minutes.summarize_past(last_minutes, first_id, last_id, template)
     data = {**result(minutes, 'summarize_past', status), 'dropped_through': minutes.history.dropped_through}
     if status in (service.PAST_QUEUED, service.PAST_PARTIAL):
+        cut_preamble(context)
         return ToolResult(json.dumps(data), reply_required=False)
     return json.dumps(data)
 

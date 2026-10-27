@@ -156,12 +156,35 @@ def frames(pcm: bytes, sr: int):
         yield rtc.AudioFrame(chunk.tobytes(), sr, 1, len(chunk))
 
 
-async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None):
+class PreambleCut:
+    """道具を呼んだ返事の前置きを、読み上げている 1 文のあとで止める（tools/singing.py・tools/minutes.py が頼む）。
+    歌を聴く・議事録をとる道具は、すぐ戻って、あとから短い一言（「どうぞ」「議事録、とり始めますね」）を言わせる。
+    会話モデルが同じ返事で前置きを何文も話すと、その一言が前置きを読み終えるまで待たされた（2026-10-27、「どうぞ」まで 22 秒）。
+    LiveKit は道具を読み上げと並べて動かすので、道具が呼ばれた時点では前置きはまだ読み上げの途中にある。
+    読み上げは 1 文ずつ、流し終える少し前に次の文を作るので、次の文を作る前に止める。止めるのは頼んだ返事だけ（返事の ID で見分ける）"""
+
+    def __init__(self) -> None:
+        self._speech_id: str | None = None
+
+    def request(self, speech) -> None:
+        self._speech_id = getattr(speech, 'id', None)
+
+    def stop(self, speech_id: str | None) -> bool:
+        return speech_id is not None and speech_id == self._speech_id
+
+
+async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None, stop=None):
     """1 文ずつ：印を読み取り、その感情の声で読み上げ、声を流し始めるときに表情を送る。
-    すぐ前に相づち（aizuchi.py）を流していたら、最初の文の頭の相づちを外す。"""
+    すぐ前に相づち（aizuchi.py）を流していたら、最初の文の頭の相づちを外す。
+    stop() が True になったら、次の文からは読まない（残りの文字は受け取って捨てる。PreambleCut）"""
     emotion = 'neutral'
     buf = ''
     first = True
+    spoken = 0
+    dropped = 0
+
+    def stopped() -> bool:
+        return stop is not None and stop()
 
     async def speak(sentence: str):
         nonlocal emotion, first
@@ -190,11 +213,20 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
             buf += chunk
             done, buf = split_sentences(buf)
             for s in done:
+                if stopped():
+                    dropped += len(strip_tags(s))
+                    continue
+                spoken += 1
                 async for f in speak(s):
                     yield f
         if strip_tags(buf).strip():
-            async for f in speak(buf):
-                yield f
+            if stopped():
+                dropped += len(strip_tags(buf))
+            else:
+                async for f in speak(buf):
+                    yield f
+        if dropped:
+            log.info('道具を呼んだ返事の前置きを止めた（%d 文を読んだあと、残り %d 字を読まない）', spoken, dropped)
 
 
 async def transcription_node(text: AsyncIterable):

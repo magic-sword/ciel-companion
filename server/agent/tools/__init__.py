@@ -23,6 +23,14 @@ class State:
     researcher: object | None = None   # web_research.WebResearcher（Web検索）
     initiative: object | None = None   # initiative.Initiative（シエルの内なる考え）
     song: object | None = None   # singing.SongListener（歌を聴く係）
+    preamble: object | None = None   # emotion.PreambleCut（道具を呼んだ返事の前置きを止める）
+
+
+def cut_preamble(context) -> None:
+    """道具を呼んだ返事の前置きを、読み上げている 1 文のあとで止める（あとから短い一言を言わせる道具が呼ぶ）"""
+    cut = getattr(context.userdata, 'preamble', None)
+    if cut is not None:
+        cut.request(getattr(context, 'speech_handle', None))
 
 
 from . import memory, minutes, people, conversation, research, thoughts, clock, singing  # noqa: E402  State の後に読む

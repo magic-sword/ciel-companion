@@ -8,6 +8,8 @@ import logging
 
 from livekit.agents import RunContext, ToolResult, function_tool
 
+from . import cut_preamble
+
 log = logging.getLogger('ciel-agent.singing-tools')
 
 
@@ -18,6 +20,7 @@ async def start_listening_to_song(context: RunContext):
     if song is None:
         return json.dumps({'status': 'unavailable'})
     status = song.start()
+    cut_preamble(context)   # 「どうぞ」を前置きのあとまで待たせない
     log.info('歌の道具 status=%s', status)
     return ToolResult(json.dumps({'status': status}), reply_required=False)
 

@@ -129,6 +129,7 @@ class Ciel(Agent):
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
+        self.preamble = emotion.PreambleCut()   # 道具を呼んだ返事の前置きを止める（歌・議事録の道具が頼む）
 
     def instructions_for(self, talk: str, presence: str) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
@@ -160,7 +161,10 @@ class Ciel(Agent):
         # 1 文ずつ、感情の印に合わせた声で読み上げ、Unity へ表情を送る（emotion.py）。
         # ひかえめのときに黙ると決めた返事（[silent]）は読み上げない（mode.py）
         if VOICE == 'irodori':
-            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi))
+            speech = self.session.current_speech
+            speech_id = speech.id if speech is not None else None
+            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi,
+                                                      stop=lambda: self.preamble.stop(speech_id)))
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
 
     def transcription_node(self, text, model_settings):
@@ -195,6 +199,7 @@ async def entrypoint(ctx: JobContext) -> None:
                            tts_text_transforms=['filter_emoji'],
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
+    session.userdata.preamble = agent.preamble
     tap = speakers.AudioTap()
     # 返事ごとのトークン数（usage.py）。指示を短くしたときの比べる基準
     usage_log = usage.UsageLog()
