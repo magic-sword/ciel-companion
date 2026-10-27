@@ -18,6 +18,8 @@ import numpy as np
 from livekit import rtc
 
 URL = os.environ.get('CIEL_SINGING_URL', 'http://127.0.0.1:8767/analyze')
+# 分析の前に、読み上げに作業用の GPU のメモリーを手放してもらう（同じ GPU に分析が入らないため。server/tts-irodori の /release）
+TTS_RELEASE_URL = os.environ.get('CIEL_TTS_RELEASE_URL', 'http://127.0.0.1:8766/release')
 TOPIC = 'ciel.song'
 SR = 16000                # speakers.AudioTap と同じ
 VOICE_DB = -42.0          # これより大きい 10 ms は歌声とみなす（自動で終えるため。分析の側はもっと細かく見る）
@@ -220,6 +222,7 @@ class SongListener:
             started = time.monotonic()
             if self._http is None:
                 self._http = aiohttp.ClientSession()
+            await self._release_tts()
             async with self._http.post(URL, data=audio.astype('<i2').tobytes(), headers={'X-Sample-Rate': str(SR)},
                                        timeout=aiohttp.ClientTimeout(total=ANALYZE_TIMEOUT)) as r:
                 r.raise_for_status()
@@ -241,6 +244,14 @@ class SongListener:
                 self._notify()
             if what is not None:
                 self._say(what)
+
+    async def _release_tts(self) -> None:
+        try:
+            async with self._http.post(TTS_RELEASE_URL, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                r.raise_for_status()
+                log.info('読み上げの GPU のメモリー %s', await r.json())
+        except Exception as e:   # 手放せなくても分析は試す（入らなければ分析が失敗を返す）
+            log.warning('読み上げの GPU のメモリーを手放せない error=%s', type(e).__name__)
 
     def _say(self, what: str) -> None:
         self.session.generate_reply(instructions=LINES[what], tool_choice='none')

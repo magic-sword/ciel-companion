@@ -159,9 +159,12 @@ class FakeResponse:
 
 class FakeHttp:
     def __init__(self, data):
-        self.data, self.bodies = data, []
+        self.data, self.bodies, self.urls = data, [], []
 
-    def post(self, url, data, headers, timeout):
+    def post(self, url, data=None, headers=None, timeout=None):
+        self.urls.append(url)
+        if url == singing.TTS_RELEASE_URL:
+            return FakeResponse({'reserved_after_mib': 3000})
         self.bodies.append((data, headers))
         return FakeResponse(self.data)
 
@@ -202,6 +205,7 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
         await self.song._task
         self.assertEqual(self.session.audio, [False, True])
         self.assertEqual(self.tap.listeners, [])
+        self.assertEqual(self.song._http.urls, [singing.TTS_RELEASE_URL, singing.URL])   # 読み上げのメモリーを先に手放す
         body, headers = self.song._http.bodies[0]
         self.assertEqual(len(body), 400 * 160 * 2)
         self.assertEqual(headers['X-Sample-Rate'], '16000')

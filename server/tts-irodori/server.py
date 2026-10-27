@@ -6,6 +6,9 @@ POST /synthesize  本文 JSON {"text": "...", "caption": "...（省略可）", "
             決めさせると間延びする（「んー、」が 2 秒など）ので、長さを渡す
   省略可：cfg_caption（キャプションの効き。既定 3.0）、cfg_speaker（参照音声の効き。既定 5.0）、seed（揺れを固定する）
   → 200、本文 = PCM（int16、リトルエンディアン、モノラル）、ヘッダー X-Sample-Rate
+POST /release  合成の作業用に取っておいた GPU のメモリーを手放す（モデルは外さない）。歌を聴くサービス（server/singing）が
+  分析の前に呼ぶ。手放さないと、合成のたびに増えた分（10.8 GB のうちモデル以外の大半）で、分析の約 2 GB が入らない（2026-10-27）。
+  次の合成で必要な分だけ取り直す → 200、本文 JSON {"reserved_before_mib", "reserved_after_mib", "allocated_mib"}
 GPU は 1 つなので、合成は 1 つのスレッドで 1 文ずつ順に行う。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
 参照音声（/data/samples/*.wav、シエルのボイスサンプル）は起動時に 1 回だけ読み込んで符号化する（encode_refs）。
 
@@ -98,6 +101,23 @@ def _synthesize(text: str, caption: str | None, seconds: float | None = None, **
     return pcm, r.sample_rate
 
 
+def release() -> dict:
+    """合成と同じスレッドで（合成の途中に手放さないように）、使っていない GPU のメモリーを手放す"""
+    def run():
+        before = torch.cuda.memory_reserved()
+        torch.cuda.empty_cache()
+        return {'reserved_before_mib': before // 2**20, 'reserved_after_mib': torch.cuda.memory_reserved() // 2**20,
+                'allocated_mib': torch.cuda.memory_allocated() // 2**20}
+    request_id = uuid.uuid4().hex
+    future = WORKER.submit('release', request_id, run)
+    try:
+        result, _ = future.result(timeout=30)
+        log.info('GPU のメモリーを手放した %s', result)
+        return result
+    finally:
+        WORKER.cancel('release', request_id)
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         path = urlsplit(self.path)
@@ -110,6 +130,19 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == '/release':
+            try:
+                body = json.dumps(release()).encode('utf-8')
+            except Exception as e:
+                log.warning('GPU のメモリーを手放せない error=%s', type(e).__name__)
+                self.send_error(500)
+                return
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path != '/synthesize':
             self.send_error(404)
             return

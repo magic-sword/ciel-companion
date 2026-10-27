@@ -5,15 +5,19 @@ POST /analyze  本文 = PCM（int16、リトルエンディアン、モノラル
   → 200、本文 JSON（analysis.analyze の結果。トリムした頭の秒数 offset も足す）
 GET /health    → 200 {"ok": true}
 歌声は受け取ったメモリーの中だけで扱い、ファイルにもログにも残さない。127.0.0.1 だけで待ち受ける（同じマシンの会話サーバー用）。
-GPU は読み上げ（tts-irodori）と分け合うので、分析は 1 つずつ順に行う。
+GPU は読み上げ（tts-irodori）と分け合うので、分析は 1 つずつ順に行う。モデルは分析のたびに GPU に載せて、終わったら外す
+（自宅の RTX A2000 12GB は、読み上げが 10.8 GB を取っていて空きが約 1.1 GB だった。2026-10-27）。分析の前に、会話サーバーが
+読み上げに作業用のメモリーを手放してもらう（tts-irodori の /release）。載せるのは約 4 秒（RTX 2060、ディスクのキャッシュから）。
 
 使うモデル（版は固定）：
 - Meta Audiobox Aesthetics（facebook/audiobox-aesthetics、CC-BY 4.0）… 区間ごとの「聴いて楽しい・心に響く」（CE）
 - MERT-v1-95M（m-a-p/MERT-v1-95M、CC-BY-NC 4.0：非商用。公開前に見直す）… 区間ごとの音楽の特徴（展開の変化）
 - torchcrepe（MIT、CREPE tiny）… 音の高さ（アカペラ・ヘッドホンで伴奏を聴く想定。伴奏が混ざるなら RMVPE へ）
 
-環境変数：SING_PORT（既定 8767）、SING_DEVICE（既定 cuda。無ければ cpu）、SING_CREPE（tiny・full）
+環境変数：SING_PORT（既定 8767）、SING_DEVICE（既定 cuda。無ければ cpu）、SING_CREPE（tiny・full）、
+  SING_KEEP（1 でモデルを載せたままにする）
 """
+import gc
 import json
 import logging
 import os
@@ -43,6 +47,7 @@ MERT_LAYER = 7             # 中ほどの層（曲の構造・音色の両方が
 # CREPE の大きさ。4 分の歌で full 24 秒・tiny 8 秒（RTX 2060）。合成の歌声で、両方とも声のある所の 99.8% が 50 セント以内で一致した
 # （2026-10-27）。本物の歌で差が出たら full にする
 CREPE_MODEL = os.environ.get('SING_CREPE', 'tiny')
+KEEP = os.environ.get('SING_KEEP', '0') == '1'
 LOCK = threading.Lock()
 
 
@@ -115,12 +120,30 @@ class Models:
 MODELS: Models | None = None
 
 
+def analyze(pcm: np.ndarray) -> dict:
+    """モデルを載せて分析し、KEEP でなければ外して GPU のメモリーを返す"""
+    global MODELS
+    models = MODELS or Models()
+    try:
+        return models.analyze(pcm)
+    finally:
+        if KEEP:
+            MODELS = models
+        else:
+            del models
+            if hasattr(torchcrepe.infer, 'model'):   # torchcrepe は読み込んだモデルを自分の中に持ったままにする
+                del torchcrepe.infer.model
+            gc.collect()
+            if DEVICE == 'cuda':
+                torch.cuda.empty_cache()
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path != '/health':
             self.send_error(404)
             return
-        self._json(200, {'ok': MODELS is not None})
+        self._json(200, {'ok': True, 'loaded': MODELS is not None})
 
     def do_POST(self) -> None:
         if self.path != '/analyze':
@@ -133,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
             if sr != analysis.SR:
                 pcm = torchaudio.functional.resample(torch.from_numpy(pcm), sr, analysis.SR).numpy()
             with LOCK:
-                result = MODELS.analyze(pcm)
+                result = analyze(pcm)
         except Exception as e:
             log.exception('分析できなかった')
             self._json(500, {'error': type(e).__name__})
@@ -153,6 +176,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    MODELS = Models()
+    if KEEP:
+        MODELS = Models()
     log.info('127.0.0.1:%d で待ち受けます', PORT)
     ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()
