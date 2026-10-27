@@ -255,6 +255,7 @@ async def entrypoint(ctx: JobContext) -> None:
     if song is not None:
         song.publish = lambda msg: asyncio.create_task(send('ciel.event', msg))
         talker.paused = lambda: song.active
+        song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:

@@ -280,6 +280,36 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
         finally:
             singing.LIVE_EVERY = old
 
+    async def test_quiet_until_feedback_is_spoken_then_old_thoughts_dropped(self):
+        # 歌の前の考え（「これから歌ってくれる」）を、歌のあとで話していた（2026-10-27）
+        ended = []
+        self.song.on_end = lambda: ended.append(self.song.active)
+        self.song.start()
+        await self.ready()
+        await self.feed(4.0)
+        speaking = asyncio.get_running_loop().create_future()
+        replies = []
+
+        def reply(instructions, tool_choice=None):
+            replies.append(instructions)
+            return speaking
+        self.session.generate_reply = reply
+        self.song.finish()
+        self.assertEqual(self.session.audio, [False])   # 分析中は、まだ会話モデルへ声を送らない
+        for _ in range(20):
+            await asyncio.sleep(0.01)
+            if replies:
+                break
+        self.assertEqual(self.session.audio, [False, True])   # 感想を話し始めるときに戻す
+        self.assertTrue(replies[0].startswith('感想を言う'))
+        self.assertEqual(self.song.state, singing.IDLE)   # アプリには終わったと見せる
+        self.assertTrue(self.song.active)                 # 感想を話し終えるまで、シエルから話しかけない
+        self.assertEqual(ended, [])
+        speaking.set_result(None)
+        await self.song._task
+        self.assertFalse(self.song.active)
+        self.assertEqual(ended, [False])
+
     async def test_short_song_is_not_sent(self):
         self.song.start()
         await self.ready()
@@ -311,6 +341,7 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.song.start(), singing.ALREADY)
         self.song.on_data(Obj(topic='ciel.song', data=json.dumps({'action': 'cancel'}).encode()))
         self.assertEqual(self.song.state, singing.IDLE)
+        await self.song._task
         self.assertEqual(self.session.audio, [False, True])
         self.assertEqual(self.session.replies[-1], singing.LINES[singing.CANCELLED])
 

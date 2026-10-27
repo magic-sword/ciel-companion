@@ -201,10 +201,13 @@ class SongListener:
         self._http: aiohttp.ClientSession | None = None
         self._live: asyncio.Task | None = None
         self._cues = LiveCues()
+        self._telling = False         # 感想・結果を話している途中（アプリには idle を見せるが、シエルから話しかけない）
+        self.on_end = None            # 歌が終わって感想を話し終えたとき（agent.py が内なる考えの interlude をつなぐ）
 
     @property
     def active(self) -> bool:
-        return self.state != IDLE
+        """歌を聴いている・味わっている・感想を話している途中か。このあいだ内なる考えは話しかけない"""
+        return self.state != IDLE or self._telling
 
     def start(self) -> str:
         if self.state == LISTENING:
@@ -227,7 +230,9 @@ class SongListener:
 
     def finish(self) -> None:
         if self.state == LISTENING:
-            self._stop()
+            # 会話モデルへの声は、感想を話し始めるときに戻す（分析中に「どうだった？」と話すと、会話モデルは「どうぞ」までしか
+            # 知らないまま返事をして、これから歌うと取り違えるため）
+            self._stop(resume=False)
             self.state = ANALYZING
             self._notify()
             self._task = asyncio.create_task(self._analyze())
@@ -236,11 +241,11 @@ class SongListener:
         if self.state == LISTENING:
             if self._task is not None:
                 self._task.cancel()
-            self._stop()
+            self._stop(resume=False)   # 声は、やめたことを伝えるとき（_tell）に戻す
             self._chunks = []
             self.state = IDLE
             self._notify()
-            self._say(CANCELLED)
+            self._task = asyncio.create_task(self._tell(LINES[CANCELLED]))
 
     def on_data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != TOPIC:
@@ -263,15 +268,19 @@ class SongListener:
         if self.state == LISTENING and self._ready_at is not None and t >= self._ready_at:
             self._chunks.append((t, pcm))
 
-    def _stop(self) -> None:
+    def _stop(self, resume: bool = True) -> None:
         if self._on_chunk in self.tap.listeners:
             self.tap.listeners.remove(self._on_chunk)
-        self.session.input.set_audio_enabled(True)
+        if resume:
+            self.session.input.set_audio_enabled(True)
 
     async def _listen(self) -> None:
         try:
             # 「どうぞ」を言い終えてから聴く（言っているあいだの声は、シエルの声が混ざるので使わない）
+            asked = time.monotonic()
             await self.session.generate_reply(instructions=LINES[STARTED], tool_choice='none')
+            # 道具を呼んだ返事のあとに並ぶので遅れることがある（2026-10-27 に 22 秒。そのあいだに歌い始めると、途中で「どうぞ」と言う）
+            log.info('「どうぞ」を言い終えた（頼んでから %.1f 秒）', time.monotonic() - asked)
             self._ready_at = time.time() + 0.3
             if self._http is None:
                 self._http = aiohttp.ClientSession()
@@ -304,11 +313,11 @@ class SongListener:
         except Exception:
             log.exception('歌を聴いている途中で失敗')
             if self.state == LISTENING:
-                self._stop()
+                self._stop(resume=False)
                 self._chunks = []
                 self.state = IDLE
                 self._notify()
-                self._say(FAILED)
+                await self._tell(LINES[FAILED])
 
     async def _live_step(self, at: float) -> None:
         """直近 LIVE_WINDOW 秒を /live に渡し、アプリへ知らせる。失敗しても歌は聴き続ける"""
@@ -367,7 +376,7 @@ class SongListener:
             self._notify()
             if self.publish is not None:
                 self.publish(result_card(result))
-            self.session.generate_reply(instructions=self.feedback.replace('{facts}', facts(result)), tool_choice='none')
+            await self._tell(self.feedback.replace('{facts}', facts(result)))
         except Exception as e:
             log.warning('歌を聴くサービスにつなげない error=%s', type(e).__name__)
             what = FAILED
@@ -376,7 +385,20 @@ class SongListener:
                 self.state = IDLE
                 self._notify()
             if what is not None:
-                self._say(what)
+                await self._tell(LINES[what])
+
+    async def _tell(self, instructions: str) -> None:
+        """歌のあとのひとこと・感想を話し終えるまで待ち、歌の前の考えを捨てさせる"""
+        self._telling = True
+        self.session.input.set_audio_enabled(True)
+        try:
+            await self.session.generate_reply(instructions=instructions, tool_choice='none')
+        except Exception:
+            log.exception('歌のあとのひとことを話せない')
+        finally:
+            self._telling = False
+            if self.on_end is not None:
+                self.on_end()
 
     async def _release_tts(self) -> None:
         try:
@@ -398,7 +420,7 @@ class SongListener:
             self._task.cancel()
         if self._live is not None:
             self._live.cancel()
-        if self.state == LISTENING:
+        if self.state != IDLE:
             self._stop()
         self._chunks = []
         if self._http is not None:

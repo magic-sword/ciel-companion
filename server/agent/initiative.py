@@ -156,6 +156,17 @@ class Initiative:
         elif ev.new_state == 'speaking':
             self._agent_done_at = None
 
+    def interlude(self) -> None:
+        """長い間（歌を聴いていた）のあと。それまでの考えは古い（歌う前の「これから歌ってくれる」など）ので捨て、
+        静けさを今から数え直す。歌っているあいだは会話モデルに声が届かず、ずっと静かだったことになっていて、
+        歌い終わった瞬間に、歌う前の考えを話しかけていた（2026-10-27、「これから歌い始める」と取り違えた）"""
+        self.thoughts = []   # 知りたいこと（unknowns）は歌と関係がないので残す
+        self.unanswered = 0
+        self._last = time.monotonic()
+        self._spoke_at = None
+        self._agent_done_at = None
+        self._new_at = None
+
     def busy(self) -> bool:
         """だれかが話しているか、シエルが返事を考えている・話している最中か（議事録の送った結果を伝える切れ目を見る）"""
         return self._user_busy or self._agent_busy

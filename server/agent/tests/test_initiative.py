@@ -180,6 +180,22 @@ class DecisionTests(unittest.TestCase):
         i.apply('not a dict', 2.0)
 
 
+class InterludeTests(unittest.TestCase):
+    def test_song_drops_thoughts_from_before_and_restarts_silence(self):
+        # 歌っているあいだは声が届かず、ずっと静かだった扱い。歌い終わった瞬間に、歌う前の考えを話していた（2026-10-27）
+        i = make()
+        start = time.monotonic()
+        i._last = start - 120
+        i.thoughts = [Thought('これから歌ってくれるの楽しみ', 'comment', 5.0, created=start - 125)]
+        i.unknowns = ['好きな歌手']
+        self.assertIsNotNone(i.pick(start))   # 直さないと、静けさ 120 秒で話しかける
+        i.interlude()
+        self.assertEqual(i.thoughts, [])
+        self.assertEqual(i.unknowns, ['好きな歌手'])
+        i.thoughts = [Thought('新しい考え', 'comment', 5.0, created=time.monotonic())]
+        self.assertIsNone(i.pick(time.monotonic() + 1))   # 静けさは今から数え直す
+
+
 class ThinkTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_turns_trigger_thinking_after_settle(self):
         h = Conversation()
