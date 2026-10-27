@@ -157,7 +157,7 @@ bash scripts/server/deploy-server.sh <ユーザー>@<サーバーのアドレス
 
 このコマンドは手元の `server/` 一式を `~/work/ciel-companion/server` へ送り、サーバーで `docker compose up -d --build` を実行する。コミット前の変更も送られるので、配布したい内容を確認してから実行する。
 
-- 通常起動するもの：会話サーバー（`agent`）、読み上げ（`tts`）、DB（`db`）。声質変換（`vc`）は任意。
+- 通常起動するもの：会話サーバー（`agent`）、読み上げ（`tts`）、歌を聴く（`singing`）、DB（`db`）。声質変換（`vc`）は任意。
 - `.env` と `data/` は送信・上書きしない。DB のデータは Docker ボリュームに保持する。サーバーの `server/.env` が無い場合は DB のパスワードを自動生成する。
 - 転送は既存ファイルへの上書きで、手元で削除したファイルをサーバーから消す処理はない。
 - 最後に `DEPLOY_SERVER_DONE` が出たら、続けて下の手順で起動状態を確認する。
