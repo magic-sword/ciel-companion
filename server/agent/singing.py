@@ -37,18 +37,27 @@ ANALYZE_TIMEOUT = 120.0
 LIVE_EVERY = 5.0          # 歌っているあいだ、これだけごとに直近を見る（秒）
 LIVE_WINDOW = 10.0        # 見る長さ（心に響いた度は 10 秒ずつ見るモデル）
 LIVE_TIMEOUT = 15.0       # 最初の 1 回はモデルを載せるので 8 秒ほどかかる
-CE_LOW, CE_HIGH = 3.0, 7.0   # メーターの幅（server/singing/analysis.py の ce_level と同じ）
+CE_LOW, CE_HIGH = 3.0, 7.0   # 心に響いた度を 0〜1 にする幅（server/singing/analysis.py の ce_level と同じ）
 BUILD_DB = 3.0            # 前の 2 回より、声の芯の帯域がこれだけ強くなったら「盛り上がり」
+CHANGE_MIN = 0.001        # 展開の変化と数える、特徴の違いの下限（server/singing/analysis.py と同じ）
+# ときめきメーター：5 秒ごとに加点して、1 まで溜まったら ♡ を出し、0 から溜め直す（溜まらない分は持ち越さない）。
+# 心に響いた度をそのまま出すと、スマホのアカペラ（4〜5）では 3 割前後で上下するだけで満タンにならず、♡ が見られなかった（利用者）。
+# 加点 = METER_BASE ＋ METER_CE × 心に響いた度（0〜1）＋ 理由ごとのおまけ。
+# 合成の歌声もどき（心に響いた度 3.9〜4.9、くせあり）で約 20 秒ごとに ♡。盛り上がり・展開の変化があれば早まる。
+# くせのおまけを 0.08 にすると 15 秒ごとで、多すぎて特別感が薄れた（2026-10-29。仮。本物の歌で合わせ直す）
+METER_BASE = 0.06
+METER_CE = 0.35
+METER_BONUS = {'peak': 0.25, 'build': 0.25, 'change': 0.2, 'vibrato': 0.05, 'scoop': 0.05}
 COMMENT_GAP = 12.0        # ひとことは、これより間をあける（秒。歌の邪魔にならないように）
 # 歌っている途中のひとこと（画面の吹き出し。声には出さない）。同じものは続けて出さない
 COMMENTS = {
-    'heart': ['ぐっときた…！', 'いまの、すごく好き！', '胸がきゅっとしたのです'],
+    'peak': ['ぐっときた…！', 'いまの、すごく好き！', '胸がきゅっとしたのです'],
     'build': ['盛り上がってきた！', '気持ちが乗ってきてる！'],
     'change': ['雰囲気が変わった！', 'ここから空気が変わったのです'],
     'vibrato': ['きれいなビブラート！', '伸ばす音、ゆらゆら素敵'],
     'scoop': ['しゃくり、いい感じ！', '言葉に気持ちが乗ってる'],
 }
-EXPRESSIONS = {'heart': 'excited', 'build': 'happy', 'change': 'surprised', 'vibrato': 'relaxed', 'scoop': 'happy'}
+EXPRESSIONS = {'peak': 'excited', 'build': 'happy', 'change': 'surprised', 'vibrato': 'relaxed', 'scoop': 'happy'}
 
 IDLE, LISTENING, ANALYZING = 'idle', 'listening', 'analyzing'
 STARTED, ALREADY, BUSY, EMPTY, FAILED, CANCELLED = 'started', 'already', 'busy', 'empty', 'failed', 'cancelled'
@@ -63,9 +72,11 @@ def clock(seconds: float) -> str:
 
 
 class LiveCues:
-    """歌っている途中の手がかり（/live の結果）から、メーター・♡・ひとこと・表情を決める。1 曲に 1 つ"""
+    """歌っている途中の手がかり（/live の結果）から、ときめきメーター・♡・ひとこと・表情を決める。1 曲に 1 つ"""
 
     def __init__(self) -> None:
+        self.meter = 0.0          # 溜まっているときめき（0〜1）
+        self.hearts = 0           # この歌で出した ♡ の数
         self.ces: list[float] = []
         self.bands: list[float] = []
         self.dists: list[float] = []
@@ -79,8 +90,8 @@ class LiveCues:
         if ce is None:
             return None
         reasons = []
-        if len(self.ces) >= 2 and ce >= max(self.ces) and ce - float(np.median(self.ces)) >= 0.3:
-            reasons.append('heart')
+        if len(self.ces) >= 2 and ce > max(self.ces) and ce - float(np.median(self.ces)) >= 0.3:
+            reasons.append('peak')   # この歌でいちばん響いた
         band = data.get('band_db')
         if band is not None:
             if len(self.bands) >= 2 and band - float(np.mean(self.bands[-2:])) >= BUILD_DB:
@@ -90,7 +101,8 @@ class LiveCues:
         if len(emb):
             if self._emb is not None:
                 d = 1 - float(emb @ self._emb / (np.linalg.norm(emb) * np.linalg.norm(self._emb) + 1e-9))
-                if len(self.dists) >= 3 and d >= np.mean(self.dists) + np.std(self.dists) and d > 0:
+                # 同じ特徴でも計算の誤差で 0 より少し大きくなるので、CHANGE_MIN より小さい違いは変化と数えない
+                if len(self.dists) >= 3 and d >= np.mean(self.dists) + np.std(self.dists) and d > CHANGE_MIN:
                     reasons.append('change')
                 self.dists.append(d)
             self._emb = emb
@@ -99,17 +111,29 @@ class LiveCues:
         if data.get('scoops', 0) >= 2:
             reasons.append('scoop')
         self.ces.append(ce)
-        event = {'v': 1, 'type': 'song.live', 'at': round(at, 1),
-                 'meter': round(min(1.0, max(0.0, (ce - CE_LOW) / (CE_HIGH - CE_LOW))), 3),
-                 'heart': any(r in ('heart', 'build', 'change') for r in reasons), 'comment': '', 'expression': ''}
+        level = min(1.0, max(0.0, (ce - CE_LOW) / (CE_HIGH - CE_LOW)))
+        self.meter += METER_BASE + METER_CE * level + sum(METER_BONUS[r] for r in reasons)
+        heart = self.meter >= 1.0
+        if heart:
+            self.hearts += 1
+            self.meter = 0.0
+        event = {'v': 1, 'type': 'song.live', 'at': round(at, 1), 'meter': round(self.meter, 3),
+                 'heart': heart, 'hearts': self.hearts, 'comment': '', 'expression': 'excited' if heart else ''}
         if reasons and at - self._comment_at >= COMMENT_GAP:
             kind = reasons[0]
             choices = [c for c in COMMENTS[kind] if c != self._last.get(kind)] or COMMENTS[kind]
             event['comment'] = choices[len(self.ces) % len(choices)]
-            event['expression'] = EXPRESSIONS[kind]
+            event['expression'] = event['expression'] or EXPRESSIONS[kind]
             self._last[kind] = event['comment']
             self._comment_at = at
         return event
+
+    def summary(self) -> str:
+        """歌い終わったときのログ（目盛りを合わせ直すため。数値だけ）"""
+        if not self.ces:
+            return 'ときめきメーター：声の手がかりなし'
+        return (f'ときめきメーター：♡ {self.hearts} 回（{len(self.ces)} 回見た）、心に響いた度 平均 {np.mean(self.ces):.2f}・'
+                f'最大 {max(self.ces):.2f}・最小 {min(self.ces):.2f}')
 
 
 def result_card(result: dict) -> dict:
@@ -349,6 +373,7 @@ class SongListener:
                           'intensity': 1.0, 'ttl_ms': 3000})
 
     async def _analyze(self) -> None:
+        log.info(self._cues.summary())
         chunks, self._chunks = self._chunks, []
         audio = np.concatenate([c for _, c in chunks]) if chunks else np.zeros(0, np.int16)
         del chunks

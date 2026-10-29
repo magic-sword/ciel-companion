@@ -96,8 +96,8 @@
   <!-- 歌っている区間 -->
   <rect x="345" y="540" width="540" height="122" rx="12" fill="#fff3f8" stroke="#f0b6cc"/>
   <text x="615" y="566" text-anchor="middle" class="box-title pink">歌っている途中（5 秒ごとに直近 10 秒）</text>
-  <text x="365" y="594" class="s">・ときめきメーター：心に響いた度で上下</text>
-  <text x="365" y="616" class="s">・♡ とシエルの表情：いちばん響いた・盛り上がり・展開の変化</text>
+  <text x="365" y="594" class="s">・ときめきメーター：心に響いた度で溜まる</text>
+  <text x="365" y="616" class="s">・満タンで ♡ がはずみ、シエルがわくわく → 0 から溜め直す</text>
   <text x="365" y="638" class="s">・吹き出しのひとこと（決まった文。12 秒より間をあける）</text>
   <text x="365" y="656" class="xs">シエルは声を出さない（マイクに入る・歌の邪魔になる）</text>
   <!-- 前 -->

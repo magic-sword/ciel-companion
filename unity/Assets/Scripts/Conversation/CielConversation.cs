@@ -96,9 +96,11 @@ namespace Ciel.Conversation
         public string SongState { get; private set; } = "idle";
         /// 歌を聴き始めた時刻（Time.unscaledTime。聴いていなければ -1）
         public float SongSince { get; private set; } = -1f;
-        /// 歌っている途中のときめきメーター（0〜1。会話サーバーの song.live、5 秒ごと）
+        /// 歌っている途中のときめきメーター（0〜1。会話サーバーの song.live、5 秒ごとに溜まり、満タンで ♡ を出して 0 に戻る）
         public float SongMeter { get; private set; }
-        /// 最後に ♡（ぐっときた）が届いた時刻・ひとことと、それが届いた時刻（Time.unscaledTime。無ければ -1）
+        /// この歌で出た ♡ の数
+        public int SongHearts { get; private set; }
+        /// 最後に ♡（メーターが満タン）が届いた時刻・ひとことと、それが届いた時刻（Time.unscaledTime。無ければ -1）
         public float SongHeartAt { get; private set; } = -1f;
         public string SongComment { get; private set; } = "";
         public float SongCommentAt { get; private set; } = -1f;
@@ -403,6 +405,7 @@ namespace Ciel.Conversation
             {
                 SongSince = Time.unscaledTime;
                 SongMeter = 0f;
+                SongHearts = 0;
                 SongHeartAt = SongCommentAt = -1f;
                 SongComment = "";
             }
@@ -969,6 +972,7 @@ namespace Ciel.Conversation
             public string state;   // song.state
             public float meter, at;   // song.live
             public bool heart;
+            public int hearts;
             public string comment;
         }
 
@@ -1019,6 +1023,7 @@ namespace Ciel.Conversation
             else if (e.type == "song.live")
             {
                 SongMeter = Mathf.Clamp01(e.meter);
+                SongHearts = e.hearts;
                 if (e.heart) SongHeartAt = Time.unscaledTime;
                 if (!string.IsNullOrEmpty(e.comment))
                 {

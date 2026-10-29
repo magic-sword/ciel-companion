@@ -18,6 +18,7 @@ FRAME = 0.05           # 音量の刻み（秒）
 WINDOW, WINDOW_HOP = 10.0, 5.0   # 心に響いたかを見る区間（Audiobox Aesthetics は 10 秒ずつ見る）
 PRESENCE_BAND = (920.0, 4400.0)  # 鳥肌が立った所で音量が上がっていた帯域（Nagel ら 2008）
 BUILD_DB = 3.0         # 前の区間より、これだけ帯域の音量が上がったら「盛り上がり」
+CHANGE_MIN = 0.001     # 展開の変化と数える、特徴の違いの下限（同じ特徴でも計算の誤差で 0 より少し大きくなる）
 NOTE_JUMP = 70.0       # これより音の高さが離れたら、次の音（セント）
 MIN_NOTE = 0.15        # これより短い音は数えない（秒）
 LONG_NOTE = 0.8        # 伸ばす音（秒）
@@ -278,7 +279,7 @@ def changes(embeddings: np.ndarray, spans: list[tuple[float, float]], limit: int
     e = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-9)
     dist = 1 - (e[1:] * e[:-1]).sum(1)
     cut = dist.mean() + dist.std()
-    idx = [i for i in np.argsort(-dist)[:limit] if dist[i] >= cut and dist[i] > 0]
+    idx = [i for i in np.argsort(-dist)[:limit] if dist[i] >= cut and dist[i] > CHANGE_MIN]
     return sorted(spans[i + 1][0] for i in idx)
 
 

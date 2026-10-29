@@ -1,5 +1,5 @@
 // 会話の画面（CielConversationUI）のうち、シエルが歌を聴いているときの表示（会話サーバーの singing.py）。
-// 歌っている途中：ときめきメーター（5 秒ごとの心に響いた度）・♡（ぐっときた・盛り上がり・展開の変化）・吹き出しのひとこと。
+// 歌っている途中：ときめきメーター（5 秒ごとに溜まり、満タンで ♡ がはずんで 0 に戻る）・♡ の数・吹き出しのひとこと。
 //   シエルは歌の邪魔をしないよう声を出さないので、ここに文字で出す。札（CielConversationUI.Tasks.cs）のすぐ上。
 // 歌い終わって分析したら：結果のカード（ときめき度と内わけ・ぐっときた所・あなたらしさ・もう一歩）。ときめき度はシエルの主観の点数。
 using UnityEngine;
@@ -12,11 +12,14 @@ namespace Ciel.Conversation
         static readonly Color SongPink = Hex(0xFF8FC0);
         const float MeterWidth = 168f;
         const float CommentSeconds = 4f;     // 吹き出しを出しておく秒数（最後の 1 秒で消えていく）
-        const float HeartSeconds = 1.2f;     // ♡ がはずむ秒数
+        const float FillSeconds = 0.35f;     // ♡ の前に、メーターを満タンまで伸ばす秒数
+        const float HeartSeconds = 1.4f;     // ♡ がはずむ秒数
 
         GameObject _songLive, _songCard;
         RectTransform _songFill, _songHeart, _songBubble, _songCardRows;
-        Text _songComment, _songScore, _songNotes;
+        Text _songComment, _songScore, _songNotes, _songHeartCount;
+        Image _songFillImage;
+        float _songHeartSeen = -1f;   // メーターを 0 に戻した ♡（SongHeartAt）
         CanvasGroup _songBubbleGroup;
         float _songMeterShown;
         int _songResultShown;
@@ -24,7 +27,7 @@ namespace Ciel.Conversation
         void BuildSong(RectTransform root)
         {
             // 歌っている途中：ときめきメーターと ♡。声の様子の上の札（218）のさらに上
-            var live = Rect("SongLive", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 252), new Vector2(286, 30));
+            var live = Rect("SongLive", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 252), new Vector2(314, 30));
             Pill(live, new Color(0.04f, 0.13f, 0.20f, 0.6f));
             Edge(live, WithAlpha(SongPink, 0.5f));
             _songLive = live.gameObject;
@@ -34,11 +37,13 @@ namespace Ciel.Conversation
             var track = Rect("Track", live, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(72, 0), new Vector2(MeterWidth, 8));
             Pill(track, WithAlpha(TextNote, 0.25f));
             _songFill = Rect("Fill", track, new Vector2(0, 0.5f), new Vector2(0, 0.5f), Vector2.zero, new Vector2(0, 8));
-            Pill(_songFill, SongPink);
+            _songFillImage = Pill(_songFill, SongPink);
             var heart = Txt("Heart", live, 18, SongPink, TextAnchor.MiddleCenter, true);
             heart.text = "♥";
             _songHeart = heart.rectTransform;
-            Place(_songHeart, new Vector2(1, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-22, 1), new Vector2(28, 28));
+            Place(_songHeart, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(262, 1), new Vector2(28, 28));
+            _songHeartCount = Txt("Count", live, 12, TextSub, TextAnchor.MiddleLeft, true);
+            Place(_songHeartCount.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(276, 0), new Vector2(36, 20));
 
             // 吹き出しのひとこと（メーターの上）
             _songBubble = Rect("SongBubble", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 288), new Vector2(240, 30));
@@ -135,11 +140,26 @@ namespace Ciel.Conversation
                 return;
             }
             var t = Time.unscaledTime;
-            _songMeterShown = Mathf.MoveTowards(_songMeterShown, c.SongMeter, Time.unscaledDeltaTime * 0.6f);
-            _songFill.sizeDelta = new Vector2(MeterWidth * _songMeterShown, 8);
+            // 満タンの ♡ が届いたら：メーターを満タンまで伸ばし、♡ を大きくはずませてから、0 に戻して溜め直す
             var since = c.SongHeartAt >= 0 ? t - c.SongHeartAt : 99f;
-            var bounce = since < HeartSeconds ? 1f + 0.45f * Mathf.Sin(since / HeartSeconds * Mathf.PI) : 1f;
+            if (since < FillSeconds)
+                _songMeterShown = Mathf.MoveTowards(_songMeterShown, 1f, Time.unscaledDeltaTime * 4f);
+            else
+            {
+                if (c.SongHeartAt >= 0 && _songHeartSeen != c.SongHeartAt)
+                {
+                    _songHeartSeen = c.SongHeartAt;
+                    _songMeterShown = 0f;
+                }
+                _songMeterShown = Mathf.MoveTowards(_songMeterShown, c.SongMeter, Time.unscaledDeltaTime * 0.6f);
+            }
+            _songFill.sizeDelta = new Vector2(MeterWidth * _songMeterShown, 8);
+            var pop = since - FillSeconds;
+            var bounce = pop >= 0 && pop < HeartSeconds ? 1f + 0.9f * Mathf.Sin(pop / HeartSeconds * Mathf.PI) : 1f;
             _songHeart.localScale = new Vector3(bounce, bounce, 1);
+            _songFillImage.color = Color.Lerp(SongPink, Color.white, since < FillSeconds + 0.3f ? 0.5f : 0f);
+            var count = c.SongHearts > 0 ? $"×{c.SongHearts}" : "";
+            if (_songHeartCount.text != count) _songHeartCount.text = count;
             var age = c.SongCommentAt >= 0 ? t - c.SongCommentAt : 99f;
             var show = age < CommentSeconds && c.SongComment != "";
             if (_songBubble.gameObject.activeSelf != show) _songBubble.gameObject.SetActive(show);

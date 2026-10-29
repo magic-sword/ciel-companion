@@ -110,22 +110,34 @@ RESULT = {'tokimeki': {'score': 81, 'parts': [{'name': '響き', 'value': 20, 'm
 
 
 class LiveTests(unittest.TestCase):
-    def test_cues_for_rise_and_change_and_comment_gap(self):
+    def test_meter_fills_then_heart_and_starts_over(self):
+        # 心に響いた度をそのまま出すと満タンにならず、♡ が見られなかった（2026-10-29）。溜まったら ♡、0 から溜め直す
         cues = singing.LiveCues()
         base = {'band_db': -10.0, 'scoops': 0, 'vibratos': 0}
         self.assertIsNone(cues.update({'voiced': 0.1}, 5))   # 声がほとんど無い所
         events = [cues.update({**base, 'ce': 4.2, 'embedding': [1, 0]}, t) for t in (5, 10, 15)]
+        self.assertEqual([e['meter'] for e in events], [0.165, 0.33, 0.495])   # 0.06 ＋ 0.35 × 0.3
         self.assertFalse(any(e['heart'] for e in events))
-        self.assertAlmostEqual(events[0]['meter'], 0.3)
+        # いちばん響いた・盛り上がりのおまけで満タン → ♡、0 に戻る
         e = cues.update({**base, 'ce': 5.0, 'band_db': -5.0, 'embedding': [1, 0]}, 20)
         self.assertTrue(e['heart'])
-        self.assertIn(e['comment'], singing.COMMENTS['heart'])
+        self.assertEqual((e['meter'], e['hearts']), (0.0, 1))
+        self.assertIn(e['comment'], singing.COMMENTS['peak'])
         self.assertEqual(e['expression'], 'excited')
-        e = cues.update({**base, 'ce': 4.0, 'vibratos': 1, 'embedding': [0, 1]}, 25)   # 12 秒あかないうちは、ひとことを出さない
-        self.assertTrue(e['heart'])   # 展開の変化
-        self.assertEqual(e['comment'], '')
+        # 展開の変化とビブラートのおまけ。12 秒あかないうちは、ひとことを出さない
+        e = cues.update({**base, 'ce': 4.0, 'vibratos': 1, 'embedding': [0, 1]}, 25)
+        self.assertEqual((e['meter'], e['heart'], e['comment'], e['expression']), (0.397, False, '', ''))
         e = cues.update({**base, 'ce': 4.0, 'vibratos': 1, 'embedding': [0, 1]}, 35)
         self.assertIn(e['comment'], singing.COMMENTS['vibrato'])
+        self.assertEqual(e['expression'], 'relaxed')
+
+    def test_same_features_are_not_a_change(self):
+        # 同じ特徴でも計算の誤差で違いが 0 より少し大きくなり、毎回「展開の変化」になっていた
+        cues = singing.LiveCues()
+        meters = [cues.update({'ce': 4.0, 'band_db': -10.0, 'embedding': [0.3, 0.7]}, t)['meter'] for t in range(5, 45, 5)]
+        self.assertEqual(cues.hearts, 1)   # 0.1475 ずつ：7 回目で満タン
+        self.assertLess(meters[-1], 0.2)
+        self.assertIn('♡ 1 回', cues.summary())
 
     def test_result_card(self):
         card = singing.result_card(RESULT)
@@ -274,7 +286,7 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(self.song._http.lives)
             self.assertLessEqual(self.song._http.lives[0], int(singing.LIVE_WINDOW * 16000) * 2 + 320)
             live = [e for e in self.events if e['type'] == 'song.live']
-            self.assertEqual(live[0]['meter'], 0.375)
+            self.assertEqual(live[0]['meter'], 0.191)   # 0.06 ＋ 0.35 × 0.375
             self.assertEqual(self.session.replies, [singing.LINES[singing.STARTED]])   # 歌の途中は話さない
             self.song.cancel()
         finally:
