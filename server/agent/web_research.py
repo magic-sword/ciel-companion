@@ -7,6 +7,7 @@ import time
 
 import openai
 
+import models
 from research import packets, web_url
 
 log = logging.getLogger('ciel-agent.web-research')
@@ -87,6 +88,7 @@ class WebResearcher:
                         tools=[{'type': 'web_search', 'external_web_access': True}],
                         tool_choice='required', reasoning={'effort': 'low'}, max_output_tokens=2200,
                     )
+                models.record('research', self.model, getattr(response, 'usage', None))
                 record.summary, record.sources, record.clipped = parse_response(response)
                 record.status = 'completed'
                 record.checked_at = time.time()

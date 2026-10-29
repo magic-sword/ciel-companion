@@ -37,3 +37,10 @@ cost = "1 回で約 0.1〜0.3 ドル（議事録のライブと清書を含む�
 cost_max_usd = 0.3
 command = "docker exec ciel-dev-agent-dev-1 python bench_stall.py [--rounds 1]"
 covers = ["turns.py", "minutes.py", "summaries/", "agent.py"]
+
+[bench_compare]
+what = "作り直しの前と後の比べ（速さ・料金・依頼の拾い方・会議で黙れたか・自分から話した回数）"
+cost = "全場面 1 回で約 0.3〜0.6 ドル（solo 0.05〜0.1、long_request 0.05〜0.15、meeting 0.1〜0.2、idle 0.1〜0.2）。--only で場面を絞れる"
+cost_max_usd = 0.6
+command = "docker exec ciel-dev-agent-dev-1 python bench_compare.py --label 名前 [--only solo,meeting] > 結果.json"
+covers = ["turns.py", "agent.py", "initiative.py", "minutes.py", "mode.py", "mouth.py", "models.py", "config/prompts/talk_"]

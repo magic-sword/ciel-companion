@@ -21,6 +21,7 @@ import os
 
 import openai
 
+import models
 import speakers
 from conversation import Conversation, Turn
 from jst import JST
@@ -182,6 +183,7 @@ class NoteTaker:
                     model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
                     messages=[{'role': 'system', 'content': self.instructions},
                               {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+                models.record('notes', MODEL, getattr(r, 'usage', None))
                 result = json.loads(r.choices[0].message.content or '{}')
             except Exception as e:   # メモが書けなくても、会話は続ける（頼まれた分は次の機会に回す）
                 log.warning('メモを書けない：%s', type(e).__name__)

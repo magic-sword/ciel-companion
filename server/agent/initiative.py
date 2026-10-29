@@ -43,6 +43,7 @@ import openai
 from livekit.agents import AgentSession
 
 import debug_log
+import models
 from jst import JST
 
 log = logging.getLogger('ciel-agent.initiative')
@@ -466,6 +467,7 @@ class Initiative:
                 model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=THINK_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.instructions},
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+            models.record('thought', MODEL, getattr(r, 'usage', None))
             result = json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 考えられなくても、会話は続ける
             log.warning('内なる考え：考えられない：%s', type(e).__name__)

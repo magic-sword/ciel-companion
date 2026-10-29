@@ -9,6 +9,7 @@ LiveKit は、会話モデルが返事を 1 つ終えるたびに、この会話
 import logging
 
 import debug_log
+import models
 
 log = logging.getLogger('ciel-agent.usage')
 
@@ -32,7 +33,10 @@ class UsageLog:
             if d['input_tokens'] <= 0 and d['output_tokens'] <= 0:
                 continue
             self.replies += 1
-            debug_log.record('usage', model=u.model, **d)
+            # キャッシュの文字・音声の内訳は届かないので、文字から先にキャッシュされたとみなす（料金は目安）
+            usd = models.cost(u.model, d['input_tokens'], d['input_cached_tokens'], d['output_tokens'],
+                              d['input_audio_tokens'], max(0, d['input_cached_tokens'] - d['input_text_tokens']))
+            debug_log.record('usage', model=u.model, usd=round(usd, 6), **d)
             log.info('使用量 返事 入力 %s（キャッシュ %s・%d%%、文字 %s・音声 %s） 出力 %s（文字 %s・考える %s）',
                      f"{d['input_tokens']:,}", f"{d['input_cached_tokens']:,}", percent(d), f"{d['input_text_tokens']:,}",
                      f"{d['input_audio_tokens']:,}", f"{d['output_tokens']:,}", f"{d['output_text_tokens']:,}",

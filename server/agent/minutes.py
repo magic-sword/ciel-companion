@@ -37,6 +37,7 @@ from pathlib import Path
 import openai
 from livekit import rtc
 
+import models
 import speakers
 from conversation import Conversation, Turn
 from jst import JST
@@ -519,6 +520,7 @@ class Minutes:
                 model=live.LIVE_MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=LIVE_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.live_instructions},
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+            models.record('minutes_live', live.LIVE_MODEL, getattr(r, 'usage', None))
             return json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 作れなくても、会話は続ける（次の機会か、終わりの清書に回す）
             log.warning('議事録：ライブの差分を作れない：%s', type(e).__name__)
@@ -596,6 +598,7 @@ class Minutes:
                 model=MODEL, reasoning_effort='medium', response_format={'type': 'json_object'}, timeout=timeout,
                 messages=[{'role': 'system', 'content': self.instructions},
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+            models.record('minutes', MODEL, getattr(r, 'usage', None))
             return json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 要約できなくても、会話は続ける
             log.warning('議事録を要約できない：%s', type(e).__name__)

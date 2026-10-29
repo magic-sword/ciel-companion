@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import openai
 
+import models
 from jst import JST
 from speaker_store import Relationship
 
@@ -115,6 +116,7 @@ class RelationKeeper:
             model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
             messages=[{'role': 'system', 'content': self.instructions},
                       {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+        models.record('relationship', MODEL, getattr(r_, 'usage', None))
         result = json.loads(r_.choices[0].message.content or '{}')
         before = r.stage
         if first:
