@@ -12,7 +12,8 @@
   python bench_compare.py --compare 前.json 後.json      … 2 つの結果を表にする（料金はかからない）
 
 場面：
-  solo         … ひとりとの短い会話（ふつう）。話し終わりからシエルの声までの秒数
+  solo         … ひとりとの短い会話（ふつう）。話し終わりから、返事の声（相づちを除く）までの秒数（first）と、
+                 相づちを含めて何かの声が出るまでの秒数（first_any）
   long_request … 約 25 秒話し続け、その途中で「議事録開始して」と頼む（ふつう）。頼んでから議事録が始まるまでの秒数
   meeting      … 2 人の会議（ひかえめ・会議）。人どうしの話に口をはさんだ回数、名前を呼ばれたときに答えたか、
                  名前を呼ばずに「議事録開始して」と頼んだときに始まったか
@@ -41,6 +42,7 @@ VOICE_A = '落ち着いた低めの声の30代の男性。ふつうの速さで�
 VOICE_B = '明るくはっきりした声の20代の女性。ふつうの速さで、会議で同僚に話す自然な話し方。'
 PAUSE = 0.6        # 1 つの発言の中の息つぎ
 QUIET = 2.5        # シエルがこれだけ静かなら、話し終えたとみなす
+AIZUCHI_TRACK = 'ciel-aizuchi'   # 相づちのトラック（aizuchi.py の TRACK）。返事の速さからは外す
 REPLY_WAIT = 12.0  # 返事を待つ最大の秒数
 
 SCENES = {
@@ -132,7 +134,8 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
             voices.append(([len(np.concatenate([x for p in pcms[:i + 1] for x in (p, gap)])) / SR for i in range(len(pcms))],
                            np.concatenate([x for p in pcms for x in (p, gap)][:-1])))
     room = rtc.Room()
-    heard = Voices()
+    heard = Voices()     # シエルの声（相づちを含む）
+    reply = Voices()     # 返事の声だけ（相づちのトラックを除く）
     events: list[tuple[float, dict]] = []
 
     def on_data(packet) -> None:
@@ -142,7 +145,13 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
             except ValueError:
                 pass
     room.on('data_received', on_data)
-    room.on('track_subscribed', lambda track, pub, p: heard.listen(track) if track.kind == rtc.TrackKind.KIND_AUDIO else None)
+    def on_track(track, pub, participant) -> None:
+        if track.kind != rtc.TrackKind.KIND_AUDIO:
+            return
+        heard.listen(track)
+        if pub.name != AIZUCHI_TRACK:
+            reply.listen(track)
+    room.on('track_subscribed', on_track)
     await room.connect(os.environ['LIVEKIT_URL'], token)
     source = rtc.AudioSource(SR, 1)
     mic = rtc.LocalAudioTrack.create_audio_track('bench-mic', source)
@@ -170,16 +179,18 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
             request_at = t_start + ends[idx] - PAUSE   # 頼む言葉を言い終えた時刻
         t_end = await speaker.say(pcm)
         await settle(t_end)
-        segs = [s for s in heard.segs if s[0] > t_end - 0.1]
+        segs = [s for s in reply.segs if s[0] > t_end - 0.1]
+        any_segs = [s for s in heard.segs if s[0] > t_end - 0.1]
         turns.append({'who': who, 'text': text_of(line), 'spoke': bool(segs),
                       'first': round(segs[0][0] - t_end, 2) if segs else None,
+                      'first_any': round(any_segs[0][0] - t_end, 2) if any_segs else None,
                       'addressed': text_of(line) in scene.get('addressed', [])})
     initiated = []
     if scene.get('silence'):
         t0 = time.time()
         while time.time() - t0 < scene['silence']:
             await asyncio.sleep(0.2)
-        initiated = [round(s[0] - t0, 1) for s in heard.segs if s[0] > t0]
+        initiated = utterances([s for s in reply.segs if s[0] > t0], t0)
     pump.cancel()
     await room.disconnect()
     await lk.room.delete_room(api.DeleteRoomRequest(room=room_name))
@@ -195,11 +206,22 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
         result['answered_addressed'] = all(t['spoke'] for t in turns if t['addressed'])
     if scene.get('silence'):
         result['initiated'] = initiated
-    firsts = [t['first'] for t in turns if t['first'] is not None]
-    if firsts:
-        result['first_median'] = round(float(np.median(firsts)), 2)
-        result['first_max'] = max(firsts)
+    for key in ('first', 'first_any'):
+        values = [t[key] for t in turns if t[key] is not None]
+        if values:
+            result[f'{key}_median'] = round(float(np.median(values)), 2)
+            result[f'{key}_max'] = max(values)
     return result
+
+
+def utterances(segs: list, t0: float) -> list[float]:
+    """声のかたまり（文ごとに切れる）を、QUIET 秒より短い間でつながる 1 つの発話にまとめ、始まりの秒（t0 から）を返す"""
+    starts, last_end = [], None
+    for a, b in segs:
+        if last_end is None or a - last_end > QUIET:
+            starts.append(round(a - t0, 1))
+        last_end = b or a
+    return starts
 
 
 async def read_log(room: str, wait: float = 120.0) -> list[dict]:
@@ -252,7 +274,7 @@ def compare(before_path: str, after_path: str) -> None:
         before = {r['scene']: r for r in json.load(f)['scenes']}
     with open(after_path, encoding='utf-8') as f:
         after = {r['scene']: r for r in json.load(f)['scenes']}
-    keys = ['first_median', 'first_max', 'usd', 'request_caught', 'request_seconds', 'interjected', 'answered_addressed',
+    keys = ['first_median', 'first_max', 'first_any_median', 'usd', 'request_caught', 'request_seconds', 'interjected', 'answered_addressed',
             'initiated']
     print('| 場面 | 項目 | 前 | 後 |\n|---|---|---|---|')
     for scene in SCENES:
