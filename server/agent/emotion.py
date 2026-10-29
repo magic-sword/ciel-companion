@@ -161,22 +161,26 @@ class PreambleCut:
     歌を聴く・議事録をとる道具は、すぐ戻って、あとから短い一言（「どうぞ」「議事録、とり始めますね」）を言わせる。
     会話モデルが同じ返事で前置きを何文も話すと、その一言が前置きを読み終えるまで待たされた（2026-10-27、「どうぞ」まで 22 秒）。
     LiveKit は道具を読み上げと並べて動かすので、道具が呼ばれた時点では前置きはまだ読み上げの途中にある。
-    読み上げは 1 文ずつ、流し終える少し前に次の文を作るので、次の文を作る前に止める。止めるのは頼んだ返事だけ（返事の ID で見分ける）"""
+    読み上げは 1 文ずつ、流し終える少し前に次の文を作るので、次の文を作る前に止める。止めるのは頼んだ返事だけ（返事の ID で見分ける）。
+    短い一言（「どうぞ」）が何文にも伸びたときにも使う（keep 文まで読む。2026-10-29、「どうぞ」が 4 文・14 秒になった）"""
 
     def __init__(self) -> None:
         self._speech_id: str | None = None
+        self._keep = 1
 
-    def request(self, speech) -> None:
+    def request(self, speech, keep: int = 1) -> None:
+        """speech の返事は、keep 文を読んだら（読んでいる途中なら、その文のあとで）止める"""
         self._speech_id = getattr(speech, 'id', None)
+        self._keep = keep
 
-    def stop(self, speech_id: str | None) -> bool:
-        return speech_id is not None and speech_id == self._speech_id
+    def stop(self, speech_id: str | None, spoken: int) -> bool:
+        return speech_id is not None and speech_id == self._speech_id and spoken >= self._keep
 
 
 async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None, stop=None):
     """1 文ずつ：印を読み取り、その感情の声で読み上げ、声を流し始めるときに表情を送る。
     すぐ前に相づち（aizuchi.py）を流していたら、最初の文の頭の相づちを外す。
-    stop() が True になったら、次の文からは読まない（残りの文字は受け取って捨てる。PreambleCut）"""
+    stop(読んだ文の数) が True になったら、次の文からは読まない（残りの文字は受け取って捨てる。PreambleCut）"""
     emotion = 'neutral'
     buf = ''
     first = True
@@ -184,7 +188,7 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
     dropped = 0
 
     def stopped() -> bool:
-        return stop is not None and stop()
+        return stop is not None and stop(spoken)
 
     async def speak(sentence: str):
         nonlocal emotion, first
@@ -226,7 +230,7 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
                 async for f in speak(buf):
                     yield f
         if dropped:
-            log.info('道具を呼んだ返事の前置きを止めた（%d 文を読んだあと、残り %d 字を読まない）', spoken, dropped)
+            log.info('返事を途中で止めた（%d 文を読んだあと、残り %d 字を読まない）', spoken, dropped)
 
 
 async def transcription_node(text: AsyncIterable):

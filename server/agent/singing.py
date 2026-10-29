@@ -61,6 +61,7 @@ EXPRESSIONS = {'peak': 'excited', 'build': 'happy', 'change': 'surprised', 'vibr
 
 IDLE, LISTENING, ANALYZING = 'idle', 'listening', 'analyzing'
 STARTED, ALREADY, BUSY, EMPTY, FAILED, CANCELLED = 'started', 'already', 'busy', 'empty', 'failed', 'cancelled'
+DOUZO_SENTENCES = 2       # 「どうぞ」はここまでの文で止める（会話モデルが 4 文・14 秒に伸ばしたことがある）
 LINES = {STARTED: '[歌：聴く準備ができた]', ALREADY: '[歌：もう聴いている]', BUSY: '[歌：前の歌を味わっている途中]',
          EMPTY: '[歌：歌が聞こえなかった]', FAILED: '[歌：うまく聴き取れなかった]', CANCELLED: '[歌：聴くのをやめた]'}
 log = logging.getLogger('ciel-agent.singing')
@@ -227,6 +228,7 @@ class SongListener:
         self._cues = LiveCues()
         self._telling = False         # 感想・結果を話している途中（アプリには idle を見せるが、シエルから話しかけない）
         self.on_end = None            # 歌が終わって感想を話し終えたとき（agent.py が内なる考えの interlude をつなぐ）
+        self.preamble = None          # emotion.PreambleCut（「どうぞ」を DOUZO_SENTENCES 文までにする。agent.py がつなぐ）
 
     @property
     def active(self) -> bool:
@@ -269,7 +271,7 @@ class SongListener:
             self._chunks = []
             self.state = IDLE
             self._notify()
-            self._task = asyncio.create_task(self._tell(LINES[CANCELLED]))
+            self._task = asyncio.create_task(self._tell(LINES[CANCELLED], note=LINES[CANCELLED]))
 
     def on_data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != TOPIC:
@@ -302,7 +304,10 @@ class SongListener:
         try:
             # 「どうぞ」を言い終えてから聴く（言っているあいだの声は、シエルの声が混ざるので使わない）
             asked = time.monotonic()
-            await self.session.generate_reply(instructions=LINES[STARTED], tool_choice='none')
+            speech = self.session.generate_reply(instructions=LINES[STARTED], tool_choice='none')
+            if self.preamble is not None:
+                self.preamble.request(speech, keep=DOUZO_SENTENCES)
+            await speech
             # 道具を呼んだ返事のあとに並ぶので遅れることがある（2026-10-27 に 22 秒。そのあいだに歌い始めると、途中で「どうぞ」と言う）
             log.info('「どうぞ」を言い終えた（頼んでから %.1f 秒）', time.monotonic() - asked)
             self._ready_at = time.time() + 0.3
@@ -341,7 +346,7 @@ class SongListener:
                 self._chunks = []
                 self.state = IDLE
                 self._notify()
-                await self._tell(LINES[FAILED])
+                await self._tell(LINES[FAILED], note=LINES[FAILED])
 
     async def _live_step(self, at: float) -> None:
         """直近 LIVE_WINDOW 秒を /live に渡し、アプリへ知らせる。失敗しても歌は聴き続ける"""
@@ -401,7 +406,10 @@ class SongListener:
             self._notify()
             if self.publish is not None:
                 self.publish(result_card(result))
-            await self._tell(self.feedback.replace('{facts}', facts(result)))
+            cues = facts(result)
+            await self._tell(self.feedback.replace('{facts}', cues),
+                             note=f'[歌：相手が歌い終えた。シエルは最後まで聴いた（{clock(result["duration"])}）。'
+                                  f'結果のカードが画面に出ている]\n{cues}')
         except Exception as e:
             log.warning('歌を聴くサービスにつなげない error=%s', type(e).__name__)
             what = FAILED
@@ -410,12 +418,17 @@ class SongListener:
                 self.state = IDLE
                 self._notify()
             if what is not None:
-                await self._tell(LINES[what])
+                await self._tell(LINES[what], note=LINES[what])
 
-    async def _tell(self, instructions: str) -> None:
-        """歌のあとのひとこと・感想を話し終えるまで待ち、歌の前の考えを捨てさせる"""
+    async def _tell(self, instructions: str, note: str | None = None) -> None:
+        """歌のあとのひとこと・感想を話し終えるまで待ち、歌の前の考えを捨てさせる。
+        note は、先に会話の後ろへ置く出来事（歌い終えた・手がかり）。返事を頼むときの指示（instructions）はその返事のときだけ
+        ふだんの指示の末尾に足され、会話には残らない。会話の最後が「どうぞ」のままだと、会話モデルは歌がこれから始まると
+        受け取り、結果が出たあとに「歌い始めた」ような返事をした（2026-10-29）"""
         self._telling = True
         self.session.input.set_audio_enabled(True)
+        if note is not None:
+            await self._note(note)
         try:
             await self.session.generate_reply(instructions=instructions, tool_choice='none')
         except Exception:
@@ -424,6 +437,27 @@ class SongListener:
             self._telling = False
             if self.on_end is not None:
                 self.on_end()
+
+    async def _note(self, text: str) -> bool:
+        """会話の後ろに、出来事を system の項目として置く（turns.py の _add_context と同じやり方）。置けなければ False"""
+        agent = getattr(self.session, 'current_agent', None)
+        if agent is None:
+            return False
+        try:
+            ctx = agent.chat_ctx.copy()
+            ctx.add_message(role='system', content=text)
+            # 会話モデルの側にだけある項目（まだ手元に届いていない発言）があると、それを消してしまうので置かない
+            remote = getattr(agent, 'realtime_llm_session', None)
+            if remote is not None:
+                local_ids = {item.id for item in ctx.items}
+                if any(item.id not in local_ids for item in remote.chat_ctx.items):
+                    log.info('会話モデルの側の会話が手元にまだ届いていないので、歌の出来事を会話に置かない')
+                    return False
+            await agent.update_chat_ctx(ctx)
+            return True
+        except Exception as e:
+            log.warning('歌の出来事を会話に置けない: %s', type(e).__name__)
+            return False
 
     async def _release_tts(self) -> None:
         try:

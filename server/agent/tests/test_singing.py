@@ -322,6 +322,58 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.song.active)
         self.assertEqual(ended, [False])
 
+    async def test_song_end_is_written_into_the_conversation_first(self):
+        # 会話の最後が「どうぞ」のままだと、結果が出たあとに「歌い始めた」ような返事をした（2026-10-29）
+        order = []
+
+        class Ctx:
+            def __init__(self, items=()):
+                self.items = list(items)
+
+            def copy(self):
+                return Ctx(self.items)
+
+            def add_message(self, role, content):
+                item = Obj(id=f'item{len(self.items)}', role=role, content=content)
+                self.items.append(item)
+                return item
+
+        class Agent:
+            chat_ctx = Ctx()
+            realtime_llm_session = Obj(chat_ctx=Ctx())
+
+            async def update_chat_ctx(self, ctx):
+                order.append(('note', ctx.items[-1].role, ctx.items[-1].content))
+                Agent.chat_ctx = ctx
+
+        self.session.current_agent = Agent()
+        reply = self.session.generate_reply
+
+        def generate(instructions, tool_choice=None):
+            order.append(('reply', instructions[:5]))
+            return reply(instructions, tool_choice)
+        self.session.generate_reply = generate
+        self.song.start()
+        await self.ready()
+        await self.feed(4.0)
+        self.song.finish()
+        await self.song._task
+        note, answer = order[-2], order[-1]
+        self.assertEqual(note[:2], ('note', 'system'))
+        self.assertTrue(note[2].startswith('[歌：相手が歌い終えた。シエルは最後まで聴いた（1分35秒）'))
+        self.assertIn('ときめき度', note[2])
+        self.assertNotIn('話す順番', note[2])   # 感想の言い方の指示は会話に残さない
+        self.assertEqual(answer, ('reply', '感想を言う'))
+
+    async def test_douzo_is_cut_after_two_sentences(self):
+        requested = []
+        self.song.preamble = Obj(request=lambda speech, keep: requested.append(keep))
+        self.song.start()
+        await self.ready()
+        self.assertEqual(requested, [singing.DOUZO_SENTENCES])
+        self.song.cancel()
+        await self.song._task
+
     async def test_short_song_is_not_sent(self):
         self.song.start()
         await self.ready()

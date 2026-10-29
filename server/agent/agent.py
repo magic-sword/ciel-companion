@@ -164,7 +164,7 @@ class Ciel(Agent):
             speech = self.session.current_speech
             speech_id = speech.id if speech is not None else None
             return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi,
-                                                      stop=lambda: self.preamble.stop(speech_id)))
+                                                      stop=lambda spoken: self.preamble.stop(speech_id, spoken)))
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
 
     def transcription_node(self, text, model_settings):
@@ -261,6 +261,7 @@ async def entrypoint(ctx: JobContext) -> None:
         song.publish = lambda msg: asyncio.create_task(send('ciel.event', msg))
         talker.paused = lambda: song.active
         song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
+        song.preamble = agent.preamble   # 「どうぞ」を 2 文までにする
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:

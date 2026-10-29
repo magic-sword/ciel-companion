@@ -29,7 +29,7 @@ class PreambleTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(emotion, 'synthesize', synthesize):
             frames = [f async for f in emotion.tts_node(
                 stream('[happy]いいですね！', 'どんな歌か楽しみです。', '準備ができたら教えてくださいね。'),
-                events, stop=lambda: cut.stop(speech_id))]
+                events, stop=lambda spoken: cut.stop(speech_id, spoken))]
         return said, frames
 
     async def test_stops_after_the_sentence_being_spoken(self):
@@ -48,6 +48,13 @@ class PreambleTests(unittest.IsolatedAsyncioTestCase):
         said, _ = await self.speak(emotion.PreambleCut(), None)
         self.assertEqual(len(said), 3)
 
+    async def test_short_line_keeps_two_sentences(self):
+        # 「どうぞ」が 4 文・14 秒に伸びた（2026-10-29）。頼んだ返事は 2 文まで
+        cut = emotion.PreambleCut()
+        cut.request(Obj(id='speech_3'), keep=2)
+        said, _ = await self.speak(cut, 'speech_3')
+        self.assertEqual(len(said), 2)
+
     def test_tool_context_without_cut(self):
         cut_preamble(Obj(userdata=Obj()))   # 前置きを止める係が無くても失敗しない
 
@@ -56,20 +63,20 @@ class PreambleTests(unittest.IsolatedAsyncioTestCase):
         song = Obj(start=lambda: 'started')
         context = Obj(userdata=Obj(song=song, preamble=cut), speech_handle=Obj(id='speech_7'))
         await start_listening_to_song(context)
-        self.assertTrue(cut.stop('speech_7'))
+        self.assertTrue(cut.stop('speech_7', 1))
 
         cut = emotion.PreambleCut()
         recorder = Obj(start=lambda lookback, template: service.STARTED,
                        status=lambda: {'recording': True, 'meeting_id': 'm1', 'latest_export': None})
         context = Obj(userdata=Obj(minutes=recorder, preamble=cut), speech_handle=Obj(id='speech_8'))
         await start_minutes(context)
-        self.assertTrue(cut.stop('speech_8'))
+        self.assertTrue(cut.stop('speech_8', 1))
 
         cut = emotion.PreambleCut()
         recorder = Obj(start=lambda lookback, template: service.UNKNOWN_TEMPLATE)
         context = Obj(userdata=Obj(minutes=recorder, preamble=cut), speech_handle=Obj(id='speech_9'))
         self.assertEqual(json.loads(await start_minutes(context))['status'], service.UNKNOWN_TEMPLATE)
-        self.assertFalse(cut.stop('speech_9'))   # 会話モデルが返事をし直すときは止めない
+        self.assertFalse(cut.stop('speech_9', 1))   # 会話モデルが返事をし直すときは止めない
 
 
 if __name__ == '__main__':
