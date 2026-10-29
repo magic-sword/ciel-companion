@@ -22,6 +22,8 @@ import aiohttp
 import numpy as np
 from livekit import rtc
 
+import mouth
+
 URL = os.environ.get('CIEL_SINGING_URL', 'http://127.0.0.1:8767/analyze')
 LIVE_URL = os.environ.get('CIEL_SINGING_LIVE_URL', 'http://127.0.0.1:8767/live')
 # 分析の前に、読み上げに作業用の GPU のメモリーを手放してもらう（同じ GPU に分析が入らないため。server/tts-irodori の /release）
@@ -304,7 +306,7 @@ class SongListener:
         try:
             # 「どうぞ」を言い終えてから聴く（言っているあいだの声は、シエルの声が混ざるので使わない）
             asked = time.monotonic()
-            speech = self.session.generate_reply(instructions=LINES[STARTED], tool_choice='none')
+            speech = mouth.of(self.session).say('song', instructions=LINES[STARTED], tool_choice='none')
             if self.preamble is not None:
                 self.preamble.request(speech, keep=DOUZO_SENTENCES)
             await speech
@@ -430,7 +432,7 @@ class SongListener:
         if note is not None:
             await self._note(note)
         try:
-            await self.session.generate_reply(instructions=instructions, tool_choice='none')
+            await mouth.of(self.session).say('song', instructions=instructions, tool_choice='none')
         except Exception:
             log.exception('歌のあとのひとことを話せない')
         finally:
@@ -468,7 +470,7 @@ class SongListener:
             log.warning('読み上げの GPU のメモリーを手放せない error=%s', type(e).__name__)
 
     def _say(self, what: str) -> None:
-        self.session.generate_reply(instructions=LINES[what], tool_choice='none')
+        mouth.of(self.session).say('song', instructions=LINES[what], tool_choice='none')
 
     def _notify(self) -> None:
         if self.publish is not None:

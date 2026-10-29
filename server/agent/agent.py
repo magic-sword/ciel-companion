@@ -38,6 +38,7 @@ import interruptions
 import irodori_tts
 import minutes
 import mode
+import mouth
 import notes
 import relationship
 import singing
@@ -200,6 +201,8 @@ async def entrypoint(ctx: JobContext) -> None:
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     agent = Ciel()
     session.userdata.preamble = agent.preamble
+    # シエルを話させる入り口は 1 つ（mouth.py）。返事・話しかけ・議事録・歌・タッチ・声の登録・あいさつが、ここを通る
+    voice = session.userdata.mouth = mouth.Mouth(session)
     tap = speakers.AudioTap()
     # 返事ごとのトークン数（usage.py）。指示を短くしたときの比べる基準
     usage_log = usage.UsageLog()
@@ -280,14 +283,14 @@ async def entrypoint(ctx: JobContext) -> None:
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        session.generate_reply(instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
+        voice.say('minutes', instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
     # 声で送り先を切り替えたら、アプリの端末に覚えさせる（次につないだときも同じ送り先にする）
     minute_taker.on_destination = lambda name: asyncio.create_task(
         send('ciel.event', {'v': 1, 'type': 'minutes.destination', 'selected': name}))
-    minute_taker.busy = talker.busy   # 送り終えたことは、話の切れ目で伝える
+    minute_taker.busy = voice.busy   # 送り終えたことは、話の切れ目で伝える
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
     if book is not None:
@@ -302,11 +305,8 @@ async def entrypoint(ctx: JobContext) -> None:
         async def enrolled(name: str) -> None:
             # 最後の文を読み終えるまで待ってから言う（読んでいる途中に話し始めて、止められたことがあった）
             await asyncio.sleep(1.0)
-            for _ in range(40):
-                if session.user_state != 'speaking':
-                    break
-                await asyncio.sleep(0.25)
-            session.generate_reply(instructions=agent.persona.enroll_done.replace('{name}', name), tool_choice='none')
+            await voice.say_when_free('enrolled', wait=10.0, anyway=True, tool_choice='none',
+                                      instructions=agent.persona.enroll_done.replace('{name}', name))
         book.on_enrolled = lambda name: asyncio.create_task(enrolled(name))
         talker.paused = lambda: book.enrolling is not None or (song is not None and song.active)
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
@@ -316,6 +316,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def close_store() -> None:
         usage_log.summary()
+        voice.summary()
         debug_log.record('end')
         await recorder.flush()   # 話者を決めている途中の発言も渡してから
         await researcher.close()
@@ -374,7 +375,7 @@ async def entrypoint(ctx: JobContext) -> None:
     await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})
     # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
     # 今の日付・時間帯（clock.py）も添える（「おはよう」「こんばんは」を合わせる）
-    await session.generate_reply(instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
+    await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
                                  tool_choice='none')
     talker.start()
     if AIZUCHI:

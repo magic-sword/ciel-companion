@@ -53,6 +53,7 @@ from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChan
 import clock
 import debug_log
 import latency
+import mouth
 import speakers
 
 log = logging.getLogger('ciel-agent.turns')
@@ -565,7 +566,7 @@ class TurnReplies:
             note = self.minutes.take_note()
             if note is not None:
                 extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), note)))
-        self.session.generate_reply(**extra)
+        mouth.of(self.session).say('reply', **extra)
         self._set_thinking(True)
 
     def _set_thinking(self, on: bool) -> None:

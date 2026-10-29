@@ -44,6 +44,7 @@ from livekit.agents import AgentSession
 
 import debug_log
 import models
+import mouth
 from jst import JST
 
 log = logging.getLogger('ciel-agent.initiative')
@@ -404,7 +405,7 @@ class Initiative:
 
     def _reply(self, nudge: str, note: str, placed: bool) -> None:
         try:
-            self.session.generate_reply(instructions=nudge if placed else f'{nudge}\n\n{note}')
+            mouth.of(self.session).say('initiative', instructions=nudge if placed else f'{nudge}\n\n{note}')
         except Exception as e:   # 話しかけられなくても、会話は続ける
             log.warning('話しかけられない: %s', e)
 

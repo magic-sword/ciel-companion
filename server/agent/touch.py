@@ -24,6 +24,8 @@ import time
 from livekit import rtc
 from livekit.agents import AgentSession
 
+import mouth
+
 log = logging.getLogger('ciel-agent.touch')
 
 TOPIC = 'ciel.touch'
@@ -133,7 +135,7 @@ class TouchReactions:
         self.last_reply = now
         log.info('タッチに返事をする%s', '（触った人を添えた）' if '触ったのは' in line else '')
         # 知らせを会話の履歴に残し、あとの会話でも触れられたことを覚えておけるようにする
-        s.generate_reply(user_input=line)
+        mouth.of(s).say('touch', user_input=line)
 
     def _who(self) -> str:
         """最後に話した人を「たぶん触った人」として添える 1 文（添えないときは空）"""

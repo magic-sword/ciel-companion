@@ -24,6 +24,7 @@ class State:
     initiative: object | None = None   # initiative.Initiative（シエルの内なる考え）
     song: object | None = None   # singing.SongListener（歌を聴く係）
     preamble: object | None = None   # emotion.PreambleCut（道具を呼んだ返事の前置きを止める）
+    mouth: object | None = None   # mouth.Mouth（シエルを話させる入り口）
 
 
 def cut_preamble(context) -> None:
