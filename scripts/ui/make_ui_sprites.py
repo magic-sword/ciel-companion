@@ -145,6 +145,45 @@ def hex_ring(w=152, h=168, stroke=5.0, corner=0.18):
     save(m, 'hex_ring.png')
 
 
+def heart_points(w, h, inset=0.0, steps=240):
+    """ハートの輪郭（古典的な式 x = 16 sin³t, y = 13 cos t − 5 cos 2t − 2 cos 3t − cos 4t）を w×h に収める"""
+    pts = [(16 * math.sin(t) ** 3, 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t))
+           for t in (2 * math.pi * i / steps for i in range(steps))]
+    x0, x1 = min(p[0] for p in pts), max(p[0] for p in pts)
+    y0, y1 = min(p[1] for p in pts), max(p[1] for p in pts)
+    sx, sy = (w - 2 * inset) / (x1 - x0), (h - 2 * inset) / (y1 - y0)
+    return [(inset + (x - x0) * sx, inset + (y1 - y) * sy) for x, y in pts]
+
+
+def heart(w=128, h=116):
+    """ときめきメーターのハート（塗り。下から満ちる表示にも使う）"""
+    m = canvas(w, h)
+    ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in heart_points(w, h, 1)], fill=255)
+    save(m, 'heart.png')
+
+
+def heart_outline(w=128, h=116, stroke=5.0):
+    """ハートの縁"""
+    m = canvas(w, h)
+    d = ImageDraw.Draw(m)
+    d.polygon([(x * SS, y * SS) for x, y in heart_points(w, h, 1)], fill=255)
+    d.polygon([(x * SS, y * SS) for x, y in heart_points(w, h, 1 + stroke)], fill=0)
+    save(m, 'heart_outline.png')
+
+
+def sparkle(n=64):
+    """きらめき（4 つの尖った光。ハートが満タンになったときに飛ばす）"""
+    m = canvas(n, n)
+    c, r, k = n * SS / 2, n * SS / 2 - 1, n * SS * 0.07
+    pts = []
+    for i in range(8):
+        a = math.pi / 4 * i - math.pi / 2
+        rr = r if i % 2 == 0 else k
+        pts.append((c + rr * math.cos(a), c + rr * math.sin(a)))
+    ImageDraw.Draw(m).polygon(pts, fill=255)
+    save(m, 'sparkle.png')
+
+
 def vertical_gradient(h=256):
     """上が透明、下が不透明（画面の下の文字を読みやすくする暗がり）"""
     img = Image.new('L', (4, h))
@@ -335,6 +374,9 @@ if __name__ == '__main__':
     glow()
     hex_glow()
     hex_ring()
+    heart()
+    heart_outline()
+    sparkle()
     ring(n=64, stroke=2.5, name='touch_ring.png')   # タッチの輪（小さく表示しても線がかすれない太さ）
     vertical_gradient()
     corner_arc()
