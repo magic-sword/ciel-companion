@@ -96,7 +96,7 @@ flowchart LR
 | LiveKit Cloud | 外部サービス | アプリと会話サーバーのあいだで、声（音声トラック）とデータのメッセージを中継する |
 | 会話サーバー | `server/agent/`（LiveKit Agents 1.8） | 部屋に入り、利用者の声を OpenAI へ送り、返事の文字から声を作ってアプリへ返す。表情・タッチ・会話のモードを扱う |
 | 読み上げサービス | `server/tts-irodori/` | Irodori-TTS で、文をシエルの声で読み上げる（GPU、16 ステップ） |
-| 歌を聴くサービス | `server/singing/` | Audiobox Aesthetics・MERT・CREPE で、歌声から感想の手がかりを出す（GPU、約 2 GB）。[歌を聴く決定記録](decisions/singing-ja.md) |
+| 歌を聴くサービス | `server/singing/` | Audiobox Aesthetics・MERT・CREPE で、歌声から感想の手がかりを出す（GPU、約 2 GB）。[仕組み（図つき）](singing-scoring-ja.md)・[歌を聴く決定記録](decisions/singing-ja.md) |
 | 声質変換サービス | `server/voice-conversion/` | Seed-VC で OpenAI の声をシエルの声へ変える。今は使っていない（品質を上げる候補） |
 | OpenAI Realtime API | 外部サービス | 声を聞いて返事を考える。既定は `gpt-realtime-2.1-mini`、返事は**文字だけ**作らせる。相手の発言の文字起こし（`gpt-4o-mini-transcribe`、日本語＋「シエル」と覚えている人の名前をヒントに）も同じ接続で作る |
 | OpenAI の文字のモデル | 外部サービス | 会話の裏の作業：その人について覚えておくメモ（`gpt-5.4-mini`）、議事録のまとめ（`gpt-5.4`） |
