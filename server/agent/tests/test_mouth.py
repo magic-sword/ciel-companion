@@ -76,6 +76,19 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.05)
         self.assertEqual(s.calls, [{'instructions': 'まとめて送る'}, {'instructions': '送った'}])
 
+    async def test_a_notice_told_in_a_reply_is_not_said_again(self):
+        s = FakeSession()
+        s.user_state = 'speaking'
+        m = mouth.Mouth(s)
+        with mock.patch.object(mouth, 'FREE_POLL', 0.01):
+            m.say_latest('minutes', instructions='とり始めた')
+            self.assertEqual(m.waiting(), {'minutes': 'とり始めた'})
+            m.drop('minutes')   # 相手への返事の中で伝え終えた
+            s.user_state = 'listening'
+            await asyncio.sleep(0.05)
+        self.assertEqual(s.calls, [])
+        self.assertEqual(m.waiting(), {})
+
     async def test_gives_up_or_speaks_anyway(self):
         s = FakeSession()
         s.agent_state = 'speaking'

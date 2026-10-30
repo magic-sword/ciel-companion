@@ -69,6 +69,8 @@ class Mind:
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
         self._deep = False               # 次の返事は心が作る
+        self.waiting = None              # まだ言っていない知らせ（why → 指示）を返す（mouth.Mouth.waiting）
+        self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -113,7 +115,8 @@ class Mind:
         # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
         # 黙る返事は声にならないので、心で受けても遅れは気にならない
         quiet = self.style is not None and self.style.talk == 'quiet'
-        why = ('request' if REQUEST.search(rest)
+        why = ('notice' if self._waiting()
+               else 'request' if REQUEST.search(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
                else 'people' if not quiet and self._speakers_since_ciel() >= 2
                else 'named' if quiet and NAME.search(text)
@@ -173,6 +176,14 @@ class Mind:
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None)
+        self.handed = None
+        if talker_instructions is None and tail_users:
+            # 切れ目を待っている知らせは、相手への返事の中で伝える。長い話の途中で聞く係が議事録を始めると、
+            # 「とり始めた」は話し終わりまで待って約 26 秒後になり、最後の質問への答えになって議事録にふれなかった（2026-10-31）
+            waiting = self._waiting()
+            if waiting:
+                self.handed, text = next(iter(waiting.items()))
+                notes = '\n\n'.join(x for x in (notes, f'[まだ伝えていない知らせ]\n{text}') if x)
         if notes:
             out.add_message(role='system', content=notes)
         speaker = '\n'.join(x for x in (turn.get('tag'), turn.get('touch')) if x)
@@ -180,6 +191,9 @@ class Mind:
             out.add_message(role='system', content=speaker)   # 今回の発言の話者（とタッチ）
         out.items.extend(self._mark_item(i) for i in tail)
         return out
+
+    def _waiting(self) -> dict[str, str]:
+        return {w: t for w, t in (self.waiting() if self.waiting is not None else {}).items() if w in DEEP_WHY and t}
 
     def _mark_item(self, item):
         """今回の発言の、付箋になった頼みを付箋の印に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）"""

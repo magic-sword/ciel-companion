@@ -163,6 +163,23 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         ctx.items.append(llm.FunctionCallOutput(call_id='c1', name='search_conversation', output='{}', is_error=False))
         self.assertEqual([t.id for t in m.tools_for(ctx, tools)], ['read_minutes'])
 
+    async def test_a_waiting_notice_goes_into_the_reply(self):
+        m = mind.Mind(history_with(), style=Style())
+        waiting = {'minutes': '[議事録：とり始めた]'}
+        m.waiting = lambda: waiting
+        ctx = self.ctx_with('ここまでで何か気になることある？')
+        self.assertEqual(m.route(ctx, {'seconds': 2.0}), 'mind')
+        items = m.build(ctx, turn={}).items
+        self.assertIn('[まだ伝えていない知らせ]\n[議事録：とり始めた]', items[-2].text_content)
+        self.assertEqual(m.handed, 'minutes')
+        # 知らせそのものの返事（相手の発言が無い）には添えない。待っている知らせが無ければ小脳
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system', content='全部の指示')
+        m.build(ctx)
+        self.assertIsNone(m.handed)
+        waiting.clear()
+        self.assertEqual(m.route(self.ctx_with('ここまでで何か気になることある？'), {'seconds': 2.0}), 'talker')
+
     async def test_requests_on_the_board_stay_marked_in_later_turns(self):
         h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))
         m = mind.Mind(h, style=Style(), board=self.board_with_minutes('議事録開始して。'))

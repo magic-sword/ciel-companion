@@ -366,6 +366,17 @@ async def entrypoint(ctx: JobContext) -> None:
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
+        agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
+
+        def on_said(ev) -> None:
+            # 知らせを添えた返事を言い終えたら、その知らせはあとで言わない（途中で止められたら、知らせは待ち続ける）
+            item = ev.item
+            if getattr(item, 'role', None) != 'assistant' or agent.mind.handed is None:
+                return
+            if not getattr(item, 'interrupted', False) and (item.text_content or '').strip():
+                voice.drop(agent.mind.handed)
+            agent.mind.handed = None
+        session.on('conversation_item_added', on_said)
         # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
         agent.ear = listener.Listener(history, minute_taker, agent.persona.listener_instructions, board=tasks)
         session.on('user_input_transcribed', agent.ear.on_transcribed)

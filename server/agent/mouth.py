@@ -50,6 +50,13 @@ class Mouth:
                             **kwargs):
         """切れ目を wait 秒まで待ってから話させる。settle 秒は続けて切れ目であること（話の途中の息つぎで言い出さない）。
         待ちきれず anyway でなければ None（呼んだ側が別の機会に回す）"""
+        if not await self._free(wait, settle) and not anyway:
+            log.info('口：%s は切れ目が来ないので話さない', why)
+            return None
+        return self.say(why, **kwargs)
+
+    async def _free(self, wait: float, settle: float) -> bool:
+        """切れ目が settle 秒続くのを wait 秒まで待つ。来たら True"""
         deadline = time.monotonic() + wait
         free_since = None
         while time.monotonic() < deadline:
@@ -58,12 +65,9 @@ class Mouth:
             elif free_since is None:
                 free_since = time.monotonic()
             if free_since is not None and time.monotonic() - free_since >= settle:
-                break
+                return True
             await asyncio.sleep(FREE_POLL)
-        if self.busy() and not anyway:
-            log.info('口：%s は切れ目が来ないので話さない', why)
-            return None
-        return self.say(why, **kwargs)
+        return not self.busy()
 
     def say_latest(self, why: str, *, settle: float = 0.0, wait: float = 30.0, **kwargs) -> None:
         """知らせを、切れ目を待ってから言う（待ったあとは言う）。待っているあいだに同じ why の知らせが来たら、最新の 1 つだけを言う。
@@ -76,9 +80,19 @@ class Mouth:
 
     async def _say_latest(self, why: str, settle: float, wait: float) -> None:
         try:
-            await self.say_when_free(why, wait=wait, anyway=True, settle=settle, _latest=True)
+            await self._free(wait, settle)
+            if why in self._latest:   # 返事の中で伝え終えていれば（drop）、言わない
+                self.say(why, _latest=True)
         finally:
             self._latest.pop(why, None)
+
+    def waiting(self) -> dict[str, str]:
+        """まだ言っていない知らせ（why → 指示）。心が、相手への返事の中で伝える（mind.py）"""
+        return {why: kw.get('instructions', '') for why, kw in self._latest.items()}
+
+    def drop(self, why: str) -> None:
+        """返事の中で伝え終えた知らせを、あとで言わない"""
+        self._latest.pop(why, None)
 
     def summary(self) -> None:
         """会話の終わりに、なぜ何回話したかを出す"""
