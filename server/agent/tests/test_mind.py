@@ -144,6 +144,10 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         m = mind.Mind(history_with(), style=Style('quiet'), board=self.board_with_minutes('議事録開始して。'))
         self.assertEqual(m.route(self.ctx_with('あ、議事録開始して。'), {'seconds': 2.0}), 'skip')
         self.assertEqual(m.route(self.ctx_with('議事録開始して。ポスターは水曜まで'), {'seconds': 2.0}), 'mind')
+        # 黙って聞いた前の発言が今回の分に残っていても、最後の発言が頼みだけなら返さない
+        ctx = self.ctx_with('賛成です。じゃあ解説は私が下書きを作ります。')
+        ctx.add_message(role='user', content='はっ、 議事録開始して。')
+        self.assertEqual(m.route(ctx, {'seconds': 2.0}), 'skip')
 
     async def test_minutes_tools_only_when_this_turn_asks(self):
         tools = [types.SimpleNamespace(id=n) for n in ('start_minutes', 'finish_minutes', 'read_minutes')]
@@ -153,6 +157,11 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ids('それで、議事録開始して。屋台を増やしたい'), ['read_minutes'])   # 付箋になった頼みは除く
         self.assertEqual(ids('議事録まとめて'), ['start_minutes', 'finish_minutes', 'read_minutes'])
         self.assertEqual(ids('記録ストップ'), ['start_minutes', 'finish_minutes', 'read_minutes'])
+        # ほかの道具の結果を受けた続きでも、頼みが無ければ渡さない
+        ctx = self.ctx_with('予算は去年と同じくらい')
+        ctx.items.append(llm.FunctionCall(call_id='c1', name='search_conversation', arguments='{}'))
+        ctx.items.append(llm.FunctionCallOutput(call_id='c1', name='search_conversation', output='{}', is_error=False))
+        self.assertEqual([t.id for t in m.tools_for(ctx, tools)], ['read_minutes'])
 
     async def test_requests_on_the_board_stay_marked_in_later_turns(self):
         h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))

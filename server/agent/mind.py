@@ -100,7 +100,11 @@ class Mind:
         # 付箋になった頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
         # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
         rest = self.board.strip(text) if self.board is not None else text
-        if rest != text and not FILLER.sub('', rest):
+        # 頼みだけの発言かは、最後の発言で見る。黙って聞いた前の発言も今回の分に残るので、全部で見ると
+        # 「賛成です。…（→ 付箋）」が頼みだけにならず、心が前の発言に返した（2026-10-31）
+        latest = next((_text(i) for i in reversed(tail) if getattr(i, 'role', None) == 'user' and _text(i)), '')
+        latest_rest = self.board.strip(latest) if self.board is not None else latest
+        if latest_rest != latest and not FILLER.sub('', latest_rest):
             # 頼みだけの発言で、付箋になった（「あ、議事録開始して」）。返事はせず、議事録係の知らせだけを言う。
             # 心が「議事録、とりながら進めていますよ」と返し、そのあと知らせも言って 2 回になった（2026-10-30）
             debug_log.record('mind_route', why='on_board')
@@ -123,10 +127,9 @@ class Mind:
 
     def tools_for(self, chat_ctx: llm.ChatContext, tools: list) -> list:
         """心に渡す道具。議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ渡す（付箋になった頼みは除く）。
-        付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）"""
+        付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
+        道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
         tail = _tail(list(chat_ctx.items))
-        if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
-            return tools   # 道具の結果を受けた続き
         text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
         rest = self.board.strip(text) if self.board is not None else text
         if not text or MINUTES_ASK.search(rest):
