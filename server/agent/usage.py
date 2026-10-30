@@ -20,10 +20,14 @@ FIELDS = ('input_tokens', 'input_cached_tokens', 'input_text_tokens', 'input_aud
 class UsageLog:
     def __init__(self) -> None:
         self._last: dict[tuple[str, str], dict[str, int]] = {}
+        self._stt_seconds: dict[tuple[str, str], float] = {}
         self.replies = 0
 
     def on_usage(self, ev) -> None:
         for u in ev.usage.model_usage:
+            if getattr(u, 'type', None) == 'stt_usage':
+                self._on_stt(u)
+                continue
             if getattr(u, 'type', None) != 'llm_usage':
                 continue
             now = {f: int(getattr(u, f, 0) or 0) for f in FIELDS}
@@ -41,6 +45,17 @@ class UsageLog:
                      f"{d['input_tokens']:,}", f"{d['input_cached_tokens']:,}", percent(d), f"{d['input_text_tokens']:,}",
                      f"{d['input_audio_tokens']:,}", f"{d['output_tokens']:,}", f"{d['output_text_tokens']:,}",
                      f"{d['output_reasoning_tokens']:,}")
+
+    def _on_stt(self, u) -> None:
+        """文字起こし（CIEL_MODEL=pipeline の STT）の使用量：前の知らせからの音声の秒数と、その料金の目安"""
+        key = (u.provider, u.model)
+        seconds = float(getattr(u, 'audio_duration', 0.0) or 0.0)
+        before = self._stt_seconds.get(key, 0.0)
+        self._stt_seconds[key] = seconds
+        if seconds - before <= 0:
+            return
+        usd = models.cost_per_minute(u.model, (seconds - before) / 60)
+        debug_log.record('stt_usage', model=u.model, seconds=round(seconds - before, 2), usd=round(usd, 6))
 
     def summary(self) -> None:
         """会話の終わりに、この会話の累計を出す"""

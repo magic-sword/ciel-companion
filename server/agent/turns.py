@@ -170,6 +170,8 @@ class TurnReplies:
         self._unheard = 0              # そのあと手元で話し終わった回数
         self._stall_reported = False
         self._clip_name: str | None = None   # 調べるときに残した、直前の発言の声のファイル名（debug_log.save_audio）
+        self._pipeline_through = 0.0   # CIEL_MODEL=pipeline：返事に使い終えた区間の終わり（pipeline_turn）
+        self.stall_watch = True        # 会話モデルの側から区切りが来ない見張り（pipeline では使わない）
 
     async def load_encoder(self) -> None:
         """声の特徴の計算の準備（数秒かかるので、会話の始めに裏で読み込む）"""
@@ -319,7 +321,7 @@ class TurnReplies:
     def _check_stall(self) -> None:
         """手元では話しているのに、会話モデルの側から区切りが来ない（STALL_SECONDS の説明）"""
         waited = time.time() - self._heard_at
-        if self._stall_reported or self._unheard < STALL_SEGMENTS or waited < STALL_SECONDS:
+        if not self.stall_watch or self._stall_reported or self._unheard < STALL_SEGMENTS or waited < STALL_SECONDS:
             return
         self._stall_reported = True
         activity = getattr(self.session, '_activity', None)
@@ -538,6 +540,36 @@ class TurnReplies:
             extra['instructions'] = '\n\n'.join(filter(None, (extra.get('instructions'), line)))
         latency.mark('返事を頼んだ')
         await self._generate_reply(extra)
+
+    async def pipeline_turn(self) -> dict:
+        """CIEL_MODEL=pipeline：LiveKit が返事を作る前に呼ぶ（agent.py の on_user_turn_completed）。前の返事のあとに
+        話し終えた区間で、誰が話したかを決め、相づちを流す。返事はここでは作らせない。
+        返す値：skip（声の登録の読み上げなど、返事をしない）・tag（話者の 1 行）・memory（覚えていること）・touch（タッチの 1 行）"""
+        segs = [s for s in self._recent if s.start > self._pipeline_through]
+        if not segs:
+            return {'skip': False, 'tag': None, 'memory': None, 'touch': self.touch.take() if self.touch else None}
+        start, end = segs[0].start, segs[-1].end
+        self._pipeline_through = end
+        if (self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS
+                and not self.backchannel.played_within(NOD_SKIP_SECONDS)):
+            latency.mark('相づち')
+            self.backchannel.play()
+        touch = self.touch.take() if self.touch is not None else None
+        if self.book is None or self.encoder is None:
+            return {'skip': False, 'tag': None, 'memory': None, 'touch': touch}
+        j = await self._judgment_for(start, end)
+        if getattr(j, 'enroll', False) or getattr(self.book, 'enrolling', None) is not None:
+            log.info('声の登録の途中なので、返事を作らせない')
+            if self.backchannel is not None:
+                self.backchannel.stop()
+            return {'skip': True, 'tag': None, 'memory': None, 'touch': None}
+        self.book.current_turns = [s.turn for s in segs if s.turn is not None]
+        presence = self.style.presence
+        parts = await self.book.identify_parts(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
+        if self.book.last is not None:
+            self.book.last_at = time.monotonic()
+        tag, memory = parts if parts is not None else (None, None)
+        return {'skip': False, 'tag': tag, 'memory': memory or None, 'touch': touch}
 
     async def _generate_reply(self, extra: dict) -> None:
         # 今の日付・時間帯（clock.py）。変わったときだけ会話の後ろに置く（置けなければ今回の指示に足す）

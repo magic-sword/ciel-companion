@@ -16,6 +16,8 @@ log = logging.getLogger('ciel-agent.models')
 # 役目 → (環境変数, 既定のモデル)
 ROLES = {
     'talk': ('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini'),     # 返事の文を作る（Realtime。使用量は usage.py）
+    'mind': ('CIEL_MIND_MODEL', 'gpt-5.4-mini'),                  # 返事の文を作る（CIEL_MODEL=pipeline の心。mind.py。使用量は usage.py）
+    'stt': ('CIEL_STT_MODEL', 'gpt-realtime-whisper'),            # 文字起こし（CIEL_MODEL=pipeline。話している途中から文字が出る）
     'thought': ('CIEL_THOUGHT_MODEL', 'gpt-5.4-mini'),            # 内なる考え（initiative.py）
     'minutes_live': ('CIEL_MINUTES_LIVE_MODEL', 'gpt-5.4-mini'),  # 議事録のライブ（minutes.py）
     'minutes': ('CIEL_MINUTES_MODEL', 'gpt-5.4'),                 # 議事録の清書（minutes.py）
@@ -32,6 +34,8 @@ PRICES = {
     'gpt-4o-mini-transcribe': (1.25, 1.25, 5.00),
 }
 AUDIO_INPUT = {'gpt-realtime-2.1-mini': (10.00, 0.30)}   # 音声の入力・そのキャッシュ
+# 音声の長さで払う文字起こし（1 分あたり、米ドル。OpenAI のモデルの説明のページ、2026-10）
+PER_MINUTE = {'gpt-realtime-whisper': 0.017, 'gpt-live-transcribe': 0.017}
 
 
 def model(role: str) -> str:
@@ -50,6 +54,10 @@ def cost(model_name: str, input_tokens: int, cached: int, output_tokens: int,
     usd = ((text_in - text_cached) * price[0] + text_cached * price[1]
            + (audio_input - audio_cached) * audio[0] + audio_cached * audio[1] + output_tokens * price[2])
     return usd / 1_000_000
+
+
+def cost_per_minute(model_name: str, minutes: float) -> float:
+    return PER_MINUTE.get(model_name, 0.0) * minutes
 
 
 def record(role: str, model_name: str, usage) -> None:

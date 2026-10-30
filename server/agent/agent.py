@@ -11,6 +11,8 @@ LiveKit Cloud のルームにアプリが入ると、このプログラムが呼
 
 会話モデルは環境変数 CIEL_MODEL で切り替える：
   realtime（既定）… OpenAI Realtime API（gpt-realtime 系）
+  pipeline        … 音声検出 1 つ（silero）→ 話している途中から出る文字起こし → 区切りのモデル → 文字のモデル（心。mind.py）
+                    → Irodori。返事のたびに会話の記録から文脈を作る（docs/attention-and-thinking-design-ja.md の 7 章。試作）
   gpt-live        … GPT-Live（全二重。利用権限が要る。irodori とは組み合わせない）
 
 実行（開発）  python -m livekit.agents start agent.py --dev
@@ -23,7 +25,7 @@ import os
 
 from dotenv import load_dotenv
 from livekit import agents, rtc
-from livekit.agents import Agent, AgentServer, AgentSession, JobContext
+from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, inference
 from livekit.plugins import openai
 from openai.types.realtime.audio_transcription import AudioTranscription
 from openai.types.realtime.realtime_reasoning import RealtimeReasoning
@@ -36,8 +38,10 @@ import emotion
 import initiative
 import interruptions
 import irodori_tts
+import mind
 import minutes
 import mode
+import models
 import mouth
 import notes
 import relationship
@@ -66,13 +70,17 @@ logger = logging.getLogger('ciel-agent')
 server = AgentServer(num_idle_processes=2, port=int(os.environ.get('CIEL_AGENT_PORT', '8081')),
                      shutdown_process_timeout=90.0)
 VOICE = os.environ.get('CIEL_VOICE', 'irodori')
-# 会話モデル（realtime・gpt-live）と、realtime のときのモデル名
+# 会話モデル（realtime・pipeline・gpt-live）と、realtime のときのモデル名
 MODEL = os.environ.get('CIEL_MODEL', 'realtime')
 REALTIME_MODEL = os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
 # GPT-Live は聞きながら話す全二重なので、返事の作らせ方を変えない（話者の識別も使わない）
-REALTIME = MODEL != 'gpt-live'
-# 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API のときだけ
-SPEAKERS = VOICE == 'irodori' and REALTIME
+REALTIME = MODEL == 'realtime'
+# 文字起こし → 心 → 読み上げの組み立て。声は Irodori で作るので、irodori のときだけ
+PIPELINE = MODEL == 'pipeline' and VOICE == 'irodori'
+# 心の考える量（pipeline。none・minimal・low…）
+MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
+# 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API・pipeline のときだけ
+SPEAKERS = VOICE == 'irodori' and (REALTIME or PIPELINE)
 # Realtime API の雑音除去（make_model）
 NOISE_REDUCTION = os.environ.get('CIEL_NOISE_REDUCTION', 'far_field')
 # 話し終わりの判定の早さ（semantic_vad の eagerness：low・medium・high・auto）
@@ -99,6 +107,8 @@ def transcription(names: list[str]) -> AudioTranscription:
 
 def make_model(names: list[str] | None = None):
     voice = os.environ.get('CIEL_OPENAI_VOICE', 'marin')
+    if PIPELINE:
+        return openai.LLM(model=models.model('mind'), reasoning_effort=MIND_REASONING)
     if not REALTIME:
         return openai.realtime.GPTLiveModel(voice=voice)
     return openai.realtime.RealtimeModel(
@@ -121,6 +131,20 @@ def make_model(names: list[str] | None = None):
     )
 
 
+def make_pipeline(names: list[str]) -> dict:
+    """pipeline の部品（AgentSession に渡す）。音声検出は 1 つにして、文字起こしの区切りにも同じ設定を使う"""
+    vad = inference.VAD()
+    hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
+    model = models.model('stt')
+    stt = openai.STT(model=model, language='ja', vad=vad, prompt=f'AI キャラクター「シエル」との会話。出てくる名前：{hint}',
+                     **({'keywords': ['シエル', *names][:30]} if model == 'gpt-live-transcribe' else {}))
+    return {'vad': vad, 'stt': stt,
+            # 区切り：声の調子から話し終えたかを見るモデル（手元で動く小さい版。日本語に対応）
+            'turn_handling': {'turn_detection': inference.TurnDetector(version='v1-mini'),
+                              # シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py と同じ秒数）
+                              'interruption': {'mode': 'vad', 'min_duration': interruptions.CONFIRM_SECONDS or 0.5}}}
+
+
 class Ciel(Agent):
     def __init__(self) -> None:
         persona = load_persona()
@@ -131,6 +155,25 @@ class Ciel(Agent):
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
         self.preamble = emotion.PreambleCut()   # 道具を呼んだ返事の前置きを止める（歌・議事録の道具が頼む）
+        self.mind: mind.Mind | None = None      # pipeline の心（entrypoint がつなぐ）
+        self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
+
+    async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
+        """pipeline：返事を作る前に、誰が話したかを決めて、今回の発言に話者の 1 行を添える"""
+        if not PIPELINE or self.replies is None or self.mind is None:
+            return
+        turn = await self.replies.pipeline_turn()
+        if turn['skip']:
+            raise StopResponse()
+        self.mind.memory = turn['memory']
+        lines = [x for x in (turn['tag'], turn['touch']) if x]
+        if lines:
+            new_message.content = ['\n'.join(lines) + '\n' + (new_message.text_content or '')]
+
+    def llm_node(self, chat_ctx, tools, model_settings):
+        if PIPELINE and self.mind is not None:
+            chat_ctx = self.mind.build(chat_ctx)
+        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
 
     def instructions_for(self, talk: str, presence: str) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
@@ -184,7 +227,8 @@ class Ciel(Agent):
 async def entrypoint(ctx: JobContext) -> None:
     logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
     # デバッグ用の会話ログ（debug_log.py）。ふだんは残さない。入れているときだけ、この会話のファイルを作る
-    debug_log.start(ctx.room.name, model=MODEL, realtime_model=REALTIME_MODEL if REALTIME else None, voice=VOICE)
+    debug_log.start(ctx.room.name, model=MODEL, realtime_model=REALTIME_MODEL if REALTIME else None, voice=VOICE,
+                    **({'mind_model': models.model('mind'), 'stt_model': models.model('stt')} if PIPELINE else {}))
     # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
     # 話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
     store = await speaker_store.Store.open() if SPEAKERS else None
@@ -193,7 +237,8 @@ async def entrypoint(ctx: JobContext) -> None:
         await book.load()
     names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
     session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
-                           turn_detection='manual' if REALTIME else agents.NOT_GIVEN,
+                           **(make_pipeline(names) if PIPELINE else
+                              {'turn_detection': 'manual' if REALTIME else agents.NOT_GIVEN}),
                            # 読み上げる前の文字の変換は、絵文字を外すだけにする。既定の filter_markdown は、返事の頭の
                            # 感情の印「[happy]」をリンクの書きかけとみなし、返事を最後まで書き終えるまで読み上げに渡さなかった
                            # （2026-10-22、bench_latency.py。印は emotion.py が読み取って外す）
@@ -256,6 +301,12 @@ async def entrypoint(ctx: JobContext) -> None:
                                    memories=lambda: book.last.notes() if book is not None and book.last is not None
                                    and book.last_sure and style.presence in ('solo', 'close') else [])
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
+    if PIPELINE:
+        # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
+        agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
+                               quiet_turn=agent.persona.talk_quiet_turn_instructions)
+        agent.replies = replies
+        replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
     # 歌を聴く（singing.py）。聴いているあいだは会話モデルへ声を送らず、シエルから話しかけない
     song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
@@ -271,6 +322,8 @@ async def entrypoint(ctx: JobContext) -> None:
         session.on('user_state_changed', replies.on_user_state)
         session.on('user_input_transcribed', replies.on_transcribed)   # 文字起こしの確定で返事を作らせる
         session.on('conversation_item_added', replies.on_item)   # 多人数で、シエルの質問への答えを待つ
+    elif PIPELINE:
+        session.on('user_state_changed', replies.on_user_state)   # 話者の区間・話している途中の相づち
     if SPEAKERS:
         asyncio.create_task(replies.load_encoder())
 

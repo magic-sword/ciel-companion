@@ -42,6 +42,7 @@ VOICE_A = '落ち着いた低めの声の30代の男性。ふつうの速さで�
 VOICE_B = '明るくはっきりした声の20代の女性。ふつうの速さで、会議で同僚に話す自然な話し方。'
 PAUSE = 0.6        # 1 つの発言の中の息つぎ
 QUIET = 2.5        # シエルがこれだけ静かなら、話し終えたとみなす
+TRANSCRIBE_PER_MINUTE = 0.003   # gpt-4o-mini-transcribe の 1 分あたりの目安（米ドル）
 AIZUCHI_TRACK = 'ciel-aizuchi'   # 相づちのトラック（aizuchi.py の TRACK）。返事の速さからは外す
 REPLY_WAIT = 12.0  # 返事を待つ最大の秒数
 
@@ -171,6 +172,7 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
     await room.local_participant.publish_data(json.dumps({'v': 1, **scene['style']}), reliable=True, topic='ciel.style')
     await asyncio.sleep(1.0)
     turns = []
+    sent_seconds = sum(len(pcm) / SR for _, pcm in voices)
     request_at = None
     for (who, line), (ends, pcm) in zip(scene['lines'], voices):
         t_start = time.time()
@@ -197,7 +199,13 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
     await lk.aclose()
     started = next((t for t, m in events if m.get('type') == 'minutes.state' and m.get('recording')), None)
     log = await read_log(room_name)
-    result = {'scene': name, 'room': room_name, 'turns': turns, **cost_of(log), 'replies': replies_of(log)}
+    cost = cost_of(log)
+    if 'stt' not in cost['usd_by_role']:
+        # Realtime の組み立ての文字起こし（gpt-4o-mini-transcribe）は使用量が届かないので、送った声の長さから見積もる
+        est = round(sent_seconds / 60 * TRANSCRIBE_PER_MINUTE, 4)
+        cost['usd_by_role']['stt(est)'] = est
+        cost['usd'] = round(cost['usd'] + est, 4)
+    result = {'scene': name, 'room': room_name, 'turns': turns, **cost, 'replies': replies_of(log)}
     if scene.get('request'):
         result['request_caught'] = started is not None
         result['request_seconds'] = round(started - request_at, 2) if started and request_at else None
@@ -250,6 +258,8 @@ def cost_of(rows: list[dict]) -> dict:
             role = 'talk'
         elif r.get('kind') == 'model_usage':
             role = r.get('role', '?')
+        elif r.get('kind') == 'stt_usage':
+            role = 'stt'
         else:
             continue
         by_role[role] = by_role.get(role, 0.0) + float(r.get('usd') or 0)
