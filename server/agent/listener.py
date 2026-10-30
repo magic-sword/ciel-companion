@@ -46,6 +46,12 @@ class Listener:
             self._client = openai.AsyncOpenAI()
         return self._client
 
+    async def settled(self, timeout: float) -> None:
+        """確かめている頼みがあれば、終わるまで（timeout 秒まで）待つ。返事を作る前に待ち、聞く係と心が同じ頼みを同時に
+        受けないようにする（心が道具で始め直して「もうとっている」が返り、知らせの一言が「もうとっているのです」になった。2026-10-30）"""
+        if self._tasks:
+            await asyncio.wait(set(self._tasks), timeout=timeout)
+
     def on_transcribed(self, ev) -> None:
         """文字起こしが区切られた（LiveKit の user_input_transcribed の確定）"""
         if not ev.is_final or not ev.transcript or not WORDS.search(ev.transcript) or not self.instructions:

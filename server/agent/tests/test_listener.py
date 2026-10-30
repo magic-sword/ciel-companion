@@ -60,6 +60,14 @@ class ListenerTest(unittest.IsolatedAsyncioTestCase):
             task.assert_called_once()
             task.call_args.args[0].close()
 
+    async def test_replies_can_wait_until_the_check_is_done(self):
+        minutes = FakeMinutes()
+        ear, client = self.make(minutes, '{"action": "start", "to_ciel": true}')
+        ear.on_transcribed(types.SimpleNamespace(is_final=True, transcript='議事録開始して'))
+        await ear.settled(1.0)
+        self.assertEqual(minutes.calls, [('start', 'meeting')])
+        await ear.settled(1.0)   # 確かめている頼みが無ければ、すぐ戻る
+
     async def test_finish_and_bad_answers(self):
         minutes = FakeMinutes(recording=True)
         ear, _ = self.make(minutes, '{"action": "finish", "to_ciel": true}')

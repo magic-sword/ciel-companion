@@ -43,10 +43,19 @@ class Mouth:
             self.before_say(why)
         return self.session.generate_reply(**kwargs)
 
-    async def say_when_free(self, why: str, *, wait: float = 30.0, anyway: bool = False, **kwargs):
-        """切れ目を wait 秒まで待ってから話させる。待ちきれず anyway でなければ None（呼んだ側が別の機会に回す）"""
+    async def say_when_free(self, why: str, *, wait: float = 30.0, anyway: bool = False, settle: float = 0.0,
+                            **kwargs):
+        """切れ目を wait 秒まで待ってから話させる。settle 秒は続けて切れ目であること（話の途中の息つぎで言い出さない）。
+        待ちきれず anyway でなければ None（呼んだ側が別の機会に回す）"""
         deadline = time.monotonic() + wait
-        while self.busy() and time.monotonic() < deadline:
+        free_since = None
+        while time.monotonic() < deadline:
+            if self.busy():
+                free_since = None
+            elif free_since is None:
+                free_since = time.monotonic()
+            if free_since is not None and time.monotonic() - free_since >= settle:
+                break
             await asyncio.sleep(FREE_POLL)
         if self.busy() and not anyway:
             log.info('口：%s は切れ目が来ないので話さない', why)

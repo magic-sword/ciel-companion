@@ -133,6 +133,14 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('議事録開始して', sent)
         self.assertIn(mind.HANDLED_NOTE, sent)
 
+    async def test_handled_requests_stay_hidden_in_later_turns(self):
+        h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))
+        m = mind.Mind(h, style=Style())
+        m.on_handled('議事録開始して。')
+        texts = [i.text_content for i in m.build(self.ctx_with('予算は去年と同じくらい'), turn={}).items]
+        self.assertFalse(any('議事録開始して' in t for t in texts))
+        self.assertTrue(any(mind.HANDLED_NOTE in t for t in texts))
+
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()
         ctx.add_message(role='user', content='議事録とって')

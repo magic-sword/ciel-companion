@@ -45,6 +45,23 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await m.say_when_free('minutes', wait=1.0, instructions='y'), 'handle')
         self.assertEqual(s.calls, [{'instructions': 'y'}])
 
+    async def test_a_breath_is_not_a_pause(self):
+        s = FakeSession()
+        m = mouth.Mouth(s)
+        said_at = []
+
+        async def breathe():
+            for _ in range(3):   # 息つぎ（短い間）をはさみながら話し続ける
+                await asyncio.sleep(0.03)
+                s.user_state = 'speaking'
+                await asyncio.sleep(0.03)
+                s.user_state = 'listening'
+        with mock.patch.object(mouth, 'FREE_POLL', 0.01):
+            talk = asyncio.create_task(breathe())
+            await m.say_when_free('minutes', wait=2.0, settle=0.1)
+            said_at.append(talk.done())
+        self.assertEqual(said_at, [True])   # 話し終えてから言う
+
     async def test_gives_up_or_speaks_anyway(self):
         s = FakeSession()
         s.agent_state = 'speaking'

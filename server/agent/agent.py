@@ -89,6 +89,10 @@ ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.6'))
 ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.5'))
 # 議事録を始めてから、この秒数のうちの「もうとっている」は言わない（聞く係と会話モデルの、同じ頼みの二重）
 ALREADY_QUIET_SECONDS = 30.0
+# 返事を作る前に、聞く係が頼みを確かめ終えるのを待つ上限（ふだんは約 1 秒で終わる）
+LISTENER_WAIT = 3.0
+# 議事録の知らせは、相手がこの秒数だまってから言う（息つぎの間に言いかけて、続きの話で止められた。2026-10-30）
+MINUTES_SETTLE = 1.2
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API・pipeline のときだけ
 SPEAKERS = VOICE == 'irodori' and (REALTIME or PIPELINE)
 # Realtime API の雑音除去（make_model）
@@ -179,6 +183,7 @@ class Ciel(Agent):
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
         self.preamble = emotion.PreambleCut()   # 道具を呼んだ返事の前置きを止める（歌・議事録の道具が頼む）
         self.mind: mind.Mind | None = None      # pipeline の心（entrypoint がつなぐ）
+        self.ear: listener.Listener | None = None   # pipeline の聞く係（entrypoint がつなぐ）
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
 
@@ -196,6 +201,8 @@ class Ciel(Agent):
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
         """pipeline：誰が話したかを決め、心と小脳のどちらが返すかをコードで決めて（mind.py の route）、返事を流す"""
         turn = await self.replies.pipeline_turn() if self.replies is not None else {}
+        if self.ear is not None:
+            await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
         if self.mind.route(chat_ctx, turn) == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
             ctx, fns = self.mind.build(chat_ctx, turn=turn), tools
@@ -352,9 +359,9 @@ async def entrypoint(ctx: JobContext) -> None:
                                brief_instructions=agent.persona.mind_brief_instructions)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
-        session.on('user_input_transcribed',
-                   listener.Listener(history, minute_taker, agent.persona.listener_instructions,
-                                     on_handled=agent.mind.on_handled).on_transcribed)
+        agent.ear = listener.Listener(history, minute_taker, agent.persona.listener_instructions,
+                                      on_handled=agent.mind.on_handled)
+        session.on('user_input_transcribed', agent.ear.on_transcribed)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
@@ -396,7 +403,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # （「とり始めますね」「もうとっていますね」と続けて言った。2026-10-30）
         if not (what == minutes.ALREADY and now - started_at < ALREADY_QUIET_SECONDS):
             # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
-            asyncio.create_task(voice.say_when_free('minutes', anyway=True,
+            asyncio.create_task(voice.say_when_free('minutes', anyway=True, settle=MINUTES_SETTLE,
                                                     instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))

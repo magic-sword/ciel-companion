@@ -153,7 +153,7 @@ class Mind:
             if t.role == 'user':
                 if any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
-                out.add_message(role='user', content=f'{t.name}：{text}')
+                out.add_message(role='user', content=f'{t.name}：{self._unhandled(text)}')
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None)
@@ -171,12 +171,17 @@ class Mind:
         if getattr(item, 'role', None) != 'user' or not self.handled:
             return item
         text = _text(item)
-        marked = text
-        for done in self.handled:
-            marked = marked.replace(done, f'（{HANDLED_NOTE}）')
+        marked = self._unhandled(text)
         if marked == text:
             return item
         return llm.ChatMessage(role='user', content=[marked])
+
+    def _unhandled(self, text: str) -> str:
+        """聞く係がもう受けた頼みを「（受け済み）」に置き換える。今回の発言だけでなく、次の返事で最近の発言として渡すときも
+        置き換える（次の発言で心に回ったとき、記録の側の「議事録開始して」を読んで終了の道具を呼んだ。2026-10-30）"""
+        for done in self.handled:
+            text = text.replace(done, f'（{HANDLED_NOTE}）')
+        return text
 
     def _recent(self, n: int):
         if self.history is None:
