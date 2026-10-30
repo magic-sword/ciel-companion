@@ -38,6 +38,7 @@ TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
 DEEP_WHY = ('minutes', 'song', 'enrolled')   # 心が返事を作る、口（mouth.py）の why
+HANDLED_KEEP = 10          # 聞く係が受けた頼みを覚えておく数
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -64,6 +65,7 @@ class Mind:
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
         self._deep = False               # 次の返事は心が作る
+        self.handled: list[str] = []     # 聞く係がもう受けた頼みの文字起こし（頼みごととして数えない）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -75,6 +77,10 @@ class Mind:
         return self._client
 
     # ---- 小脳と心の振り分け ----
+
+    def on_handled(self, text: str) -> None:
+        """聞く係が、この文字起こしの頼みを受けて議事録を動かした（listener.Listener の on_handled）"""
+        self.handled = (self.handled + [text.strip()])[-HANDLED_KEEP:]
 
     def on_say(self, why: str) -> None:
         """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
@@ -92,9 +98,14 @@ class Mind:
         text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
         if not text:
             return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
+        # 聞く係がもう受けた頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
+        # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
+        rest = text
+        for done in self.handled:
+            rest = rest.replace(done, '')
         # ひかえめ（会議）では、何人も話したことは心に回す理由にしない（人どうしの話に心が意見を言った。2026-10-30）
         quiet = self.style is not None and self.style.talk == 'quiet'
-        why = ('request' if REQUEST.search(text)
+        why = ('request' if REQUEST.search(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
                else 'people' if not quiet and self._speakers_since_ciel() >= 2
                else 'named' if quiet and NAME.search(text)

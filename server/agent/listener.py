@@ -31,10 +31,11 @@ COOLDOWN = 20.0     # 同じ頼みを続けて動かさない秒数（「議事�
 
 
 class Listener:
-    def __init__(self, history, minutes, instructions: str, client=None) -> None:
+    def __init__(self, history, minutes, instructions: str, client=None, on_handled=None) -> None:
         self.history = history        # conversation.Conversation
         self.minutes = minutes        # minutes.Minutes
         self.instructions = instructions   # config/prompts/listener.md
+        self.on_handled = on_handled  # 頼みを受けた文字起こしを知らせる先（mind.Mind.on_handled。心が同じ頼みを受け直さない）
         self._client = client
         self._done: dict[str, float] = {}  # 頼みの種類 → 動かした時刻
         self._tasks: set[asyncio.Task] = set()
@@ -69,7 +70,10 @@ class Listener:
         except Exception as e:   # 確かめられなくても、会話は続ける（会話モデルが道具で受けることもできる）
             log.warning('聞く係：頼みを確かめられない：%s', type(e).__name__)
             return None
-        return self.act(result, time.monotonic())
+        action = self.act(result, time.monotonic())
+        if action is not None and self.on_handled is not None:
+            self.on_handled(text)
+        return action
 
     def act(self, result, now: float) -> str | None:
         action = result.get('action') if isinstance(result, dict) else None

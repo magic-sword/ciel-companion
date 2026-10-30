@@ -24,7 +24,9 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         self.context = SimpleNamespace(userdata=SimpleNamespace(minutes=self.m))
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        for target, value in [('minutes.WEBHOOK', ''), ('minutes.SAVE_DIR', Path(self.tmp.name))]:
+        # 始めた直後の終了の確かめ（test_finish_right_after_start_asks_first）は、ほかの試験では外す
+        for target, value in [('minutes.WEBHOOK', ''), ('minutes.SAVE_DIR', Path(self.tmp.name)),
+                              ('tools.minutes.JUST_STARTED_SECONDS', 0.0)]:
             p = patch(target, value)
             p.start()
             self.addCleanup(p.stop)
@@ -86,6 +88,14 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
                          minutes.NOT_RECORDING)
         await self.m.flush()
         self.assertFalse(self.m.status()['processing'])
+
+    async def test_finish_right_after_start_asks_first(self):
+        await start_minutes(self.context)
+        with patch('tools.minutes.JUST_STARTED_SECONDS', 30.0):
+            self.assertEqual(json.loads(await finish_minutes(self.context))['status'], 'just_started')
+            self.assertTrue(self.m.recording)
+            result = await finish_minutes(self.context, confirm=True)
+        self.assertEqual(json.loads(result.output)['status'], minutes.FINISHED)
 
     async def test_status_tool_is_read_only(self):
         self.m.start()

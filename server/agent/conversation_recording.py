@@ -9,6 +9,8 @@ import turns
 
 log = logging.getLogger('ciel-agent.conversation')
 
+CUT_OFF_CHARS = 6   # 止められた返事が、これ以下の文字数なら記録しない
+
 
 class ConversationRecorder:
     def __init__(self, history, replies, note_taker=None):
@@ -37,6 +39,8 @@ class ConversationRecorder:
                                item.metrics.get('started_speaking_at'), item.id)
         if item.role == 'assistant':
             text = emotion.strip_tags(item.text_content or '').replace('[silent]', '').strip()
+            if getattr(item, 'interrupted', False) and len(text) <= CUT_OFF_CHARS:
+                return   # 言いかけてすぐ止められた返事（「わ」「議事録、と」）は、話したことにしない
             if text and not self._has_source(item.id):
                 turn = self.history.reserve(item.created_at, 'assistant')
                 turn.source_id = item.id

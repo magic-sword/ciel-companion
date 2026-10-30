@@ -116,6 +116,7 @@ class Meeting:
     closed: bool = False
     incomplete: bool = False
     snapshot: list[Line] | None = None  # 過去のまとめは依頼時の対象を固定する
+    began: float = field(default_factory=time.monotonic)   # 始めた時刻（さかのぼった分は含めない。recording_seconds）
     export_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
     summarized_turn_count: int = 0
     stage: str = 'recording'
@@ -165,6 +166,10 @@ class Minutes:
     @property
     def recording(self) -> bool:
         return self.meeting is not None
+
+    def recording_seconds(self) -> float:
+        """今の議事録を始めてからの秒数（とっていなければ 0）"""
+        return time.monotonic() - self.meeting.began if self.meeting is not None else 0.0
 
     def status(self) -> dict:
         """会話モデルへ渡す事実だけ。まとめや会話の本文は含めない。"""

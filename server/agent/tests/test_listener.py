@@ -33,8 +33,11 @@ class ListenerTest(unittest.IsolatedAsyncioTestCase):
     async def test_request_in_the_middle_of_talk_starts_minutes(self):
         minutes = FakeMinutes()
         ear, client = self.make(minutes, '{"action": "start", "to_ciel": true, "template": "meeting"}')
+        handled = []
+        ear.on_handled = handled.append
         self.assertEqual(await ear.check('あ、そうだ、議事録開始して'), 'start')
         self.assertEqual(minutes.calls, [('start', 'meeting')])
+        self.assertEqual(handled, ['あ、そうだ、議事録開始して'])   # 心が同じ頼みを受け直さないように知らせる
         # 言い直しても、続けては動かさない
         self.assertIsNone(await ear.check('議事録開始してね'))
         self.assertEqual(len(minutes.calls), 1)

@@ -82,8 +82,11 @@ PIPELINE = MODEL == 'pipeline' and VOICE == 'irodori'
 # 心の考える量（pipeline。none・minimal・low…）
 MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
 # 話し終えたと決めるまでの最短・最長の待ち（pipeline。秒）
-ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.4'))
-ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.2'))
+# 最短 0.4 秒では、話の途中の 0.6 秒の息つぎで返事を始めては止められ、「わ」「は」だけが流れた（2026-10-30）。
+# 話し方に合わせて待ちを変える（dynamic：その人の話の途中の間の長さを覚える）
+ENDPOINT_MODE = os.environ.get('CIEL_ENDPOINT_MODE', 'dynamic')
+ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.6'))
+ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.5'))
 # 議事録を始めてから、この秒数のうちの「もうとっている」は言わない（聞く係と会話モデルの、同じ頼みの二重）
 ALREADY_QUIET_SECONDS = 30.0
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API・pipeline のときだけ
@@ -158,7 +161,7 @@ def make_pipeline(names: list[str]) -> dict:
             'turn_handling': {'turn_detection': inference.TurnDetector(version='v1-mini'),
                               # 話し終えたと決めるまでの待ち。既定（最短 0.5・最長 3 秒）では、区切りのモデルが日本語の
                               # 合成音声に自信を持てず、話し終わりから約 2.25 秒待っていた（2026-10-30、bench_compare.py）
-                              'endpointing': {'min_delay': ENDPOINT_MIN, 'max_delay': ENDPOINT_MAX},
+                              'endpointing': {'mode': ENDPOINT_MODE, 'min_delay': ENDPOINT_MIN, 'max_delay': ENDPOINT_MAX},
                               # 話し終えたと決まる前から、返事の文に加えて声も作り始める
                               'preemptive_generation': {'preemptive_tts': True},
                               # シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py と同じ秒数）
@@ -350,7 +353,8 @@ async def entrypoint(ctx: JobContext) -> None:
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
         session.on('user_input_transcribed',
-                   listener.Listener(history, minute_taker, agent.persona.listener_instructions).on_transcribed)
+                   listener.Listener(history, minute_taker, agent.persona.listener_instructions,
+                                     on_handled=agent.mind.on_handled).on_transcribed)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける

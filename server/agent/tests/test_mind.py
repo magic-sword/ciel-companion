@@ -125,6 +125,12 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         # 「議事録」が「二次録」と書き起こされても、頼みごととして心に回す
         self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('二次録開始して'), {}), 'mind')
 
+    async def test_requests_the_listener_handled_are_not_requests_again(self):
+        m = mind.Mind(history_with(), style=Style())
+        m.on_handled('あ、そうだ、議事録開始して。')
+        ctx = self.ctx_with('商店街にも声をかけて。あ、そうだ、議事録開始して。それで屋台を増やしたい')
+        self.assertEqual(m.route(ctx, {'seconds': 4.0}), 'talker')
+
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()
         ctx.add_message(role='user', content='議事録とって')
