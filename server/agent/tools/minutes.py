@@ -11,7 +11,6 @@ import minutes as service
 from . import cut_preamble
 
 NO_MINUTES = '今は議事録をとれません。'
-JUST_STARTED_SECONDS = 30.0   # 始めてからこの秒数のうちの終了は、確かめてから受ける
 log = logging.getLogger('ciel-agent.minutes-tools')
 
 
@@ -38,16 +37,11 @@ async def start_minutes(context: RunContext, lookback_minutes: int = 0, template
 
 
 @function_tool
-async def finish_minutes(context: RunContext, confirm: bool = False):
-    """会議の議事録をまとめて、下書きを送る（「議事録まとめて」「議事録終わり」と頼まれたとき）。
-    始めたばかりで just_started が返ったら、本当に終えるか聞いてから confirm=true で呼び直す。"""
+async def finish_minutes(context: RunContext):
+    """会議の議事録をまとめて、下書きを送る（「議事録まとめて」「議事録終わり」と頼まれたとき）。"""
     minutes = context.userdata.minutes
     if minutes is None:
         return NO_MINUTES
-    # 始めた直後の終了は、確かめてから受ける。話の途中の頼みで始めた直後、同じ発言の「議事録開始して」を
-    # 会話モデルが終了の頼みと取り違えて終わらせた（2026-10-30）
-    if not confirm and minutes.recording and minutes.recording_seconds() < JUST_STARTED_SECONDS:
-        return json.dumps({'status': 'just_started'})
     status = minutes.finish()
     cut_preamble(context)
     return ToolResult(json.dumps(result(minutes, 'finish', status)), reply_required=False)

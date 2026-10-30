@@ -37,6 +37,7 @@ from pathlib import Path
 import openai
 from livekit import rtc
 
+import board as tasks
 import models
 import speakers
 from conversation import Conversation, Turn
@@ -81,6 +82,9 @@ EMPTY, BUSY, INVALID_RANGE, UNKNOWN_TEMPLATE = 'empty', 'busy', 'invalid_range',
 EXPORT_SENT, EXPORT_SAVED = 'export_sent', 'export_saved'
 EXPORT_FAILED, EXPORT_EMPTY = 'export_failed', 'export_empty'
 RESULTS = {'sent': EXPORT_SENT, 'saved_locally': EXPORT_SAVED, 'failed': EXPORT_FAILED, 'empty': EXPORT_EMPTY}
+# 付箋（board.py）に書く結果のひとこと（{to} は送り先の名前）
+CARD_NOTES = {'sent': '{to}に送った', 'saved_locally': '送れなかったので、サーバーに保存した',
+              'empty': '発言が少なくて作らなかった', 'failed': '作れなかった'}
 # 出来事ごとに、シエルに渡す 1 行（どう伝えるかは config/prompts/minutes_voice.md）。
 # 受け付けたときは、まだ作っている途中なので、送れたらまた知らせると添える（作成中を失敗と取り違えて謝ったことがあった。2026-10-25）
 LINES = {STARTED: '[議事録：とり始めた]', ALREADY: '[議事録：もうとっている]',
@@ -161,6 +165,7 @@ class Minutes:
         self.destinations: dict[str, str] = {}   # 送り先の名前 → Webhook の URL（アプリの端末が知らせる）
         self.destination: str | None = None      # 選んでいる送り先の名前（登録が無ければ None）
         self.on_destination: Callable[[str], None] | None = None   # 声で切り替えたとき（アプリの端末に覚えさせる）
+        self.board: tasks.Board | None = None   # 付箋の一覧（pipeline のとき agent.py がつなぐ）
         self._client = openai.AsyncOpenAI()
 
     @property
@@ -294,10 +299,10 @@ class Minutes:
             return
         if action == 'start':
             template = msg.get('template') or summary_templates.DEFAULT
-            if self.start(template=template if isinstance(template, str) else '') == UNKNOWN_TEMPLATE:
+            if self.start(template=template if isinstance(template, str) else '', by='app') == UNKNOWN_TEMPLATE:
                 log.warning('まとめの知らないテンプレート')
         elif action == 'finish':
-            self.finish()
+            self.finish(by='app')
         elif action == 'refresh':
             self.refresh()
         elif action == 'destinations':
@@ -359,7 +364,7 @@ class Minutes:
 
     # ---- 始め・終わり ----
 
-    def start(self, lookback_minutes: int = 0, template: str = summary_templates.DEFAULT) -> str:
+    def start(self, lookback_minutes: int = 0, template: str = summary_templates.DEFAULT, by: str = 'ciel') -> str:
         if type(lookback_minutes) is not int or not 0 <= lookback_minutes <= 1440:
             return INVALID_RANGE
         if template not in self.templates:
@@ -380,12 +385,20 @@ class Minutes:
         m.timer = asyncio.create_task(self._live(m))
         log.info('議事録：とり始めた（%s）', m.template.name)
         status = STARTED_PARTIAL if m.incomplete else STARTED_EARLIER if lookback_minutes else STARTED
+        if self.board is not None:
+            # 聞く係が確かめていた付箋があれば、それを実行中にする（同じ頼みの付箋を 2 枚にしない）
+            title = f'{m.template.label}をとる'
+            card = self.board.find('minutes', statuses=(tasks.CHECKING,))
+            if card is not None:
+                self.board.move(card, tasks.RUNNING, title=title, ref=m.export_id)
+            else:
+                self.board.add('minutes', title, tasks.RUNNING, by, ref=m.export_id)
         self._changed(status)
         self._publish(m)
         return status
 
     def summarize_past(self, last_minutes: int = 0, first_id: int = 0, last_id: int = 0,
-                       template: str = summary_templates.DEFAULT) -> str:
+                       template: str = summary_templates.DEFAULT, by: str = 'ciel') -> str:
         """開始し忘れた会話の下書きを作って送る。記録状態を切り替えない。"""
         if (any(type(v) is not int or v < 0 for v in (last_minutes, first_id, last_id))
                 or last_minutes > 1440 or (last_minutes and (first_id or last_id))
@@ -410,12 +423,15 @@ class Minutes:
             or (cutoff is None and first_id <= self.history.dropped_through))
         m = Meeting(self.templates[template], datetime.fromtimestamp(rows[0].at, JST), rows[0].id - 1,
                     end_id=through, closed=True, incomplete=incomplete, snapshot=list(rows))
+        if self.board is not None:
+            self.board.add('minutes', f'ここまでの会話を{m.template.label}にまとめて送る', tasks.WRAPPING, by,
+                           ref=m.export_id)
         self._queue_export(m, ended)
         status = PAST_PARTIAL if incomplete else PAST_QUEUED
         self._changed(status)
         return status
 
-    def finish(self, announce: bool = True) -> str:
+    def finish(self, announce: bool = True, by: str = 'ciel') -> str:
         m = self.meeting
         if m is None:
             log.info('議事録：とっていない')
@@ -428,6 +444,9 @@ class Minutes:
         if m.timer is not None and not m.lock.locked():   # ライブの更新の最中なら、終わるのを待つ（_write が lock で待つ）
             m.timer.cancel()
         self._shown = m
+        card = self.board.find('minutes', ref=m.export_id) if self.board is not None else None
+        if card is not None:
+            self.board.move(card, tasks.WRAPPING, title=f'{m.template.label}をまとめて送る')
         self._queue_export(m, datetime.now(JST))
         if announce:
             self._changed(FINISHED)
@@ -557,6 +576,10 @@ class Minutes:
             m.snapshot = None
             log.info('議事録：処理結果 id=%s stage=%s', m.export_id, m.stage)
             self._publish(m)
+            card = self.board.find('minutes', ref=m.export_id) if self.board is not None else None
+            if card is not None:
+                self.board.move(card, tasks.FAILED if m.stage == 'failed' else tasks.DONE,
+                                note=CARD_NOTES.get(m.stage, '').format(to=m.destination or 'サーバー'))
             if not self._closing and m.stage in RESULTS:
                 task = asyncio.create_task(self._announce(RESULTS[m.stage]))
                 self._announcing.add(task)

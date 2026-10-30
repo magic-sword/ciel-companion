@@ -5,6 +5,7 @@ from unittest import mock
 
 from livekit.agents import llm
 
+import board
 import mind
 from conversation import Conversation
 
@@ -123,23 +124,30 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         # 「議事録」が「二次録」と書き起こされても、頼みごととして心に回す
         self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('二次録開始して'), {}), 'mind')
 
-    async def test_requests_the_listener_handled_are_not_requests_again(self):
-        m = mind.Mind(history_with(), style=Style())
-        m.on_handled('あ、そうだ、議事録開始して。')
+    def board_with_minutes(self, said):
+        tasks = board.Board()
+        tasks.add('minutes', '会議の議事録をとる', board.RUNNING, 'listener', said=said)
+        return tasks
+
+    async def test_requests_on_the_board_are_not_requests_again(self):
+        m = mind.Mind(history_with(), style=Style(), board=self.board_with_minutes('あ、そうだ、議事録開始して。'))
         ctx = self.ctx_with('商店街にも声をかけて。あ、そうだ、議事録開始して。それで屋台を増やしたい')
         self.assertEqual(m.route(ctx, {'seconds': 4.0}), 'talker')
-        # 長い話で心に回っても、受けた頼みは「受け済み」と書き換えて渡す（終了の頼みと取り違えないように）
-        sent = m.build(ctx, turn={}).items[-1].text_content
-        self.assertNotIn('議事録開始して', sent)
-        self.assertIn(mind.HANDLED_NOTE, sent)
+        # 長い話で心に回っても、付箋になった頼みは付箋の印で渡す（終了の頼みと取り違えないように）
+        items = m.build(ctx, turn={}).items
+        self.assertNotIn('議事録開始して', items[-1].text_content)
+        self.assertIn('（→ #1 会議の議事録をとる：実行中）', items[-1].text_content)
+        self.assertIn('[今のタスク]\n#1 会議の議事録をとる：実行中', items[-2].text_content)
 
-    async def test_handled_requests_stay_hidden_in_later_turns(self):
+    async def test_requests_on_the_board_stay_marked_in_later_turns(self):
         h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))
-        m = mind.Mind(h, style=Style())
-        m.on_handled('議事録開始して。')
+        m = mind.Mind(h, style=Style(), board=self.board_with_minutes('議事録開始して。'))
         texts = [i.text_content for i in m.build(self.ctx_with('予算は去年と同じくらい'), turn={}).items]
         self.assertFalse(any('議事録開始して' in t for t in texts))
-        self.assertTrue(any(mind.HANDLED_NOTE in t for t in texts))
+        self.assertIn('ゆうき：商店街にも声をかけて。あ、そうだ、（→ #1 会議の議事録をとる：実行中）', texts)
+        # 小脳にも、今どうなっているかを渡す（していないことを言わないように）
+        talker = m.build(self.ctx_with('うん'), talker_instructions='短い指示', turn={}).items
+        self.assertTrue(any('[今のタスク]' in i.text_content for i in talker))
 
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()

@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from conversation import Conversation
+import board
 import minutes
 from tools.minutes import finish_minutes, get_minutes_status, read_minutes, start_minutes
 from turns import TurnReplies
@@ -24,9 +25,7 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         self.context = SimpleNamespace(userdata=SimpleNamespace(minutes=self.m))
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        # 始めた直後の終了の確かめ（test_finish_right_after_start_asks_first）は、ほかの試験では外す
-        for target, value in [('minutes.WEBHOOK', ''), ('minutes.SAVE_DIR', Path(self.tmp.name)),
-                              ('tools.minutes.JUST_STARTED_SECONDS', 0.0)]:
+        for target, value in [('minutes.WEBHOOK', ''), ('minutes.SAVE_DIR', Path(self.tmp.name))]:
             p = patch(target, value)
             p.start()
             self.addCleanup(p.stop)
@@ -89,13 +88,17 @@ class MinutesStateTests(unittest.IsolatedAsyncioTestCase):
         await self.m.flush()
         self.assertFalse(self.m.status()['processing'])
 
-    async def test_finish_right_after_start_asks_first(self):
-        await start_minutes(self.context)
-        with patch('tools.minutes.JUST_STARTED_SECONDS', 30.0):
-            self.assertEqual(json.loads(await finish_minutes(self.context))['status'], 'just_started')
-            self.assertTrue(self.m.recording)
-            result = await finish_minutes(self.context, confirm=True)
-        self.assertEqual(json.loads(result.output)['status'], minutes.FINISHED)
+    async def test_minutes_move_one_card_on_the_board(self):
+        self.m.board = tasks = board.Board()
+        checking = tasks.add('minutes', '議事録の頼みかを確かめる', board.CHECKING, 'listener', said='議事録開始して')
+        self.m.start(by='listener')
+        self.m.start()   # 同じ頼みの二重は、付箋を増やさない
+        self.assertEqual([(c.id, c.status, c.ref) for c in tasks.cards],
+                         [(checking.id, board.RUNNING, self.m.meeting.export_id)])
+        self.m.finish()
+        self.assertEqual(checking.status, board.WRAPPING)
+        await self.m.flush()
+        self.assertEqual(checking.status, board.DONE)
 
     async def test_status_tool_is_read_only(self):
         self.m.start()

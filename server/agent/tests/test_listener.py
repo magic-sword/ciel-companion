@@ -2,6 +2,7 @@ import types
 import unittest
 from unittest import mock
 
+import board
 import listener
 
 
@@ -10,11 +11,15 @@ class FakeMinutes:
         self.recording = recording
         self.calls = []
 
-    def start(self, lookback, template):
+    board = None
+
+    def start(self, lookback, template, by='ciel'):
         self.calls.append(('start', template))
+        if self.board is not None:   # 本物の議事録係と同じく、確認中の付箋を実行中にする
+            self.board.move(self.board.find('minutes', statuses=(board.CHECKING,)), board.RUNNING)
         return 'started'
 
-    def finish(self):
+    def finish(self, by='ciel'):
         self.calls.append(('finish',))
         return 'finishing'
 
@@ -25,27 +30,29 @@ def reply(content):
 
 
 class ListenerTest(unittest.IsolatedAsyncioTestCase):
-    def make(self, minutes, answer):
+    def make(self, minutes, answer, tasks=None):
         client = mock.Mock()
         client.chat.completions.create = mock.AsyncMock(return_value=reply(answer))
-        return listener.Listener(None, minutes, '耳の指示', client=client), client
+        return listener.Listener(None, minutes, '耳の指示', client=client, board=tasks), client
 
     async def test_request_in_the_middle_of_talk_starts_minutes(self):
         minutes = FakeMinutes()
-        ear, client = self.make(minutes, '{"action": "start", "to_ciel": true, "template": "meeting"}')
-        handled = []
-        ear.on_handled = handled.append
+        minutes.board = tasks = board.Board()
+        ear, client = self.make(minutes, '{"action": "start", "to_ciel": true, "template": "meeting"}', tasks)
         self.assertEqual(await ear.check('あ、そうだ、議事録開始して'), 'start')
         self.assertEqual(minutes.calls, [('start', 'meeting')])
-        self.assertEqual(handled, ['あ、そうだ、議事録開始して'])   # 心が同じ頼みを受け直さないように知らせる
+        # 頼んだ発言は議事録の付箋に結び付く（心が同じ頼みを受け直さない）
+        self.assertEqual([(c.status, c.said) for c in tasks.cards], [(board.RUNNING, ['あ、そうだ、議事録開始して'])])
         # 言い直しても、続けては動かさない
         self.assertIsNone(await ear.check('議事録開始してね'))
         self.assertEqual(len(minutes.calls), 1)
 
     async def test_requests_to_others_and_talk_about_minutes_do_nothing(self):
         minutes = FakeMinutes()
-        ear, _ = self.make(minutes, '{"action": "start", "to_ciel": false}')
+        tasks = board.Board()
+        ear, _ = self.make(minutes, '{"action": "start", "to_ciel": false}', tasks)
         self.assertIsNone(await ear.check('田中さん、議事録とっといて'))
+        self.assertEqual(tasks.cards, [])   # 確かめていた付箋は外す
         ear, _ = self.make(minutes, '{"action": "none"}')
         self.assertIsNone(await ear.check('前回の議事録、読んだ？'))
         self.assertEqual(minutes.calls, [])

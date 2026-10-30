@@ -40,3 +40,5 @@ talker_instructions_file = "prompts/talker.md"
 mind_brief_instructions_file = "prompts/mind_brief.md"
 # 聞く係（listener.py）：話の途中の一言が、シエルへの議事録の頼みかを決める
 listener_instructions_file = "prompts/listener.md"
+# 付箋（board.py）：「[今のタスク]」と、頼みの発言に付く印の読み方（心と小脳の両方に渡す）
+tasks_instructions_file = "prompts/tasks.md"

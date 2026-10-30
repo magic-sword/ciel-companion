@@ -38,8 +38,6 @@ TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
 DEEP_WHY = ('minutes', 'song', 'enrolled')   # 心が返事を作る、口（mouth.py）の why
-HANDLED_KEEP = 10          # 聞く係が受けた頼みを覚えておく数
-HANDLED_NOTE = '議事録の頼み。もう受けて、議事録を動かしてある'   # 送る会話で、受けた頼みの代わりに置く言葉
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -52,10 +50,11 @@ BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まっ�
 
 class Mind:
     def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
-                 brief_instructions: str = '', client=None) -> None:
+                 brief_instructions: str = '', client=None, board=None) -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
+        self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.quiet_turn = quiet_turn  # ひかえめのときの念押し（config/prompts/talk_quiet_turn.md）
         self.brief_instructions = brief_instructions   # config/prompts/mind_brief.md
@@ -66,7 +65,6 @@ class Mind:
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
         self._deep = False               # 次の返事は心が作る
-        self.handled: list[str] = []     # 聞く係がもう受けた頼みの文字起こし（頼みごととして数えない）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -78,10 +76,6 @@ class Mind:
         return self._client
 
     # ---- 小脳と心の振り分け ----
-
-    def on_handled(self, text: str) -> None:
-        """聞く係が、この文字起こしの頼みを受けて議事録を動かした（listener.Listener の on_handled）"""
-        self.handled = (self.handled + [text.strip()])[-HANDLED_KEEP:]
 
     def on_say(self, why: str) -> None:
         """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
@@ -99,11 +93,9 @@ class Mind:
         text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
         if not text:
             return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
-        # 聞く係がもう受けた頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
+        # 付箋になった頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
         # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
-        rest = text
-        for done in self.handled:
-            rest = rest.replace(done, '')
+        rest = self.board.strip(text) if self.board is not None else text
         # ひかえめ（会議）では、どの発言も心が受ける。黙るか答えるかの見極めは、短い指示の小脳では人どうしの話に
         # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
         # 黙る返事は声にならないので、心で受けても遅れは気にならない
@@ -153,7 +145,7 @@ class Mind:
             if t.role == 'user':
                 if any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
-                out.add_message(role='user', content=f'{t.name}：{self._unhandled(text)}')
+                out.add_message(role='user', content=f'{t.name}：{self._marked(text)}')
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None)
@@ -162,26 +154,21 @@ class Mind:
         speaker = '\n'.join(x for x in (turn.get('tag'), turn.get('touch')) if x)
         if speaker and tail_users:
             out.add_message(role='system', content=speaker)   # 今回の発言の話者（とタッチ）
-        out.items.extend(self._mark_handled(i) for i in tail)
+        out.items.extend(self._mark_item(i) for i in tail)
         return out
 
-    def _mark_handled(self, item):
-        """今回の発言のうち、聞く係がもう受けた頼みを「（受け済み）」に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）。
-        長い話の途中の「議事録開始して」を、議事録をとっている心が終了の頼みと取り違えた（2026-10-30）"""
-        if getattr(item, 'role', None) != 'user' or not self.handled:
+    def _mark_item(self, item):
+        """今回の発言の、付箋になった頼みを付箋の印に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）"""
+        if getattr(item, 'role', None) != 'user':
             return item
         text = _text(item)
-        marked = self._unhandled(text)
-        if marked == text:
-            return item
-        return llm.ChatMessage(role='user', content=[marked])
+        marked = self._marked(text)
+        return item if marked == text else llm.ChatMessage(role='user', content=[marked])
 
-    def _unhandled(self, text: str) -> str:
-        """聞く係がもう受けた頼みを「（受け済み）」に置き換える。今回の発言だけでなく、次の返事で最近の発言として渡すときも
-        置き換える（次の発言で心に回ったとき、記録の側の「議事録開始して」を読んで終了の道具を呼んだ。2026-10-30）"""
-        for done in self.handled:
-            text = text.replace(done, f'（{HANDLED_NOTE}）')
-        return text
+    def _marked(self, text: str) -> str:
+        """付箋になった頼みを「（→ #3 議事録をとる：実行中）」に置き換える。今回の発言も、最近の発言として渡す過去の分も
+        （過去の「議事録開始して」を読んだ心が、終了の頼みと取り違えて終了の道具を呼んだ。2026-10-30）"""
+        return self.board.mark(text) if self.board is not None else text
 
     def _recent(self, n: int):
         if self.history is None:
@@ -200,6 +187,8 @@ class Mind:
                 self._state = note
             if self._state and self.style is not None and self.style.talk == 'chatty':
                 lines.append(self._state)
+        if self.board is not None:
+            lines.append(self.board.context())   # 今どうなっているか（小脳も、していないことを言わないように読む）
         if deep and self.minutes is not None:
             lines.append(self.minutes.context())
             note = self.minutes.take_note()

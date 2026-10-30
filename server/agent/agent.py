@@ -33,6 +33,7 @@ from openai.types.realtime.realtime_reasoning import RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
 import aizuchi
+import board
 import clock
 import debug_log
 import emotion
@@ -87,8 +88,6 @@ MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
 ENDPOINT_MODE = os.environ.get('CIEL_ENDPOINT_MODE', 'dynamic')
 ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.6'))
 ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.5'))
-# 議事録を始めてから、この秒数のうちの「もうとっている」は言わない（聞く係と会話モデルの、同じ頼みの二重）
-ALREADY_QUIET_SECONDS = 30.0
 # 返事を作る前に、聞く係が頼みを確かめ終えるのを待つ上限（ふだんは約 1 秒で終わる）
 LISTENER_WAIT = 3.0
 # 議事録の知らせは、相手がこの秒数だまってから言う（息つぎの間に言いかけて、続きの話で止められた。2026-10-30）
@@ -218,7 +217,7 @@ class Ciel(Agent):
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
         話者の識別・議事録・道具の使い方は心が受け持つので入れない"""
         p = self.persona
-        parts = [p.instructions + p.emotion_instructions, p.touch_instructions, p.talker_instructions,
+        parts = [p.instructions + p.emotion_instructions, p.touch_instructions, p.talker_instructions, p.tasks_instructions,
                  {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
                   'public': p.presence_public_instructions}[presence]]
         talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
@@ -238,6 +237,8 @@ class Ciel(Agent):
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions,
                   p.inner_thoughts_voice_instructions]
+        if PIPELINE:
+            parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
         if VOICE == 'irodori':
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
@@ -354,13 +355,16 @@ async def entrypoint(ctx: JobContext) -> None:
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
     if PIPELINE:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
+        # 付箋の一覧：頼まれたこと・していることの今の状態を、心・小脳・アプリが同じ 1 つで見る（board.py）
+        tasks = board.Board()
+        tasks.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
+        minute_taker.board = tasks
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
-                               brief_instructions=agent.persona.mind_brief_instructions)
+                               brief_instructions=agent.persona.mind_brief_instructions, board=tasks)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
-        agent.ear = listener.Listener(history, minute_taker, agent.persona.listener_instructions,
-                                      on_handled=agent.mind.on_handled)
+        agent.ear = listener.Listener(history, minute_taker, agent.persona.listener_instructions, board=tasks)
         session.on('user_input_transcribed', agent.ear.on_transcribed)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
@@ -391,20 +395,11 @@ async def entrypoint(ctx: JobContext) -> None:
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
                        if note_taker is not None else None)
 
-    started_at = -1e9
-
     def on_minutes(what: str) -> None:
-        # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        nonlocal started_at
-        now = time.monotonic()
-        if what == minutes.STARTED:
-            started_at = now
-        # 聞く係が始めた直後に、会話モデルも道具で始めようとしたとき（同じ頼みの二重）は、「もうとっている」を言わない
-        # （「とり始めますね」「もうとっていますね」と続けて言った。2026-10-30）
-        if not (what == minutes.ALREADY and now - started_at < ALREADY_QUIET_SECONDS):
-            # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
-            asyncio.create_task(voice.say_when_free('minutes', anyway=True, settle=MINUTES_SETTLE,
-                                                    instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
+        # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる。
+        # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
+        asyncio.create_task(voice.say_when_free('minutes', anyway=True, settle=MINUTES_SETTLE,
+                                                instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
