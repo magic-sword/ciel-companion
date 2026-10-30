@@ -108,10 +108,10 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(m.route(self.ctx_with('あ、議事録開始して'), {'seconds': 2.0}), 'mind')       # 頼みごと
         self.assertEqual(m.route(self.ctx_with('今日はね'), {'seconds': 12.0}), 'mind')                # 長い話
         self.assertEqual(m.route(self.ctx_with('あ' * 90), {}), 'mind')
-        # ひかえめ（会議）では、名前（聞き間違いも）を呼ばれたら心が返す
+        # ひかえめ（会議）では、どの発言も心が受け、黙るか答えるかを見極める
         quiet = mind.Mind(history_with(), style=Style('quiet'))
         self.assertEqual(quiet.route(self.ctx_with('シェル、今の話どう思う？'), {'seconds': 3.0}), 'mind')
-        self.assertEqual(quiet.route(self.ctx_with('ポスターは水曜までに作りましょう'), {'seconds': 3.0}), 'talker')
+        self.assertEqual(quiet.route(self.ctx_with('ポスターは水曜までに作りましょう'), {'seconds': 3.0}), 'mind')
         # 議事録・歌の知らせは、次の 1 回だけ心が返す
         m.on_say('minutes')
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
@@ -120,16 +120,18 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
     async def test_several_people_since_ciel_go_to_the_mind(self):
         h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))
         self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('いいですね'), {}), 'mind')
-        # ひかえめ（会議）では、人どうしの話に心が口をはさまないよう、何人も話しただけでは心に回さない
-        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('いいですね'), {}), 'talker')
         # 「議事録」が「二次録」と書き起こされても、頼みごととして心に回す
-        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('二次録開始して'), {}), 'mind')
+        self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('二次録開始して'), {}), 'mind')
 
     async def test_requests_the_listener_handled_are_not_requests_again(self):
         m = mind.Mind(history_with(), style=Style())
         m.on_handled('あ、そうだ、議事録開始して。')
         ctx = self.ctx_with('商店街にも声をかけて。あ、そうだ、議事録開始して。それで屋台を増やしたい')
         self.assertEqual(m.route(ctx, {'seconds': 4.0}), 'talker')
+        # 長い話で心に回っても、受けた頼みは「受け済み」と書き換えて渡す（終了の頼みと取り違えないように）
+        sent = m.build(ctx, turn={}).items[-1].text_content
+        self.assertNotIn('議事録開始して', sent)
+        self.assertIn(mind.HANDLED_NOTE, sent)
 
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()

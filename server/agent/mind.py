@@ -39,6 +39,7 @@ BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数
 BRIEF_TIMEOUT = 20.0
 DEEP_WHY = ('minutes', 'song', 'enrolled')   # 心が返事を作る、口（mouth.py）の why
 HANDLED_KEEP = 10          # 聞く係が受けた頼みを覚えておく数
+HANDLED_NOTE = '議事録の頼み。もう受けて、議事録を動かしてある'   # 送る会話で、受けた頼みの代わりに置く言葉
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -103,12 +104,15 @@ class Mind:
         rest = text
         for done in self.handled:
             rest = rest.replace(done, '')
-        # ひかえめ（会議）では、何人も話したことは心に回す理由にしない（人どうしの話に心が意見を言った。2026-10-30）
+        # ひかえめ（会議）では、どの発言も心が受ける。黙るか答えるかの見極めは、短い指示の小脳では人どうしの話に
+        # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
+        # 黙る返事は声にならないので、心で受けても遅れは気にならない
         quiet = self.style is not None and self.style.talk == 'quiet'
         why = ('request' if REQUEST.search(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
                else 'people' if not quiet and self._speakers_since_ciel() >= 2
                else 'named' if quiet and NAME.search(text)
+               else 'quiet' if quiet
                else None)
         if why is None:
             return 'talker'
@@ -158,8 +162,21 @@ class Mind:
         speaker = '\n'.join(x for x in (turn.get('tag'), turn.get('touch')) if x)
         if speaker and tail_users:
             out.add_message(role='system', content=speaker)   # 今回の発言の話者（とタッチ）
-        out.items.extend(tail)
+        out.items.extend(self._mark_handled(i) for i in tail)
         return out
+
+    def _mark_handled(self, item):
+        """今回の発言のうち、聞く係がもう受けた頼みを「（受け済み）」に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）。
+        長い話の途中の「議事録開始して」を、議事録をとっている心が終了の頼みと取り違えた（2026-10-30）"""
+        if getattr(item, 'role', None) != 'user' or not self.handled:
+            return item
+        text = _text(item)
+        marked = text
+        for done in self.handled:
+            marked = marked.replace(done, f'（{HANDLED_NOTE}）')
+        if marked == text:
+            return item
+        return llm.ChatMessage(role='user', content=[marked])
 
     def _recent(self, n: int):
         if self.history is None:
