@@ -136,8 +136,15 @@ def make_pipeline(names: list[str]) -> dict:
     vad = inference.VAD()
     hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
     model = models.model('stt')
-    stt = openai.STT(model=model, language='ja', vad=vad, prompt=f'AI キャラクター「シエル」との会話。出てくる名前：{hint}',
-                     **({'keywords': ['シエル', *names][:30]} if model == 'gpt-live-transcribe' else {}))
+    # gpt-realtime-whisper は名前のヒント（prompt）を受け付けない（渡すと会話が止まった。2026-10-30）。
+    # gpt-live-transcribe は keywords で名前を渡せる。そのほかのモデルは prompt で渡す
+    if model == 'gpt-live-transcribe':
+        hints = {'keywords': ['シエル', *names][:30]}
+    elif model == 'gpt-realtime-whisper':
+        hints = {}
+    else:
+        hints = {'prompt': f'AI キャラクター「シエル」との会話。出てくる名前：{hint}'}
+    stt = openai.STT(model=model, language='ja', vad=vad, **hints)
     return {'vad': vad, 'stt': stt,
             # 区切り：声の調子から話し終えたかを見るモデル（手元で動く小さい版。日本語に対応）
             'turn_handling': {'turn_detection': inference.TurnDetector(version='v1-mini'),
