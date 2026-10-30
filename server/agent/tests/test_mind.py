@@ -119,7 +119,11 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_several_people_since_ciel_go_to_the_mind(self):
         h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))
-        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('いいですね'), {}), 'mind')
+        self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('いいですね'), {}), 'mind')
+        # ひかえめ（会議）では、人どうしの話に心が口をはさまないよう、何人も話しただけでは心に回さない
+        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('いいですね'), {}), 'talker')
+        # 「議事録」が「二次録」と書き起こされても、頼みごととして心に回す
+        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('二次録開始して'), {}), 'mind')
 
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()

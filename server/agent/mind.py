@@ -43,7 +43,7 @@ LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
 NAME = re.compile(r'シエル|しえる|シェル|シェアル|チエル|ciel|\bCL\b', re.IGNORECASE)
 # 道具が要る頼みごとの言葉（議事録・調べもの・時刻・名前・覚えていること・歌）。あれば心が返す
-REQUEST = re.compile(r'議事録|記録|まとめ|調べ|検索|何時|時間を|名前|覚えて|忘れて|歌')
+REQUEST = re.compile(r'録|まとめ|調べ|検索|何時|時間を|名前|覚えて|忘れて|歌')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
 
@@ -92,10 +92,12 @@ class Mind:
         text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
         if not text:
             return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
+        # ひかえめ（会議）では、何人も話したことは心に回す理由にしない（人どうしの話に心が意見を言った。2026-10-30）
+        quiet = self.style is not None and self.style.talk == 'quiet'
         why = ('request' if REQUEST.search(text)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
-               else 'people' if self._speakers_since_ciel() >= 2
-               else 'named' if self.style is not None and self.style.talk == 'quiet' and NAME.search(text)
+               else 'people' if not quiet and self._speakers_since_ciel() >= 2
+               else 'named' if quiet and NAME.search(text)
                else None)
         if why is None:
             return 'talker'

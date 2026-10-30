@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from livekit import agents, rtc
@@ -80,6 +81,11 @@ REALTIME = MODEL == 'realtime'
 PIPELINE = MODEL == 'pipeline' and VOICE == 'irodori'
 # 心の考える量（pipeline。none・minimal・low…）
 MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
+# 話し終えたと決めるまでの最短・最長の待ち（pipeline。秒）
+ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.4'))
+ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.2'))
+# 議事録を始めてから、この秒数のうちの「もうとっている」は言わない（聞く係と会話モデルの、同じ頼みの二重）
+ALREADY_QUIET_SECONDS = 30.0
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API・pipeline のときだけ
 SPEAKERS = VOICE == 'irodori' and (REALTIME or PIPELINE)
 # Realtime API の雑音除去（make_model）
@@ -140,7 +146,8 @@ def make_pipeline(names: list[str]) -> dict:
     # gpt-realtime-whisper は名前のヒント（prompt）を受け付けない（渡すと会話が止まった。2026-10-30）。
     # gpt-live-transcribe は keywords で名前を渡せる。そのほかのモデルは prompt で渡す
     if model == 'gpt-live-transcribe':
-        hints = {'keywords': ['シエル', *names][:30]}
+        # 名前と、聞く係が拾う言葉（gpt-realtime-whisper では「シエル」が「シェル」、「議事録」が「二次録」になった）
+        hints = {'keywords': ['シエル', '議事録', *names][:30]}
     elif model == 'gpt-realtime-whisper':
         hints = {}
     else:
@@ -149,6 +156,11 @@ def make_pipeline(names: list[str]) -> dict:
     return {'vad': vad, 'stt': stt,
             # 区切り：声の調子から話し終えたかを見るモデル（手元で動く小さい版。日本語に対応）
             'turn_handling': {'turn_detection': inference.TurnDetector(version='v1-mini'),
+                              # 話し終えたと決めるまでの待ち。既定（最短 0.5・最長 3 秒）では、区切りのモデルが日本語の
+                              # 合成音声に自信を持てず、話し終わりから約 2.25 秒待っていた（2026-10-30、bench_compare.py）
+                              'endpointing': {'min_delay': ENDPOINT_MIN, 'max_delay': ENDPOINT_MAX},
+                              # 話し終えたと決まる前から、返事の文に加えて声も作り始める
+                              'preemptive_generation': {'preemptive_tts': True},
                               # シエルが話している途中の短い声（咳・相づち）では止めない（interruptions.py と同じ秒数）
                               'interruption': {'mode': 'vad', 'min_duration': interruptions.CONFIRM_SECONDS or 0.5}}}
 
@@ -368,11 +380,20 @@ async def entrypoint(ctx: JobContext) -> None:
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
                        if note_taker is not None else None)
 
+    started_at = -1e9
+
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
-        asyncio.create_task(voice.say_when_free('minutes', anyway=True,
-                                                instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
+        nonlocal started_at
+        now = time.monotonic()
+        if what == minutes.STARTED:
+            started_at = now
+        # 聞く係が始めた直後に、会話モデルも道具で始めようとしたとき（同じ頼みの二重）は、「もうとっている」を言わない
+        # （「とり始めますね」「もうとっていますね」と続けて言った。2026-10-30）
+        if not (what == minutes.ALREADY and now - started_at < ALREADY_QUIET_SECONDS):
+            # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
+            asyncio.create_task(voice.say_when_free('minutes', anyway=True,
+                                                    instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes

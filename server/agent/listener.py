@@ -23,7 +23,8 @@ import models
 
 log = logging.getLogger('ciel-agent.listener')
 
-WORDS = re.compile(r'議事録|記録|まとめ')
+# 「議事録」は「二次録」などと書き起こされることがあるので、「録」で見る（頼みかは軽いモデルが確かめる）
+WORDS = re.compile(r'録|まとめ')
 CONTEXT_TURNS = 6
 TIMEOUT = 10.0
 COOLDOWN = 20.0     # 同じ頼みを続けて動かさない秒数（「議事録開始して」「議事録とってね」と言い直したとき）
