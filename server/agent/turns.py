@@ -171,6 +171,8 @@ class TurnReplies:
         self._stall_reported = False
         self._clip_name: str | None = None   # 調べるときに残した、直前の発言の声のファイル名（debug_log.save_audio）
         self._pipeline_through = 0.0   # CIEL_MODEL=pipeline：返事に使い終えた区間の終わり（pipeline_turn）
+        self._pipeline_next = 0.0      # 話し終えた発言の区間の終わり（次に話し始めたら _pipeline_through にする）
+        self._touch_line: str | None = None   # この発言に添えるタッチの 1 行（先に作る返事と、本番の返事で同じものを使う）
         self.stall_watch = True        # 会話モデルの側から区切りが来ない見張り（pipeline では使わない）
 
     async def load_encoder(self) -> None:
@@ -182,6 +184,7 @@ class TurnReplies:
 
     def on_user_state(self, ev: UserStateChangedEvent) -> None:
         if ev.new_state == 'speaking':
+            self._pipeline_through = max(self._pipeline_through, self._pipeline_next)
             self._segment_start = ev.created_at
             self._speaking = True
             self._cancel_later()
@@ -542,34 +545,43 @@ class TurnReplies:
         await self._generate_reply(extra)
 
     async def pipeline_turn(self) -> dict:
-        """CIEL_MODEL=pipeline：LiveKit が返事を作る前に呼ぶ（agent.py の on_user_turn_completed）。前の返事のあとに
-        話し終えた区間で、誰が話したかを決め、相づちを流す。返事はここでは作らせない。
-        返す値：skip（声の登録の読み上げなど、返事をしない）・tag（話者の 1 行）・memory（覚えていること）・touch（タッチの 1 行）"""
+        """CIEL_MODEL=pipeline：返事を作るときに呼ぶ（agent.py の llm_node。相手が話し終える前の、先に作る返事でも呼ばれる）。
+        前の発言のあとに話した区間で、誰が話したかを決める。発言そのもの（LiveKit の会話）は書き換えない
+        （書き換えると、先に作った返事が「発言が変わった」として捨てられ、毎回作り直しになっていた。2026-10-30）。
+        返す値：tag（話者の 1 行）・memory（覚えていること）・touch（タッチの 1 行）・seconds（話した長さ）・enroll（声の登録の読み上げ）"""
         segs = [s for s in self._recent if s.start > self._pipeline_through]
-        if not segs:
-            return {'skip': False, 'tag': None, 'memory': None, 'touch': self.touch.take() if self.touch else None}
-        start, end = segs[0].start, segs[-1].end
-        self._pipeline_through = end
-        if (self.backchannel is not None and self.style.talk != 'quiet' and end - start >= SHORT_SECONDS
-                and not self.backchannel.played_within(NOD_SKIP_SECONDS)):
-            latency.mark('相づち')
-            self.backchannel.play()
-        touch = self.touch.take() if self.touch is not None else None
-        if self.book is None or self.encoder is None:
-            return {'skip': False, 'tag': None, 'memory': None, 'touch': touch}
-        j = await self._judgment_for(start, end)
+        if self._touch_line is None and self.touch is not None:
+            self._touch_line = self.touch.take()
+        turn = {'tag': None, 'memory': None, 'touch': self._touch_line, 'enroll': False,
+                'seconds': segs[-1].end - segs[0].start if segs else 0.0}
+        if not segs or self.book is None or self.encoder is None:
+            return turn
+        j = await self._judgment_for(segs[0].start, segs[-1].end)
         if getattr(j, 'enroll', False) or getattr(self.book, 'enrolling', None) is not None:
-            log.info('声の登録の途中なので、返事を作らせない')
-            if self.backchannel is not None:
-                self.backchannel.stop()
-            return {'skip': True, 'tag': None, 'memory': None, 'touch': None}
+            return {**turn, 'enroll': True}
         self.book.current_turns = [s.turn for s in segs if s.turn is not None]
         presence = self.style.presence
         parts = await self.book.identify_parts(j, solo=presence == 'solo', push_notes=presence in ('solo', 'close'))
         if self.book.last is not None:
             self.book.last_at = time.monotonic()
         tag, memory = parts if parts is not None else (None, None)
-        return {'skip': False, 'tag': tag, 'memory': memory or None, 'touch': touch}
+        return {**turn, 'tag': tag, 'memory': memory or None}
+
+    def pipeline_end_turn(self) -> bool:
+        """CIEL_MODEL=pipeline：相手が話し終えた（agent.py の on_user_turn_completed）。長く話したなら相づちを流す。
+        この発言の区間は、次に相手が話し始めたら使い終えたことにする。返事をしない（声の登録の読み上げ）なら False"""
+        segs = [s for s in self._recent if s.start > self._pipeline_through]
+        if segs:
+            self._pipeline_next = segs[-1].end
+        self._touch_line = None
+        if getattr(self.book, 'enrolling', None) is not None:
+            log.info('声の登録の途中なので、返事を作らせない')
+            return False
+        if (segs and self.backchannel is not None and self.style.talk != 'quiet'
+                and segs[-1].end - segs[0].start >= SHORT_SECONDS and not self.backchannel.played_within(NOD_SKIP_SECONDS)):
+            latency.mark('相づち')
+            self.backchannel.play()
+        return True
 
     async def _generate_reply(self, extra: dict) -> None:
         # 今の日付・時間帯（clock.py）。変わったときだけ会話の後ろに置く（置けなければ今回の指示に足す）

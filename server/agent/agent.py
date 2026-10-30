@@ -37,6 +37,7 @@ import debug_log
 import emotion
 import initiative
 import interruptions
+import listener
 import irodori_tts
 import mind
 import minutes
@@ -167,28 +168,29 @@ class Ciel(Agent):
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
-        """pipeline：返事を作る前に、誰が話したかを決めて、今回の発言に話者の 1 行を添える"""
-        if not PIPELINE or self.replies is None or self.mind is None:
-            return
-        turn = await self.replies.pipeline_turn()
-        if turn['skip']:
+        """pipeline：相手が話し終えた。長く話したなら相づちを流す。発言（LiveKit の会話）は書き換えない
+        （書き換えると、先に作った返事が捨てられる。話者の 1 行は llm_node で、送る会話にだけ置く）"""
+        if PIPELINE and self.replies is not None and not self.replies.pipeline_end_turn():
             raise StopResponse()
-        self.mind.memory = turn['memory']
-        lines = [x for x in (turn['tag'], turn['touch']) if x]
-        if lines:
-            new_message.content = ['\n'.join(lines) + '\n' + (new_message.text_content or '')]
 
     def llm_node(self, chat_ctx, tools, model_settings):
         if not PIPELINE or self.mind is None:
             return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
-        if self.mind.deep_turn(chat_ctx):
-            # 心：全部の指示と道具で作る（議事録・歌の知らせ、小脳が [think] と言ったとき、道具の結果を受けたとき）
-            return Agent.default.llm_node(self, self.mind.build(chat_ctx), tools, model_settings)
-        # 小脳：短い指示・道具なしで、すぐ返す（mind.py）
-        style = self.style
-        brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
-        return self.mind.talk(Agent.default.llm_node(self, self.mind.build(chat_ctx, talker_instructions=brief),
-                                                     [], model_settings))
+        return self._pipeline_llm(chat_ctx, tools, model_settings)
+
+    async def _pipeline_llm(self, chat_ctx, tools, model_settings):
+        """pipeline：誰が話したかを決め、心と小脳のどちらが返すかをコードで決めて（mind.py の route）、返事を流す"""
+        turn = await self.replies.pipeline_turn() if self.replies is not None else {}
+        if self.mind.route(chat_ctx, turn) == 'mind':
+            # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
+            ctx, fns = self.mind.build(chat_ctx, turn=turn), tools
+        else:
+            # 小脳：短い指示・道具なしで、すぐ返す
+            style = self.style
+            brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
+            ctx, fns = self.mind.build(chat_ctx, talker_instructions=brief, turn=turn), []
+        async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
+            yield chunk
 
     def talker_instructions_for(self, talk: str, presence: str) -> str:
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
@@ -332,10 +334,11 @@ async def entrypoint(ctx: JobContext) -> None:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
-                               brief_instructions=agent.persona.mind_brief_instructions,
-                               turn_instructions=agent.persona.mind_turn_instructions,
-                               say=voice.say, think=agent.aizuchi.think if AIZUCHI else None)
-        voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・考える番の返事は心が作る
+                               brief_instructions=agent.persona.mind_brief_instructions)
+        voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
+        # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
+        session.on('user_input_transcribed',
+                   listener.Listener(history, minute_taker, agent.persona.listener_instructions).on_transcribed)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
@@ -367,7 +370,9 @@ async def entrypoint(ctx: JobContext) -> None:
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる
-        voice.say('minutes', instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
+        # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
+        asyncio.create_task(voice.say_when_free('minutes', anyway=True,
+                                                instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes

@@ -17,6 +17,7 @@ log = logging.getLogger('ciel-agent.models')
 ROLES = {
     'talk': ('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini'),     # 返事の文を作る（Realtime。使用量は usage.py）
     'mind': ('CIEL_MIND_MODEL', 'gpt-5.4-mini'),                  # 返事の文を作る（CIEL_MODEL=pipeline の心。mind.py。使用量は usage.py）
+    'listener': ('CIEL_LISTENER_MODEL', 'gpt-5.4-mini'),          # 聞く係が、話の途中の頼みを確かめる（listener.py）
     'brief': ('CIEL_BRIEF_MODEL', 'gpt-5.4-mini'),                # 心が「今のまとめ」を書く（mind.py）
     'stt': ('CIEL_STT_MODEL', 'gpt-realtime-whisper'),            # 文字起こし（CIEL_MODEL=pipeline。話している途中から文字が出る）
     'thought': ('CIEL_THOUGHT_MODEL', 'gpt-5.4-mini'),            # 内なる考え（initiative.py）

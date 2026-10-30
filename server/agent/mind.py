@@ -6,14 +6,15 @@ system の項目として差し込んで合わせていた（記録が 2 つ。d
 ここでは、LiveKit が持つ会話からは今回の分（今回の発言・今回だけの指示・道具の呼び出し）だけを使い、ほかは記録から作る。
 
 返事は 2 つの係で作る（研究 Talker-Reasoner の形。速く話す係と、裏で考える係を分ける）。
-- 小脳（すぐの返事）：発言のたびに呼ぶ。短い指示（人物像・話し方・config/prompts/talker.md）と、心が書いた「今のまとめ」と、
-  最近の発言だけを読み、道具は持たない。全部の指示（約 1 万 3 千トークン）と道具 26 個を毎回読ませると、返事が
-  約 1〜2 秒遅れた（2026-10-30、bench_compare.py）。黙るときは [silent]、考える・道具が要るときは [think] とだけ返す。
-- 心（考える番）：小脳が [think] と言ったとき（考える相づちを流してから）・議事録や歌の知らせのとき・道具の結果を受けたときに、
-  全部の指示と道具で返事を作る（config/prompts/mind_turn.md）。
+- 小脳（すぐの返事）：ふつうの発言に返す。短い指示（人物像・話し方・config/prompts/talker.md）と、心が書いた「今のまとめ」と、
+  最近の発言だけを読み、道具は持たない。黙るときは [silent]。
+- 心（考える番）：全部の指示と道具で返す。どちらで返すかはコードが決める（route）：頼みごとの言葉がある・長く話した・何人も話した・
+  ひかえめで名前を呼ばれた・議事録や歌の知らせ・道具の結果を受けた続き。小脳に「考えるべきか」を [think] で言わせる作りは、
+  2 回の試験で一度も [think] を出さず、議事録を頼まれて道具なしで「準備しますね」と答えたのでやめた（2026-10-30）。
 - 今のまとめ：心が、発言が増えたら（summaries/live.py と同じ決め方）会話を読み直して書く（config/prompts/mind_brief.md）。
   小脳は最近の発言しか読まないので、会話全体の流れはここで伝える。
 """
+import re
 import asyncio
 import json
 import logging
@@ -36,26 +37,27 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-THINK = '[think]'
-DEEP_WHY = ('mind', 'minutes', 'song', 'enrolled')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled')   # 心が返事を作る、口（mouth.py）の why
+LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
+LONG_CHARS = 80
+# 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
+NAME = re.compile(r'シエル|しえる|シェル|シェアル|チエル|ciel|\bCL\b', re.IGNORECASE)
+# 道具が要る頼みごとの言葉（議事録・調べもの・時刻・名前・覚えていること・歌）。あれば心が返す
+REQUEST = re.compile(r'議事録|記録|まとめ|調べ|検索|何時|時間を|名前|覚えて|忘れて|歌')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
 
 
 class Mind:
     def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
-                 brief_instructions: str = '', turn_instructions: str = '', say=None, think=None, client=None) -> None:
+                 brief_instructions: str = '', client=None) -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.quiet_turn = quiet_turn  # ひかえめのときの念押し（config/prompts/talk_quiet_turn.md）
         self.brief_instructions = brief_instructions   # config/prompts/mind_brief.md
-        self.turn_instructions = turn_instructions     # config/prompts/mind_turn.md
-        self.say = say                # 口（mouth.Mouth.say）。考える番の返事を頼む
-        self.think = think            # 考える相づちを流す（aizuchi.Backchannel.think）
         self._client = client
-        self.memory: str | None = None   # 今回の話者について覚えていること（turns.py の pipeline_turn が入れる）
         self.brief: str | None = None    # 今のまとめ（心が書く）
         self._brief_raw: dict = {}
         self._brief_through = 0          # 今のまとめに使った最後の発言 ID
@@ -75,56 +77,55 @@ class Mind:
     # ---- 小脳と心の振り分け ----
 
     def on_say(self, why: str) -> None:
-        """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・考える番は、心が作る"""
+        """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
         if why in DEEP_WHY:
             self._deep = True
 
-    def deep_turn(self, chat_ctx: llm.ChatContext) -> bool:
-        """この返事を心が作るか。道具の結果を受けた続きの返事も、心が作る"""
-        if any(getattr(i, 'type', None) == 'function_call_output' for i in _tail(list(chat_ctx.items))):
-            return True
-        deep, self._deep = self._deep, False
-        return deep
+    def route(self, chat_ctx: llm.ChatContext, turn: dict | None = None) -> str:
+        """この返事を心（'mind'）と小脳（'talker'）のどちらが作るか（コードで決める）。turn は turns.py の pipeline_turn"""
+        tail = _tail(list(chat_ctx.items))
+        if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
+            return 'mind'   # 道具の結果を受けた続き
+        if self._deep:
+            self._deep = False
+            return 'mind'
+        text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
+        if not text:
+            return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
+        why = ('request' if REQUEST.search(text)
+               else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
+               else 'people' if self._speakers_since_ciel() >= 2
+               else 'named' if self.style is not None and self.style.talk == 'quiet' and NAME.search(text)
+               else None)
+        if why is None:
+            return 'talker'
+        log.info('心：考えて返す（%s）', why)
+        debug_log.record('mind_route', why=why)
+        return 'mind'
 
-    async def talk(self, stream):
-        """小脳の返事を流す。頭が [think] なら流さず、考える相づちを流して、心に考える番の返事を頼む"""
-        held, text = [], ''
-        async for chunk in stream:
-            if held is None:
-                yield chunk
-                continue
-            held.append(chunk)
-            text += _chunk_text(chunk)
-            lead = text.lstrip()
-            if not lead or THINK.startswith(lead):
-                continue   # まだ決められない（[think] の書きかけかもしれない）
-            if lead.startswith(THINK):
-                self._handoff()
-                return
-            for c in held:
-                yield c
-            held = None
-        if held:
-            for c in held:
-                yield c
-
-    def _handoff(self) -> None:
-        log.info('心：小脳が考える番にした')
-        debug_log.record('mind_handoff')
-        if self.think is not None:
-            self.think()
-        if self.say is not None:
-            self.say('mind', instructions=self.turn_instructions, tool_choice='auto')
+    def _speakers_since_ciel(self) -> int:
+        """シエルが最後に話してから話した人の数（話者が分からない発言は数えない）"""
+        names = set()
+        for t in reversed(self.history.turns if self.history is not None else []):
+            if t.role == 'assistant' and t.text:
+                break
+            if t.role == 'user' and t.text and t.speaker is not None:
+                names.add(id(t.speaker))
+        return len(names)
 
     # ---- 文脈 ----
 
-    def build(self, chat_ctx: llm.ChatContext, *, talker_instructions: str | None = None) -> llm.ChatContext:
+    def build(self, chat_ctx: llm.ChatContext, *, talker_instructions: str | None = None,
+              turn: dict | None = None) -> llm.ChatContext:
         """LiveKit が渡した会話（会話の指示＋LiveKit が持つ発言＋今回の分）から、送る会話を作る。
-        talker_instructions があれば小脳（会話の指示をこれに替え、最近の発言を少なく）、無ければ心（全部の指示）"""
+        talker_instructions があれば小脳（会話の指示をこれに替え、最近の発言を少なく）、無ければ心（全部の指示）。
+        turn（turns.py の pipeline_turn）の話者の 1 行・タッチは、今回の発言の前に置く（LiveKit の会話は書き換えない）"""
         items = list(chat_ctx.items)
         instructions = next((i for i in items if getattr(i, 'role', None) == 'system'), None)
         tail = [i for i in _tail(items) if i is not instructions]
         tail_users = {_text(i) for i in tail if getattr(i, 'role', None) == 'user'}
+        turn = turn or {}
+        self.memory = turn.get('memory')
         out = llm.ChatContext()
         if talker_instructions is not None:
             out.add_message(role='system', content=talker_instructions)
@@ -133,14 +134,17 @@ class Mind:
         for t in self._recent(TALKER_TURNS if talker_instructions is not None else DEEP_TURNS):
             text = t.text[:TURN_CHARS]
             if t.role == 'user':
-                if any(u.endswith(text) for u in tail_users):
-                    continue   # 今回の発言は、LiveKit の側の分（話者を添えたもの）を使う
+                if any(text in u for u in tail_users):
+                    continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 out.add_message(role='user', content=f'{t.name}：{text}')
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None)
         if notes:
             out.add_message(role='system', content=notes)
+        speaker = '\n'.join(x for x in (turn.get('tag'), turn.get('touch')) if x)
+        if speaker and tail_users:
+            out.add_message(role='system', content=speaker)   # 今回の発言の話者（とタッチ）
         out.items.extend(tail)
         return out
 
@@ -240,9 +244,3 @@ def _tail(items: list) -> list:
 def _text(item) -> str:
     return (getattr(item, 'text_content', None) or '').strip()
 
-
-def _chunk_text(chunk) -> str:
-    if isinstance(chunk, str):
-        return chunk
-    delta = getattr(chunk, 'delta', None)
-    return (getattr(delta, 'content', None) or '') if delta is not None else ''

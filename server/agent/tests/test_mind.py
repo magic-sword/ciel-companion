@@ -62,10 +62,13 @@ class MindBuildTest(unittest.TestCase):
         minutes.context.return_value = '[議事録状態] {}'
         minutes.take_note.return_value = '[議事録：送った]'
         m = mind.Mind(history_with(), style=Style('quiet'), minutes=minutes, quiet_turn='呼ばれたときだけ')
-        m.memory = '[覚えていること] 走るのが好き'
-        notes = m.build(self.livekit_ctx(('user', 'こんにちは'))).items[-2].text_content
+        out = m.build(self.livekit_ctx(('user', 'こんにちは')),
+                      turn={'memory': '[覚えていること] 走るのが好き', 'tag': '[発言者：ゆうき]'})
+        notes = out.items[-3].text_content
         for part in ('[議事録状態] {}', '[議事録：送った]', '走るのが好き', '呼ばれたときだけ'):
             self.assertIn(part, notes)
+        # 話者の 1 行は、今回の発言のすぐ前に置く（LiveKit の会話の発言は書き換えない）
+        self.assertEqual([i.text_content for i in out.items[-2:]], ['[発言者：ゆうき]', 'こんにちは'])
 
     def test_tool_calls_of_this_turn_are_kept(self):
         ctx = self.livekit_ctx(('user', '議事録とって'))
@@ -81,11 +84,11 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    async def collect(self, m, parts):
-        async def stream():
-            for p in parts:
-                yield p
-        return [c async for c in m.talk(stream())]
+    def ctx_with(self, text):
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system', content='全部の指示')
+        ctx.add_message(role='user', content=text)
+        return ctx
 
     async def test_talker_gets_short_instructions_and_the_brief(self):
         m = mind.Mind(history_with(), style=Style())
@@ -99,29 +102,30 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('全部の指示', texts)
         self.assertIn('[今のまとめ]\n話題：展示\n決まったこと：A2 で印刷', texts[-2])
 
-    async def test_think_hands_over_to_the_mind(self):
-        said, thought = [], []
-        m = mind.Mind(history_with(), say=lambda why, **kw: said.append((why, kw)), think=lambda: thought.append(1),
-                      turn_instructions='考える番')
-        self.assertEqual(await self.collect(m, ['[th', 'ink]', 'ignored']), [])
-        self.assertEqual(said, [('mind', {'instructions': '考える番', 'tool_choice': 'auto'})])
-        self.assertEqual(thought, [1])
-        # 口が「mind」で頼んだ次の返事は、心が作る（1 回だけ）
-        m.on_say('mind')
-        self.assertTrue(m.deep_turn(llm.ChatContext()))
-        self.assertFalse(m.deep_turn(llm.ChatContext()))
+    async def test_code_routes_turns(self):
+        m = mind.Mind(history_with(), style=Style())
+        self.assertEqual(m.route(self.ctx_with('シエルは何色が好き？'), {'seconds': 2.0}), 'talker')
+        self.assertEqual(m.route(self.ctx_with('あ、議事録開始して'), {'seconds': 2.0}), 'mind')       # 頼みごと
+        self.assertEqual(m.route(self.ctx_with('今日はね'), {'seconds': 12.0}), 'mind')                # 長い話
+        self.assertEqual(m.route(self.ctx_with('あ' * 90), {}), 'mind')
+        # ひかえめ（会議）では、名前（聞き間違いも）を呼ばれたら心が返す
+        quiet = mind.Mind(history_with(), style=Style('quiet'))
+        self.assertEqual(quiet.route(self.ctx_with('シェル、今の話どう思う？'), {'seconds': 3.0}), 'mind')
+        self.assertEqual(quiet.route(self.ctx_with('ポスターは水曜までに作りましょう'), {'seconds': 3.0}), 'talker')
+        # 議事録・歌の知らせは、次の 1 回だけ心が返す
+        m.on_say('minutes')
+        self.assertEqual(m.route(llm.ChatContext()), 'mind')
+        self.assertEqual(m.route(llm.ChatContext()), 'talker')
 
-    async def test_ordinary_and_emotion_tagged_replies_flow(self):
-        m = mind.Mind(history_with(), say=lambda *a, **k: self.fail('handed over'))
-        self.assertEqual(await self.collect(m, ['[think', 'ing]えっと', '…']), ['[think', 'ing]えっと', '…'])
-        self.assertEqual(await self.collect(m, ['[happy]', 'わあ']), ['[happy]', 'わあ'])
-        self.assertEqual(await self.collect(m, ['[silent]']), ['[silent]'])
+    async def test_several_people_since_ciel_go_to_the_mind(self):
+        h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))
+        self.assertEqual(mind.Mind(h, style=Style('quiet')).route(self.ctx_with('いいですね'), {}), 'mind')
 
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()
         ctx.add_message(role='user', content='議事録とって')
         ctx.items.append(llm.FunctionCallOutput(call_id='c1', name='start_minutes', output='{}', is_error=False))
-        self.assertTrue(mind.Mind(history_with()).deep_turn(ctx))
+        self.assertEqual(mind.Mind(history_with()).route(ctx), 'mind')
 
     async def test_brief_is_written_when_enough_was_said(self):
         h = history_with(*[('user', f'発言{i}', 'ゆうき') for i in range(6)])
