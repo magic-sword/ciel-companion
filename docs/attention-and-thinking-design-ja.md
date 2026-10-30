@@ -1,6 +1,6 @@
 # シエルの「聞く・考える・話す」の作り直し（設計）
 
-状態：作業中（2026-10-30〜、ブランチ `refactor/one-log-one-mouth`）。決めたことは、決まり次第 `docs/decisions/` に移す。
+状態：pipeline を本番に入れた（2026-10-31）。成果と理由のまとめは [会話の作り直しの成果](conversation-improvements-2026-10-ja.md)。段階 3 以降は作業中。
 図：[会話の流れの図](https://claude.ai/artifact/6SJDdj41w2XVBfMfN8XYGq)（最初の案のもの。下の 3 章の形に合わせて描き直す予定）。
 
 ## 1. 何を解くか

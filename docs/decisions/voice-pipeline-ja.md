@@ -47,6 +47,8 @@
 
 1 分の目安は、音声 1 分 = 入力 600 トークン・出力 1,200 トークン、会話の履歴のキャッシュが効く前提の第三者の試算（[forasoft](https://www.forasoft.com/blog/article/openai-realtime-api-pricing)）。
 
+2026-10-31 から、本番は Realtime ではなく pipeline（`CIEL_MODEL=pipeline`。文字起こし → 小脳と心 → Irodori）で動かす（[会話の作り直しの成果](../conversation-improvements-2026-10-ja.md)）。以下は Realtime を使うときの方針。
+
 方針：開発の既定は **gpt-realtime-2.1-mini**（安い）。会話の質を gpt-realtime-2.1 と比べ、GPT-Live は日本語と Seed-VC との相性を確かめてから判断する（`CIEL_MODEL`・`CIEL_REALTIME_MODEL` で切り替え）。
 
 ## 声質変換の測定（2026-10-13、自宅 GPU RTX A2000 12GB）

@@ -20,8 +20,8 @@ services:
     environment:
       - CIEL_VOICE=irodori
       - CIEL_AGENT_NAME=ciel-dev
-      # 会話の組み立て（realtime・pipeline）。比べるときは、起動し直すシェルで CIEL_DEV_MODEL=pipeline を付ける
-      - CIEL_MODEL=${CIEL_DEV_MODEL:-realtime}
+      # 会話の組み立て（realtime・pipeline）。本番と同じ pipeline が既定。比べるときは、起動し直すシェルで CIEL_DEV_MODEL=realtime を付ける
+      - CIEL_MODEL=${CIEL_DEV_MODEL:-pipeline}
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
