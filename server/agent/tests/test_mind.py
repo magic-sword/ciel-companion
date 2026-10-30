@@ -1,5 +1,6 @@
 import asyncio
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -138,6 +139,20 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('議事録開始して', items[-1].text_content)
         self.assertIn('（→ #1 会議の議事録をとる：実行中）', items[-1].text_content)
         self.assertIn('[今のタスク]\n#1 会議の議事録をとる：実行中', items[-2].text_content)
+
+    async def test_a_turn_that_was_only_the_request_gets_no_reply(self):
+        m = mind.Mind(history_with(), style=Style('quiet'), board=self.board_with_minutes('議事録開始して。'))
+        self.assertEqual(m.route(self.ctx_with('あ、議事録開始して。'), {'seconds': 2.0}), 'skip')
+        self.assertEqual(m.route(self.ctx_with('議事録開始して。ポスターは水曜まで'), {'seconds': 2.0}), 'mind')
+
+    async def test_minutes_tools_only_when_this_turn_asks(self):
+        tools = [types.SimpleNamespace(id=n) for n in ('start_minutes', 'finish_minutes', 'read_minutes')]
+        m = mind.Mind(history_with(), style=Style(), board=self.board_with_minutes('議事録開始して。'))
+        ids = lambda text: [t.id for t in m.tools_for(self.ctx_with(text), tools)]
+        self.assertEqual(ids('予算は去年と同じくらい'), ['read_minutes'])
+        self.assertEqual(ids('それで、議事録開始して。屋台を増やしたい'), ['read_minutes'])   # 付箋になった頼みは除く
+        self.assertEqual(ids('議事録まとめて'), ['start_minutes', 'finish_minutes', 'read_minutes'])
+        self.assertEqual(ids('記録ストップ'), ['start_minutes', 'finish_minutes', 'read_minutes'])
 
     async def test_requests_on_the_board_stay_marked_in_later_turns(self):
         h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))

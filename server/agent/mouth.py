@@ -28,14 +28,17 @@ class Mouth:
         self.session = session
         self.counts: collections.Counter[str] = collections.Counter()
         self.before_say = None   # 話させる直前に why を知らせる先（pipeline の心が、考える番の返事かを知る。mind.py）
+        self._latest: dict[str, dict] = {}   # say_latest で、まだ言っていない最新の知らせ（why ごと）
 
     def busy(self) -> bool:
         s = self.session
         return (getattr(s, 'user_state', None) == 'speaking'
                 or getattr(s, 'agent_state', None) in ('thinking', 'speaking', 'initializing'))
 
-    def say(self, why: str, **kwargs):
+    def say(self, why: str, _latest: bool = False, **kwargs):
         """今すぐ話させる。generate_reply の返り（SpeechHandle）をそのまま返す"""
+        if _latest:
+            kwargs = self._latest.pop(why, kwargs)
         self.counts[why] += 1
         log.info('口：%s', why)
         debug_log.record('speak', why=why)
@@ -61,6 +64,21 @@ class Mouth:
             log.info('口：%s は切れ目が来ないので話さない', why)
             return None
         return self.say(why, **kwargs)
+
+    def say_latest(self, why: str, *, settle: float = 0.0, wait: float = 30.0, **kwargs) -> None:
+        """知らせを、切れ目を待ってから言う（待ったあとは言う）。待っているあいだに同じ why の知らせが来たら、最新の 1 つだけを言う。
+        長い話の途中で議事録を始めて終えたとき、「とり始めた」「まとめて送る」「送った」を話し終わりにまとめて言い、
+        返事より後ろに古い知らせが続いた（2026-10-30）"""
+        waiting = why in self._latest
+        self._latest[why] = kwargs
+        if not waiting:
+            asyncio.create_task(self._say_latest(why, settle, wait))
+
+    async def _say_latest(self, why: str, settle: float, wait: float) -> None:
+        try:
+            await self.say_when_free(why, wait=wait, anyway=True, settle=settle, _latest=True)
+        finally:
+            self._latest.pop(why, None)
 
     def summary(self) -> None:
         """会話の終わりに、なぜ何回話したかを出す"""

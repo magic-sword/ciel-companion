@@ -44,6 +44,10 @@ LONG_CHARS = 80
 NAME = re.compile(r'シエル|しえる|シェル|シェアル|チエル|ciel|\bCL\b', re.IGNORECASE)
 # 道具が要る頼みごとの言葉（議事録・調べもの・時刻・名前・覚えていること・歌）。あれば心が返す
 REQUEST = re.compile(r'録|まとめ|調べ|検索|何時|時間を|名前|覚えて|忘れて|歌')
+# 議事録を始める・終える頼みの言葉。今回の発言（付箋になった分を除く）に無ければ、議事録を動かす道具を心に渡さない
+MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
+MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
+FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
 
@@ -96,6 +100,11 @@ class Mind:
         # 付箋になった頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
         # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
         rest = self.board.strip(text) if self.board is not None else text
+        if rest != text and not FILLER.sub('', rest):
+            # 頼みだけの発言で、付箋になった（「あ、議事録開始して」）。返事はせず、議事録係の知らせだけを言う。
+            # 心が「議事録、とりながら進めていますよ」と返し、そのあと知らせも言って 2 回になった（2026-10-30）
+            debug_log.record('mind_route', why='on_board')
+            return 'skip'
         # ひかえめ（会議）では、どの発言も心が受ける。黙るか答えるかの見極めは、短い指示の小脳では人どうしの話に
         # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
         # 黙る返事は声にならないので、心で受けても遅れは気にならない
@@ -111,6 +120,18 @@ class Mind:
         log.info('心：考えて返す（%s）', why)
         debug_log.record('mind_route', why=why)
         return 'mind'
+
+    def tools_for(self, chat_ctx: llm.ChatContext, tools: list) -> list:
+        """心に渡す道具。議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ渡す（付箋になった頼みは除く）。
+        付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）"""
+        tail = _tail(list(chat_ctx.items))
+        if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
+            return tools   # 道具の結果を受けた続き
+        text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
+        rest = self.board.strip(text) if self.board is not None else text
+        if not text or MINUTES_ASK.search(rest):
+            return tools   # 知らせ（相手の発言の無い返事）か、議事録の頼みがある
+        return [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
 
     def _speakers_since_ciel(self) -> int:
         """シエルが最後に話してから話した人の数（話者が分からない発言は数えない）"""

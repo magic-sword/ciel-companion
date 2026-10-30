@@ -202,9 +202,12 @@ class Ciel(Agent):
         turn = await self.replies.pipeline_turn() if self.replies is not None else {}
         if self.ear is not None:
             await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
-        if self.mind.route(chat_ctx, turn) == 'mind':
+        who = self.mind.route(chat_ctx, turn)
+        if who == 'skip':
+            return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
+        if who == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
-            ctx, fns = self.mind.build(chat_ctx, turn=turn), tools
+            ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
         else:
             # 小脳：短い指示・道具なしで、すぐ返す
             style = self.style
@@ -397,9 +400,9 @@ async def entrypoint(ctx: JobContext) -> None:
 
     def on_minutes(what: str) -> None:
         # シエルに一言告げさせ（config/prompts/minutes_voice.md）、アプリのボタンの表示を合わせる。
-        # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから言う
-        asyncio.create_task(voice.say_when_free('minutes', anyway=True, settle=MINUTES_SETTLE,
-                                                instructions=minutes.LINES[what] + '\n\n' + minute_taker.context()))
+        # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから、そのとき最新の知らせだけを言う
+        voice.say_latest('minutes', settle=MINUTES_SETTLE,
+                         instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
         msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
         asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
     minute_taker.on_change = on_minutes
