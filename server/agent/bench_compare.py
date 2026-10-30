@@ -35,6 +35,7 @@ from dotenv import load_dotenv
 from livekit import api, rtc
 
 import debug_log
+import models
 from bench_latency import FRAME, SR, TTS_URL, Voices
 
 load_dotenv()
@@ -200,9 +201,15 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
     started = next((t for t, m in events if m.get('type') == 'minutes.state' and m.get('recording')), None)
     log = await read_log(room_name)
     cost = cost_of(log)
+    start = next((r for r in log if r.get('kind') == 'start'), {})
     if 'stt' not in cost['usd_by_role']:
-        # Realtime の組み立ての文字起こし（gpt-4o-mini-transcribe）は使用量が届かないので、送った声の長さから見積もる
-        est = round(sent_seconds / 60 * TRANSCRIBE_PER_MINUTE, 4)
+        # 文字起こしの使用量が届かないとき：Realtime（gpt-4o-mini-transcribe）は送った声の長さから見積もる。
+        # pipeline の gpt-realtime-whisper などは音声の長さで払うので、会話の長さ全体（多めの見積もり）で見積もる
+        if start.get('stt_model') in models.PER_MINUTE:
+            span = (log[-1]['t'] - log[0]['t']) if log else 0.0
+            est = round(models.cost_per_minute(start['stt_model'], span / 60), 4)
+        else:
+            est = round(sent_seconds / 60 * TRANSCRIBE_PER_MINUTE, 4)
         cost['usd_by_role']['stt(est)'] = est
         cost['usd'] = round(cost['usd'] + est, 4)
     result = {'scene': name, 'room': room_name, 'turns': turns, **cost, 'replies': replies_of(log)}
