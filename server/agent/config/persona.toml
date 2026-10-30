@@ -35,3 +35,8 @@ minutes_voice_instructions_file = "prompts/minutes_voice.md"
 # 歌を聴く（singing.py）：声で頼まれたときの道具の使い方と一言、聴き終えたときの感想の言い方
 singing_voice_instructions_file = "prompts/singing_voice.md"
 singing_feedback_file = "prompts/singing_feedback.md"
+# 小脳と心（CIEL_MODEL=pipeline。mind.py）：すぐの返事をする係の決まり（[think] で心に渡す）と、心が「今のまとめ」を書く指示
+talker_instructions_file = "prompts/talker.md"
+mind_brief_instructions_file = "prompts/mind_brief.md"
+# 小脳が [think] と言ったとき、心に考えて答えさせる合図
+mind_turn_instructions_file = "prompts/mind_turn.md"

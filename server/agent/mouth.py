@@ -19,7 +19,7 @@ import debug_log
 
 log = logging.getLogger('ciel-agent.mouth')
 
-WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled')
+WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'mind')
 FREE_POLL = 0.25
 
 
@@ -27,6 +27,7 @@ class Mouth:
     def __init__(self, session) -> None:
         self.session = session
         self.counts: collections.Counter[str] = collections.Counter()
+        self.before_say = None   # 話させる直前に why を知らせる先（pipeline の心が、考える番の返事かを知る。mind.py）
 
     def busy(self) -> bool:
         s = self.session
@@ -38,6 +39,8 @@ class Mouth:
         self.counts[why] += 1
         log.info('口：%s', why)
         debug_log.record('speak', why=why)
+        if self.before_say is not None:
+            self.before_say(why)
         return self.session.generate_reply(**kwargs)
 
     async def say_when_free(self, why: str, *, wait: float = 30.0, anyway: bool = False, **kwargs):

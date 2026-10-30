@@ -137,6 +137,14 @@ class Backchannel:
             return
         self._task = asyncio.create_task(self._play())
 
+    def think(self) -> None:
+        """考える時間の相づち（「えっと」）を 1 つ流す（mind.py：すぐの返事の係が [think] と言ったとき）"""
+        if self._source is None or not self._think or (self._task is not None and not self._task.done()):
+            return
+        self._question = True
+        self._heard.set()
+        self._task = asyncio.create_task(self._play())
+
     def nod(self) -> bool:
         """話している途中の息つぎに、聞いたときの相づちを 1 つ流す（文字起こしは待たない）。流したら True"""
         if self._source is None or not self._voices or (self._task is not None and not self._task.done()):

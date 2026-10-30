@@ -163,6 +163,7 @@ class Ciel(Agent):
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
         self.preamble = emotion.PreambleCut()   # 道具を呼んだ返事の前置きを止める（歌・議事録の道具が頼む）
         self.mind: mind.Mind | None = None      # pipeline の心（entrypoint がつなぐ）
+        self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
@@ -178,9 +179,28 @@ class Ciel(Agent):
             new_message.content = ['\n'.join(lines) + '\n' + (new_message.text_content or '')]
 
     def llm_node(self, chat_ctx, tools, model_settings):
-        if PIPELINE and self.mind is not None:
-            chat_ctx = self.mind.build(chat_ctx)
-        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        if not PIPELINE or self.mind is None:
+            return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        if self.mind.deep_turn(chat_ctx):
+            # 心：全部の指示と道具で作る（議事録・歌の知らせ、小脳が [think] と言ったとき、道具の結果を受けたとき）
+            return Agent.default.llm_node(self, self.mind.build(chat_ctx), tools, model_settings)
+        # 小脳：短い指示・道具なしで、すぐ返す（mind.py）
+        style = self.style
+        brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
+        return self.mind.talk(Agent.default.llm_node(self, self.mind.build(chat_ctx, talker_instructions=brief),
+                                                     [], model_settings))
+
+    def talker_instructions_for(self, talk: str, presence: str) -> str:
+        """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
+        話者の識別・議事録・道具の使い方は心が受け持つので入れない"""
+        p = self.persona
+        parts = [p.instructions + p.emotion_instructions, p.touch_instructions, p.talker_instructions,
+                 {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
+                  'public': p.presence_public_instructions}[presence]]
+        talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
+        if talk_text:
+            parts.append(talk_text)
+        return '\n\n'.join(part.strip('\n') for part in parts)
 
     def instructions_for(self, talk: str, presence: str) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
@@ -311,8 +331,12 @@ async def entrypoint(ctx: JobContext) -> None:
     if PIPELINE:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
-                               quiet_turn=agent.persona.talk_quiet_turn_instructions)
-        agent.replies = replies
+                               quiet_turn=agent.persona.talk_quiet_turn_instructions,
+                               brief_instructions=agent.persona.mind_brief_instructions,
+                               turn_instructions=agent.persona.mind_turn_instructions,
+                               say=voice.say, think=agent.aizuchi.think if AIZUCHI else None)
+        voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・考える番の返事は心が作る
+        agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
     # 歌を聴く（singing.py）。聴いているあいだは会話モデルへ声を送らず、シエルから話しかけない
@@ -438,6 +462,8 @@ async def entrypoint(ctx: JobContext) -> None:
     await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
                                  tool_choice='none')
     talker.start()
+    if agent.mind is not None:
+        agent.mind.start()   # 心が「今のまとめ」を書く見回り
     if AIZUCHI:
         await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく
 

@@ -44,3 +44,10 @@ cost = "全場面 1 回で約 0.3〜0.6 ドル（solo 0.05〜0.1、long_request 
 cost_max_usd = 0.6
 command = "docker exec ciel-dev-agent-dev-1 python bench_compare.py --label 名前 [--only solo,meeting] > 結果.json"
 covers = ["turns.py", "agent.py", "initiative.py", "minutes.py", "mode.py", "mouth.py", "models.py", "config/prompts/talk_"]
+
+[bench_ttft]
+what = "心（全部の指示と道具）と小脳（短い指示・道具なし）で、文字のモデルが書き始めるまでの秒数（声は使わない）"
+cost = "既定（各 10 回）で約 0.02〜0.03 ドル"
+cost_max_usd = 0.05
+command = "docker exec ciel-dev-agent-dev-1 python bench_ttft.py [--rounds 10]"
+covers = ["mind.py", "config/prompts/talker.md"]
