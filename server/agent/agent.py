@@ -370,6 +370,8 @@ async def entrypoint(ctx: JobContext) -> None:
         tasks = board.Board()
         tasks.on_change = notify
         minute_taker.board = tasks
+        # 気になっていることも付箋にし、話す番が来たら心が話すかを決める（沈黙の秒数では話さない。initiative.py）
+        talker.board, talker.open_nudge = tasks, agent.persona.initiative_open_nudge
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks)

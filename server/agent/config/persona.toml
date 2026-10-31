@@ -42,3 +42,5 @@ mind_brief_instructions_file = "prompts/mind_brief.md"
 listener_instructions_file = "prompts/listener.md"
 # 付箋（board.py）：「[今のタスク]」と、頼みの発言に付く印の読み方（心と小脳の両方に渡す）
 tasks_instructions_file = "prompts/tasks.md"
+# 話す番（initiative.py の付箋の形）：返事を話し終えて相手が話さない間に、気になっていることを話すかを心が決める
+initiative_open_nudge_file = "prompts/initiative_open.md"

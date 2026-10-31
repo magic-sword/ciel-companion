@@ -28,6 +28,14 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   ひかえめのときは話さないし、考えもしない。
 - 人が話している最中、シエルが考え中・話している最中は話しかけない。会話の始めのあいさつの前も話しかけない。
 - ログには考えの中身を出さない（数と気持ちの強さだけ）。中身はデバッグ用の会話ログ（debug_log、thoughts）にだけ残す。
+付箋の形（CIEL_MODEL=pipeline。board をつなぐと、こちらになる）：沈黙の秒数で話さず、満腹度も使わない。
+- 気になっていること（上の state_note と同じ選び方）を「気になっている」の付箋にする（board.py）。小脳も心も、ふつう・
+  おしゃべりのどちらでも、相手への返事で流れに合えば話題にする（今までの心の状態は、おしゃべりのときだけだった）。
+- 話す番（返事を話し終えて相手が話し始めない間）が来て、気になっている付箋があれば、心に話すかを決めさせる
+  （config/prompts/initiative_open.md。話す価値が無ければ [silent]）。気持ちが 5 かどうかの決まりで止めない。
+- おしゃべりのときは、静かなあいだに強い考え（気持ち 5）が新しく浮かんだことも、話す番にする（時間ではなく出来事）。
+  話しかけて返事が無ければ、相手が話すまで待つ。長い沈黙の最後の手段（FALLBACK_SECONDS）は使わない。
+- 話したかは、今までどおり次に考えるときに確かめる（spoken）。話していれば付箋ごと外す。
 決めたことは docs/decisions/inner-thoughts-ja.md、参考にした研究と設計の原点は docs/inner-thoughts-research-ja.md。
 """
 import asyncio
@@ -42,6 +50,7 @@ from datetime import datetime
 import openai
 from livekit.agents import AgentSession
 
+import board
 import debug_log
 import models
 import mouth
@@ -82,6 +91,7 @@ REACTIVE_TURNS = 2
 UNREVIEWED_LOSS = 1.0         # 考える係が、前の考えを付け直しも捨てもしなかったら、気持ちをこれだけ下げる
 TOPIC_SHIFT_LOSS = 1.0        # 話題が移ったとき、前の話題の聞きたいこと・戻りたいことの気持ちを下げる量
 MAX_THOUGHTS = 12
+BOARD_THOUGHTS = 2            # 付箋にする、気になっていることの数
 PER_TOPIC_KIND = 2             # 同じ話題・同じ種類の考えを持つ数
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
@@ -138,6 +148,9 @@ class Initiative:
         self._agent_done_at: float | None = None   # シエルが相手への返事を話し終えた時刻（続けて話してよいかを見る）
         self.satiety = 0.0                 # 話したい欲の満腹度（_satiated_at の時点の値。satiety_at で今の値）
         self._satiated_at = time.monotonic()
+        self.board: board.Board | None = None   # 付箋の一覧（pipeline。つなぐと付箋の形で話す。agent.py がつなぐ）
+        self.open_nudge = ''               # 話す番の合図（config/prompts/initiative_open.md）
+        self._cards: dict[str, board.Card] = {}   # 考えの id → 気になっている付箋
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -194,11 +207,15 @@ class Initiative:
             return   # 声の登録の途中など、シエルから話しかけない間（agent.py がつなぐ）
         talk = self.style.talk
         if talk == 'quiet':
+            if self.board is not None:
+                self._cards = self._clear_cards()
             return
         self._watch_history(now)
         if self._should_think(now):
             self._thought_at = now
             self._thinking = asyncio.create_task(self._think(now))
+        if self.board is not None:
+            self.sync_board(now)
         if self._user_busy or self._agent_busy:
             return
         thought = self.pick(now)
@@ -228,10 +245,13 @@ class Initiative:
                 and now - self._last >= idle and now - self._thought_at >= idle)
 
     def score(self, t: Thought, now: float) -> float:
-        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）"""
+        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）。
+        付箋の形では、静けさと満腹度を使わない（古いほど下がるだけ）"""
+        loss = STALE_LOSS * max(0.0, (now - t.created) - STALE_SECONDS) / STALE_SECONDS
+        if self.board is not None:
+            return t.motivation - loss
         silence = max(0.0, now - self._last)
         gain = min(SILENCE_GAIN * int(silence // SILENCE_STEP), SILENCE_GAIN_MAX)
-        loss = STALE_LOSS * max(0.0, (now - t.created) - STALE_SECONDS) / STALE_SECONDS
         return t.motivation + gain - loss - self.satiety_at(now)
 
     def satiety_at(self, now: float) -> float:
@@ -261,6 +281,8 @@ class Initiative:
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
         self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
+        if self.board is not None:
+            return self._pick_open(now)
         candidates = [t for t in self.thoughts if not t.offered]   # 心の状態に載せた考えは、話したか分かるまで待つ
         silence = now - self._last
         talk = self.style.talk
@@ -278,13 +300,55 @@ class Initiative:
             return next((t for t in candidates if t.kind == 'correction' and t.motivation >= 5), None)
         return None
 
+    def _pick_open(self, now: float) -> Thought | None:
+        """付箋の形：話す番が来て、気になっている付箋があれば、そのいちばん強い考え（話すかは心が決める）"""
+        talk = self.style.talk
+        if talk == 'normal' and now - self._last >= CORRECTION_PAUSE_SECONDS:
+            fix = next((t for t in self.thoughts if t.kind == 'correction' and t.motivation >= 5), None)
+            if fix is not None:
+                return fix
+        shown = [t for t in self.thoughts if t.id in self._cards]
+        if self.continuing(now):
+            return max(shown, key=lambda t: self.score(t, now), default=None)
+        if talk == 'chatty' and self._spoke_at is None:
+            # 静かなあいだに、強い考えが新しく浮かんだ（時間ではなく出来事で話す）
+            new = [t for t in shown if t.created > self._last and t.motivation >= CONTINUE_THRESHOLD]
+            return max(new, key=lambda t: t.motivation, default=None)
+        return None
+
+    def board_thoughts(self, now: float) -> list[Thought]:
+        """付箋にする考え：今の話題に新しく（きっかけの発言のあと相手が話したのは 1 回まで）、気持ちが基準を超えたもの。
+        言い直しは付箋にせず、すぐ話す"""
+        return sorted((t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction'
+                       and self.turns_since(t.anchor) <= 1 and self.score(t, now) >= THRESHOLD),
+                      key=lambda t: -self.score(t, now))[:BOARD_THOUGHTS]
+
+    def _clear_cards(self) -> dict:
+        """気になっている付箋を全部外す（ひかえめのあいだは、自分から話題にしない）"""
+        for card in self._cards.values():
+            self.board.remove(card)
+        return {}
+
+    def sync_board(self, now: float) -> None:
+        """気になっている付箋を、今の考えに合わせる。付箋にした考えは「見せた」にして、話したかを次に考えるときに確かめる"""
+        want = {t.id: t for t in self.board_thoughts(now)}
+        for tid in [tid for tid in self._cards if tid not in want]:
+            self.board.remove(self._cards.pop(tid))
+        last_id = self.history.last_id if self.history is not None else 0
+        for t in want.values():
+            if t.id not in self._cards:
+                self._cards[t.id] = self.board.add('thought', f'{t.text}（{KIND_LABELS[t.kind]}）', board.WANT, 'self',
+                                                   ref=t.id)
+            if not t.offered:
+                t.offered, t.shown_id = True, last_id
+
     def state_note(self) -> str | None:
         """会話の後ろに置く、シエルの今の心の状態（turns.py が返事を頼むときに呼ぶ）。前に置いたものと同じなら None。
         「言えたら添えて」という用事として渡すと、会話モデルは目の前の返事を優先してほとんど使わなかった（2026-10-24）。
         気持ちとして置いておき、流れに合うときに自然に使わせる。載せるのは今の話題に新しく、気持ち − 満腹度が基準を
         超えた考えだけ（満腹度が高いほど少なく、満ちていれば載せない）"""
-        if self.style.talk != 'chatty' or not self.state_header:
-            return None
+        if self.style.talk != 'chatty' or not self.state_header or self.board is not None:
+            return None   # 付箋の形では、気になっていることは付箋の一覧で渡す
         now = time.monotonic()
         satiety = self.satiety_at(now)
         if satiety >= 1.5:
@@ -366,6 +430,14 @@ class Initiative:
 
     def _express(self, t: Thought, now: float) -> None:
         self._agent_done_at = None   # 続けて話すのは 1 回だけ
+        if self.board is not None and t.kind != 'correction':
+            # 付箋の形：どの付箋を話すか・黙るかは心が決める。話したかは、次に考えるときに確かめる
+            self._spoke_at = self._last = now
+            log.info('内なる考え：話す番。心に話すかを決めさせる（気になっていること %d 個、いちばん強い気持ち %.0f）',
+                     len(self._cards), t.motivation)
+            debug_log.record('thought_opening', thought_kind=t.kind, text=t.text, motivation=t.motivation)
+            self._reply(self.open_nudge or self.nudge, '', placed=True)
+            return
         t.expressed = True
         self.expressed = (self.expressed + [t.text])[-8:]
         if self._spoke_at is not None:
@@ -378,7 +450,8 @@ class Initiative:
                  t.kind, t.motivation, self.unanswered, self.satiety_at(now))
         debug_log.record('thought_expressed', thought_kind=t.kind, text=t.text, motivation=t.motivation)
         note = f'[話したいこと（{KIND_LABELS[t.kind]}）] {t.text}'
-        if getattr(self.session, 'current_agent', None) is None:
+        if getattr(self.session, 'current_agent', None) is None or self.board is not None:
+            # 付箋の形（pipeline）では、LiveKit の会話を書き換えない（mind.py が今回の分から文脈を作る）
             self._reply(nudge, note, placed=False)
             return
         task = asyncio.create_task(self._say(nudge, note))

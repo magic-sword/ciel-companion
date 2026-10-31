@@ -439,6 +439,75 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         none = SimpleNamespace(userdata=SimpleNamespace(initiative=None))
         self.assertEqual(json.loads(await read_inner_thoughts(none))['status'], 'unavailable')
 
+def make_board(talk='normal'):
+    """The pipeline form: thoughts go on the board, and the mind decides at the open turn."""
+    import board
+    i = make(talk)
+    i.board, i.open_nudge = board.Board(), 'OPEN'
+    return i
+
+
+class BoardFormTests(unittest.TestCase):
+    def test_strong_thoughts_become_want_cards_and_leave_when_gone(self):
+        import board
+        i = make_board()
+        t = Thought('星空の写真を見たい', 'question', 4.0, created=100.0)
+        weak = Thought('なんとなく', 'comment', 3.0, created=100.0)
+        i.thoughts = [t, weak]
+        i.sync_board(100.0)
+        self.assertEqual([(c.title, c.status, c.by) for c in i.board.cards],
+                         [('星空の写真を見たい（相手に聞きたいこと）', board.WANT, 'self')])
+        self.assertTrue(t.offered)                 # shown: the thinker checks later whether she said it
+        self.assertIn('気になっている', i.board.context())
+        i.thoughts = [weak]                        # spoken or dropped
+        i.sync_board(101.0)
+        self.assertEqual(i.board.cards, [])
+
+    def test_open_turn_in_normal_talk_with_a_motivation_of_four(self):
+        i = make_board('normal')
+        i.thoughts = [Thought('星空の写真を見たい', 'question', 4.0, created=100.0)]
+        i.sync_board(100.0)
+        agent_finished(i, 100.0)
+        self.assertEqual(i.pick(100.0 + initiative.CONTINUE_AFTER).text, '星空の写真を見たい')
+
+    def test_no_long_silence_fallback_and_no_satiety(self):
+        i = make_board('chatty')
+        i.thoughts = [Thought('星空の写真を見たい', 'question', 4.5, created=0.0)]
+        i._last = 0.0
+        i.sync_board(1.0)
+        self.assertIsNone(i.pick(initiative.FALLBACK_SECONDS * 4))
+        i._sate(0.0, 5.0)
+        self.assertEqual(i.score(i.thoughts[0], 1.0), 4.5)
+
+    def test_a_strong_new_thought_in_a_lull_is_an_open_turn_once(self):
+        i = make_board('chatty')
+        i._last = 100.0
+        i.thoughts = [Thought('さっきの星座、名前が気になる', 'research', 5.0, created=130.0)]
+        i.sync_board(130.0)
+        self.assertIsNotNone(i.pick(130.5))
+        i._spoke_at = 131.0                       # she spoke and nobody answered yet
+        self.assertIsNone(i.pick(140.0))
+
+    def test_the_mind_gets_the_open_nudge_and_the_thought_stays_until_checked(self):
+        i = make_board('normal')
+        t = Thought('星空の写真を見たい', 'question', 4.0, created=100.0)
+        i.thoughts = [t]
+        i.sync_board(100.0)
+        say = Mock()
+        with patch.object(initiative.mouth, 'of', return_value=SimpleNamespace(say=say)):
+            i._express(t, 102.0)
+        say.assert_called_once_with('initiative', instructions='OPEN')
+        self.assertFalse(t.expressed)
+        self.assertIsNone(i._agent_done_at)
+
+    def test_quiet_clears_the_cards(self):
+        i = make_board('normal')
+        i.thoughts = [Thought('星空の写真を見たい', 'question', 4.0, created=100.0)]
+        i.sync_board(100.0)
+        i.style.talk = 'quiet'
+        i.step(101.0)
+        self.assertEqual(i.board.cards, [])
+
 
 if __name__ == '__main__':
     unittest.main()
