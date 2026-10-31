@@ -37,7 +37,7 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research')   # 心が返事を作る、口（mouth.py）の why
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）

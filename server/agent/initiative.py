@@ -36,6 +36,7 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
 - おしゃべりのときは、静かなあいだに強い考え（気持ち 5）が新しく浮かんだことも、話す番にする（時間ではなく出来事）。
   話しかけて返事が無ければ、相手が話すまで待つ。長い沈黙の最後の手段（FALLBACK_SECONDS）は使わない。
 - 話したかは、今までどおり次に考えるときに確かめる（spoken）。話していれば付箋ごと外す。
+- 調べてみたいこと（research）で調べる質問があれば、まず自分で調べる（curiosity.py）。調べているあいだは付箋にしない。
 決めたことは docs/decisions/inner-thoughts-ja.md、参考にした研究と設計の原点は docs/inner-thoughts-research-ja.md。
 """
 import asyncio
@@ -113,6 +114,8 @@ class Thought:
     shown_id: int = 0       # 心の状態に載せたときの最後の発言 ID（話したかは、これより後のシエルの発言だけで判定する）
     topic: str = ''         # 考えたときの話題（話題が移ったら、その話題への反応は用済み）
     stimulus: str = ''      # 何をきっかけにした考えか（相手の発言の中身・覚えていること・知りたいこと）
+    query: str = ''         # 調べてみたいこと（research）の、Web で調べる質問（curiosity.py が自分で調べる）
+    researching: bool = False   # 今、自分で調べている
 
 
 class Initiative:
@@ -151,6 +154,7 @@ class Initiative:
         self.board: board.Board | None = None   # 付箋の一覧（pipeline。つなぐと付箋の形で話す。agent.py がつなぐ）
         self.open_nudge = ''               # 話す番の合図（config/prompts/initiative_open.md）
         self._cards: dict[str, board.Card] = {}   # 考えの id → 気になっている付箋
+        self.curious = None                # curiosity.Curiosity（調べてみたいことを自分で調べる。agent.py がつなぐ）
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -319,7 +323,7 @@ class Initiative:
     def board_thoughts(self, now: float) -> list[Thought]:
         """付箋にする考え：今の話題に新しく（きっかけの発言のあと相手が話したのは 1 回まで）、気持ちが基準を超えたもの。
         言い直しは付箋にせず、すぐ話す"""
-        return sorted((t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction'
+        return sorted((t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction' and not t.researching
                        and self.turns_since(t.anchor) <= 1 and self.score(t, now) >= THRESHOLD),
                       key=lambda t: -self.score(t, now))[:BOARD_THOUGHTS]
 
@@ -331,6 +335,10 @@ class Initiative:
 
     def sync_board(self, now: float) -> None:
         """気になっている付箋を、今の考えに合わせる。付箋にした考えは「見せた」にして、話したかを次に考えるときに確かめる"""
+        if self.curious is not None:
+            for t in self.thoughts:
+                if t.kind == 'research' and t.query and not t.researching and self.alive(t, now):
+                    self.curious.offer(t)   # 受けたら researching になり、気になっている付箋からは外れる
         want = {t.id: t for t in self.board_thoughts(now)}
         for tid in [tid for tid in self._cards if tid not in want]:
             self.board.remove(self._cards.pop(tid))
@@ -618,8 +626,9 @@ class Initiative:
             if any(t.text == text for t in self.thoughts) or text in self.expressed:
                 continue
             kind = raw.get('kind') if raw.get('kind') in KINDS else 'comment'
+            query = raw.get('query').strip()[:200] if kind == 'research' and isinstance(raw.get('query'), str) else ''
             self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor,
-                                         topic=self.topic, stimulus=stimulus))
+                                         topic=self.topic, stimulus=stimulus, query=query))
             added += 1
         # 同じ話題・同じ種類の考えは、気持ちの強いものから PER_TOPIC_KIND 個まで（言い方を変えただけの似た考えが
         # 積み重なった。2026-10-24、評価の AI の動向の場面）

@@ -35,6 +35,7 @@ from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVa
 import aizuchi
 import board
 import clock
+import curiosity
 import debug_log
 import emotion
 import initiative
@@ -213,8 +214,23 @@ class Ciel(Agent):
             style = self.style
             brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
             ctx, fns = self.mind.build(chat_ctx, talker_instructions=brief, turn=turn), []
-        async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
-            yield chunk
+        # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
+        # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
+        speech = getattr(self.session.current_speech, 'id', None)
+        text, calls, done = [], [], False
+        try:
+            async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
+                delta = chunk if isinstance(chunk, str) else getattr(chunk, 'delta', None)
+                if isinstance(delta, str):
+                    text.append(delta)
+                elif delta is not None:
+                    text.append(delta.content or '')
+                    calls += [c.name for c in delta.tool_calls or []]
+                yield chunk
+            done = True
+        finally:
+            debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
+                             tools_given=len(fns))
 
     def talker_instructions_for(self, talk: str, presence: str) -> str:
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
@@ -372,6 +388,10 @@ async def entrypoint(ctx: JobContext) -> None:
         minute_taker.board = tasks
         # 気になっていることも付箋にし、話す番が来たら心が話すかを決める（沈黙の秒数では話さない。initiative.py）
         talker.board, talker.open_nudge = tasks, agent.persona.initiative_open_nudge
+        # 調べてみたいことを、自分で調べて、分かったら話の切れ目に話す（curiosity.py）
+        talker.curious = curiosity.Curiosity(
+            researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
+            agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused())
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks)

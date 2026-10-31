@@ -154,6 +154,16 @@ def attach(session, room, agent) -> None:
     def on_error(ev) -> None:
         record('error', error=repr(ev.error))
 
+    def on_speech(ev) -> None:
+        # 話す予定（返事・話しかけ）ができた。どれが声になり、どれが止められ・取り消されたかを、id で mind_output・item と結ぶ
+        handle = ev.speech_handle
+        record('speech', id=handle.id, source=ev.source, user_initiated=ev.user_initiated)
+        handle.add_done_callback(lambda h: record('speech_done', id=h.id, interrupted=h.interrupted,
+                                                  items=[getattr(i, 'id', None) for i in h.chat_items]))
+
+    def on_false_interruption(ev) -> None:
+        record('false_interruption', resumed=ev.resumed)
+
     def on_data(packet) -> None:
         try:
             payload = packet.data.decode('utf-8')
@@ -167,4 +177,6 @@ def attach(session, room, agent) -> None:
     session.on('user_state_changed', on_user_state)
     session.on('agent_state_changed', on_agent_state)
     session.on('error', on_error)
+    session.on('speech_created', on_speech)
+    session.on('agent_false_interruption', on_false_interruption)
     room.on('data_received', on_data)
