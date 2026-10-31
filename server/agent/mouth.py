@@ -35,10 +35,8 @@ class Mouth:
         return (getattr(s, 'user_state', None) == 'speaking'
                 or getattr(s, 'agent_state', None) in ('thinking', 'speaking', 'initializing'))
 
-    def say(self, why: str, _latest: bool = False, **kwargs):
+    def say(self, why: str, **kwargs):
         """今すぐ話させる。generate_reply の返り（SpeechHandle）をそのまま返す"""
-        if _latest:
-            kwargs = self._latest.pop(why, kwargs)
         self.counts[why] += 1
         log.info('口：%s', why)
         debug_log.record('speak', why=why)
@@ -81,8 +79,9 @@ class Mouth:
     async def _say_latest(self, why: str, settle: float, wait: float) -> None:
         try:
             await self._free(wait, settle)
-            if why in self._latest:   # 返事の中で伝え終えていれば（drop）、言わない
-                self.say(why, _latest=True)
+            kwargs = self._latest.pop(why, None)
+            if kwargs is not None:   # 返事の中で伝え終えていれば（drop）、言わない
+                self.say(why, **kwargs)
         finally:
             self._latest.pop(why, None)
 

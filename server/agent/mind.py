@@ -14,10 +14,10 @@ system の項目として差し込んで合わせていた（記録が 2 つ。d
 - 今のまとめ：心が、発言が増えたら（summaries/live.py と同じ決め方）会話を読み直して書く（config/prompts/mind_brief.md）。
   小脳は最近の発言しか読まないので、会話全体の流れはここで伝える。
 """
-import re
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -73,7 +73,6 @@ class Mind:
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
-        self._tasks: set[asyncio.Task] = set()
 
     @property
     def client(self):
@@ -96,16 +95,16 @@ class Mind:
         if self._deep:
             self._deep = False
             return 'mind'
-        text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
+        text = _user_text(tail)
         if not text:
             return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
         # 付箋になった頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
         # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
-        rest = self.board.strip(text) if self.board is not None else text
+        rest = self._strip(text)
         # 頼みだけの発言かは、最後の発言で見る。黙って聞いた前の発言も今回の分に残るので、全部で見ると
         # 「賛成です。…（→ 付箋）」が頼みだけにならず、心が前の発言に返した（2026-10-31）
-        latest = next((_text(i) for i in reversed(tail) if getattr(i, 'role', None) == 'user' and _text(i)), '')
-        latest_rest = self.board.strip(latest) if self.board is not None else latest
+        latest = next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
+        latest_rest = self._strip(latest)
         if latest_rest != latest and not FILLER.sub('', latest_rest):
             # 頼みだけの発言で、付箋になった（「あ、議事録開始して」）。返事はせず、議事録係の知らせだけを言う。
             # 心が「議事録、とりながら進めていますよ」と返し、そのあと知らせも言って 2 回になった（2026-10-30）
@@ -132,10 +131,8 @@ class Mind:
         """心に渡す道具。議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ渡す（付箋になった頼みは除く）。
         付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
         道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
-        tail = _tail(list(chat_ctx.items))
-        text = ''.join(_text(i) for i in tail if getattr(i, 'role', None) == 'user')
-        rest = self.board.strip(text) if self.board is not None else text
-        if not text or MINUTES_ASK.search(rest):
+        text = _user_text(_tail(list(chat_ctx.items)))
+        if not text or MINUTES_ASK.search(self._strip(text)):
             return tools   # 知らせ（相手の発言の無い返事）か、議事録の頼みがある
         return [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
 
@@ -159,9 +156,8 @@ class Mind:
         items = list(chat_ctx.items)
         instructions = next((i for i in items if getattr(i, 'role', None) == 'system'), None)
         tail = [i for i in _tail(items) if i is not instructions]
-        tail_users = {_text(i) for i in tail if getattr(i, 'role', None) == 'user'}
+        tail_users = {_text(i) for i in tail if _is_user(i)}
         turn = turn or {}
-        self.memory = turn.get('memory')
         out = llm.ChatContext()
         if talker_instructions is not None:
             out.add_message(role='system', content=talker_instructions)
@@ -175,7 +171,7 @@ class Mind:
                 out.add_message(role='user', content=f'{t.name}：{self._marked(text)}')
             else:
                 out.add_message(role='assistant', content=text)
-        notes = self._notes(deep=talker_instructions is None)
+        notes = self._notes(deep=talker_instructions is None, memory=turn.get('memory'))
         self.handed = None
         if talker_instructions is None and tail_users:
             # 切れ目を待っている知らせは、相手への返事の中で伝える。長い話の途中で聞く係が議事録を始めると、
@@ -197,7 +193,7 @@ class Mind:
 
     def _mark_item(self, item):
         """今回の発言の、付箋になった頼みを付箋の印に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）"""
-        if getattr(item, 'role', None) != 'user':
+        if not _is_user(item):
             return item
         text = _text(item)
         marked = self._marked(text)
@@ -208,13 +204,17 @@ class Mind:
         （過去の「議事録開始して」を読んだ心が、終了の頼みと取り違えて終了の道具を呼んだ。2026-10-30）"""
         return self.board.mark(text) if self.board is not None else text
 
+    def _strip(self, text: str) -> str:
+        """付箋になった頼みを除いた発言（頼みごととして数え直さない）"""
+        return self.board.strip(text) if self.board is not None else text
+
     def _recent(self, n: int):
         if self.history is None:
             return []
         rows = [t for t in self.history.turns if t.ready.is_set() and t.text and t.role in ('user', 'assistant')]
         return rows[-n:]
 
-    def _notes(self, deep: bool) -> str:
+    def _notes(self, deep: bool, memory: str | None = None) -> str:
         """今回の返事のための補足（会話の後ろ、今回の発言の前に置く）"""
         lines = [clock.now_line()]
         if self.brief:
@@ -232,8 +232,8 @@ class Mind:
             note = self.minutes.take_note()
             if note:
                 lines.append(note)
-        if self.memory:
-            lines.append(self.memory)
+        if memory:
+            lines.append(memory)
         if self.style is not None and self.style.talk == 'quiet' and self.quiet_turn:
             lines.append(self.quiet_turn)
         return '\n\n'.join(line for line in lines if line)
@@ -305,4 +305,13 @@ def _tail(items: list) -> list:
 
 def _text(item) -> str:
     return (getattr(item, 'text_content', None) or '').strip()
+
+
+def _is_user(item) -> bool:
+    return getattr(item, 'role', None) == 'user'
+
+
+def _user_text(items: list) -> str:
+    """相手の発言をつないだ文"""
+    return ''.join(_text(i) for i in items if _is_user(i))
 

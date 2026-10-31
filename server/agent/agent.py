@@ -23,7 +23,6 @@ import asyncio
 import json
 import logging
 import os
-import time
 
 from dotenv import load_dotenv
 from livekit import agents, rtc
@@ -222,12 +221,19 @@ class Ciel(Agent):
         話者の識別・議事録・道具の使い方は心が受け持つので入れない"""
         p = self.persona
         parts = [p.instructions + p.emotion_instructions, p.touch_instructions, p.talker_instructions, p.tasks_instructions,
-                 {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
-                  'public': p.presence_public_instructions}[presence]]
-        talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
-        if talk_text:
-            parts.append(talk_text)
-        return '\n\n'.join(part.strip('\n') for part in parts)
+                 self._presence_text(presence), self._talk_text(talk)]
+        return '\n\n'.join(part.strip('\n') for part in parts if part)
+
+    def _presence_text(self, presence: str) -> str:
+        """その場にいる人（presence_*.md、覚えていることの出し方）"""
+        p = self.persona
+        return {'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
+                'public': p.presence_public_instructions}[presence]
+
+    def _talk_text(self, talk: str) -> str:
+        """おしゃべり度（ひかえめ talk_quiet.md・おしゃべり talk_chatty.md。ふつうは空）"""
+        p = self.persona
+        return {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk, '')
 
     def instructions_for(self, talk: str, presence: str) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
@@ -246,11 +252,9 @@ class Ciel(Agent):
         if VOICE == 'irodori':
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
-            parts.append({'solo': p.presence_solo_instructions, 'close': p.presence_close_instructions,
-                          'public': p.presence_public_instructions}[presence])
-        talk_text = {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk)
-        if talk_text:
-            parts.append(talk_text)
+            parts.append(self._presence_text(presence))
+        if self._talk_text(talk):
+            parts.append(self._talk_text(talk))
         # 1 つずつ、前の末尾の改行を落として空行 1 つでつなぐ（最後の本文の末尾はそのまま）
         instructions = parts[0]
         for part in parts[1:]:
@@ -314,17 +318,6 @@ async def entrypoint(ctx: JobContext) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
-    # 会話のしかた（mode.py）。いまの答え方・覚えていることの出し方は、変わるたびに Unity へ知らせる
-    style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
-    style.publish = lambda msg: asyncio.create_task(ctx.room.local_participant.publish_data(
-        json.dumps(msg), reliable=True, topic='ciel.event'))
-    history = Conversation()
-    session.userdata.history = history
-    # 会話のまとめ（議事録など。minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
-    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history,
-                                   agent.persona.minutes_live_instructions)
-    session.userdata.minutes = minute_taker
-    summary_seq = 0
 
     async def send(topic: str, *messages: dict) -> None:
         # アプリへの知らせ。会話が終わって部屋が閉じたあと（議事録の清書の結果など）は送れないので、捨てる
@@ -335,13 +328,27 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception as e:
             logger.info('アプリへ送れない（%s）: %s', topic, type(e).__name__)
 
+    def notify(msg: dict) -> None:
+        # アプリへの知らせ（ciel.event）を、待たずに送る
+        asyncio.create_task(send('ciel.event', msg))
+    # 会話のしかた（mode.py）。いまの答え方・覚えていることの出し方は、変わるたびに Unity へ知らせる
+    style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
+    style.publish = notify
+    history = Conversation()
+    session.userdata.history = history
+    # 会話のまとめ（議事録など。minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から
+    minute_taker = minutes.Minutes(book, agent.persona.minutes_instructions, history,
+                                   agent.persona.minutes_live_instructions)
+    session.userdata.minutes = minute_taker
+    summary_seq = 0
+
     def publish_summary(state) -> None:
         # まとめの中身は大きいので、分けて送る（アプリが seq ごとにつなぐ）
         nonlocal summary_seq
         summary_seq += 1
         asyncio.create_task(send('ciel.summary', *minutes.packets(state, summary_seq)))
     minute_taker.on_state = publish_summary
-    minute_taker.on_progress = lambda msg: asyncio.create_task(send('ciel.event', msg))
+    minute_taker.on_progress = notify
     replies = turns.TurnReplies(session, book, tap, style, agent.persona.talk_quiet_turn_instructions,
                                 agent.aizuchi if AIZUCHI else None, history=history, minutes=minute_taker, nod=NOD)
     async def publish_research(packet):
@@ -361,7 +368,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
         # 付箋の一覧：頼まれたこと・していることの今の状態を、心・小脳・アプリが同じ 1 つで見る（board.py）
         tasks = board.Board()
-        tasks.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
+        tasks.on_change = notify
         minute_taker.board = tasks
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
@@ -388,7 +395,7 @@ async def entrypoint(ctx: JobContext) -> None:
     song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
     session.userdata.song = song
     if song is not None:
-        song.publish = lambda msg: asyncio.create_task(send('ciel.event', msg))
+        song.publish = notify
         talker.paused = lambda: song.active
         song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
         song.preamble = agent.preamble   # 「どうぞ」を 2 文までにする
@@ -415,12 +422,10 @@ async def entrypoint(ctx: JobContext) -> None:
         # 話の途中で頼まれたとき（聞く係）もあるので、話の切れ目まで待ってから、そのとき最新の知らせだけを言う
         voice.say_latest('minutes', settle=MINUTES_SETTLE,
                          instructions=minutes.LINES[what] + '\n\n' + minute_taker.context())
-        msg = json.dumps({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
-        asyncio.create_task(ctx.room.local_participant.publish_data(msg, reliable=True, topic='ciel.event'))
+        notify({'v': 1, 'type': 'minutes.state', 'recording': minute_taker.recording})
     minute_taker.on_change = on_minutes
     # 声で送り先を切り替えたら、アプリの端末に覚えさせる（次につないだときも同じ送り先にする）
-    minute_taker.on_destination = lambda name: asyncio.create_task(
-        send('ciel.event', {'v': 1, 'type': 'minutes.destination', 'selected': name}))
+    minute_taker.on_destination = lambda name: notify({'v': 1, 'type': 'minutes.destination', 'selected': name})
     minute_taker.busy = voice.busy   # 送り終えたことは、話の切れ目で伝える
     if note_taker is not None:
         book.on_notes_consent = note_taker.on_consent   # 同意したら、同意の前に話したことも含めてすぐ書く
@@ -428,11 +433,11 @@ async def entrypoint(ctx: JobContext) -> None:
         book.on_split = history.on_split
         book.on_merge = history.on_merge
         # アプリの参加者パネル（speakers.py の state）。名簿・最後に話した人が変わるたびに知らせる
-        book.on_change = lambda state: asyncio.create_task(send('ciel.event', state))
+        book.on_change = notify
         # ひとり・身近な人のときは、端末の持ち主の声を優先して当てる（speakers.py の _owner_judge）
         book.private = lambda: style.presence in ('solo', 'close')
         # 声の登録（アプリの「声を登録する」）：様子をアプリへ知らせ、その間はシエルから話しかけない。登録できたらひとこと言う
-        book.on_enroll = lambda state: asyncio.create_task(send('ciel.event', state))
+        book.on_enroll = notify
         async def enrolled(name: str) -> None:
             # 最後の文を読み終えるまで待ってから言う（読んでいる途中に話し始めて、止められたことがあった）
             await asyncio.sleep(1.0)
@@ -477,8 +482,7 @@ async def entrypoint(ctx: JobContext) -> None:
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
     await session.start(room=ctx.room, agent=agent, record=False)
     # アプリの「まとめをとる」で選べるテンプレート（minutes.py）
-    await ctx.room.local_participant.publish_data(
-        json.dumps(minute_taker.templates_event(), ensure_ascii=False), reliable=True, topic='ciel.event')
+    await send('ciel.event', minute_taker.templates_event())
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
     toucher = touch.TouchReactions(session, book, style)
     replies.touch = toucher

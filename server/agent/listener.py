@@ -65,7 +65,8 @@ class Listener:
 
     async def check(self, text: str) -> str | None:
         """頼みかを確かめて、頼みなら動かす。動かした頼みの種類（start・finish）を返す"""
-        card = self.board.add('minutes', '議事録の頼みかを確かめる', tasks.CHECKING, 'listener', said=text)             if self.board is not None else None
+        card = (self.board.add('minutes', '議事録の頼みかを確かめる', tasks.CHECKING, 'listener', said=text)
+                if self.board is not None else None)
         try:
             action = await self._check(text)
         finally:
