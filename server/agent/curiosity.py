@@ -11,6 +11,7 @@
 - 調べているあいだは「気になって調べている」の付箋（board.py）。アプリには、頼まれた調べものと同じ調査のパネルが届く。
 - 分かったら、口の知らせ（mouth.py の say_latest、why は research）で、話の切れ目に言う。相手への返事を先に作るときは、
   心がその返事の中で伝える（mind.py の [まだ伝えていない知らせ]）。言い方は config/prompts/research_found.md。
+- 分かったことは、考える係にも渡す（initiative.py の learn）。答えが出た考え・知りたいことを、見直して外させる。
 - 調べられなかったら、話さない（付箋は失敗にし、その考えは気持ちを下げて残す）。
 ログには数と状態だけを出す（質問・結果の中身は debug_log）。
 """
@@ -34,13 +35,14 @@ SUMMARY_CHARS = 1500   # 知らせに渡す結果の文字数
 
 class Curiosity:
     def __init__(self, researcher, board: tasks.Board, say, instructions: str, *, style=None,
-                 paused=None, clock=time.monotonic) -> None:
+                 paused=None, learned=None, clock=time.monotonic) -> None:
         self.researcher = researcher    # web_research.WebResearcher
         self.board = board
         self.say = say                  # 知らせを言う（instructions を受ける。agent.py が mouth.say_latest につなぐ）
         self.instructions = instructions   # config/prompts/research_found.md
         self.style = style              # mode.ConversationStyle
         self.paused = paused            # 呼ぶと True のあいだは調べない（声の登録・歌）
+        self.learned = learned          # 分かったことを渡す（質問・要約を受ける。agent.py が initiative の learn につなぐ）
         self._clock = clock
         self._started: deque[float] = deque()
         self._task: asyncio.Task | None = None
@@ -102,4 +104,6 @@ class Curiosity:
         found = {'thought': thought.text, 'question': query,
                  'summary': (result.get('summary') or '')[:SUMMARY_CHARS],
                  'sources': [s.get('title') for s in result.get('sources') or [] if isinstance(s, dict)][:3]}
+        if self.learned is not None:
+            self.learned(query, found['summary'])   # 答えが出た「聞きたいこと」を、報告のあとに聞き直さない
         self.say(self.instructions + '\n\n' + json.dumps(found, ensure_ascii=False))

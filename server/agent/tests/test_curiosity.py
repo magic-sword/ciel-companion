@@ -38,6 +38,13 @@ class CuriosityTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(t.expressed)
         self.assertFalse(t.researching)
 
+    async def test_what_she_learned_goes_to_the_thinker(self):
+        c, _, _ = make()
+        c.learned = Mock()
+        self.assertTrue(c.offer(thought()))
+        await c._task
+        c.learned.assert_called_once_with('スマートフォンでオリオン座をきれいに撮る設定', '夜景モードで三脚を使う[1]')
+
     async def test_failure_is_not_told_and_not_retried(self):
         c, _, say = make({'status': 'failed'})
         t = thought()

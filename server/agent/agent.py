@@ -391,7 +391,8 @@ async def entrypoint(ctx: JobContext) -> None:
         # 調べてみたいことを、自分で調べて、分かったら話の切れ目に話す（curiosity.py）
         talker.curious = curiosity.Curiosity(
             researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
-            agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused())
+            agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
+            learned=talker.learn)
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks)

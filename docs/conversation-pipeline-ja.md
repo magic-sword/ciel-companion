@@ -147,7 +147,7 @@ stateDiagram-v2
 
 言い直し（`correction`、気持ち 5）は付箋にせず、ふつうのときに 3 秒の間で話す（今までどおり）。
 
-調べてみたいこと（`research`）で調べる質問（`query`）があれば、付箋にする前に `curiosity.Curiosity.offer` に渡し、シエルが自分で調べる。分かったことは知らせ（`say_latest('research')`、`config/prompts/research_found.md`）で、話の切れ目か次の返事の中で話す。ひかえめ・止めている間・頼まれた調べものの最中・1 時間 3 回を超えたら調べない。
+調べてみたいこと（`research`）で調べる質問（`query`）があれば、付箋にする前に `curiosity.Curiosity.offer` に渡し、シエルが自分で調べる。分かったことは知らせ（`say_latest('research')`、`config/prompts/research_found.md`）で、話の切れ目か次の返事の中で話す。ひかえめ・止めている間・頼まれた調べものの最中・1 時間 3 回を超えたら調べない。分かったことは考える係にも渡し（`Initiative.learn` → 入力の `learned`）、報告を話し終えたらすぐ見直させる。見直すまでは「気になっている」付箋を外し、話す番も開かない（調べて答えが出た「聞きたいこと」を聞き直さないため）。
 
 ## 6. 口と知らせ（`mouth.py`）
 
