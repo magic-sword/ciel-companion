@@ -338,7 +338,8 @@ class Initiative:
         if self.curious is not None:
             for t in self.thoughts:
                 if t.kind == 'research' and t.query and not t.researching and self.alive(t, now):
-                    self.curious.offer(t)   # 受けたら researching になり、気になっている付箋からは外れる
+                    if self.curious.offer(t):   # 受けたら researching になり、気になっている付箋からは外れる
+                        self.expressed = (self.expressed + [t.text])[-8:]   # 考える係が似た考えを作り直さない
         want = {t.id: t for t in self.board_thoughts(now)}
         for tid in [tid for tid in self._cards if tid not in want]:
             self.board.remove(self._cards.pop(tid))

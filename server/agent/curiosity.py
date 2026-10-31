@@ -6,7 +6,8 @@
 分かったら知らせとして話す。時間ではなく、気になった・分かったという出来事で話す。
 - 受ける考え：種類が research、気持ち MIN_MOTIVATION 以上、考える係が調べる質問（query。個人的なことは入れない。
   config/prompts/inner_thoughts.md）を書いたもの。initiative.py の sync_board が渡す。断ったら「気になっている」の付箋のまま。
-- 断るとき：ひかえめ（会議）・止めている間（声の登録・歌）・別の調べものの最中・1 時間に PER_HOUR 回を超えた（料金のため）。
+- 断るとき：ひかえめ（会議）・止めている間（声の登録・歌）・別の調べものの最中・1 時間に PER_HOUR 回を超えた（料金のため）・
+  同じ話題をもう調べた（言い方を変えた同じ問いを 2 度調べて 2 度話した。2026-10-31、bench_compare.py の curious）。
 - 調べているあいだは「気になって調べている」の付箋（board.py）。アプリには、頼まれた調べものと同じ調査のパネルが届く。
 - 分かったら、口の知らせ（mouth.py の say_latest、why は research）で、話の切れ目に言う。相手への返事を先に作るときは、
   心がその返事の中で伝える（mind.py の [まだ伝えていない知らせ]）。言い方は config/prompts/research_found.md。
@@ -44,6 +45,7 @@ class Curiosity:
         self._started: deque[float] = deque()
         self._task: asyncio.Task | None = None
         self._capped: set[str] = set()   # 上限で断った考えの id
+        self._topics: set[str] = set()   # 調べた話題（initiative の topic）
 
     def busy(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -56,6 +58,9 @@ class Curiosity:
             return False
         if (self.style is not None and self.style.talk == 'quiet') or (self.paused is not None and self.paused()):
             return False
+        topic = getattr(thought, 'topic', '')
+        if topic and topic in self._topics:
+            return False   # この話題はもう調べた
         lock = getattr(self.researcher, '_lock', None)
         if lock is not None and lock.locked():
             return False   # 頼まれた調べものの最中
@@ -69,6 +74,8 @@ class Curiosity:
                 debug_log.record('curiosity_capped', thought=thought.text)
             return False
         self._started.append(now)
+        if topic:
+            self._topics.add(topic)
         thought.researching = True   # 気になっている付箋には載せない（initiative.py の board_thoughts）
         self._task = asyncio.create_task(self._research(thought, query))
         return True

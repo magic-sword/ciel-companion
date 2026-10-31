@@ -59,6 +59,14 @@ class CuriosityTests(unittest.IsolatedAsyncioTestCase):
         async with researcher._lock:                            # a requested search is running
             self.assertFalse(c.offer(thought()))
 
+    async def test_one_research_per_topic(self):
+        c, _, _ = make()
+        self.assertTrue(c.offer(thought(topic='プラネタリウム')))
+        await c._task
+        self.assertFalse(c.offer(thought(text='投影機の会社が知りたい', topic='プラネタリウム')))
+        self.assertTrue(c.offer(thought(text='流星群の見頃が気になる', topic='流星群')))
+        await c._task
+
     async def test_hourly_cap(self):
         c, _, _ = make()
         now = [0.0]
