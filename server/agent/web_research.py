@@ -107,6 +107,8 @@ class WebResearcher:
             return record.payload()
 
     def link_to_reply(self, record, speech):
+        if speech is None:
+            return   # シエルが自分から調べた（curiosity.py）。結び付ける返事は無い
         after = len(speech.chat_items)
         speech.add_done_callback(lambda done: self.history.research.link_answers(
             record, self.history, done.chat_items[after:]))

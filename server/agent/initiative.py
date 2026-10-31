@@ -28,6 +28,18 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   ひかえめのときは話さないし、考えもしない。
 - 人が話している最中、シエルが考え中・話している最中は話しかけない。会話の始めのあいさつの前も話しかけない。
 - ログには考えの中身を出さない（数と気持ちの強さだけ）。中身はデバッグ用の会話ログ（debug_log、thoughts）にだけ残す。
+付箋の形（CIEL_MODEL=pipeline。board をつなぐと、こちらになる）：沈黙の秒数で話さず、満腹度も使わない。
+- 気になっていること（上の state_note と同じ選び方）を「気になっている」の付箋にする（board.py）。小脳も心も、ふつう・
+  おしゃべりのどちらでも、相手への返事で流れに合えば話題にする（今までの心の状態は、おしゃべりのときだけだった）。
+- 話す番（返事を話し終えて相手が話し始めない間）が来て、気になっている付箋があれば、心に話すかを決めさせる
+  （config/prompts/initiative_open.md。話す価値が無ければ [silent]）。気持ちが 5 かどうかの決まりで止めない。
+- おしゃべりのときは、静かなあいだに強い考え（気持ち 5）が新しく浮かんだことも、話す番にする（時間ではなく出来事）。
+  話しかけて返事が無ければ、相手が話すまで待つ。長い沈黙の最後の手段（FALLBACK_SECONDS）は使わない。
+- 話したかは、今までどおり次に考えるときに確かめる（spoken）。話していれば付箋ごと外す。
+- 調べてみたいこと（research）で調べる質問があれば、まず自分で調べる（curiosity.py）。調べているあいだは付箋にしない。
+- 調べて分かったら（learn）、分かったことを考える係に渡し（learned）、報告を話し終えたらすぐ見直させる。見直すまでは
+  付箋を外し、話す番も開かない。調べて答えが出た「聞きたいこと」が残って、報告のあとに「いつか分かったら教えて」と
+  聞き直した（2026-10-31、bench_compare.py の curious）。
 決めたことは docs/decisions/inner-thoughts-ja.md、参考にした研究と設計の原点は docs/inner-thoughts-research-ja.md。
 """
 import asyncio
@@ -42,6 +54,7 @@ from datetime import datetime
 import openai
 from livekit.agents import AgentSession
 
+import board
 import debug_log
 import models
 import mouth
@@ -82,6 +95,10 @@ REACTIVE_TURNS = 2
 UNREVIEWED_LOSS = 1.0         # 考える係が、前の考えを付け直しも捨てもしなかったら、気持ちをこれだけ下げる
 TOPIC_SHIFT_LOSS = 1.0        # 話題が移ったとき、前の話題の聞きたいこと・戻りたいことの気持ちを下げる量
 MAX_THOUGHTS = 12
+REVIEW_MAX_SECONDS = 40.0     # 調べて分かったあと、見直すまで付箋を外しておく最長の秒数（考えられなかったとき）
+LEARNED_KEEP = 3              # 考える係に渡す、調べて分かったことの数
+LEARNED_CHARS = 400
+BOARD_THOUGHTS = 2            # 付箋にする、気になっていることの数
 PER_TOPIC_KIND = 2             # 同じ話題・同じ種類の考えを持つ数
 CONVERSATION_TURNS = 20
 KINDS = ('comment', 'question', 'recall', 'research', 'correction')
@@ -103,6 +120,8 @@ class Thought:
     shown_id: int = 0       # 心の状態に載せたときの最後の発言 ID（話したかは、これより後のシエルの発言だけで判定する）
     topic: str = ''         # 考えたときの話題（話題が移ったら、その話題への反応は用済み）
     stimulus: str = ''      # 何をきっかけにした考えか（相手の発言の中身・覚えていること・知りたいこと）
+    query: str = ''         # 調べてみたいこと（research）の、Web で調べる質問（curiosity.py が自分で調べる）
+    researching: bool = False   # 今、自分で調べている
 
 
 class Initiative:
@@ -122,6 +141,8 @@ class Initiative:
         self.thoughts: list[Thought] = []
         self.expressed: list[str] = []   # 最近話した考え（繰り返さないため）
         self.unknowns: list[str] = []
+        self.learned: list[dict] = []    # シエルが自分で調べて分かったこと（考える係に渡す）
+        self._review_at: float | None = None   # 調べて分かった時刻（考える係が見直すまで、付箋を外す）
         self.topic = ''                  # 今の話題（考える係の解釈）
         self.unanswered = 0              # 話しかけたのに返事が無かった回数
         self._last = time.monotonic()    # 最後に誰かが話していた時刻
@@ -138,6 +159,10 @@ class Initiative:
         self._agent_done_at: float | None = None   # シエルが相手への返事を話し終えた時刻（続けて話してよいかを見る）
         self.satiety = 0.0                 # 話したい欲の満腹度（_satiated_at の時点の値。satiety_at で今の値）
         self._satiated_at = time.monotonic()
+        self.board: board.Board | None = None   # 付箋の一覧（pipeline。つなぐと付箋の形で話す。agent.py がつなぐ）
+        self.open_nudge = ''               # 話す番の合図（config/prompts/initiative_open.md）
+        self._cards: dict[str, board.Card] = {}   # 考えの id → 気になっている付箋
+        self.curious = None                # curiosity.Curiosity（調べてみたいことを自分で調べる。agent.py がつなぐ）
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -194,11 +219,15 @@ class Initiative:
             return   # 声の登録の途中など、シエルから話しかけない間（agent.py がつなぐ）
         talk = self.style.talk
         if talk == 'quiet':
+            if self.board is not None:
+                self._cards = self._clear_cards()
             return
         self._watch_history(now)
         if self._should_think(now):
             self._thought_at = now
             self._thinking = asyncio.create_task(self._think(now))
+        if self.board is not None:
+            self.sync_board(now)
         if self._user_busy or self._agent_busy:
             return
         thought = self.pick(now)
@@ -212,9 +241,23 @@ class Initiative:
         if through > self._seen_id and self._new_at is None:
             self._new_at = now
 
+    def learn(self, question: str, summary: str, now: float | None = None) -> None:
+        """自分で調べて分かった（curiosity.py が呼ぶ）。考える係に渡し、見直すまで付箋を外す"""
+        self.learned = (self.learned + [{'question': question, 'summary': summary[:LEARNED_CHARS]}])[-LEARNED_KEEP:]
+        self._review_at = time.monotonic() if now is None else now
+
+    def reviewing(self, now: float) -> bool:
+        """調べて分かったことを、考える係がまだ見直していないか"""
+        if self._review_at is not None and now - self._review_at >= REVIEW_MAX_SECONDS:
+            self._review_at = None
+        return self._review_at is not None
+
     def _should_think(self, now: float) -> bool:
         if not self.instructions or (self._thinking is not None and not self._thinking.done()):
             return False
+        if (self.reviewing(now) and not self._user_busy and not self._agent_busy
+                and now - self._last >= THINK_SETTLE_SECONDS):
+            return True   # 調べて分かった：報告を話し終えたら、間をあけずに見直す
         if now - self._thought_at < THINK_MIN_SECONDS:
             return False
         # 相手が話し続けているあいだ（文字起こしが一言ずつ確定する）は、最後に声がしてから待つ。
@@ -228,10 +271,13 @@ class Initiative:
                 and now - self._last >= idle and now - self._thought_at >= idle)
 
     def score(self, t: Thought, now: float) -> float:
-        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）"""
+        """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）。
+        付箋の形では、静けさと満腹度を使わない（古いほど下がるだけ）"""
+        loss = STALE_LOSS * max(0.0, (now - t.created) - STALE_SECONDS) / STALE_SECONDS
+        if self.board is not None:
+            return t.motivation - loss
         silence = max(0.0, now - self._last)
         gain = min(SILENCE_GAIN * int(silence // SILENCE_STEP), SILENCE_GAIN_MAX)
-        loss = STALE_LOSS * max(0.0, (now - t.created) - STALE_SECONDS) / STALE_SECONDS
         return t.motivation + gain - loss - self.satiety_at(now)
 
     def satiety_at(self, now: float) -> float:
@@ -261,6 +307,8 @@ class Initiative:
     def pick(self, now: float) -> Thought | None:
         """今話す考え（無ければ None）"""
         self.thoughts = [t for t in self.thoughts if self.alive(t, now)]
+        if self.board is not None:
+            return self._pick_open(now)
         candidates = [t for t in self.thoughts if not t.offered]   # 心の状態に載せた考えは、話したか分かるまで待つ
         silence = now - self._last
         talk = self.style.talk
@@ -278,13 +326,64 @@ class Initiative:
             return next((t for t in candidates if t.kind == 'correction' and t.motivation >= 5), None)
         return None
 
+    def _pick_open(self, now: float) -> Thought | None:
+        """付箋の形：話す番が来て、気になっている付箋があれば、そのいちばん強い考え（話すかは心が決める）"""
+        talk = self.style.talk
+        if talk == 'normal' and now - self._last >= CORRECTION_PAUSE_SECONDS:
+            fix = next((t for t in self.thoughts if t.kind == 'correction' and t.motivation >= 5), None)
+            if fix is not None:
+                return fix
+        if self.reviewing(now):
+            return None   # 調べて分かったことで答えが出た考えを、見直す前に話さない
+        shown = [t for t in self.thoughts if t.id in self._cards]
+        if self.continuing(now):
+            return max(shown, key=lambda t: self.score(t, now), default=None)
+        if talk == 'chatty' and self._spoke_at is None:
+            # 静かなあいだに、強い考えが新しく浮かんだ（時間ではなく出来事で話す）
+            new = [t for t in shown if t.created > self._last and t.motivation >= CONTINUE_THRESHOLD]
+            return max(new, key=lambda t: t.motivation, default=None)
+        return None
+
+    def board_thoughts(self, now: float) -> list[Thought]:
+        """付箋にする考え：今の話題に新しく（きっかけの発言のあと相手が話したのは 1 回まで）、気持ちが基準を超えたもの。
+        言い直しは付箋にせず、すぐ話す。調べて分かったことを見直すまでは、付箋にしない"""
+        if self.reviewing(now):
+            return []
+        return sorted((t for t in self.thoughts if self.alive(t, now) and t.kind != 'correction' and not t.researching
+                       and self.turns_since(t.anchor) <= 1 and self.score(t, now) >= THRESHOLD),
+                      key=lambda t: -self.score(t, now))[:BOARD_THOUGHTS]
+
+    def _clear_cards(self) -> dict:
+        """気になっている付箋を全部外す（ひかえめのあいだは、自分から話題にしない）"""
+        for card in self._cards.values():
+            self.board.remove(card)
+        return {}
+
+    def sync_board(self, now: float) -> None:
+        """気になっている付箋を、今の考えに合わせる。付箋にした考えは「見せた」にして、話したかを次に考えるときに確かめる"""
+        if self.curious is not None:
+            for t in self.thoughts:
+                if t.kind == 'research' and t.query and not t.researching and self.alive(t, now):
+                    if self.curious.offer(t):   # 受けたら researching になり、気になっている付箋からは外れる
+                        self.expressed = (self.expressed + [t.text])[-8:]   # 考える係が似た考えを作り直さない
+        want = {t.id: t for t in self.board_thoughts(now)}
+        for tid in [tid for tid in self._cards if tid not in want]:
+            self.board.remove(self._cards.pop(tid))
+        last_id = self.history.last_id if self.history is not None else 0
+        for t in want.values():
+            if t.id not in self._cards:
+                self._cards[t.id] = self.board.add('thought', f'{t.text}（{KIND_LABELS[t.kind]}）', board.WANT, 'self',
+                                                   ref=t.id)
+            if not t.offered:
+                t.offered, t.shown_id = True, last_id
+
     def state_note(self) -> str | None:
         """会話の後ろに置く、シエルの今の心の状態（turns.py が返事を頼むときに呼ぶ）。前に置いたものと同じなら None。
         「言えたら添えて」という用事として渡すと、会話モデルは目の前の返事を優先してほとんど使わなかった（2026-10-24）。
         気持ちとして置いておき、流れに合うときに自然に使わせる。載せるのは今の話題に新しく、気持ち − 満腹度が基準を
         超えた考えだけ（満腹度が高いほど少なく、満ちていれば載せない）"""
-        if self.style.talk != 'chatty' or not self.state_header:
-            return None
+        if self.style.talk != 'chatty' or not self.state_header or self.board is not None:
+            return None   # 付箋の形では、気になっていることは付箋の一覧で渡す
         now = time.monotonic()
         satiety = self.satiety_at(now)
         if satiety >= 1.5:
@@ -366,6 +465,14 @@ class Initiative:
 
     def _express(self, t: Thought, now: float) -> None:
         self._agent_done_at = None   # 続けて話すのは 1 回だけ
+        if self.board is not None and t.kind != 'correction':
+            # 付箋の形：どの付箋を話すか・黙るかは心が決める。話したかは、次に考えるときに確かめる
+            self._spoke_at = self._last = now
+            log.info('内なる考え：話す番。心に話すかを決めさせる（気になっていること %d 個、いちばん強い気持ち %.0f）',
+                     len(self._cards), t.motivation)
+            debug_log.record('thought_opening', thought_kind=t.kind, text=t.text, motivation=t.motivation)
+            self._reply(self.open_nudge or self.nudge, '', placed=True)
+            return
         t.expressed = True
         self.expressed = (self.expressed + [t.text])[-8:]
         if self._spoke_at is not None:
@@ -378,7 +485,8 @@ class Initiative:
                  t.kind, t.motivation, self.unanswered, self.satiety_at(now))
         debug_log.record('thought_expressed', thought_kind=t.kind, text=t.text, motivation=t.motivation)
         note = f'[話したいこと（{KIND_LABELS[t.kind]}）] {t.text}'
-        if getattr(self.session, 'current_agent', None) is None:
+        if getattr(self.session, 'current_agent', None) is None or self.board is not None:
+            # 付箋の形（pipeline）では、LiveKit の会話を書き換えない（mind.py が今回の分から文脈を作る）
             self._reply(nudge, note, placed=False)
             return
         task = asyncio.create_task(self._say(nudge, note))
@@ -442,6 +550,7 @@ class Initiative:
         return lines
 
     async def _think(self, now: float) -> None:
+        started = time.monotonic()
         if self.history is not None:
             self._seen_id = self.history.settled_through()
         self._new_at = None
@@ -458,6 +567,7 @@ class Initiative:
                           **({'offered': True} if t.offered else {})} for t in sent],
             'expressed': self.expressed,
             'unknowns': self.unknowns,
+            **({'learned': self.learned} if self.learned else {}),
             **({'topic': self.topic} if self.topic else {}),
             **({'memories': memories} if memories else {}),
             **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
@@ -473,6 +583,9 @@ class Initiative:
         except Exception as e:   # 考えられなくても、会話は続ける
             log.warning('内なる考え：考えられない：%s', type(e).__name__)
             return
+        finally:
+            if self._review_at is not None and started >= self._review_at:
+                self._review_at = None   # 分かったことを渡して考えた（考えられなくても、付箋は戻す）
         self.apply(result, time.monotonic(), reviewed={t.id for t in sent})
 
     def apply(self, result, now: float, reviewed: set[str] | None = None) -> None:
@@ -545,8 +658,9 @@ class Initiative:
             if any(t.text == text for t in self.thoughts) or text in self.expressed:
                 continue
             kind = raw.get('kind') if raw.get('kind') in KINDS else 'comment'
+            query = raw.get('query').strip()[:200] if kind == 'research' and isinstance(raw.get('query'), str) else ''
             self.thoughts.append(Thought(text, kind, _motivation(raw.get('motivation'), 1.0), created=now, anchor=anchor,
-                                         topic=self.topic, stimulus=stimulus))
+                                         topic=self.topic, stimulus=stimulus, query=query))
             added += 1
         # 同じ話題・同じ種類の考えは、気持ちの強いものから PER_TOPIC_KIND 個まで（言い方を変えただけの似た考えが
         # 積み重なった。2026-10-24、評価の AI の動向の場面）

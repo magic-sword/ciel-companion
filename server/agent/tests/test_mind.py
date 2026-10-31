@@ -118,6 +118,9 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         m.on_say('minutes')
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
         self.assertEqual(m.route(llm.ChatContext()), 'talker')
+        # 話す番（自分から話す）も、心が話すか黙るかを決める
+        m.on_say('initiative')
+        self.assertEqual(m.route(llm.ChatContext()), 'mind')
 
     async def test_several_people_since_ciel_go_to_the_mind(self):
         h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))

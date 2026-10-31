@@ -10,7 +10,9 @@
 - 頼んだ発言（said）を付箋に結び付ける。心と小脳へ渡す会話では、その発言を「（→ #3 議事録をとる：実行中）」に置き換えるので、
   過去の頼みを読み直すことはない。終わった付箋は KEEP_SECONDS のあいだだけ一覧に残す（記録には発言が残る）。
 - 一覧は、返事のたびに「[今のタスク]」として心と小脳へ渡し、アプリにも同じものを送る（board.state）。
-今は議事録だけ（minutes.py・listener.py）。調べもの・歌・声の登録・シエルの言いたいことは、あとで同じ形で乗せる。
+- シエル自身が気になっていること（内なる考え。initiative.py）も「気になっている」の付箋にする。心と小脳は、流れに合えば
+  返事の中で話題にし、話す番が来たら心が話すかを決める。話した・用済みになったら、付箋ごと外す。
+今は議事録（minutes.py・listener.py）と、気になっていること。調べもの・歌・声の登録は、あとで同じ形で乗せる。
 """
 import itertools
 import logging
@@ -22,10 +24,11 @@ import debug_log
 
 log = logging.getLogger('ciel-agent.board')
 
-CHECKING, RUNNING, WRAPPING, DONE, FAILED = 'checking', 'running', 'wrapping', 'done', 'failed'
-ACTIVE = (CHECKING, RUNNING, WRAPPING)
-LABELS = {CHECKING: '確認中', RUNNING: '実行中', WRAPPING: '仕上げ中', DONE: '完了', FAILED: '失敗'}
-BY = {'listener': '話の途中の頼みを聞く係が受けた', 'ciel': 'シエルが受けた', 'app': 'アプリのボタンで'}
+CHECKING, RUNNING, WRAPPING, DONE, FAILED, WANT = 'checking', 'running', 'wrapping', 'done', 'failed', 'want'
+ACTIVE = (CHECKING, RUNNING, WRAPPING, WANT)
+LABELS = {CHECKING: '確認中', RUNNING: '実行中', WRAPPING: '仕上げ中', DONE: '完了', FAILED: '失敗', WANT: '気になっている'}
+BY = {'listener': '話の途中の頼みを聞く係が受けた', 'ciel': 'シエルが受けた', 'app': 'アプリのボタンで',
+      'self': 'シエルが思った'}
 KEEP_SECONDS = 120.0   # 終わった付箋を一覧に残す秒数
 
 
