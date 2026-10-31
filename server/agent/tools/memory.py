@@ -72,3 +72,7 @@ async def agree_to_notes(context: RunContext) -> str:
 
 
 TOOLS = [remember_about_speaker, recall_about_speaker, forget_about_speaker, agree_to_notes]
+# 配信のコメントから使ってよいか（tools/__init__.py）。どれも「いま話している本人」（声の人）のメモなので、コメントの人に当てると
+# 人違いになる。読めば覚えていることを配信で知らせることにもなる
+FROM_COMMENTS = {remember_about_speaker: False, recall_about_speaker: False, forget_about_speaker: False,
+                 agree_to_notes: False}

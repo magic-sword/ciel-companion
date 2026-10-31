@@ -27,15 +27,16 @@
 | `recall_about_speaker` | `tools/memory.py` | いま話している本人について覚えていること（メモ）を読む（[メモの決定記録](person-notes-ja.md)） |
 | `forget_about_speaker` | `tools/memory.py` | 本人に「忘れて」「それは別の人の話」と頼まれたことを、中身で忘れる（メモとシエルの気持ちから） |
 | `agree_to_notes` | `tools/memory.py` | 声を覚えている本人が、お話を覚えることに同意した |
-| `start_minutes` | `tools/minutes.py` | é ¼ã¾ããããä¼è­°ã®è­°äºé²ãã¨ãå§ãããããæ»ããè¿äºãä½ãç´ããªããã·ã¨ã«ã®ä¸è¨ã¯è­°äºé²ä¿ã®ç¥ããããï¼[è­°äºé²ã®æ±ºå®è¨é²](meeting-minutes-ja.md)ï¼ |
-| `finish_minutes` | `tools/minutes.py` | é ¼ã¾ããããè­°äºé²ãã¾ã¨ãã¦ä¸æ¸ããéããåããè¿äºãä½ãç´ããªã |
+| `start_minutes` | `tools/minutes.py` | 頼まれたら、会議の議事録をとり始める。すぐ戻り、返事を作り直さない。シエルの一言は議事録係の知らせから（[議事録の決定記録](meeting-minutes-ja.md)） |
+| `finish_minutes` | `tools/minutes.py` | 頼まれたら、議事録をまとめて下書きを送る。すぐ戻り、返事を作り直さない |
 
 ## 道具の足し方
 
 1. `server/agent/tools/` にモジュールを作り、`@function_tool` の関数を書いて `TOOLS` に並べる（例：`tools/people.py`）。
 2. `tools/__init__.py` で読み込み、`TOOLS` に加える。会話の状態が要るなら `State` に足し、`agent.py` で入れる。
 3. いつ使うかを `config/prompts/` の Markdown に書く（新しいファイルなら `persona.toml`・`persona.py` にも足す）。
-4. 代表的な会話で、呼ぶべきときに呼び、呼ぶべきでないときに呼ばないかを確かめる。
+4. 配信のコメントから使ってよいかを決め、モジュールの `FROM_COMMENTS` に書く（下の「配信のコメントから使う道具」）。書いていない道具があると、会話サーバーは起動しない。
+5. 代表的な会話で、呼ぶべきときに呼び、呼ぶべきでないときに呼ばないかを確かめる。
 
 ## MCP との関係
 
@@ -50,3 +51,21 @@
 ## 返事を作り直さない道具（2026-10-16）
 
 道具を呼ぶと、ふつうは結果を受けて会話モデルがもう一度返事を作る。保存を頼むだけの道具など、結果を話す必要がないものは `ToolResult('…', reply_required=False)` を返す（LiveKit Agents の機能）。会話モデルは道具を呼びながら、そのまま話を続けられる（例：`remember_about_speaker`）。時間のかかる処理は道具の中で待たず、裏の処理に預けてすぐ戻る。
+
+## 配信のコメントから使う道具（2026-10-31）
+
+YouTube の配信のコメント（[コメントへの返し方の設計](../youtube-comments-design-ja.md)）は、だれでも書ける。利用者の決定：コメントからも道具は基本的に動かしてよい。ただし、道具ごとにコメントから使ってよいかを決めるきまりにして、使えない道具は仕組みで外しておく。
+
+| 項目 | 決定 |
+|---|---|
+| 決める場所 | 道具のモジュールの `FROM_COMMENTS`（道具 → 使ってよいか）。`tools/__init__.py` が、全部の道具が書いてあるかを起動のときに確かめる。書いていなければ起動しない（決めないまま増えないように） |
+| 外し方 | コメントへの返事（口の why が `comment`）と、その道具の結果を受けた続きでは、`Mind.tools_for` が使ってよい道具だけを心に渡す（`tools.for_comments`）。`FROM_COMMENTS` に無い道具（MCP など）は渡さない |
+| 呼び出しの関所 | LiveKit は、モデルに送らなかった道具でも Agent の道具なら呼んでしまう。そこで、渡していない道具の呼び出しは返事の流れから落とす（`mind.py` の `only_given`、`agent.py` の `_pipeline_llm`）。落としたら警告のログと、デバッグ用の会話ログの `mind_output` の `blocked` に残す。道具の名前（`id`）で見るので、MCP の道具の集まり（toolset）をつなぐときは、中の道具の名前で通るかを確かめる |
+| 見分け方 | 「いま話している本人」は声の人なので、コメントの人に当てると人違いになる。持ち主のもの（議事録・覚えている人）を、だれでも書けるコメントから動かしたり読ませたりしない |
+
+| 道具 | コメントから | 理由 |
+|---|---|---|
+| `people_here`・`get_minutes_status`・`search_conversation`・`research_web`・`read_research`・`read_inner_thoughts`・`keep_thought`・`current_time`・`start_listening_to_song` | 使う | 配信で答えて困らない。`search_conversation` は、配信の前の話も同じ記録にあるので、同じ接続のまま配信と別の話をするなら見直す |
+| `name_speaker`・`rename_speaker`・`not_this_speaker`・`forget_speaker`・`get_speaker_status`・`register_participant_name`・`confirm_participant_name` | 使わない | 声の人が相手の道具。声の記録を消すことにもなる |
+| `lookup_person`・`remember_about_speaker`・`recall_about_speaker`・`forget_about_speaker`・`agree_to_notes` | 使わない | 覚えている人・メモを配信で知らせる、人違いで書き換える |
+| `start_minutes`・`finish_minutes`・`summarize_past_minutes`・`read_minutes`・`choose_minutes_destination` | 使わない | 議事録は持ち主のもの |

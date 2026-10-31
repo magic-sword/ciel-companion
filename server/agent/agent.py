@@ -217,9 +217,16 @@ class Ciel(Agent):
         # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
-        text, calls, done = [], [], False
+        text, calls, blocked, done = [], [], [], False
         try:
             async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
+                # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
+                chunk, dropped = mind.only_given(chunk, fns)
+                if dropped:
+                    logger.warning('心：渡していない道具の呼び出しを止めた %s', dropped)
+                    blocked += dropped
+                if chunk is None:
+                    continue
                 delta = chunk if isinstance(chunk, str) else getattr(chunk, 'delta', None)
                 if isinstance(delta, str):
                     text.append(delta)
@@ -230,7 +237,7 @@ class Ciel(Agent):
             done = True
         finally:
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
-                             tools_given=len(fns))
+                             tools_given=len(fns), blocked=blocked)
 
     def talker_instructions_for(self, talk: str, presence: str) -> str:
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。

@@ -36,5 +36,17 @@ def cut_preamble(context) -> None:
 
 from . import memory, minutes, people, conversation, research, thoughts, clock, singing  # noqa: E402  State の後に読む
 
-TOOLS = [*people.TOOLS, *memory.TOOLS, *minutes.TOOLS, *conversation.TOOLS, *research.TOOLS, *thoughts.TOOLS, *clock.TOOLS,
-         *singing.TOOLS]
+MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing)
+TOOLS = [t for m in MODULES for t in m.TOOLS]
+# 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
+# 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。
+# ここに無い道具（MCP など）は、コメントからは使わない
+FROM_COMMENTS = {t.id: ok for m in MODULES for t, ok in m.FROM_COMMENTS.items()}
+_undecided = [t.id for t in TOOLS if t.id not in FROM_COMMENTS]
+if _undecided:
+    raise RuntimeError(f'コメントから使ってよいかが決まっていない道具：{_undecided}（モジュールの FROM_COMMENTS に書く）')
+
+
+def for_comments(tools: list) -> list:
+    """コメントからの返事に渡してよい道具だけにする"""
+    return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False)]

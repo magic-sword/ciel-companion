@@ -71,7 +71,7 @@ Windows・Android のビルドと起動・端末への入れ方、サーバー�
 
 全体の構成（アプリ・LiveKit・会話サーバー・読み上げ・OpenAI のつながり、データのメッセージ、動かす場所）は [システムの構成](docs/architecture-ja.md) にまとめています。会話サーバーの今の組み立て（pipeline：小脳と心・聞く係・付箋）は [会話の組み立て（pipeline）の仕組み](docs/conversation-pipeline-ja.md)、そうした理由と成果は [会話の作り直しの成果](docs/conversation-improvements-2026-10-ja.md) にあります。
 
-シエルを Zoom・Google Meet の会議に参加させて多人数で話す方法（仮想オーディオ・OBS の配線、Windows 用のビルド、会話のモード）は [会議への参加](docs/meeting-bridge-ja.md) を参照してください。
+シエルを Zoom・Google Meet の会議に参加させて多人数で話す方法（仮想オーディオ・OBS の配線、Windows 用のビルド、会話のモード）は [会議への参加](docs/meeting-bridge-ja.md) を参照してください。YouTube の配信のコメントに返す仕組みの設計（どのコメントに返すか・まとめ方・コメントから使える道具）は [コメントへの返し方の設計](docs/youtube-comments-design-ja.md) にあります。
 
 現在は、シエル（Live2D）の表示・タッチ・表情、OpenAI Realtime API と Irodori-TTS による音声会話、会議への参加、会話のしかた（おしゃべり度・その場にいる人）、声による話者の識別と、本人が同意した人の名前・メモの記憶まで動いています（Windows と Android で確認）。
 シエルが人を覚えるしくみ（名前の覚え方、呼び名・人違いの直し方、メモの確認と削除、保存するもの）は [人を覚える機能の使い方](docs/people-memory-ja.md) にまとめています。
