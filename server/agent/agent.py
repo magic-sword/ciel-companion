@@ -10,9 +10,10 @@ LiveKit Cloud のルームにアプリが入ると、このプログラムが呼
   openai  … 会話モデルの声のまま（比べるとき）
 
 会話モデルは環境変数 CIEL_MODEL で切り替える：
-  realtime（既定）… OpenAI Realtime API（gpt-realtime 系）
-  pipeline        … 音声検出 1 つ（silero）→ 話している途中から出る文字起こし → 区切りのモデル → 文字のモデル（心。mind.py）
-                    → Irodori。返事のたびに会話の記録から文脈を作る（docs/attention-and-thinking-design-ja.md の 7 章。試作）
+  realtime（コードの既定）… OpenAI Realtime API（gpt-realtime 系）。2026-10-31 までの本番
+  pipeline        … 音声検出 1 つ（silero）→ 話している途中から出る文字起こし → 区切りのモデル → 小脳と心（mind.py）
+                    → Irodori。返事のたびに会話の記録から文脈を作る。本番・開発用の Compose はこれ
+                    （仕組みは docs/conversation-pipeline-ja.md）
   gpt-live        … GPT-Live（全二重。利用権限が要る。irodori とは組み合わせない）
 
 実行（開発）  python -m livekit.agents start agent.py --dev

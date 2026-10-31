@@ -1,6 +1,6 @@
 # 会話の作り直しの成果（2026-10-29〜31）
 
-ブランチ `refactor/one-log-one-mouth` で、シエルの「聞く・考える・話す」を作り直した。何が良くなったか、なぜそうしたかを、ここにまとめる。細かい経緯と測定ごとの記録は [聞く・考える・話すの作り直し（設計）](attention-and-thinking-design-ja.md) の 5〜8 章にある。
+ブランチ `refactor/one-log-one-mouth` で、シエルの「聞く・考える・話す」を作り直した。何が良くなったか、なぜそうしたかを、ここにまとめる。今の作りの地図（処理の順・部品・直す入口）は [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)、細かい経緯と測定ごとの記録は [聞く・考える・話すの作り直し（設計）](attention-and-thinking-design-ja.md) の 5〜8 章にある。
 
 ## 1. 結論
 

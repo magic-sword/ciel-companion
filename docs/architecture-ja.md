@@ -1,6 +1,6 @@
 # システムの構成
 
-更新：2026-10-19（日本時間）。リポジトリの既定構成と、既存の運用記録をまとめる。本番未反映の追加実装は個別に示す。目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
+更新：2026-10-19（日本時間）。リポジトリの既定構成と、既存の運用記録をまとめる。本番未反映の追加実装は個別に示す。**2026-10-31 から、会話の組み立ては pipeline（`CIEL_MODEL=pipeline`）。この文書の Realtime API の記述は、戻すときのための以前の形で、今の作りは [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md) を参照。** 目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
 
 ## 新しく参加する人へ
 

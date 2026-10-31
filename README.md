@@ -69,7 +69,7 @@ Editorを閉じて以下を実行してください。アプリ名、画面方�
 
 Windows・Android のビルドと起動・端末への入れ方、サーバーへのデプロイは [ビルド・サーバーデプロイのコマンド集](docs/build-ja.md) にまとめています。
 
-全体の構成（アプリ・LiveKit・会話サーバー・読み上げ・OpenAI のつながり、データのメッセージ、動かす場所）は [システムの構成](docs/architecture-ja.md) にまとめています。
+全体の構成（アプリ・LiveKit・会話サーバー・読み上げ・OpenAI のつながり、データのメッセージ、動かす場所）は [システムの構成](docs/architecture-ja.md) にまとめています。会話サーバーの今の組み立て（pipeline：小脳と心・聞く係・付箋）は [会話の組み立て（pipeline）の仕組み](docs/conversation-pipeline-ja.md)、そうした理由と成果は [会話の作り直しの成果](docs/conversation-improvements-2026-10-ja.md) にあります。
 
 シエルを Zoom・Google Meet の会議に参加させて多人数で話す方法（仮想オーディオ・OBS の配線、Windows 用のビルド、会話のモード）は [会議への参加](docs/meeting-bridge-ja.md) を参照してください。
 

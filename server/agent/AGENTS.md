@@ -1,5 +1,7 @@
 # 会話サーバーを扱うエージェントへ
 
+会話の組み立て（pipeline：小脳と心・聞く係・付箋・口）を直す前に、[会話の組み立て（pipeline）の仕組み](../../docs/conversation-pipeline-ja.md) を読んでください。
+
 プロンプトを編集・追加する前に、[プロンプト管理方針](../../docs/decisions/prompt-management-ja.md) と [編集手順](README.md) を読んでください。
 
 - モデルに渡す本文は `config/prompts/*.md`、参照先は `config/persona.toml` で管理する。本文を Python や TOML へ埋め戻さない。
