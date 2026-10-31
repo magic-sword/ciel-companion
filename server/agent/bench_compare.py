@@ -18,6 +18,7 @@
   meeting      … 2 人の会議（ひかえめ・会議）。人どうしの話に口をはさんだ回数、名前を呼ばれたときに答えたか、
                  名前を呼ばずに「議事録開始して」と頼んだときに始まったか
   idle         … 少し話して 60 秒黙る（おしゃべり）。自分から話しかけた回数と時刻
+  curious      … 世の中のことを話して 60 秒黙る（おしゃべり）。気になったことを自分で調べて話したか（self_research・spoke_why）
 """
 import argparse
 import asyncio
@@ -77,6 +78,12 @@ SCENES = {
              'lines': [
         ('A', '昨日の夜、オリオン座の写真を撮ってみたんだ。'),
         ('A', '寒かったけど、思ったよりきれいに撮れたよ。'),
+    ], 'silence': 60.0},
+    # 気になったことを自分で調べて話すか（curiosity.py）。相手は頼まず、シエルが気になりそうな世の中のことを話して黙る
+    'curious': {'cost': '約 0.1〜0.2 ドル（自分で調べる Web 検索を含む）', 'style': {'talk': 'chatty', 'presence': 'solo'},
+                'lines': [
+        ('A', '週末にプラネタリウムに行ってきたんだ。'),
+        ('A', '投影機が日本のメーカーのもので、世界でも使われてるって解説の人が言ってたよ。どこのメーカーかは忘れちゃった。'),
     ], 'silence': 60.0},
 }
 
@@ -221,6 +228,9 @@ async def run_scene(name: str, scene: dict, agent: str) -> dict:
         result['answered_addressed'] = all(t['spoke'] for t in turns if t['addressed'])
     if scene.get('silence'):
         result['initiated'] = initiated
+    # 自分で調べたか（curiosity.py）と、なぜ話したか（口の why の回数）
+    result['self_research'] = [r.get('status', 'started') for r in log if r.get('kind') in ('curiosity_start', 'curiosity_done')]
+    result['spoke_why'] = [r.get('why') for r in log if r.get('kind') == 'speak']
     for key in ('first', 'first_any'):
         values = [t[key] for t in turns if t[key] is not None]
         if values:
