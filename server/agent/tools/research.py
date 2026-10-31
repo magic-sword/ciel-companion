@@ -26,3 +26,5 @@ async def read_research(context: RunContext, research_id: int) -> str:
 
 
 TOOLS = [research_web, read_research]
+# 配信のコメントから使ってよいか（tools/__init__.py）
+FROM_COMMENTS = {research_web: True, read_research: True}

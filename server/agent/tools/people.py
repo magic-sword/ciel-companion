@@ -168,3 +168,8 @@ async def people_here(context: RunContext) -> str:
 
 TOOLS = [name_speaker, rename_speaker, not_this_speaker, forget_speaker, lookup_person, people_here, get_speaker_status,
          register_participant_name, confirm_participant_name]
+# 配信のコメントから使ってよいか（tools/__init__.py）。「いま話している本人」は声の人なので、コメントの人に当てると人違いになる。
+# 声の記録を消す・覚えている人を知らせるのは、だれでも書けるコメントからはさせない
+FROM_COMMENTS = {name_speaker: False, rename_speaker: False, not_this_speaker: False, forget_speaker: False,
+                 lookup_person: False, people_here: True, get_speaker_status: False, register_participant_name: False,
+                 confirm_participant_name: False}

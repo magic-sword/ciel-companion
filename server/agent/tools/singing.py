@@ -26,3 +26,5 @@ async def start_listening_to_song(context: RunContext):
 
 
 TOOLS = [start_listening_to_song]
+# 配信のコメントから使ってよいか（tools/__init__.py）。聴くのは持ち主のマイクの歌で、頼むのが視聴者でも困ることはない
+FROM_COMMENTS = {start_listening_to_song: True}

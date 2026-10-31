@@ -27,6 +27,7 @@ from livekit.agents import llm
 import clock
 import debug_log
 import models
+import tools as toolbox
 from jst import JST
 from summaries import live
 
@@ -37,7 +38,7 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment')   # 心が返事を作る、口（mouth.py）の why
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -69,6 +70,7 @@ class Mind:
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
         self._deep = False               # 次の返事は心が作る
+        self.from_comment = False        # 今の返事（と、その道具の結果の続き）は配信のコメントへの返事
         self.waiting = None              # まだ言っていない知らせ（why → 指示）を返す（mouth.Mouth.waiting）
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
@@ -84,6 +86,7 @@ class Mind:
 
     def on_say(self, why: str) -> None:
         """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
+        self.from_comment = why == 'comment'
         if why in DEEP_WHY:
             self._deep = True
 
@@ -95,6 +98,7 @@ class Mind:
         if self._deep:
             self._deep = False
             return 'mind'
+        self.from_comment = False   # 声の発言への返事（口を通さない）
         text = _user_text(tail)
         if not text:
             return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
@@ -132,9 +136,10 @@ class Mind:
         付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
         道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
         text = _user_text(_tail(list(chat_ctx.items)))
-        if not text or MINUTES_ASK.search(self._strip(text)):
-            return tools   # 知らせ（相手の発言の無い返事）か、議事録の頼みがある
-        return [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
+        if text and not MINUTES_ASK.search(self._strip(text)):
+            tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
+        # 配信のコメントへの返事では、コメントから使ってよい道具だけ（tools/ の FROM_COMMENTS）
+        return toolbox.for_comments(tools) if self.from_comment else tools
 
     def _speakers_since_ciel(self) -> int:
         """シエルが最後に話してから話した人の数（話者が分からない発言は数えない）"""
@@ -295,6 +300,24 @@ class Mind:
         self.brief = '\n'.join(['[今のまとめ]', *lines]) if lines else None
         log.info('心：今のまとめを書いた（%d 項目）', len(lines))
         debug_log.record('mind_brief', brief=self.brief)
+
+
+def only_given(chunk, fns: list):
+    """返事の流れから、今回渡した道具（fns）の呼び出しだけを通す。LiveKit は、送らなかった道具でも Agent の道具なら
+    呼んでしまう（voice/agent_activity.py の tool_ctx は Agent の道具全部）。渡していない道具（コメントから使えない道具・
+    絞った議事録の道具）を呼ばせないために、ここで落とす。（通す chunk, 落とした道具の名前）を返し、全部落として
+    何も残らなければ chunk は None"""
+    delta = None if isinstance(chunk, str) else getattr(chunk, 'delta', None)
+    if delta is None or not delta.tool_calls:
+        return chunk, []
+    given = {getattr(t, 'id', None) for t in fns}
+    kept = [c for c in delta.tool_calls if c.name in given]
+    dropped = [c.name for c in delta.tool_calls if c.name not in given]
+    if not dropped:
+        return chunk, []
+    if not kept and not delta.content and getattr(chunk, 'usage', None) is None:
+        return None, dropped
+    return chunk.model_copy(update={'delta': delta.model_copy(update={'tool_calls': kept})}), dropped
 
 
 def _tail(items: list) -> list:

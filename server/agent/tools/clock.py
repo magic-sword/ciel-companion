@@ -13,3 +13,5 @@ async def current_time(context: RunContext) -> str:
 
 
 TOOLS = [current_time]
+# 配信のコメントから使ってよいか（tools/__init__.py）
+FROM_COMMENTS = {current_time: True}

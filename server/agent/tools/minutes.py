@@ -98,3 +98,7 @@ async def choose_minutes_destination(context: RunContext, name: str = ''):
 
 TOOLS = [start_minutes, finish_minutes, summarize_past_minutes, get_minutes_status, read_minutes,
          choose_minutes_destination]
+# 配信のコメントから使ってよいか（tools/__init__.py）。議事録は持ち主のもの。始める・終える・送り先を変えるのと、中身を読むのは
+# させない。とっているかどうかだけは答えてよい
+FROM_COMMENTS = {start_minutes: False, finish_minutes: False, summarize_past_minutes: False, get_minutes_status: True,
+                 read_minutes: False, choose_minutes_destination: False}

@@ -19,7 +19,7 @@ import debug_log
 
 log = logging.getLogger('ciel-agent.mouth')
 
-WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research')
+WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment')   # comment：配信のコメントへの返事
 FREE_POLL = 0.25
 
 

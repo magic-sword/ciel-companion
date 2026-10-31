@@ -23,3 +23,5 @@ async def keep_thought(context: RunContext, text: str, kind: str = 'question') -
 
 
 TOOLS = [read_inner_thoughts, keep_thought]
+# 配信のコメントから使ってよいか（tools/__init__.py）
+FROM_COMMENTS = {read_inner_thoughts: True, keep_thought: True}

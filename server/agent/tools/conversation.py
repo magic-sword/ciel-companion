@@ -21,3 +21,6 @@ async def search_conversation(context: RunContext, query: str = '', first_id: in
 
 
 TOOLS = [search_conversation]
+# 配信のコメントから使ってよいか（tools/__init__.py）。「さっき何て言った？」に答える。配信の前の会話も同じ記録にあるので、
+# 配信と別の話をしたあとで同じ接続のまま配信するなら見直す
+FROM_COMMENTS = {search_conversation: True}
