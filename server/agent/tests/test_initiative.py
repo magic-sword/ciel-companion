@@ -525,6 +525,41 @@ class BoardFormTests(unittest.TestCase):
         self.assertTrue(i._should_think(105.0 + initiative.THINK_SETTLE_SECONDS))   # right after the report, not 20 s later
         self.assertFalse(i.reviewing(100.5 + initiative.REVIEW_MAX_SECONDS))        # give up if it never thinks
 
+    def test_a_new_user_turn_is_thought_about_without_the_twenty_second_wait(self):
+        h = Conversation()
+        i = make_board('normal')
+        i.history = h
+        i._thought_at = 100.0                     # just thought
+        t = h.reserve(role='assistant')
+        h.complete(t, 'ワタシの返事なのです')
+        i._last = 101.0
+        i._watch_history(101.0)
+        self.assertFalse(i._should_think(101.0 + initiative.THINK_SETTLE_SECONDS))   # her own words still wait
+        t = h.reserve()
+        h.complete(t, '最近おすすめの本とかある？')
+        self.assertTrue(i._should_think(101.0 + initiative.THINK_SETTLE_SECONDS))
+        plain = make('normal', history=h)         # the Realtime form keeps the wait
+        plain._thought_at, plain._last = 100.0, 101.0
+        plain._watch_history(101.0)
+        self.assertFalse(plain._should_think(101.0 + initiative.THINK_SETTLE_SECONDS))
+
+    def test_the_open_turn_waits_for_thinking_in_progress(self):
+        i = make_board('normal')
+        agent_finished(i, 100.0)
+        i._thinking = Mock(done=Mock(return_value=False))
+        self.assertTrue(i.continuing(100.0 + initiative.CONTINUE_HOLD))
+        self.assertFalse(i.continuing(100.0 + initiative.CONTINUE_HOLD + 0.5))
+        # the thought arrives after the usual window: the card still gets the open turn
+        i._thinking.done.return_value = True
+        i.apply({'thoughts': [{'text': 'どんな本が好きか聞きたい', 'kind': 'question', 'motivation': 4,
+                               'stimulus': 'おすすめの本'}]}, 105.0)
+        i.sync_board(105.0)
+        self.assertEqual(i.pick(105.0).text, 'どんな本が好きか聞きたい')
+        # no thinking going on: the usual window
+        j = make_board('normal')
+        agent_finished(j, 100.0)
+        self.assertFalse(j.continuing(100.0 + initiative.CONTINUE_WINDOW + 0.5))
+
     def test_quiet_clears_the_cards(self):
         i = make_board('normal')
         i.thoughts = [Thought('星空の写真を見たい', 'question', 4.0, created=100.0)]

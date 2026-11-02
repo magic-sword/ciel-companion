@@ -33,6 +33,8 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
   おしゃべりのどちらでも、相手への返事で流れに合えば話題にする（今までの心の状態は、おしゃべりのときだけだった）。
 - 話す番（返事を話し終えて相手が話し始めない間）が来て、気になっている付箋があれば、心に話すかを決めさせる
   （config/prompts/initiative_open.md。話す価値が無ければ [silent]）。気持ちが 5 かどうかの決まりで止めない。
+  付箋が話す番に間に合うように、相手の発言は THINK_MIN_SECONDS を待たずに考え、話し終えたときに考え中なら
+  CONTINUE_HOLD 秒まで話す番を開けておく。
 - おしゃべりのときは、静かなあいだに強い考え（気持ち 5）が新しく浮かんだことも、話す番にする（時間ではなく出来事）。
   話しかけて返事が無ければ、相手が話すまで待つ。長い沈黙の最後の手段（FALLBACK_SECONDS）は使わない。
 - 話したかは、今までどおり次に考えるときに確かめる（spoken）。話していれば付箋ごと外す。
@@ -71,6 +73,7 @@ IDLE_THINK_MAX = 600.0
 THINK_TIMEOUT = 20.0
 CONTINUE_AFTER = 1.5          # シエルが話し終えて、相手がこれだけ話し始めなければ、続けて話してよい
 CONTINUE_WINDOW = 4.0         # 続けて話すのは、話し終えてからこの秒数まで（過ぎたら、長い沈黙を待つ）
+CONTINUE_HOLD = 6.0           # 付箋の形：話し終えたときに考え中なら、考え終わるまで話す番をこの秒数まで開けておく
 FALLBACK_SECONDS = 30.0       # 誰もこれだけ話さなければ、話しかける（最後の手段）
 CONTINUE_THRESHOLD = float(os.environ.get('CIEL_THOUGHT_CONTINUE_THRESHOLD', '5.0'))   # 続けて話す気持ちの強さ
 CORRECTION_PAUSE_SECONDS = 3.0
@@ -153,6 +156,7 @@ class Initiative:
         self._new_at: float | None = None   # まだ考えに使っていない発言が確定した時刻
         self._thought_at = -1e9          # 最後に考えた時刻
         self._thinking: asyncio.Task | None = None
+        self._thought_done_at = -1e9     # 最後に考え終わった時刻（話す番を、考え終わるまで開けておくかを見る）
         self._spoke_at: float | None = None   # 自分から話しかけた時刻（そのあと人が話したかで、返事を見る）
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
@@ -258,7 +262,9 @@ class Initiative:
         if (self.reviewing(now) and not self._user_busy and not self._agent_busy
                 and now - self._last >= THINK_SETTLE_SECONDS):
             return True   # 調べて分かった：報告を話し終えたら、間をあけずに見直す
-        if now - self._thought_at < THINK_MIN_SECONDS:
+        # 付箋の形では、相手の発言は 20 秒の間を待たずに考える。待つと、話す番に付箋が間に合わなかった
+        # （2026-11-02、ベンチの記録で、話し終えたときに付箋が無かった 37 回のうち 9 回）
+        if now - self._thought_at < THINK_MIN_SECONDS and not (self.board is not None and self._user_spoke()):
             return False
         # 相手が話し続けているあいだ（文字起こしが一言ずつ確定する）は、最後に声がしてから待つ。
         # 「ねえ、シエル。」だけで考え始めると、その一言に反応した考えができる
@@ -269,6 +275,13 @@ class Initiative:
         idle = min(IDLE_THINK_SECONDS * 2 ** self.unanswered, IDLE_THINK_MAX)
         return (self.style.talk == 'chatty' and not self._user_busy and not self._agent_busy
                 and now - self._last >= idle and now - self._thought_at >= idle)
+
+    def _user_spoke(self) -> bool:
+        """まだ考えに使っていない確定した発言に、相手の発言があるか"""
+        if self.history is None:
+            return False
+        return any(t.role == 'user' and t.text
+                   for t in self.history.between(self._seen_id, self.history.settled_through()))
 
     def score(self, t: Thought, now: float) -> float:
         """話したい気持ちの今の強さ：静かなほど少し上がり、古いほど下がり、話したばかりなら下がる（満腹度）。
@@ -290,8 +303,15 @@ class Initiative:
     def continuing(self, now: float) -> bool:
         """シエルが相手への返事を話し終えて、相手がまだ話し始めていない（続けて話してよい）"""
         done = self._agent_done_at
-        return (done is not None and self._last <= done and not self._user_busy
-                and CONTINUE_AFTER <= now - done <= CONTINUE_WINDOW)
+        if done is None:
+            return False
+        window = CONTINUE_WINDOW
+        if self.board is not None and (self._thinking is not None and not self._thinking.done()
+                                       or self._thought_done_at > done):
+            # 付箋の形：考え中なら、考え終わって付箋ができるまで待つ（2026-11-02、話し終えたあとに考え終わり、
+            # 気持ち 4 の考えが話す番を逃していた）
+            window = CONTINUE_HOLD
+        return self._last <= done and not self._user_busy and CONTINUE_AFTER <= now - done <= window
 
     def turns_since(self, anchor: int) -> int:
         """きっかけの発言のあとに、相手が話した回数"""
@@ -591,6 +611,7 @@ class Initiative:
     def apply(self, result, now: float, reviewed: set[str] | None = None) -> None:
         """モデルの答え（config/prompts/inner_thoughts.md の形）を、貯めている考えに当てる。
         reviewed は、見直しを頼んだ前の考えの id（付け直しも捨てもされなかったものは、気持ちを下げる）"""
+        self._thought_done_at = now
         if not isinstance(result, dict):
             return
         anchor = self._seen_id
