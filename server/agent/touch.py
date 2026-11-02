@@ -35,6 +35,8 @@ GESTURES = {'tap': 'ちょんとつつく', 'stroke': '撫でる', 'hold': 'そ�
 # 引っ張る強さ（Unity が、引いた量と速さから決める）と、そのときアプリが出した表情
 STRENGTHS = {'gentle': 'やさしく', 'hard': '強く'}
 EXPRESSIONS = {'troubled': '困り顔', 'teary': '半泣きの顔', 'surprised': '驚いた顔', 'embarrassed': '照れた顔'}
+# 日記（diary.py）に残すときの言い方
+DIARY_GESTURES = {'tap': 'ちょんとつつかれた', 'stroke': 'なでてもらった', 'hold': 'そっと触れてもらった', 'pull': 'つまんで引っ張られた'}
 PHASES = {'once', 'start', 'end'}   # once：tap・hold を離したとき。start・end：なぞりの始まりと終わり
 COOLDOWN = 4.0         # 返事の最短の間隔（秒）
 WAIT_SECONDS = 0.0     # 触れてから、話し始めるのを待つ時間（待たない）
@@ -66,6 +68,8 @@ class TouchReactions:
         self._pending_at = 0.0
         self._user_spoke_at = -1.0        # 最後に人が話し始めた時刻
         self._timer: asyncio.TimerHandle | None = None
+        self.diary = None                 # diary.Diary（なでてもらったことを残す。agent.py がつなぐ）
+        self._noted: set[tuple[str, str]] = set()   # この会話で日記に残した（部位、しぐさ）
 
     # ---- 知らせを受ける ----
 
@@ -85,6 +89,9 @@ class TouchReactions:
             return
 
         line = describe(part, gesture, phase, duration_ms, strength, expression)
+        if self.diary is not None and phase != 'end' and (part, gesture) not in self._noted:
+            self._noted.add((part, gesture))   # だれが触ったかは書かない（diary.py）
+            self.diary.add('touch', f'{PARTS[part]}を{DIARY_GESTURES[gesture]}')
         if phase == 'start':
             self.stroke_answered = True   # 撫で始め・引っ張り始めで知らせる（終わりでは知らせない）
             self._hold(line)

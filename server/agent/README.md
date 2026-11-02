@@ -5,6 +5,8 @@ GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として
 | 編集するファイル | 内容 |
 |---|---|
 | [character.md](config/prompts/character.md) | 人物像、話し方、会話上のルール |
+| [ciel_self.md](config/prompts/ciel_self.md) | シエル自身の好み・苦手・こだわり。会話モデルと内なる考えの両方に渡す |
+| [ciel_growth.md](config/prompts/ciel_growth.md) | 会話の終わりに、出来事から好みが育つかを決める係（`growth.py`）への指示 |
 | [greeting.md](config/prompts/greeting.md) | 初回のあいさつを生成するための指示 |
 | [emotion.md](config/prompts/emotion.md) | Irodori-TTS 用の感情タグの指示 |
 | [touch.md](config/prompts/touch.md) | 画面のタッチ（`[タッチ]` の知らせ）への反応の仕方。処理は `touch.py` |
