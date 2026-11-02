@@ -11,10 +11,11 @@
 // マイクの機器：PC は OS の一覧から選べる（既定は OS の既定のマイク）。スマホは OS が切り替えを管理するので選ばない。
 // 声を出す機器（スピーカー）も PC では選べる。「既定」は、Windows に OS の既定の機器を問い合わせて、その機器を選ぶ（WindowsDefaultAudio）。
 // 再生中は出力の機器を変えられないので、シエルの声の受信をいったん止めてから変え、受け直す（SwitchWhilePlaying）。
-// 仮想オーディオケーブルへ出せば、Meet・Zoom などの会議にシエルの声を流せる。
+// マイクと声を出す機器は、つなぎ方（ふだん・会議）ごとに組で覚える（CielConversation.Route.cs）。
+// 会議では仮想オーディオケーブルで会議のブラウザとつなぎ、Meet・Zoom などの会議でシエルが聞き、話す。
 // 会話のしかた：おしゃべり度（ひかえめ・ふつう・おしゃべり）と、その場にいる人（自動・ひとり・身近な人・人前）。
-// 会話サーバー（server/agent/mode.py）へ、選んだ設定と、声を仮想オーディオケーブル（会議）へ出しているかを、
-// つないだとき・会話サーバーが入ってきたとき・設定や声の出力が変わったときに知らせる（topic ciel.style）。
+// 会話サーバー（server/agent/mode.py）へ、選んだ設定と、会議につないでいるか（つなぎ方）を、
+// つないだとき・会話サーバーが入ってきたとき・設定やつなぎ方が変わったときに知らせる（topic ciel.style）。
 // 実際の答え方・出し方は会話サーバーが決め（自動なら、会議・聞こえた声の数で変わる）、conversation.style で返ってくる。
 // シエルの声の大きさ：SetVoiceVolume（設定画面）で、会話サーバー（server/agent/volume.py）へ送る。会話サーバーが声を小さくして送る。
 // 会話のまとめ（議事録など）：StartSummary・FinishSummary・RefreshSummary（画面の「まとめ」のパネル）で、会話サーバー（server/agent/minutes.py）へ送る。
@@ -40,7 +41,8 @@ using RoomOptions = LiveKit.RoomOptions;
 
 namespace Ciel.Conversation
 {
-    public sealed class CielConversation : MonoBehaviour
+    // 声のつなぎ方（ふだん・会議）と会議の確かめ、会話サーバーの不調の知らせは CielConversation.Route.cs
+    public sealed partial class CielConversation : MonoBehaviour
     {
         [SerializeField] CubismMouthController _mouth;
         [SerializeField] CielExpression _expression;
@@ -63,9 +65,6 @@ namespace Ciel.Conversation
         const string DevAgentName = "ciel-dev";   // 開発用の会話サーバーの名前（server/compose.dev.yaml の CIEL_AGENT_NAME）
         const string AizuchiTrack = "ciel-aizuchi";   // 相づちのトラックの名前（server/agent/aizuchi.py の TRACK）
 
-        [Tooltip("この文字を名前に含む「声の出力」は会議へつなぐ仮想オーディオケーブルとみなす（自動のとき多人数にする）")]
-        [SerializeField] string[] _meetingOutputKeywords = { "CABLE", "VB-Audio", "Voicemeeter" };
-
         Room _room;
         PlatformAudio _platformAudio;
         PlatformAudioSource _micSource;
@@ -80,8 +79,8 @@ namespace Ciel.Conversation
         bool _recording, _busy, _quitting, _micRestarting;
         int? _sleepTimeoutBeforeMinutes;
         bool _applicationPaused;
-        string _micGuid;   // 選んだマイク。null は OS の既定
-        string _speakerGuid;   // 選んだスピーカー。null は OS の既定
+        string _micGuid;   // いまのつなぎ方で選んだマイク。null は OS の既定（会議では、見つけた仮想ケーブル。MicChoice）
+        string _speakerGuid;   // いまのつなぎ方で選んだスピーカー。null は OS の既定（会議では、見つけた仮想ケーブル。SpeakerChoice）
 
         public enum State { Disconnected, Connecting, Connected, Failed }
         public State Status { get; private set; } = State.Disconnected;
@@ -315,10 +314,10 @@ namespace Ciel.Conversation
         Talk? _serverTalk;
         Presence? _serverPresence;
         /// いまの答え方。会話サーバーが決めたもの（つなぐ前は、選んだ設定と声の出力から決める）
-        public Talk CurrentTalk => _serverTalk ?? (IsMeetingOutput() && PresenceChoice == Presence.Auto ? Talk.Quiet : TalkChoice);
+        public Talk CurrentTalk => _serverTalk ?? (InMeeting && PresenceChoice == Presence.Auto ? Talk.Quiet : TalkChoice);
         /// いまの覚えていることの出し方（Auto にはならない）
         public Presence CurrentPresence => _serverPresence
-            ?? (PresenceChoice != Presence.Auto ? PresenceChoice : IsMeetingOutput() ? Presence.Public : Presence.Solo);
+            ?? (PresenceChoice != Presence.Auto ? PresenceChoice : InMeeting ? Presence.Public : Presence.Solo);
         /// 自動で決めた理由（"meeting"：会議につないでいる、"voices"：2 人以上の声が聞こえた、""：なし）
         public string PresenceReason { get; private set; } = "";
 
@@ -330,20 +329,11 @@ namespace Ciel.Conversation
         /// いまのシエルの声の大きさ（0〜1 くらい。画面の波形用）。声の大きさの設定に左右されない
         public float VoiceLevel => Mathf.Max(_meter != null ? _meter.Level : 0f, _aizuchiMeter != null ? _aizuchiMeter.Level : 0f)
                                    / Mathf.Max(VoiceVolume, 0.05f);
-        bool IsMeetingOutput()
-        {
-            if (_speakerGuid == null) return false;
-            var name = SpeakerDevices.Find(m => m.guid == _speakerGuid).name ?? "";
-            foreach (var k in _meetingOutputKeywords)
-                if (!string.IsNullOrEmpty(k) && name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-            return false;
-        }
 
         void Start()
         {
             if (_mouth != null) _mouth.BlendMode = Live2D.Cubism.Framework.CubismParameterBlendMode.Override;
-            _micGuid = PlayerPrefs.HasKey(MicPrefKey) ? PlayerPrefs.GetString(MicPrefKey) : null;
-            _speakerGuid = PlayerPrefs.HasKey(SpeakerPrefKey) ? PlayerPrefs.GetString(SpeakerPrefKey) : null;
+            LoadRoute();
             if (!PlayerPrefs.HasKey(TalkPrefKey) && PlayerPrefs.GetInt(ModePrefKey, 0) == 2)
                 PlayerPrefs.SetInt(TalkPrefKey, (int)Talk.Quiet);   // 以前「多人数」を選んでいた人は、ひかえめから始める
             TalkChoice = (Talk)Mathf.Clamp(PlayerPrefs.GetInt(TalkPrefKey, (int)Talk.Normal), 0, 2);
@@ -475,6 +465,7 @@ namespace Ciel.Conversation
         {
             var me = _room?.LocalParticipant?.Identity;
             _userSpeaking = me != null && speakers.Exists(p => p != null && p.Identity == me);
+            if (_userSpeaking && _recording) UserHeardAt = Time.unscaledTime;   // 会議の確かめ（会議の音が届いた）
         }
 
         static void Trace(string what) =>
@@ -483,6 +474,7 @@ namespace Ciel.Conversation
         IEnumerator Connect()
         {
             _restartAfterConnect = false;
+            ClearRouteChecks();
             SetStatus(State.Connecting);
             Trace("トークンを取得");
             string serverUrl = null, token = null;
@@ -513,9 +505,8 @@ namespace Ciel.Conversation
                     Debug.Log($"[CielConversation] スピーカー {d.Index}: {d.Name} [{d.Guid}]");
                     if (!string.IsNullOrEmpty(d.Guid)) SpeakerDevices.Add((d.Name, d.Guid));
                 }
-                // 保存していた機器が今は無いなら、既定に戻す
-                if (_micGuid != null && !MicDevices.Exists(m => m.guid == _micGuid)) _micGuid = null;
-                if (_speakerGuid != null && !SpeakerDevices.Exists(m => m.guid == _speakerGuid)) _speakerGuid = null;
+                // 保存していた機器が今は無いなら、既定に戻す。会議の組の仮想ケーブルを探す
+                ResolveRouteDevices();
                 Debug.Log($"[CielConversation] OS の既定：マイク [{WindowsDefaultAudio.Mic()}]、スピーカー [{WindowsDefaultAudio.Speaker()}]");
                 ApplySpeaker();
             }
@@ -554,6 +545,7 @@ namespace Ciel.Conversation
             SendStyle();
             SendVolume();
             SendDeviceHello();
+            if (InMeeting) SetMicEnabled(true);   // 会議の音は、マイクを入れておかないと届かない
         }
 
         [System.Serializable]
@@ -639,35 +631,36 @@ namespace Ciel.Conversation
             StartCoroutine(on ? MicOn() : MicOff());
         }
 
-        /// マイクの機器を選ぶ（null は OS の既定）。録音中なら入れ直す
+        /// いまのつなぎ方のマイクの機器を選ぶ（null は OS の既定。会議では見つけた仮想ケーブル）。録音中なら入れ直す
         public void SelectMic(string guid)
         {
             _micGuid = guid;
-            if (guid == null) PlayerPrefs.DeleteKey(MicPrefKey);
-            else PlayerPrefs.SetString(MicPrefKey, guid);
-            if (_recording || _busy) StartCoroutine(Restart());
+            if (guid == null) PlayerPrefs.DeleteKey(MicKey);
+            else PlayerPrefs.SetString(MicKey, guid);
+            UpdateRouteMissing();
+            if (_recording || _busy) StartCoroutine(RestartMic());
             Changed?.Invoke();
-
-            // 入れる・切るの途中なら、終わるのを待ってから入れ直す（待たずにやめると、あとで選んだ機器が使われない）
-            IEnumerator Restart()
-            {
-                while (_busy) yield return null;
-                if (!_recording || _micRestarting) yield break;
-                _micRestarting = true;
-                yield return MicOff();
-                yield return MicOn();
-                _micRestarting = false;
-            }
         }
 
-        /// 声を出す機器を選ぶ（null は OS の既定）。会話中でもすぐ切り替える
+        // 入れる・切るの途中なら、終わるのを待ってから入れ直す（待たずにやめると、あとで選んだ機器が使われない）
+        IEnumerator RestartMic()
+        {
+            while (_busy) yield return null;
+            if (!_recording || _micRestarting) yield break;
+            _micRestarting = true;
+            yield return MicOff();
+            yield return MicOn();
+            _micRestarting = false;
+        }
+
+        /// いまのつなぎ方の声を出す機器を選ぶ（null は OS の既定。会議では見つけた仮想ケーブル）。会話中でもすぐ切り替える
         public void SelectSpeaker(string guid)
         {
             _speakerGuid = guid;
-            if (guid == null) PlayerPrefs.DeleteKey(SpeakerPrefKey);
-            else PlayerPrefs.SetString(SpeakerPrefKey, guid);
+            if (guid == null) PlayerPrefs.DeleteKey(SpeakerKey);
+            else PlayerPrefs.SetString(SpeakerKey, guid);
+            UpdateRouteMissing();
             if (_platformAudio != null) ApplySpeaker();
-            SendStyle();   // 自動のときは、声の出力（会議かどうか）で変わる
             Changed?.Invoke();
         }
 
@@ -718,7 +711,7 @@ namespace Ciel.Conversation
             if (_room == null || Status != State.Connected) return;
             var talk = TalkNames[(int)TalkChoice];
             var presence = PresenceNames[(int)PresenceChoice];
-            var meeting = IsMeetingOutput() ? "true" : "false";
+            var meeting = InMeeting ? "true" : "false";
             var json = $"{{\"v\":1,\"type\":\"conversation.style\",\"talk\":\"{talk}\",\"presence\":\"{presence}\",\"meeting\":{meeting}}}";
             try
             {
@@ -772,7 +765,7 @@ namespace Ciel.Conversation
         void ApplySpeaker()
         {
             if (_platformAudio == null || Application.isMobilePlatform) return;
-            var guid = _speakerGuid ?? DefaultDevice(WindowsDefaultAudio.Speaker(), SpeakerDevices);
+            var guid = SpeakerChoice ?? DefaultDevice(WindowsDefaultAudio.Speaker(), SpeakerDevices);
             var name = SpeakerDevices.Find(m => m.guid == guid).name ?? "一覧の最初の機器";
             if ((_voicePublication != null && _voiceStream != null) || _aizuchiStream != null)
             {
@@ -790,7 +783,7 @@ namespace Ciel.Conversation
             try
             {
                 _platformAudio.SetPlayoutDevice(guid ?? "");
-                Debug.Log($"[CielConversation] スピーカー '{name}'{(_speakerGuid == null ? "（OS の既定）" : "")} で再生");
+                Debug.Log($"[CielConversation] スピーカー '{name}'{(SpeakerChoice == null ? "（OS の既定）" : "")} で再生");
                 return true;
             }
             catch (Exception e)
@@ -884,10 +877,11 @@ namespace Ciel.Conversation
         {
             _recording = false;
             var tries = new List<(string name, string guid)>();
-            if (_micGuid != null) tries.Add((MicDevices.Find(m => m.guid == _micGuid).name, _micGuid));
+            var chosen = MicChoice;
+            if (chosen != null) tries.Add((MicDevices.Find(m => m.guid == chosen).name, chosen));
             // OS の既定：PC は Windows に問い合わせた機器を選ぶ（選ばないと、前に選んだ機器のまま録音する）
             tries.Add(("OS の既定", Application.isMobilePlatform ? null : DefaultDevice(WindowsDefaultAudio.Mic(), MicDevices)));
-            foreach (var m in MicDevices) if (m.guid != _micGuid) tries.Add(m);
+            foreach (var m in MicDevices) if (m.guid != chosen) tries.Add(m);
 
             foreach (var (name, guid) in tries)
             {
@@ -963,7 +957,9 @@ namespace Ciel.Conversation
             public float intensity;
             public int ttl_ms;
             public bool recording;   // minutes.state
-            public string talk, presence, reason;   // conversation.style
+            public string talk, presence, reason;   // conversation.style（reason は voice.test でも）
+            public string kind, service;   // agent.problem
+            public bool stopped;
             public bool on;   // agent.thinking
             public string meeting_id;   // summary.progress
             public int pending_turns;
@@ -1056,6 +1052,8 @@ namespace Ciel.Conversation
                 Debug.Log($"[CielConversation] 声の登録：{Enroll.status}（{Enroll.accepted}/{Enroll.needed}）");
                 Changed?.Invoke();
             }
+            else if (e.type == "voice.test") OnVoiceTest(e);
+            else if (e.type == "agent.problem") OnProblem(e);
             else if (e.type == "device.hello_request")
             {
                 // 会話サーバーが入った直後に送った知らせは届かないことがあるので、準備ができたと言われたら送り直す

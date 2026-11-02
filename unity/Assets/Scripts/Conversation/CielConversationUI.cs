@@ -21,6 +21,7 @@ namespace Ciel.Conversation
     {
         [SerializeField] CielConversation _conversation;
         [SerializeField] CielBackground _background;
+        CielStreamWindow _stream;   // Windows だけ
 
         // 色：白磁・シアン・チャコールと、議事録の琥珀（企画設計の「シエル主観視界」の色の決まり）
         static readonly Color Cyan = Hex(0x7FE9FF), CyanDeep = Hex(0x2CC8EE), Ink = Hex(0x04293D);
@@ -63,6 +64,7 @@ namespace Ciel.Conversation
             if (_background == null) _background = FindAnyObjectByType<CielBackground>();
             if (_background == null) _background = gameObject.AddComponent<CielBackground>();
             if (FindAnyObjectByType<CielResizeGuard>() == null) gameObject.AddComponent<CielResizeGuard>();   // 画面の大きさが変わってもシエルを描く
+            if (CielStreamWindow.Supported) _stream = gameObject.AddComponent<CielStreamWindow>();   // OBS で取り込む、シエルだけのウィンドウ
             _font = Font.CreateDynamicFontFromOSFont(
                 new[] { "Yu Gothic UI", "Meiryo UI", "Meiryo", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP" }, 32);
             Build();
@@ -72,6 +74,7 @@ namespace Ciel.Conversation
         {
             if (_conversation != null) _conversation.Changed += Refresh;
             if (_background != null) _background.Changed += Refresh;
+            if (_stream != null) _stream.Changed += Refresh;
             Refresh();
         }
 
@@ -79,6 +82,7 @@ namespace Ciel.Conversation
         {
             if (_conversation != null) _conversation.Changed -= Refresh;
             if (_background != null) _background.Changed -= Refresh;
+            if (_stream != null) _stream.Changed -= Refresh;
         }
 
         // ---- 組み立て ----
@@ -164,6 +168,7 @@ namespace Ciel.Conversation
             {
                 var s = _conversation.Status;
                 if (s == CielConversation.State.Failed || s == CielConversation.State.Disconnected) _conversation.StartConversation();
+                else if (s == CielConversation.State.Connected && _conversation.ProblemStopped) _conversation.Reconnect();
             });
             var dot = Rect("Dot", link, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(6, 0), new Vector2(6, 6));
             _linkDot = Img(dot, "circle", Mint);
@@ -338,16 +343,9 @@ namespace Ciel.Conversation
             var c = _conversation;
             var connected = c.Status == CielConversation.State.Connected;
 
-            (_linkDot.color, _linkText.text) = c.Status switch
-            {
-                CielConversation.State.Connecting => (Amber, "つないでいます…"),
-                CielConversation.State.Failed => (Alert, "つながらない・タップで再試行"),
-                CielConversation.State.Disconnected => (Idle, "未接続・タップでつなぐ"),
-                _ => (Mint, "つながっています"),
-            };
-            _linkDot.transform.GetChild(0).GetComponent<Image>().color = WithAlpha(_linkDot.color, 0.6f);
-            // 開発用のサーバーにつないでいることを、いつも見えるように（左上の名前の横）
-            _nameText.text = c.DevServer ? "C I E L ・ 開発用" : "C I E L";
+            UpdateLink();
+            // 開発用のサーバー・会議につないでいることを、いつも見えるように（左上の名前の横）
+            _nameText.text = "C I E L" + (c.DevServer ? " ・ 開発用" : "") + (c.InMeeting ? " ・ 会議" : "");
             _nameText.color = c.DevServer ? Amber : TextMain;
 
             var talk = (int)c.CurrentTalk;
@@ -392,6 +390,43 @@ namespace Ciel.Conversation
             RefreshSettings();
         }
 
+        // 接続の状態（左上）。つながっていても、会話サーバーが聞き取り・返事をできないとき（残高切れなど）は、それを出す。
+        // 止まっていない不調は時間で消えるので、毎フレーム見る（変わったときだけ書き換える）
+        void UpdateLink()
+        {
+            var c = _conversation;
+            var problem = c.Status == CielConversation.State.Connected ? c.Problem : "";
+            var (color, text) = c.Status switch
+            {
+                CielConversation.State.Connecting => (Amber, "つないでいます…"),
+                CielConversation.State.Failed => (Alert, "つながらない・タップで再試行"),
+                CielConversation.State.Disconnected => (Idle, "未接続・タップでつなぐ"),
+                _ when problem != "" && c.ProblemStopped => (Alert, $"止まっています・{ProblemLabel(problem)}"),
+                _ when problem != "" => (Amber, $"{ServiceLabel(c.ProblemService)}に失敗・{ProblemLabel(problem)}"),
+                _ => (Mint, "つながっています"),
+            };
+            if (_linkText.text == text && _linkDot.color == color) return;
+            (_linkDot.color, _linkText.text) = (color, text);
+            _linkDot.transform.GetChild(0).GetComponent<Image>().color = WithAlpha(color, 0.6f);
+        }
+
+        // 会話サーバーの不調（server/agent/health.py の kind・service）
+        static string ProblemLabel(string kind) => kind switch
+        {
+            "quota" => "OpenAI の残高切れ",
+            "auth" => "API キーが使えない",
+            "rate_limit" => "OpenAI が混雑",
+            _ => "サーバーの不調",
+        };
+
+        static string ServiceLabel(string service) => service switch
+        {
+            "stt" => "聞き取り",
+            "llm" => "返事",
+            "tts" => "読み上げ",
+            _ => "会話",
+        };
+
         // 会話サーバーが返事を考えている（返事を頼んでから、声が出るまで）
         static bool Thinking(CielConversation c) => c.Thinking;
 
@@ -406,11 +441,13 @@ namespace Ciel.Conversation
             var speaking = connected && c.AgentState == "speaking";
             var research = connected && c.ResearchPending;
             var listening = connected && c.MicEnabled && c.UserSpeaking;
+            UpdateLink();
             var (status, caption) = c.Status switch
             {
                 CielConversation.State.Connecting => ("シエルに接続しています…", ""),
                 CielConversation.State.Failed => ("接続できませんでした", ""),
                 CielConversation.State.Disconnected => ("接続していません", ""),
+                _ when c.ProblemStopped => ("シエルが止まっています", "左上をタップすると、つなぎ直します"),
                 _ when speaking => ("話しています", "S P E A K I N G"),
                 _ when Thinking(c) => ("考えています…", "T H I N K I N G"),   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
                 _ when listening => ("聞いています…", "L I S T E N I N G"),

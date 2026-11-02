@@ -28,6 +28,9 @@ namespace Ciel.Conversation
         public string Current { get; private set; }
         public event Action Changed;
 
+        /// ほかに映すカメラ（配信用のウィンドウ、CielStreamWindow）の横÷縦。アプリの画面より横長なら、そちらも覆うように広げる（0 はなし）
+        public float CoverAspect { get; set; }
+
         SpriteRenderer _renderer;
         Camera _camera;
         Vector3 _fitted;
@@ -52,11 +55,12 @@ namespace Ciel.Conversation
             var distance = Mathf.Min(_camera.farClipPlane * 0.5f, 50f);
             var height = _camera.orthographic ? _camera.orthographicSize * 2
                 : 2 * distance * Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            var key = new Vector3(height, _camera.aspect, distance);
+            var aspect = Mathf.Max(_camera.aspect, CoverAspect);
+            var key = new Vector3(height, aspect, distance);
             if (key == _fitted) return;
             _fitted = key;
             var size = _renderer.sprite.bounds.size;
-            var scale = Mathf.Max(height * _camera.aspect / size.x, height / size.y);
+            var scale = Mathf.Max(height * aspect / size.x, height / size.y);
             var t = _renderer.transform;
             t.localPosition = new Vector3(0, 0, distance);
             t.localRotation = Quaternion.identity;

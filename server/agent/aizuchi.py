@@ -89,7 +89,7 @@ class Backchannel:
                 with wave.open(str(path)) as w:
                     if w.getnchannels() != 1 or w.getsampwidth() != 2:
                         raise ValueError('1 チャンネル・16 bit ではない')
-                    self._think[path.stem] = self._fit(w.readframes(w.getnframes()), w.getframerate())
+                    self._think[path.stem] = self.fit(w.readframes(w.getnframes()), w.getframerate())
             except Exception as e:
                 log.warning('考えるときの相づち %s を読めない: %s', path.name, e)
         t0 = time.perf_counter()
@@ -104,13 +104,13 @@ class Backchannel:
                     pcm = trim(pcm, sr)
                     seconds = len(pcm) / 2 / sr
                     if seconds <= MAX_SECONDS:
-                        self._voices[text] = self._fit(pcm, sr)
+                        self._voices[text] = self.fit(pcm, sr)
                         break
                     log.info('相づち「%s」が %.2f 秒と長いので、読み上げ直す', text, seconds)
         log.info('相づちを用意した：聞いたとき %d 個（読み上げ %.1f 秒）、考えるとき %d 個',
                  len(self._voices), time.perf_counter() - t0, len(self._think))
 
-    def _fit(self, pcm: bytes, sr: int) -> list[rtc.AudioFrame]:
+    def fit(self, pcm: bytes, sr: int) -> list[rtc.AudioFrame]:
         """声のトラックの音の形（サンプリング周波数・1 チャンネル・20 ms ずつ）にそろえる"""
         rate = self._source.sample_rate
         if sr != rate:
@@ -163,8 +163,21 @@ class Backchannel:
         self._last = word(key)
         self._played_at = time.monotonic()
         log.info('相づち%s：%s', '（話の途中）' if nod else '', key)
-        frames = voices[key]
+        await self._stream(voices[key])
 
+    @property
+    def ready(self) -> bool:
+        """相づちのトラックを出せたか（あいさつのあとの prepare から）"""
+        return self._source is not None
+
+    def play_frames(self, frames: list[rtc.AudioFrame]) -> None:
+        """読み上げておいた声を、相づちのトラックで流す（流している相づちは止める。音の確かめ：soundcheck.py）"""
+        if self._source is None:
+            return
+        self.stop()
+        self._task = asyncio.create_task(self._stream(frames))
+
+    async def _stream(self, frames: list[rtc.AudioFrame]) -> None:
         async def each():
             for f in frames:
                 yield f

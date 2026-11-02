@@ -16,6 +16,7 @@
 // research-latest.png（開くと最新 3/3）、research-prev.png（「‹ 前」で 2/3）、research-stay.png（前のページを読んでいるあいだに
 // 新しい調べものが届いても 2/4 のまま）、research-pending.png（調べものの札から、調べている最中の 4/4）。research.txt にページを書く。
 // summary-done.png（終えたあと：送った結果と、種類を選ぶボタン）。パネルの部品の数を summary.txt に書く。
+// "route" を含めると、合成の機器の一覧で声のつなぎ方（設定のそのほか）を撮る：route-meeting.png・route-problem.png・route-everyday.png（RouteShots）。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -59,7 +60,7 @@ namespace Ciel.EditorTools
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
                     || request.Contains("people") || request.Contains("summary") || request.Contains("status")
-                    || request.Contains("research"))
+                    || request.Contains("research") || request.Contains("route"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -96,6 +97,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("research"))
             {
                 ResearchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("route"))
+            {
+                RouteShots(step);
                 return;
             }
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("status"))
@@ -691,6 +697,71 @@ namespace Ciel.EditorTools
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える
+        // "route"：声のつなぎ方（設定のそのほか）を、合成の機器の一覧で撮る。
+        // route-meeting.png（会議：見つけた仮想ケーブルと確かめ）、route-problem.png（会議の音が届き、声の確かめを流し、
+        // 会話サーバーが残高切れで止まった）、route-everyday.png（ふだん）。表示の文を route.txt に書く
+        static void RouteShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var type = typeof(Ciel.Conversation.CielConversation);
+            var log = Path.Combine(OutDir, "route.txt");
+            void Event(string json)
+            {
+                var m = type.GetMethod("OnDataReceived", flags);
+                var kind = System.Enum.ToObject(m.GetParameters()[2].ParameterType, 0);
+                m.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null, kind, "ciel.event" });
+            }
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                c.MicDevices.Clear();
+                c.MicDevices.Add(("マイク (AT2040USB)", "mic-1"));
+                c.MicDevices.Add(("CABLE Output (VB-Audio Virtual Cable)", "mic-2"));
+                c.MicDevices.Add(("Hi-Fi Cable Output (VB-Audio Hi-Fi Cable)", "mic-3"));
+                c.SpeakerDevices.Clear();
+                c.SpeakerDevices.Add(("ヘッドホン (Bose QC Headphones)", "spk-1"));
+                c.SpeakerDevices.Add(("Hi-Fi Cable Input (VB-Audio Hi-Fi Cable)", "spk-2"));
+                c.SpeakerDevices.Add(("CABLE In 16ch (VB-Audio Virtual Cable)", "spk-3"));
+                c.SpeakerDevices.Add(("CABLE Input (VB-Audio Virtual Cable)", "spk-4"));
+                type.GetMethod("ResolveRouteDevices", flags).Invoke(c, null);
+                c.SelectRoute(Ciel.Conversation.CielConversation.Route.Meeting);
+                type.GetField("_recording", flags).SetValue(c, true);   // マイクを入れている
+                ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "route-meeting", "route-problem", "route-everyday" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                string Texts(string path) => string.Join("｜", System.Linq.Enumerable.Select(
+                    ui.transform.Find(path).GetComponentsInChildren<UnityEngine.UI.Text>(), t => t.text));
+                File.AppendAllText(log, $"{name}: 自動={c.AutoMeetingMic}/{c.AutoMeetingSpeaker} 足りない={c.RouteMissing}"
+                    + $"｜{Texts("ConversationCanvas/SafeArea/Link")}｜{Texts("ConversationCanvas/SafeArea/Status")}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.5) return;
+            _captured = false;
+            if (step == 3)
+            {
+                type.GetProperty("UserHeardAt").GetSetMethod(true).Invoke(c, new object[] { Time.unscaledTime });
+                Event("{\"v\":1,\"type\":\"voice.test\",\"state\":\"playing\"}");
+                Event("{\"v\":1,\"type\":\"agent.problem\",\"kind\":\"quota\",\"service\":\"stt\",\"stopped\":true}");
+            }
+            if (step == 4) c.SelectRoute(Ciel.Conversation.CielConversation.Route.Everyday);
+            if (step == 5) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
         static void FinishUiShots()
         {
             RemoveGameViewSize(SessionState.GetInt(SizeKey, -1));
