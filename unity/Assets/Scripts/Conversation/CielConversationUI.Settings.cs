@@ -1,6 +1,8 @@
 // 会話の画面（CielConversationUI）のうち、設定画面（下からすべり出る）。
 // タブ：声と会話（シエルの声の大きさ・おしゃべり度・その場にいる人）、背景（CielBackground）、
-// 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、そのほか（PC ではマイクとスピーカー、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
+// 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、そのほか（PC では声のつなぎ方（ふだん・会議）と
+// マイクとスピーカー（CielConversationUI.Route.cs）、
+// Windows では配信用のウィンドウ（CielStreamWindow）、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -25,7 +27,7 @@ namespace Ciel.Conversation
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
-        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob;
+        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -105,7 +107,7 @@ namespace Ciel.Conversation
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("議事録", BuildMinutesSection),
-                ("そのほか", c => { BuildDevicesSection(c); BuildDevSection(c); }),
+                ("そのほか", c => { BuildDevicesSection(c); BuildStreamSection(c); BuildDevSection(c); }),
             };
             for (int i = 0; i < pages.Length; i++)
             {
@@ -355,16 +357,15 @@ namespace Ciel.Conversation
             }
         }
 
-        // PC だけ：マイクとスピーカーの選択
-        void BuildDevicesSection(RectTransform content)
+        // PC（Windows）だけ：配信用のウィンドウ（CielStreamWindow）
+        void BuildStreamSection(RectTransform content)
         {
+            if (_stream == null) return;
             var sec = Section(content);
-            _devicesSection = sec.gameObject;
-            SectionLabel(Row(sec, 20), "マイクとスピーカー");
-            _devices = NewDropdown(Row(sec, 44), "MicDevice");
-            _devices.onValueChanged.AddListener(i => _conversation.SelectMic(i <= 0 ? null : _deviceGuids[i]));
-            _speakers = NewDropdown(Row(sec, 44), "SpeakerDevice");
-            _speakers.onValueChanged.AddListener(i => _conversation.SelectSpeaker(i <= 0 ? null : _speakerGuids[i]));
+            SectionLabel(Row(sec, 20), "配信");
+            (_streamSwitch, _streamKnob) = SwitchRow(sec, "配信用のウィンドウを開く", () => _stream.SetOpen(!_stream.IsOpen));
+            Note(sec, $"シエルと背景だけを映すウィンドウ「{CielStreamWindow.Title}」を開きます。"
+                + "OBS のウィンドウキャプチャでこちらを取り込むと、設定・名前・ボタンは映りません。大きさを変えると、その大きさで描きます");
         }
 
         void BuildDevSection(RectTransform content)
@@ -443,13 +444,12 @@ namespace Ciel.Conversation
             _presenceNote.text = PresenceNotes[presence]
                 + (c.PresenceChoice == CielConversation.Presence.Auto
                     ? "\n自動：会議につなぐと人前に、2人以上の声が聞こえると身近な人にします。" : "");
-            _devicesSection.SetActive(c.CanSelectMic || c.CanSelectSpeaker);
-            RefreshDevices(_devices, _deviceGuids, c.CanSelectMic, c.MicDevices, c.SelectedMic, "既定のマイク（OS の設定）", "マイク：");
-            RefreshDevices(_speakers, _speakerGuids, c.CanSelectSpeaker, c.SpeakerDevices, c.SelectedSpeaker, "既定のスピーカー（OS の設定）", "声の出力：");
+            RefreshRoute();   // 声のつなぎ方とマイク・スピーカー（CielConversationUI.Route.cs）
             var expr = ExpressionButtonsOn;
             if (_exprPanel != null) _exprPanel.SetActive(expr);
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
+            if (_stream != null) ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
             RefreshMinutesDestinations();
         }
 
@@ -458,13 +458,16 @@ namespace Ciel.Conversation
         {
             dd.gameObject.SetActive(can);
             if (!can) return;
-            if (guids.Count != devices.Count + 1)
+            var names = new List<string> { prefix + defaultName };
+            foreach (var (name, _) in devices) names.Add(prefix + name);
+            // 機器が増減したときと、つなぎ方を変えて呼び名が変わったときに作り直す
+            if (guids.Count != devices.Count + 1 || dd.options.Count != names.Count || dd.options[0].text != names[0]
+                || (names.Count > 1 && dd.options[1].text != names[1]))
             {
                 guids.Clear();
                 dd.ClearOptions();
-                var names = new List<string> { prefix + defaultName };
                 guids.Add(null);
-                foreach (var (name, guid) in devices) { names.Add(prefix + name); guids.Add(guid); }
+                foreach (var (_, guid) in devices) guids.Add(guid);
                 dd.AddOptions(names);
             }
             dd.SetValueWithoutNotify(Mathf.Max(0, guids.IndexOf(selected)));
@@ -473,6 +476,7 @@ namespace Ciel.Conversation
         // 設定の出し入れ（下からすべり出る。Update から呼ぶ）
         void UpdateSheet()
         {
+            if (_sheetOpen) UpdateMeetingCheck();
             var target = _sheetOpen ? 1f : 0f;
             if (!Mathf.Approximately(_sheetT, target))
             {

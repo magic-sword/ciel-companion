@@ -192,8 +192,11 @@ sequenceDiagram
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"character.expression","seq":…,"expression":"happy","intensity":1.0,"ttl_ms":…}` | 声に合わせて表情を変える |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"minutes.state","recording":true}` | 議事録をとっているか（アプリの議事録のボタンの表示） |
 | `ciel.touch` | アプリ → 会話サーバー | `{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
-| `ciel.style` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.style","talk":"chatty","presence":"auto","meeting":false}` | 会話のしかた。おしゃべり度（quiet・normal・chatty）、その場にいる人（auto・solo・close・public）、会議の機器につないでいるか。以前の `ciel.mode`（solo・group）も受け付ける |
+| `ciel.style` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.style","talk":"chatty","presence":"auto","meeting":false}` | 会話のしかた。おしゃべり度（quiet・normal・chatty）、その場にいる人（auto・solo・close・public）、会議につないでいるか（設定の「声のつなぎ方」）。以前の `ciel.mode`（solo・group）も受け付ける |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"conversation.style","talk":"quiet","presence":"public","reason":"meeting"}` | いまの答え方と覚えていることの出し方（自動のときは会議・聞こえた声の数で決まる）。設定画面の「いまは：…」 |
+| `ciel.soundcheck` | アプリ → 会話サーバー | `{"v":1,"type":"voice.test"}` | シエルの声を試しに流す（会議の確かめ）。会話モデルを使わず決まった一言を読み上げる（`soundcheck.py`） |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"voice.test","state":"playing"}` | 声の確かめの結果（playing・failed。failed には reason：not_ready・tts） |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"agent.problem","kind":"quota","service":"stt","stopped":true}` | 聞き取り・返事・読み上げの失敗（quota・auth・rate_limit・error）と、それで会話が止まったか（`health.py`）。アプリの左上の接続の表示に出す |
 | `ciel.volume` | アプリ → 会話サーバー | `{"v":1,"type":"voice.volume","volume":0.7}` | シエルの声の大きさ（0〜1）。アプリの声の再生には音量を変える手段がないので、会話サーバーが送る前に声を小さくする（`server/agent/volume.py`） |
 | `ciel.minutes` | アプリ・管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
 | `ciel.research` | 会話サーバー → アプリ | `research.result`・`research.text`・`research.source`・`research.complete` | 調査本文と出典を小さいパケットに分けて送る。[Web 調査](decisions/web-research-ja.md) |
@@ -214,7 +217,7 @@ flowchart LR
     B -- "スピーカー：Hi-Fi Cable" --> U
     U -- "声の出力：VB-Cable" --> B
     B -- "シエルの声" --> M
-    U -- "画面" --> OBS
+    U -- "配信用のウィンドウ" --> OBS
     OBS -- "OBS Virtual Camera" --> B
     U <--> S
 ```

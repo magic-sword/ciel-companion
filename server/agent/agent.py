@@ -38,6 +38,7 @@ import clock
 import curiosity
 import debug_log
 import emotion
+import health
 import initiative
 import interruptions
 import listener
@@ -50,6 +51,7 @@ import mouth
 import notes
 import relationship
 import singing
+import soundcheck
 import speaker_store
 import speakers
 import tools
@@ -354,6 +356,10 @@ async def entrypoint(ctx: JobContext) -> None:
     def notify(msg: dict) -> None:
         # アプリへの知らせ（ciel.event）を、待たずに送る
         asyncio.create_task(send('ciel.event', msg))
+    # 聞き取り・返事・読み上げの失敗（残高切れなど）と、それで会話が止まったことを、アプリの接続の表示に出す（health.py）
+    checkup = health.Health(notify)
+    session.on('error', checkup.on_error)
+    session.on('close', checkup.on_close)
     # 会話のしかた（mode.py）。いまの答え方・覚えていることの出し方は、変わるたびに Unity へ知らせる
     style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
     style.publish = notify
@@ -535,6 +541,8 @@ async def entrypoint(ctx: JobContext) -> None:
         book.notify()
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
+    # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す
+    ctx.room.on('data_received', soundcheck.SoundCheck(agent.aizuchi if AIZUCHI else None, notify).on_data)
     # アプリが部屋に入った直後に送った知らせは、会話サーバーの受け取りの準備ができる前で、届かないことがある
     # （2026-10-24、開発用の試験で 3 回に 2 回、hello か会話のしかたが届かなかった）。準備ができたので、もう一度送ってもらう
     await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})

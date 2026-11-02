@@ -89,6 +89,7 @@ tail -n 50 Logs/build-android.log
 
 - ビルドのときに次のプレイヤー設定にする：前面でなくても動き続ける（Run In Background）、ウィンドウで開く、ウィンドウの大きさを変えられる。会議中に OBS やブラウザを操作しても会話が止まらないようにするため。
 - 起動：`unity\Builds\Windows\CIEL Companion.exe` をダブルクリック。`CIEL Companion_Data` などのフォルダは exe と同じ場所に置いたままにする。
+- 起動すると、操作用のウィンドウ（`CIEL Companion`）と、シエルと背景だけの配信用のウィンドウ（`CIEL Companion 配信`）が開く。OBS では配信用のほうを取り込む（[会議への参加](meeting-bridge-ja.md) の OBS の節）。開くかどうかは設定 → そのほか → 「配信用のウィンドウを開く」。処理は `Assets/Scripts/Conversation/CielStreamWindow.cs`。
 - 起動したままだとビルドで上書きできないので、ビルドの前に閉じる。
 - アプリのログ：`%USERPROFILE%\AppData\LocalLow\CIEL\CIEL Companion\Player.log`
 - `..._BackUpThisFolder_ButDontShipItWithYourGame` は不具合を調べるための情報で、配らない。
