@@ -5,6 +5,10 @@
 - voiceprints：声の特徴（192 次元、人ごとに複数、多すぎたら古いものから消す）
 - person_notes：その人について覚えておくメモ（短い文、人ごとに上限あり。notes.py が書く）
 - person_relationship：シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分。relationship.py が書く）
+- ciel_events：シエル自身に本当にあった出来事（調べて分かった・歌を聴いた・なでてもらった。diary.py が書く）。だれと
+  話していても同じ記録を使うので、相手の名前や事情は書かない。古いものから消す
+- ciel_likes：出来事から育ったシエルの好み（好き・ちょっと苦手・気になっている。growth.py が書く）。根拠の出来事を写して持つ
+- ciel_like_history：育った好みを足した・変えた・外した記録（いつ・何を・根拠・理由）。あとから見直すため
 - device_owners：端末の持ち主（アプリの端末 ID と、端末だけが持つ合言葉のハッシュ）。合言葉そのものは置かない
 - voiceprints.channel：その見本を録った経路（端末の ID など。マイクや経路で声の特徴が変わるので、同じ経路の見本を優先して比べる）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
@@ -21,6 +25,7 @@ from datetime import datetime
 import numpy as np
 import psycopg
 from pgvector.psycopg import register_vector_async
+from psycopg.types.json import Jsonb
 
 log = logging.getLogger('ciel-agent.speaker_store')
 
@@ -115,6 +120,31 @@ CREATE TABLE IF NOT EXISTS device_owners (
     person_id bigint NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS ciel_events (
+    id bigserial PRIMARY KEY,
+    at timestamptz NOT NULL DEFAULT now(),
+    kind text NOT NULL,
+    text text NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ciel_likes (
+    id bigserial PRIMARY KEY,
+    kind text NOT NULL,
+    text text NOT NULL,
+    why text NOT NULL DEFAULT '',
+    evidence jsonb NOT NULL DEFAULT '[]',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ciel_like_history (
+    id bigserial PRIMARY KEY,
+    at timestamptz NOT NULL DEFAULT now(),
+    action text NOT NULL,
+    like_id bigint,
+    kind text NOT NULL DEFAULT '',
+    text text NOT NULL DEFAULT '',
+    why text NOT NULL DEFAULT '',
+    evidence jsonb NOT NULL DEFAULT '[]'
+);
 """
 MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
 
@@ -205,6 +235,57 @@ class Store:
             return False
         await self.conn.execute('DELETE FROM device_owners WHERE device_id = %s', (device_id,))
         return True
+
+    # ---- シエル自身の出来事（diary.py。人には結び付けない） ----
+
+    async def add_ciel_event(self, kind: str, text: str, keep: int) -> None:
+        """出来事を 1 つ足す。keep 個を超えたら古いものから消す"""
+        async with self.conn.transaction():
+            await self.conn.execute('INSERT INTO ciel_events (kind, text) VALUES (%s, %s)', (kind, text))
+            await self.conn.execute(
+                'DELETE FROM ciel_events WHERE id NOT IN (SELECT id FROM ciel_events ORDER BY at DESC, id DESC LIMIT %s)',
+                (keep,))
+
+    async def ciel_events(self, limit: int) -> list[tuple[int, datetime, str, str]]:
+        """新しい順に（番号、日時、種類、文）"""
+        return await (await self.conn.execute(
+            'SELECT id, at, kind, text FROM ciel_events ORDER BY at DESC, id DESC LIMIT %s', (limit,))).fetchall()
+
+    async def ciel_likes(self) -> list[tuple[int, str, str, str, list]]:
+        """育った好み（番号、種類、文、きっかけ、根拠の出来事の写し）。古い順"""
+        return await (await self.conn.execute(
+            'SELECT id, kind, text, why, evidence FROM ciel_likes ORDER BY created_at, id')).fetchall()
+
+    async def last_like_change(self) -> datetime | None:
+        row = await (await self.conn.execute('SELECT max(at) FROM ciel_like_history')).fetchone()
+        return row[0] if row else None
+
+    async def change_ciel_like(self, action: str, like_id: int | None, kind: str, text: str, why: str,
+                               evidence: list) -> int | None:
+        """育った好みを足す（add）・書き直す（update）・外す（remove）。記録（ciel_like_history）も一緒に残す"""
+        ev = Jsonb(evidence)
+        async with self.conn.transaction():
+            if action == 'add':
+                row = await (await self.conn.execute(
+                    'INSERT INTO ciel_likes (kind, text, why, evidence) VALUES (%s, %s, %s, %s) RETURNING id',
+                    (kind, text, why, ev))).fetchone()
+                like_id = row[0]
+            elif action == 'update':
+                cur = await self.conn.execute(
+                    'UPDATE ciel_likes SET kind = %s, text = %s, why = %s, evidence = %s, updated_at = now() WHERE id = %s',
+                    (kind, text, why, ev, like_id))
+                if cur.rowcount == 0:
+                    return None
+            elif action == 'remove':
+                cur = await self.conn.execute('DELETE FROM ciel_likes WHERE id = %s', (like_id,))
+                if cur.rowcount == 0:
+                    return None
+            else:
+                raise ValueError(action)
+            await self.conn.execute(
+                'INSERT INTO ciel_like_history (action, like_id, kind, text, why, evidence) VALUES (%s, %s, %s, %s, %s, %s)',
+                (action, like_id, kind, text, why, ev))
+        return like_id
 
     async def set_notes_consent(self, person_id: int) -> None:
         await self.conn.execute('UPDATE people SET notes_consented_at = now() WHERE id = %s', (person_id,))

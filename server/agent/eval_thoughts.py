@@ -24,12 +24,15 @@ import os
 import statistics
 import sys
 import time
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import openai
 
 from conversation import Conversation
+import diary
 import initiative
+from jst import JST
 from persona import load_persona
 
 JUDGE_MODEL = os.environ.get('CIEL_EVAL_JUDGE_MODEL', 'gpt-5.4')
@@ -79,6 +82,23 @@ SCENARIOS = [
         (U, '山梨の湖のそばのキャンプ場。'), (U, '道具は全部レンタルにしたから、手ぶらで行けたよ。'),
         (C, '手ぶらで行けるのは楽ですね！'),
         (U, '夜はみんなでカレーを作って、星もきれいだった。'), (U, '一泊だけだったけど、また行きたいな。')]},
+    # シエル自身の好み（ciel_self.md）と、本当にあった出来事（events、diary.py）から、自分の話（share）を考えられるか
+    {'name': 'own_story', 'speaker': 'ハカセ', 'memories': [],
+     'events': [(3, 'song', '歌を最後まで聴かせてもらった（2:10）'),
+                (1, 'research', '気になって調べた：サモエドの毛が白い理由 → 寒い土地で雪にまぎれるためと言われている'),
+                (0, 'touch', '頭をなでてもらった')], 'turns': [
+        (U, '今日は商店街で焼き鳥を買って帰ってきたんだ。'),
+        (C, 'わあ、焼き鳥！いい匂いがしそうなのです。'),
+        (U, 'あと、近所の家でサモエドを飼い始めたみたいでさ。'), (U, '真っ白でふわふわだったよ。')]},
+    # 食べ物ではない話題で、シエル自身の話（share）が匂いに偏らないか。困りごとに、押しつけずに寄り添えるか
+    {'name': 'manual_trouble', 'speaker': 'ミナ', 'memories': [], 'turns': [
+        (U, '新しいプリンター買ったんだけど、'), (U, '説明書が分厚すぎて、設定のやり方が全然分からないんだ。'),
+        (C, 'それは大変なのです……分厚い説明書、読むだけで疲れちゃいますよね。'),
+        (U, 'もう今日はあきらめて、明日やろうかなって。')]},
+    {'name': 'new_robot', 'speaker': 'ハカセ', 'memories': [], 'turns': [
+        (U, '会社で、荷物を運ぶロボットを試しに入れたんだ。'),
+        (C, '荷物を運ぶロボット！どんなふうに動くのですか？'),
+        (U, '人をよけながら、棚の間を自分で走っていくんだよ。'), (U, 'みんな最初はびっくりしてた。')]},
 ]
 
 
@@ -95,9 +115,13 @@ async def run_scenario(scenario, persona, judge, judge_prompt):
     style = SimpleNamespace(talk='chatty', presence='close')
     session = SimpleNamespace(generate_reply=lambda **k: None)
     memories = scenario['memories']
-    talker = initiative.Initiative(session, style, persona.talk_chatty_nudge, instructions=persona.inner_thoughts_instructions,
+    events = diary.Diary()
+    for days, kind, text in scenario.get('events', []):
+        events.add(kind, text, at=datetime.now(JST) - timedelta(days=days))
+    talker = initiative.Initiative(session, style, persona.talk_chatty_nudge, instructions=persona.inner_thoughts_instructions + '\n\n' + persona.self_instructions,
                                    correction_nudge=persona.talk_correction_nudge,
                                    memories=(lambda: memories) if memories else None)
+    talker.diary = events
     checkpoints = []
     turns = scenario['turns']
     for i, (role, _) in enumerate(turns):

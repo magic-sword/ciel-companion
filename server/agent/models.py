@@ -25,6 +25,7 @@ ROLES = {
     'minutes': ('CIEL_MINUTES_MODEL', 'gpt-5.4'),                 # 議事録の清書（minutes.py）
     'notes': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),                # メモ（notes.py）
     'relationship': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),         # 関係（relationship.py。メモと同じモデル）
+    'growth': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),               # 出来事から育つ好み（growth.py。メモと同じモデル）
     'research': ('CIEL_RESEARCH_MODEL', 'gpt-5.4-mini'),          # 調べもの（web_research.py）
 }
 

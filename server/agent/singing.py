@@ -231,6 +231,7 @@ class SongListener:
         self._telling = False         # 感想・結果を話している途中（アプリには idle を見せるが、シエルから話しかけない）
         self.on_end = None            # 歌が終わって感想を話し終えたとき（agent.py が内なる考えの interlude をつなぐ）
         self.preamble = None          # emotion.PreambleCut（「どうぞ」を DOUZO_SENTENCES 文までにする。agent.py がつなぐ）
+        self.diary = None             # diary.Diary（歌を聴いたことを残す。agent.py がつなぐ）
 
     @property
     def active(self) -> bool:
@@ -409,6 +410,8 @@ class SongListener:
             if self.publish is not None:
                 self.publish(result_card(result))
             cues = facts(result)
+            if self.diary is not None:   # だれが歌ったかは書かない（diary.py）
+                self.diary.add('song', f'歌を最後まで聴かせてもらった（{clock(result["duration"])}）')
             await self._tell(self.feedback.replace('{facts}', cues),
                              note=f'[歌：相手が歌い終えた。シエルは最後まで聴いた（{clock(result["duration"])}）。'
                                   f'結果のカードが画面に出ている]\n{cues}')

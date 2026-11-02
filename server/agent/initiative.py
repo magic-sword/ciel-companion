@@ -104,10 +104,10 @@ LEARNED_CHARS = 400
 BOARD_THOUGHTS = 2            # 付箋にする、気になっていることの数
 PER_TOPIC_KIND = 2             # 同じ話題・同じ種類の考えを持つ数
 CONVERSATION_TURNS = 20
-KINDS = ('comment', 'question', 'recall', 'research', 'correction')
+KINDS = ('comment', 'question', 'recall', 'research', 'correction', 'share')
 # 話しかけるときに添える、考えの種類（シエルが考えと違う話をしないように）
 KIND_LABELS = {'comment': '感想', 'question': '相手に聞きたいこと', 'recall': '前の話に戻りたい',
-               'research': '調べてみたいこと', 'correction': '言い直したいこと'}
+               'research': '調べてみたいこと', 'correction': '言い直したいこと', 'share': '自分のことで話したいこと'}
 
 
 @dataclass
@@ -167,6 +167,7 @@ class Initiative:
         self.open_nudge = ''               # 話す番の合図（config/prompts/initiative_open.md）
         self._cards: dict[str, board.Card] = {}   # 考えの id → 気になっている付箋
         self.curious = None                # curiosity.Curiosity（調べてみたいことを自分で調べる。agent.py がつなぐ）
+        self.diary = None                  # diary.Diary（シエル自身に本当にあった出来事。agent.py がつなぐ）
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -578,6 +579,7 @@ class Initiative:
         sent = list(self.thoughts)
         memories = self._memories()
         wall = datetime.now(JST)
+        events = self.diary.lines(wall) if self.diary is not None else []
         request = {
             'now': f'{wall:%Y-%m-%d %H:%M}（{"月火水木金土日"[wall.weekday()]}）',
             'talk': self.style.talk,
@@ -590,6 +592,7 @@ class Initiative:
             **({'learned': self.learned} if self.learned else {}),
             **({'topic': self.topic} if self.topic else {}),
             **({'memories': memories} if memories else {}),
+            **({'ciel_events': events} if events else {}),
             **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
                if any(t.offered for t in sent) else {}),
         }

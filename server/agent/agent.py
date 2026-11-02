@@ -37,7 +37,9 @@ import board
 import clock
 import curiosity
 import debug_log
+import diary
 import emotion
+import growth
 import health
 import initiative
 import interruptions
@@ -175,9 +177,10 @@ def make_pipeline(names: list[str]) -> dict:
 
 
 class Ciel(Agent):
-    def __init__(self) -> None:
+    def __init__(self, grown: str = '') -> None:
         persona = load_persona()
         self.persona = persona
+        self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
         super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS)
         self.events = emotion.ExpressionEvents()
@@ -245,8 +248,9 @@ class Ciel(Agent):
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
         話者の識別・議事録・道具の使い方は心が受け持つので入れない"""
         p = self.persona
-        parts = [p.instructions + p.emotion_instructions, p.touch_instructions, p.talker_instructions, p.tasks_instructions,
-                 self._presence_text(presence), self._talk_text(talk)]
+        parts = [p.instructions + p.emotion_instructions, p.self_instructions, self.grown, p.touch_instructions,
+                 p.talker_instructions,
+                 p.tasks_instructions, self._presence_text(presence), self._talk_text(talk)]
         return '\n\n'.join(part.strip('\n') for part in parts if part)
 
     def _presence_text(self, presence: str) -> str:
@@ -265,6 +269,8 @@ class Ciel(Agent):
         おしゃべり度（ひかえめ talk_quiet.md・おしゃべり talk_chatty.md。ふつうは足さない）を最後に足す。"""
         p = self.persona
         parts = [p.instructions + (p.emotion_instructions if VOICE == 'irodori' else ''),
+                 p.self_instructions,    # シエル自身の好み・苦手・こだわり（ciel_self.md）
+                 self.grown,             # 出来事から育った好み（growth.py）
                  p.touch_instructions]   # 画面のタッチへの反応（touch.py）
         if SPEAKERS:
             # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
@@ -320,6 +326,16 @@ async def entrypoint(ctx: JobContext) -> None:
     book = speakers.SpeakerBook(store) if SPEAKERS else None
     if book is not None:
         await book.load()
+    # シエル自身に本当にあった出来事（diary.py）。内なる考えが、自分から話したいことの材料にする
+    ciel_diary = diary.Diary(store)
+    await ciel_diary.load()
+    # 出来事から育った好み（growth.py）。芯の好みのあとに、会話モデルと内なる考えへ渡す
+    grown = []
+    if store is not None:
+        try:
+            grown = await store.ciel_likes()
+        except Exception as e:
+            logger.warning('育った好みを読めない: %s', type(e).__name__)
     names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
     session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
                            **(make_pipeline(names) if PIPELINE else
@@ -329,7 +345,7 @@ async def entrypoint(ctx: JobContext) -> None:
                            # （2026-10-22、bench_latency.py。印は emotion.py が読み取って外す）
                            tts_text_transforms=['filter_emoji'],
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
-    agent = Ciel()
+    agent = Ciel(growth.context(grown))
     session.userdata.preamble = agent.preamble
     # シエルを話させる入り口は 1 つ（mouth.py）。返事・話しかけ・議事録・歌・タッチ・声の登録・あいさつが、ここを通る
     voice = session.userdata.mouth = mouth.Mouth(session)
@@ -387,12 +403,14 @@ async def entrypoint(ctx: JobContext) -> None:
     session.userdata.researcher = researcher
     # シエルの内なる考え：会話の裏で考えを作り、話したい気持ちが強い考えを、会話が途切れたときに話す（initiative.py）
     talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge, history=history,
-                                   instructions=agent.persona.inner_thoughts_instructions,
+                                   instructions='\n\n'.join(part for part in (agent.persona.inner_thoughts_instructions,
+                                                                agent.persona.self_instructions, agent.grown) if part),
                                    correction_nudge=agent.persona.talk_correction_nudge,
                                    state_header=agent.persona.talk_inner_state_instructions,
                                    memories=lambda: book.last.notes() if book is not None and book.last is not None
                                    and book.last_sure and style.presence in ('solo', 'close') else [])
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
+    talker.diary = ciel_diary
     if PIPELINE:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
         # 付箋の一覧：頼まれたこと・していることの今の状態を、心・小脳・アプリが同じ 1 つで見る（board.py）
@@ -401,11 +419,15 @@ async def entrypoint(ctx: JobContext) -> None:
         minute_taker.board = tasks
         # 気になっていることも付箋にし、話す番が来たら心が話すかを決める（沈黙の秒数では話さない。initiative.py）
         talker.board, talker.open_nudge = tasks, agent.persona.initiative_open_nudge
-        # 調べてみたいことを、自分で調べて、分かったら話の切れ目に話す（curiosity.py）
+
+        # 調べてみたいことを、自分で調べて、分かったら話の切れ目に話す（curiosity.py）。分かったことは日記にも残す
+        def learned(question: str, summary: str) -> None:
+            talker.learn(question, summary)
+            ciel_diary.add('research', f'気になって調べた：{question} → {summary}')
         talker.curious = curiosity.Curiosity(
             researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
             agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
-            learned=talker.learn)
+            learned=learned)
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks)
@@ -431,6 +453,7 @@ async def entrypoint(ctx: JobContext) -> None:
     song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
     session.userdata.song = song
     if song is not None:
+        song.diary = ciel_diary
         song.publish = notify
         talker.paused = lambda: song.active
         song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
@@ -499,12 +522,15 @@ async def entrypoint(ctx: JobContext) -> None:
                 await note_taker.flush()   # 会話の終わりに、まだメモにしていない分を書く
             if relation_keeper is not None:
                 await relation_keeper.flush()   # メモを書いたあとで、関係を書き直す
+            await ciel_diary.drain()   # 出来事を書き終えてから、好みが育つかを見る
+            await grower.flush()
         # 議事録（とっている途中なら、そこまでで下書きを送る）とメモは別々なので、並べて待つ（片方の失敗で、もう片方を止めない）
         for result in await asyncio.gather(minute_taker.flush(), memories(), return_exceptions=True):
             if isinstance(result, BaseException):
                 logger.warning('会話の後片付けに失敗 error=%s', type(result).__name__)
         if store is not None:
             await store.close()
+    grower = growth.Grower(store, ciel_diary, agent.persona.self_instructions, agent.persona.growth_instructions)
     ctx.add_shutdown_callback(close_store)
     logger.info('persona_sha256=%s model=%s realtime_model=%s voice=%s',
                 agent.persona.fingerprint, MODEL, REALTIME_MODEL if REALTIME else 'n/a', VOICE)
@@ -521,6 +547,7 @@ async def entrypoint(ctx: JobContext) -> None:
     await send('ciel.event', minute_taker.templates_event())
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る
     toucher = touch.TouchReactions(session, book, style)
+    toucher.diary = ciel_diary
     replies.touch = toucher
     # シエルが話している途中の短い声で、話を止めない（interruptions.py）
     if INTERRUPT_GATE:
