@@ -13,9 +13,9 @@ import asyncio
 import os
 import sys
 
-import psycopg
 from psycopg.types.json import Jsonb
 
+import speaker_store
 from jst import JST
 
 
@@ -24,7 +24,11 @@ async def main(args: list[str]) -> int:
     if not url:
         print('CIEL_DB_URL がありません')
         return 1
-    async with await psycopg.AsyncConnection.connect(url, autocommit=True) as conn:
+    store = await speaker_store.Store.open()   # 表が無ければ作る（会話の始めと同じ。まだ会話が無いときのため）
+    if store is None:
+        print('DB へつなげません')
+        return 1
+    async with store.conn as conn:
         cmd = args[0] if args else 'likes'
         if cmd == 'likes':
             rows = await (await conn.execute(
