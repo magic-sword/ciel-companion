@@ -5,9 +5,9 @@
 
 [eval_thoughts]
 what = "内なる考えの質（決まった場面を考える係に通し、gpt-5.4 が採点する）"
-cost = "全場面 1 回で約 2〜3.5 ドル（採点の gpt-5.4 が 7 割）。--only で 1 場面なら約 0.3〜0.5 ドル"
+cost = "全場面 1 回で約 2〜3.5 ドル（採点の gpt-5.4 が 7 割）。--only で 1 場面なら約 0.3〜0.5 ドル。--no-judge（採点せず気持ちの付き方だけ）なら全場面 1 回で約 0.1 ドル"
 cost_max_usd = 3.5
-command = "docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--only 場面] > 結果.json"
+command = "docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--only 場面] [--no-judge] > 結果.json"
 covers = ["initiative.py", "eval_thoughts.py", "config/prompts/inner_thoughts.md", "config/prompts/eval_thought_judge.md"]
 
 [bench_thoughts]

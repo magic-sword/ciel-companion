@@ -11,7 +11,9 @@
 （grounded）・シエルらしさ（persona）、いちばん強い考えを今話したら良くなるか（top）、知りたいことの質（unknowns）。
 OpenAI の API を使う（会話は合成。実在の人の会話は使わない）。開発用の会話サーバーのコンテナで動かす：
 
-  docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--repeat 1] [--only 名前] > 結果.json
+  docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--repeat 1] [--only 名前] [--no-judge] > 結果.json
+
+--no-judge は採点せず、相手が話すたびのいちばん強い気持ちの分布だけを出す（考える係の分だけ。全場面 1 回で約 0.1 ドル）。
 
 標準出力に場面ごとの考え・採点と平均を JSON で出す。標準エラーに要約を出す。
 """
@@ -109,6 +111,9 @@ async def run_scenario(scenario, persona, judge, judge_prompt):
                    **({'memories': memories} if memories else {}),
                    'thoughts': [{'text': t.text, 'kind': t.kind, 'motivation': t.motivation} for t in thoughts],
                    'unknowns': talker.unknowns}
+        if judge is None:   # 採点しない（気持ちの付き方だけを見る）
+            checkpoints.append({'after': turns[i][1], **request})
+            continue
         r = await judge.chat.completions.create(
             model=JUDGE_MODEL, reasoning_effort='medium', response_format={'type': 'json_object'},
             messages=[{'role': 'system', 'content': judge_prompt},
@@ -116,6 +121,14 @@ async def run_scenario(scenario, persona, judge, judge_prompt):
         score = json.loads(r.choices[0].message.content or '{}')
         checkpoints.append({'after': turns[i][1], **request, 'score': score})
     return {'name': scenario['name'], 'checkpoints': checkpoints}
+
+
+def motivations(results):
+    """相手が話すたびの、いちばん強い気持ちの分布（話す番に付箋ができるのは 4 以上）"""
+    tops = [max((t['motivation'] for t in c['thoughts']), default=0) for s in results for c in s['checkpoints']]
+    return {'checkpoints': len(tops), 'top_4_or_more': sum(m >= 4 for m in tops), 'top_5': sum(m >= 5 for m in tops),
+            'by_scene': {s['name']: [max((t['motivation'] for t in c['thoughts']), default=0) for c in s['checkpoints']]
+                         for s in results}}
 
 
 def summarize(results):
@@ -147,15 +160,16 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--repeat', type=int, default=1)
     ap.add_argument('--only', default='')
+    ap.add_argument('--no-judge', action='store_true', help='採点せず、気持ちの付き方だけを見る（考える係の分だけ。1 回約 0.1 ドル）')
     args = ap.parse_args()
     persona = load_persona()
-    judge = openai.AsyncOpenAI()
+    judge = None if args.no_judge else openai.AsyncOpenAI()
     judge_prompt = open(JUDGE_PROMPT, encoding='utf-8').read()
     scenarios = [s for s in SCENARIOS if not args.only or s['name'] == args.only]
     results = []
     for _ in range(args.repeat):
         results += await asyncio.gather(*(run_scenario(s, persona, judge, judge_prompt) for s in scenarios))
-    summary = summarize(results)
+    summary = {**({} if judge is None else summarize(results)), 'motivation': motivations(results)}
     print(json.dumps({'summary': summary, 'results': results}, ensure_ascii=False, indent=1))
     print(json.dumps(summary, ensure_ascii=False), file=sys.stderr)
 
