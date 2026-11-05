@@ -1,0 +1,210 @@
+# シエルとマインクラフトで遊ぶ（設計）
+
+状態：B1（マイクラのサーバーと体）を作った（2026-11-05）。自宅サーバーで、体が入る・様子・場所へ行く・原木を集める・持ち主についていく・ゾンビに反撃するを確かめた（使い方は 12 章）。会話の組み立ては [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)、コメントの扱いは [コメントへの返し方の設計](youtube-comments-design-ja.md) を前提にする。
+
+## 1. 何を解くか
+
+シエルがマインクラフトの世界に「体」を持ち、持ち主と一緒に遊ぶ。ついてくる、頼まれたものを集める、危ないときに声を上げる、見たことを話す、など。
+
+- シエルの返事は、作るのに 2〜3 秒かかる。一歩ずつの操作（歩く・ジャンプ・狙う）を会話モデルにさせると、遅すぎて遊べない。
+- ゲームの出来事は 1 秒に何十も起きる。全部を会話モデルに渡すと、料金がかさむうえに、シエルが実況ばかりになる。
+
+そこで、**足はボットが動かし、シエルは「何をするか」だけを決める**。ゲームの出来事は、コードで選んだものだけをシエルに渡す。
+
+## 2. 決めたこと
+
+| 項目 | 決定 |
+|---|---|
+| 版 | **Java 版**（利用者、2026-11-05）。体には Mineflayer を使う。統合版は、体を持てる手段が乏しいので使わない |
+
+## 3. 手法の選び方（調べたこと）
+
+| 手法 | 例 | 採否 |
+|---|---|---|
+| ボットのライブラリ ＋ LLM の道具 | Mineflayer、Mindcraft、Minecraft 用の MCP サーバー | **採る**。Mineflayer に体を任せ、シエルの心に道具として渡す |
+| LLM がその場で行動のコードを書く | Voyager、Mindcraft の newAction | 採らない。遅く、料金が高く、任意のコードを実行することになる |
+| Mod の中の AI の仲間（NPC） | AI Companion 系の Mod、Player2 | 採らない。シエルの記憶・人格と二重になる |
+| 画面を見てキーとマウスで操作 | OpenAI VPT、STEVE-1 | 採らない。研究用で、遅く重い |
+
+Mindcraft は、それ自体が会話モデルの繰り返しを持つので、シエルの心と二重になる。そのまま組み込まず、道具の分け方と技（skills）の実装を参考にする。
+
+## 4. 形
+
+```mermaid
+flowchart LR
+    subgraph Home["自宅の GPU サーバー（Docker）"]
+        MC["マイクラのサーバー<br>Java 版・家の中だけ<br>:25565"]
+        BOT["シエルの体<br>server/minecraft（Node.js）<br>Mineflayer ＋ 経路探索<br>ws://127.0.0.1:8768"]
+        A["会話サーバー<br>server/agent<br>minecraft.py ＋ tools/minecraft.py"]
+    end
+    PC["持ち主の PC<br>マイクラ（Java 版）"] -- "遊ぶ" --> MC
+    BOT -- "プレイヤーとして入る" --> MC
+    A -- "つなぐ（会話の側からつなぐ）<br>する・止める・様子を聞く" --> BOT
+    BOT -- "様子・出来事・終わった" --> A
+    APP["Unity アプリ"] <-- "声・表情（今までどおり LiveKit）" --> A
+```
+
+- **体（ボット）は会話とは別に動き続ける。** 会話サーバーは、アプリの会話ごとに始まって終わる（LiveKit の部屋ごと）。体を会話の中に作ると、会話を切るたびにシエルがログアウトする。体は独立したサービスにして、会話の側から WebSocket でつなぐ。
+- **体を動かせる会話は 1 つだけ。** アプリの設定でマイクラをオンにした会話がつなぐ。別の会話がつないでいるあいだは、体は「使用中」と断る。
+- **声はアプリから出す**（今までどおり）。ゲーム内の声（Simple Voice Chat）は後で考える（9 章）。
+- 外から入る口は増やさない。体の WebSocket は 127.0.0.1 だけで待ち受ける。マイクラのサーバーは持ち主の PC から入るので家の中のネットワークに開くが、ルーターでは開かない。
+
+### 4.1 マイクラのサーバー
+
+- 自宅の GPU サーバーの Docker で動かす（`itzg/minecraft-server` など。Compose の `minecraft` profile にして、ふだんは止めておく）。
+- 版は **1.21.11**。Mineflayer 4.39.0 の `testedVersions` は 26.1 まであるが、経路探索（mineflayer-pathfinder 2.4.5、2023 年）とブロック集め（mineflayer-collectblock 1.6.0）が新しい版で動くかは分からないので、1.21 系の最後にした。上げるときは、サーバーの `VERSION` と体の `MC_VERSION` を一緒に変える。
+- シエル用にもう 1 つアカウントを買わないので、`online-mode=false`（アカウントの確認なし）にする。誰でも好きな名前で入れてしまうので、**家の中のネットワークだけ・ホワイトリスト（持ち主と `Ciel`）だけ**にする。配信で視聴者を入れるなら、シエル用のアカウントを用意して `online-mode=true` に戻す。
+- `online-mode=false` のサーバーでは、プレイヤーの ID（UUID）がふつうと違う。Compose の `WHITELIST` に名前を書くと、ふつうの ID で登録されて入れないことがある。`rcon-cli whitelist add` も、ふつうの ID で登録するので入れなかった（2026-11-05）。そこで、`src/whitelist.js` で「OfflinePlayer:名前」から ID を作り、`whitelist.json` を書いて読み直させる（12 章）。
+- サーバーのイメージは `itzg/minecraft-server:2026.10.1-java21`。体はブロックを壊さない・置かない（`carefulMovements`）。壊すのは「集める」で頼まれたブロックだけ。
+
+### 4.2 体（`server/minecraft/`、新規）
+
+Node.js（Mineflayer ＋ mineflayer-pathfinder ＋ mineflayer-collectblock）。会話モデルは使わない。
+
+| 係 | 中身 |
+|---|---|
+| 技（skills） | ついていく・来る・場所へ行く・止まる・集める（ブロックの種類と数）・渡す・拾う・食べる・寝る。1 つずつ決まった JavaScript で書く（その場でコードを書かせない） |
+| 身を守る（`src/guard.js`） | 会話を待たずに体が自分でする。6 ブロック以内の敵と、持ち主に 6 ブロックまで来た敵に、いちばん良い剣・斧で反撃する。クリーパーは叩かずに離れる。体力 6 以下か、近くに敵が 3 体以上なら、持ち主のほうへ（見えなければ敵から）逃げる。エンダーマン・ピグリンなど、手を出さなければ襲わないものには向かわない。守っているあいだ、技は待って、守り終えたら続ける。食べる・溶岩や落下を避けるのは、まだ |
+| 様子 | 2 秒ごとにまとめる：場所・体力・空腹・時刻・天気・持っている物・近くのプレイヤーと敵・今している技 |
+| 出来事 | ダメージ・倒れた・持ち主が倒れた・技が終わった／失敗した・プレイヤーが来た／去った・夜になった／朝になった・天気・チャット・守り始めた（`defend`）・倒した（`defeated`）・逃げた（`flee`）・守り終えた（`safe`） |
+
+会話サーバーとのやりとり（JSON、`v:1`）：
+
+| 向き | 例 |
+|---|---|
+| 会話 → 体 | `{"v":1,"type":"do","id":7,"skill":"collect","args":{"block":"oak_log","count":10}}`、`{"v":1,"type":"stop"}`、`{"v":1,"type":"chat","text":"…"}` |
+| 体 → 会話 | `{"v":1,"type":"state",…}`、`{"v":1,"type":"event","kind":"hurt","amount":4}`、`{"v":1,"type":"done","id":7,"ok":true,"note":"原木を 10 個"}` |
+
+技は時間がかかる（集めるのに数十秒）。体は `do` を受けたらすぐ「始めた」を返し、終わったら `done` を送る。
+
+### 4.3 会話サーバーの側
+
+| 部品 | 中身 |
+|---|---|
+| `minecraft.py`（新規） | 体へつなぐ。最新の様子を持ち、出来事を選んで（5 章）口や心へ渡す |
+| `tools/minecraft.py`（新規） | 心が呼ぶ道具：`follow_me`・`come_here`・`go_to`・`stop_moving`・`collect`・`give_item`・`look_around`。つないでいるときだけ渡す。`FROM_COMMENTS` も書く（6 章） |
+| `board.py` | 頼まれた技を付箋にする（種類 `game`、「原木を 10 個集める：実行中」）。終わったら完了／失敗。同じ頼みを二重に受けない |
+| `mouth.py` | why に `game` を足す。技の終わり・危ない出来事は `say_latest('game')` で切れ目に言う |
+| `mind.py` | `game` を `DEEP_WHY` に足す（知らせは心が話す）。つないでいるあいだは、送る会話に「[マイクラの様子]」を 1〜2 行足す（小脳にも渡す。見たことを話せるように）。体を動かす頼みの言葉（ついてきて・来て・取って・集めて・止まって など）を、つないでいるときだけ `REQUEST` と同じ扱いにして心に回す |
+| `config/prompts/minecraft.md`（新規） | 一緒に遊ぶときの振る舞い。参照は `config/persona.toml`。本文を Python に書かない |
+| アプリ | 設定に「マイクラ」のオン・オフと、つながっているかの表示。`ciel.game` の topic で送る |
+
+`ついてきて` は短いので、今の振り分けでは小脳に行き、道具を持たない小脳が「はーい」と言うだけになる。そのため、頼みの言葉は**コードで**心に回す（pipeline の 0 章の 6）。
+
+## 5. 出来事の選び方（モデルを使わない）
+
+| 出来事 | 扱い |
+|---|---|
+| 頼んだ技が終わった・失敗した | 付箋を完了／失敗にして、切れ目で言う |
+| シエルが大きなダメージ（4 以上）・体力が残り少ない・逃げた（`flee`） | すぐ言う（会話の途中でも、短く） |
+| 守り始めた・倒した（`defend`・`defeated`） | 様子に入れる。倒したら、話す番に一言言ってよい |
+| 持ち主が倒れた・シエルが倒れた | すぐ言う |
+| 夜になった・雨が降り出した | 様子に入れるだけ。おしゃべりのときは、話す番に心が拾ってよい（気になっている付箋） |
+| 近くに敵が来た | 様子に入れる。持ち主が気づいていなさそう（近い・後ろ）なら言う |
+| 移動・小さなダメージ・拾った | 様子に入れるだけ |
+
+同じ種類は 30 秒に 1 回まで。持ち主が話しているあいだは、すぐ言うもの以外は待つ。
+
+## 6. 安全・道具の許可
+
+- 持ち主のゲーム内チャットは、声と同じに扱う（設定したプレイヤー名だけ）。
+- ほかのプレイヤーのチャットは、配信のコメントと同じく**信用できない入力**として扱う。コメントの溜まりに入れ、コメントから使ってよい道具だけを渡す。
+- 体を動かす道具は、まず `FROM_COMMENTS` で「使わない」にする。配信で視聴者に動かしてもらうかは、あとで決める。
+- 体の側でも、受けた `do` の技名を一覧で確かめる。一覧に無い技は動かさない（任意のコードは実行しない）。
+
+## 7. 入力の受け口（YouTube と共通にする部分）
+
+マイクラのチャットと YouTube のコメントは、どちらも「声とは別に届く、信頼度の違う文字の入力」になる。だから、受け口を共通にする。
+
+- 入力の形：`source`（`voice`・`youtube`・`minecraft`）、`who`、`text`、`trust`（`owner`・`anyone`）、届いた時刻。
+- `trust` が `owner` なら声の発言と同じに返す。`anyone` ならコメントの溜まり（[コメントへの返し方の設計](youtube-comments-design-ja.md) の 3 章）に入れて、話せる番に心が選ぶ。
+- 今の `Mind.from_comment` は、入力の `trust` から決まる形にする（`anyone` の返事なら `tools.for_comments`）。
+- つなぐ相手（体・YouTube の取り込み）は会話とは別に動き続け、会話の側からつなぐ。会話サーバーに外から入る口は作らない。
+
+マイクラだけなら持ち主のチャットで足りるので、共通の受け口は段階 B4（ほかの人のチャット）か、YouTube の取り込みのときに作る。
+
+## 8. 進め方
+
+| 段階 | 中身 | 確かめ方 |
+|---|---|---|
+| B1 体だけ | マイクラのサーバーと体を Compose で動かす。体が入り、持ち主についていく。手元の WebSocket から技を送って動かす | 実際に一緒に歩く。会話モデルは使わない |
+| B2 つなぐ | `minecraft.py`・道具（ついてくる・来る・止まる・周りを見る）・様子の行・危ない出来事。最初は環境変数で、つなぐ会話を決める | 声で「ついてきて」「止まって」「何が見える？」 |
+| B3 手伝う | 集める・渡す・付箋・技の終わりの知らせ。アプリの設定のオン・オフ | 「原木を 10 個集めて」から渡すまで |
+| B4 ほかの人 | 持ち主のゲーム内チャット、ほかのプレイヤーのチャット（共通の受け口） | 2 人で遊ぶ |
+
+各段階の合否は、**一緒に遊んで楽しいか、シエルらしいか**を人が見て決める。数値だけで良いとしない。返事までの秒数と、遊んだ 1 時間の料金は測る。会話モデルを使う試験（`bench_*`）は、回す前に料金を見積もる。
+
+## 9. あとで考えること
+
+- 戦う（mineflayer-pvp）、建てる（設計図から置く）、作業台で作る。
+- ゲーム内の声：Simple Voice Chat と、外の AI をつなぐ Easy LLM Voice で、シエルの声をシエルの位置から出す。
+- 配信でマイクラを遊ぶとき、コメントから体を動かしてよいか。
+- 体の見た目（スキン）。
+
+## 10. 決めてほしいこと
+
+| 項目 | 案 |
+|---|---|
+| マイクラのサーバーをどこで動かすか | 自宅の GPU サーバー（体と同じ場所。会話サーバーとサーバーの中だけでつながる） |
+| 持ち主のプレイヤー名 | 設定（`.env`）に書く |
+| 会話を切ったあとの体 | その場で待つ（ログアウトしない） |
+
+利用者の決定（2026-11-05）：10 章の案のとおり。
+
+## 11. 参考
+
+- Mineflayer（対応版の一覧は `lib/version.js` の `testedVersions`）：https://github.com/PrismarineJS/mineflayer
+- Mindcraft（Mineflayer ＋ LLM。道具と技の参考）：https://github.com/mindcraft-bots/mindcraft
+- Minecraft 用の MCP サーバー（Mineflayer の道具の分け方の参考）：https://github.com/yuniko-software/minecraft-mcp-server
+- Voyager（LLM が技のコードを書いて貯める）：https://arxiv.org/abs/2305.16291
+- Easy LLM Voice（Simple Voice Chat と外の AI をつなぐ）：https://www.curseforge.com/minecraft/mc-mods/easy-llm-voice
+
+## 12. 使い方（B1：体だけ）
+
+置き場所：`server/minecraft/`（体）、`server/compose.yaml` の `minecraft`・`minecraft-body`（`minecraft` profile。ふだんの `docker compose up` では起動しない）。
+
+| ファイル | 中身 |
+|---|---|
+| `src/main.js` | マイクラへ入る（切れたら 5〜60 秒で入り直す）、会話を待つ、2 秒ごとの様子、出来事 |
+| `src/protocol.js` | 命令の形と、技の一覧・引数の確かめ方 |
+| `src/skills.js` | 技（`follow`・`come`・`go_to`・`collect`）。一度に 1 つ。止めたときも `done` を 1 回送る |
+| `src/guard.js` | 身を守る係（反撃・逃げる。どうするかは `pickThreat`）。守り終えたら「守り終えた hits=… kills=…」をログに出す |
+| `src/movements.js` | 歩き方の決まり（ふだんは壊さない・置かない、集めるときだけ掘る） |
+| `src/state.js` | 様子のまとめ |
+| `src/send.js` | 手元から命令を送って確かめる（会話サーバーの代わり） |
+| `src/whitelist.js` | アカウントの確認なしのサーバー用の `whitelist.json` を出す |
+
+### 初回
+
+マイクラの設定は、秘密を含まない別のファイル `server/.env.minecraft`（見本は `.env.minecraft.example`、Git・デプロイの外）に置く。`server/.env`（DB のパスワード）とは混ぜない。下のコマンドは自宅サーバーの `~/work/ciel-companion/server` で。
+
+1. `server/.env.minecraft` に、`MINECRAFT_EULA=TRUE`（[マイクラの利用規約](https://www.minecraft.net/eula)に同意する場合）、`MC_OWNER=（持ち主のプレイヤー名）`、`MC_BIND=（自宅サーバーの家の中の IPv4 アドレス）` を書く。
+2. 起動：`docker compose --env-file .env --env-file .env.minecraft --profile minecraft up -d --build minecraft minecraft-body`（入れ直し・止めるときも、同じ `--env-file` と `--profile` を付ける。付けないと、別の設定で作り直したり、何もしなかったりする）
+3. ホワイトリスト：
+   ```sh
+   docker compose exec -T minecraft-body node src/whitelist.js Ciel （持ち主のプレイヤー名） | docker compose exec -T minecraft sh -c 'cat > whitelist.json'
+   docker compose exec -T minecraft rcon-cli whitelist reload
+   ```
+4. 体は、外されても 5〜60 秒あけて入り直す。すぐ入れたいときは 2 と同じ形で `restart minecraft-body`。
+
+### 確かめる
+
+持ち主の PC のマイクラ（Java 版 1.21.11）で、マルチプレイ →「サーバーを追加」→ 自宅サーバーの家の中のアドレス。入って、`Ciel` がいることを見る。
+
+`docker compose exec -T` から送るときは `SECONDS=` を付ける（外から止めてもコンテナの中に送り手が残り、つながったままになって、次の送り手が `busy` で断られた。2026-11-05）。
+
+```sh
+docker compose exec minecraft-body node src/send.js '{"type":"do","id":1,"skill":"follow"}'   # ついてくる。Ctrl+C で切ると、その場で待つ
+docker compose exec minecraft-body node src/send.js '{"type":"do","id":2,"skill":"collect","args":{"block":"oak_log","count":5}}'
+docker compose exec minecraft-body node src/send.js '{"type":"do","id":3,"skill":"go_to","args":{"x":100,"z":-20}}'
+docker compose logs -f minecraft-body
+```
+
+`QUIET_STATE=1` を付けると、2 秒ごとの様子を出さない。テストは `server/minecraft` で `npm test`。
+
+### 気をつけること
+
+- `npm audit` で、Mineflayer がアカウントの確認に使う部品（yggdrasil の uuid）に中程度の注意が 8 件出る。体はアカウントの確認をしない（`auth: 'offline'`）ので、その部品は動かない。
+- 道具が無いと掘れないブロック（石など）は、集めても増えない（`cannot_harvest`）。道具を作る・渡すのは B3。
+- 身を守る係を試したとき（2026-11-05）：鉄の剣で、ゾンビ 1 体を 5 回叩いて、ダメージを受けずに倒した。その前、夜に体力 12・食べ物なしで敵に囲まれ、持ち主と一緒に倒されたので、囲まれたら逃げるようにした。食べ物を持って食べる、倒れたあと持ち主のところへ戻るのは、まだ。
+- 倒れると持ち物を落とし、初めの場所で生き返る。ついていく技は `player_not_visible` か `died` で終わるので、もう一度頼む。

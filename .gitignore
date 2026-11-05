@@ -24,6 +24,7 @@
 .env
 .env.*
 !.env.example
+!.env.minecraft.example
 *.keystore
 *.jks
 /assets/private/
@@ -56,3 +57,7 @@ __pycache__/
 
 # Claude Code の個人の設定（許可など）。共有の設定は .claude/settings.json
 /.claude/settings.local.json
+
+# マイクラの体（server/minecraft）の依存と、マイクラのサーバーの世界
+/server/minecraft/node_modules/
+/server/minecraft/data/

@@ -1,0 +1,21 @@
+{
+  "name": "ciel-minecraft-body",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0",
+    "mineflayer-collectblock": "1.6.0",
+    "mineflayer-pathfinder": "2.4.5",
+    "ws": "8.22.1"
+  },
+  "devDependencies": {
+    "vec3": "0.1.10"
+  }
+}
