@@ -50,3 +50,5 @@ tasks_instructions_file = "prompts/tasks.md"
 initiative_open_nudge_file = "prompts/initiative_open.md"
 # 気になって自分で調べたことを話す（curiosity.py）
 research_found_nudge_file = "prompts/research_found.md"
+# マイクラで一緒に遊ぶ（minecraft.py・tools/minecraft.py）。体へつなぐとき（CIEL_MINECRAFT_URL）だけ会話の指示に足す
+minecraft_instructions_file = "prompts/minecraft.md"

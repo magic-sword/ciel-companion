@@ -28,6 +28,7 @@ import clock
 import debug_log
 import models
 import tools as toolbox
+from tools.minecraft import BODY_TOOLS
 from jst import JST
 from summaries import live
 
@@ -38,7 +39,7 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment', 'game')   # 心が返事を作る、口（mouth.py）の why
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -48,6 +49,12 @@ REQUEST = re.compile(r'録|まとめ|調べ|検索|何時|時間を|名前|覚�
 # 議事録を始める・終える頼みの言葉。今回の発言（付箋になった分を除く）に無ければ、議事録を動かす道具を心に渡さない
 MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
 MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
+# マイクラの体を動かす・見る頼みの言葉（minecraft.py）。体とつながっているときだけ心に回す。「ついてきて」は短いので、
+# 小脳に行くと、道具を持たない小脳が「はーい」と言うだけになる（docs/minecraft-design-ja.md の 4.3）
+# 「きて」「まって」だけでは「できて」「決まって」も当たるので入れない
+# 「ついてくるの止められないかな？」が当たらず、小脳が「『止まって』と言ってくれたら」と返した（2026-11-05）
+GAME_ASK = re.compile(r'つい(て|と)(き|来|く|こ|い)|付いて|こっち|おいで|来て|止ま|止め|とまっ|待って|ストップ|やめて|'
+                      r'見える|何がある|なにがある|周り|まわり|大丈夫|体力|マイクラ')
 FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
@@ -55,12 +62,13 @@ BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まっ�
 
 class Mind:
     def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
-                 brief_instructions: str = '', client=None, board=None) -> None:
+                 brief_instructions: str = '', client=None, board=None, body=None) -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
         self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
+        self.body = body              # minecraft.Body（マイクラの体。つなぐときだけ）
         self.quiet_turn = quiet_turn  # ひかえめのときの念押し（config/prompts/talk_quiet_turn.md）
         self.brief_instructions = brief_instructions   # config/prompts/mind_brief.md
         self._client = client
@@ -120,6 +128,7 @@ class Mind:
         quiet = self.style is not None and self.style.talk == 'quiet'
         why = ('notice' if self._waiting()
                else 'request' if REQUEST.search(rest)
+               else 'game' if self._body_linked() and GAME_ASK.search(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
                else 'people' if not quiet and self._speakers_since_ciel() >= 2
                else 'named' if quiet and NAME.search(text)
@@ -138,8 +147,14 @@ class Mind:
         text = _user_text(_tail(list(chat_ctx.items)))
         if text and not MINUTES_ASK.search(self._strip(text)):
             tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
+        # マイクラの体とつながっていなければ、体の道具は渡さない
+        if not self._body_linked():
+            tools = [t for t in tools if getattr(t, 'id', None) not in BODY_TOOLS]
         # 配信のコメントへの返事では、コメントから使ってよい道具だけ（tools/ の FROM_COMMENTS）
         return toolbox.for_comments(tools) if self.from_comment else tools
+
+    def _body_linked(self) -> bool:
+        return self.body is not None and self.body.linked
 
     def _speakers_since_ciel(self) -> int:
         """シエルが最後に話してから話した人の数（話者が分からない発言は数えない）"""
@@ -232,6 +247,8 @@ class Mind:
                 lines.append(self._state)
         if self.board is not None:
             lines.append(self.board.context())   # 今どうなっているか（小脳も、していないことを言わないように読む）
+        if self.body is not None:
+            lines.append(self.body.context())    # マイクラの様子（小脳も、見ていないことを言わないように読む）
         if deep and self.minutes is not None:
             lines.append(self.minutes.context())
             note = self.minutes.take_note()

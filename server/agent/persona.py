@@ -49,6 +49,7 @@ class Persona:
     tasks_instructions: str
     initiative_open_nudge: str
     research_found_nudge: str
+    minecraft_instructions: str
 
     @property
     def fingerprint(self) -> str:
@@ -65,7 +66,7 @@ class Persona:
              self.conversation_instructions, self.research_instructions, self.research_voice_instructions,
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
              self.mind_brief_instructions, self.listener_instructions, self.tasks_instructions,
-             self.initiative_open_nudge, self.research_found_nudge],
+             self.initiative_open_nudge, self.research_found_nudge, self.minecraft_instructions],
             ensure_ascii=False,
         )
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -93,7 +94,7 @@ def load_persona() -> Persona:
                 'conversation_instructions',
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
                 'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'tasks_instructions',
-                'initiative_open_nudge', 'research_found_nudge'):
+                'initiative_open_nudge', 'research_found_nudge', 'minecraft_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)
         if not isinstance(value, str) or not value.strip():

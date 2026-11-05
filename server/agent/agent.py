@@ -46,6 +46,7 @@ import interruptions
 import listener
 import irodori_tts
 import mind
+import minecraft
 import minutes
 import mode
 import models
@@ -250,7 +251,8 @@ class Ciel(Agent):
         p = self.persona
         parts = [p.instructions + p.emotion_instructions, p.self_instructions, self.grown, p.touch_instructions,
                  p.talker_instructions,
-                 p.tasks_instructions, self._presence_text(presence), self._talk_text(talk)]
+                 p.tasks_instructions, self._presence_text(presence), self._talk_text(talk),
+                 p.minecraft_instructions if PIPELINE and minecraft.URL else '']
         return '\n\n'.join(part.strip('\n') for part in parts if part)
 
     def _presence_text(self, presence: str) -> str:
@@ -280,6 +282,8 @@ class Ciel(Agent):
                   p.inner_thoughts_voice_instructions]
         if PIPELINE:
             parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
+            if minecraft.URL:
+                parts.append(p.minecraft_instructions)   # マイクラで一緒に遊ぶ（minecraft.py。体へつなぐときだけ）
         if VOICE == 'irodori':
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
@@ -428,9 +432,15 @@ async def entrypoint(ctx: JobContext) -> None:
             researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
             agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
             learned=learned)
+        # マイクラの体（minecraft.py）。つなぐ先があるときだけ。出来事は、話の切れ目に心が知らせる（why 'game'）
+        body = minecraft.Body(minecraft.URL, voice.say_latest, diary=ciel_diary) if minecraft.URL else None
+        session.userdata.body = body
+        if body is not None:
+            body.start()
+            ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
-                               brief_instructions=agent.persona.mind_brief_instructions, board=tasks)
+                               brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 

@@ -6,6 +6,7 @@
 - research：気になって自分で調べて分かったこと（curiosity.py）
 - song：歌を最後まで聴かせてもらったこと（singing.py）
 - touch：なでてもらった・つつかれたこと（touch.py。1 回の会話で、同じ部位・しぐさは 1 度だけ）
+- minecraft：マイクラで倒した・倒れたこと（minecraft.py。1 回の会話で、同じことは 1 度だけ）
 だれと話していても同じ記録を使うので、相手の名前や事情は書かない。DB（speaker_store.Store の ciel_events）があれば
 会話をまたいで残し（KEEP 個まで）、無ければその会話の間だけ覚える。
 """

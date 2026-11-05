@@ -19,7 +19,8 @@ import debug_log
 
 log = logging.getLogger('ciel-agent.mouth')
 
-WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment')   # comment：配信のコメントへの返事
+WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
+       'game')   # comment：配信のコメントへの返事。game：マイクラの出来事の知らせ（minecraft.py）
 FREE_POLL = 0.25
 
 
