@@ -89,6 +89,51 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
+  # マイクラのサーバー（Java 版。docs/minecraft-design-ja.md）。ふだんは起動しない。
+  #   docker compose --env-file .env --env-file .env.minecraft --profile minecraft up -d minecraft minecraft-body
+  # シエル用のアカウントを買わないので、アカウントの確認なし（online-mode=false）で動かす。だれでも好きな名前で入れるので、
+  # 家の中のネットワークだけで使い、ルーターで 25565 を開かない。入れるのはホワイトリストの人だけ（docs/minecraft-design-ja.md の 12 章）。
+  # 世界は ./minecraft/data（Git・デプロイの外）
+  minecraft:
+    profiles: [minecraft]
+    image: itzg/minecraft-server:2026.10.1-java21
+    environment:
+      - EULA=${MINECRAFT_EULA:-FALSE}   # 利用規約への同意は、利用者が server/.env.minecraft に書く
+      - TYPE=VANILLA
+      - VERSION=1.21.11                 # 体（Mineflayer 4.39）の MC_VERSION と同じにする
+      - ONLINE_MODE=FALSE
+      - ENFORCE_SECURE_PROFILE=FALSE
+      - ENABLE_WHITELIST=TRUE
+      - ENFORCE_WHITELIST=TRUE
+      - MEMORY=2G
+      - DIFFICULTY=easy
+    ports:
+      # 家の中の IPv4 アドレスだけで開く（server/.env.minecraft の MC_BIND）。自宅サーバーには外から届く IPv6 のアドレスもあるので、
+      # 全部のアドレス（0.0.0.0・::）では開かない。書いていなければ、このマシンの中だけ
+      - ${MC_BIND:-127.0.0.1}:25565:25565
+    volumes:
+      - ./minecraft/data:/data
+    restart: unless-stopped
+
+  # シエルの体（server/minecraft。マイクラにプレイヤーとして入るボット）。会話サーバーは ws://127.0.0.1:8768 へつなぐ
+  minecraft-body:
+    profiles: [minecraft]
+    build:
+      context: ./minecraft
+      network: host
+    network_mode: host
+    environment:
+      - MC_HOST=${MC_BIND:-127.0.0.1}   # マイクラのサーバーを開いたアドレス
+      - MC_PORT=25565
+      - MC_VERSION=1.21.11
+      - MC_USERNAME=Ciel
+      - MC_OWNER=${MC_OWNER:-}
+      - BODY_HOST=127.0.0.1
+      - BODY_PORT=8768
+    depends_on:
+      - minecraft
+    restart: unless-stopped
+
   # 記録の場所（PostgreSQL＋pgvector）。いまは「覚えている人」の名前と声の特徴だけを置く
   db:
     image: pgvector/pgvector:0.8.0-pg17

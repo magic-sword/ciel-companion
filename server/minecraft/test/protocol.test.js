@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { parseCommand } from '../src/protocol.js';
+
+const p = (m) => parseCommand(JSON.stringify(m));
+
+test('技の命令を整えて受ける', () => {
+  assert.deepEqual(p({ v: 1, type: 'do', id: 3, skill: 'follow' }).cmd, { type: 'do', id: 3, skill: 'follow', args: {} });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 4, skill: 'collect', args: { block: 'oak_log', count: 10 } }).cmd.args,
+    { block: 'oak_log', count: 10 });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 5, skill: 'go_to', args: { x: 10, z: -3.5 } }).cmd.args, { x: 10, z: -3.5 });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 6, skill: 'come', args: { player: 'Steve_1' } }).cmd.args, { player: 'Steve_1' });
+});
+
+test('一覧に無い技は動かさない', () => {
+  assert.deepEqual(p({ v: 1, type: 'do', id: 1, skill: 'eval', args: {} }), { error: 'unknown_skill', id: 1 });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 1, skill: 'constructor' }), { error: 'unknown_skill', id: 1 });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 1, skill: '__proto__' }), { error: 'unknown_skill', id: 1 });
+});
+
+test('形の違う引数は動かさない', () => {
+  const bad = [
+    { skill: 'collect', args: { block: 'oak_log', count: 0 } },
+    { skill: 'collect', args: { block: 'oak_log', count: 65 } },
+    { skill: 'collect', args: { block: 'oak_log', count: 1.5 } },
+    { skill: 'collect', args: { block: '../x' } },
+    { skill: 'go_to', args: { x: 'a', z: 1 } },
+    { skill: 'go_to', args: { x: 1, z: Infinity } },
+    { skill: 'go_to', args: { x: 1e9, z: 1 } },
+    { skill: 'follow', args: { player: 'a b' } },
+    { skill: 'follow', args: [] },
+  ];
+  for (const m of bad) assert.equal(p({ v: 1, type: 'do', id: 2, ...m }).error, 'bad_args', JSON.stringify(m));
+});
+
+test('id・版・形の確かめ', () => {
+  assert.equal(p({ v: 1, type: 'do', skill: 'follow' }).error, 'bad_id');
+  assert.equal(p({ v: 2, type: 'stop' }).error, 'bad_version');
+  assert.equal(parseCommand('{').error, 'bad_json');
+  assert.equal(parseCommand('[1]').error, 'bad_json');
+  assert.equal(p({ v: 1, type: 'shell' }).error, 'unknown_type');
+});
+
+test('チャットはコマンドにしない・改行を消す・長さを切る', () => {
+  assert.equal(p({ v: 1, type: 'chat', text: '/op Steve' }).error, 'bad_args');
+  assert.equal(p({ v: 1, type: 'chat', text: ' \n/op Steve' }).error, 'bad_args');
+  assert.equal(p({ v: 1, type: 'chat', text: 'やあ\nみんな' }).cmd.text, 'やあ みんな');
+  assert.equal(p({ v: 1, type: 'chat', text: 'あ'.repeat(300) }).cmd.text.length, 256);
+  assert.equal(p({ v: 1, type: 'chat', text: '   ' }).error, 'bad_args');
+});
