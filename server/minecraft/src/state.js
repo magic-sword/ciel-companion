@@ -10,8 +10,42 @@ export function isNight(timeOfDay) {
 }
 
 const round = (v) => Math.round(v * 10) / 10;
+const BLOCKS_NEAR = 16;
+const TREE = /_leaves$|_log$|_wood$/;
+const GROUND_SCAN = 40;
 
-export function summarize(bot, doing) {
+// 足元のブロックと、木の上なら地面からの高さ（葉・原木・空気を下へ数える）。木の上でなければ height は null
+export function footing(bot) {
+  if (!bot?.entity) return null;
+  const feet = bot.entity.position.floored();
+  const below = bot.blockAt(feet.offset(0, -1, 0));
+  if (!below) return null;
+  if (!TREE.test(below.name)) return { on: below.name, height: null };
+  let height = 0;
+  for (let dy = 1; dy <= GROUND_SCAN; dy++) {
+    const b = bot.blockAt(feet.offset(0, -dy, 0));
+    if (!b || !(TREE.test(b.name) || b.boundingBox === 'empty')) break;
+    height = dy;
+  }
+  return { on: below.name, height };
+}
+const BLOCKS_COUNT = 256;
+// 「何が見える？」「木を集めて」に答えるための、近くのブロック（原木・鉱石・危ないもの・使えるもの）
+const INTERESTING = /_log$|_ore$|^(lava|crafting_table|chest|furnace|ancient_debris)$/;
+
+// 近くのブロックの種類と数（重いので、呼ぶのは 10 秒に 1 回ほど。main.js）
+export function nearbyBlocks(bot) {
+  if (!bot?.entity) return {};
+  const ids = Object.values(bot.registry.blocksByName).filter((b) => INTERESTING.test(b.name)).map((b) => b.id);
+  const counts = {};
+  for (const p of bot.findBlocks({ matching: ids, maxDistance: BLOCKS_NEAR, count: BLOCKS_COUNT })) {
+    const name = bot.blockAt(p)?.name;
+    if (name) counts[name] = (counts[name] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export function summarize(bot, doing, blocks = {}) {
   if (!bot || !bot.entity) return { connected: false, doing: doing ?? null };
   const me = bot.entity.position;
   const near = Object.values(bot.entities)
@@ -34,6 +68,8 @@ export function summarize(bot, doing) {
     inventory: Object.fromEntries(top),
     players: near.filter(({ e }) => e.type === 'player').map(({ e, distance }) => ({ name: e.username, distance })),
     hostiles: near.filter(({ e }) => e.type === 'hostile').map(({ e, distance }) => ({ name: e.name, distance })),
+    blocks,
+    footing: footing(bot),
     doing: doing ?? null,
   };
 }

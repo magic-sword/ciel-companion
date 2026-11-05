@@ -432,11 +432,13 @@ async def entrypoint(ctx: JobContext) -> None:
             researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
             agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
             learned=learned)
-        # マイクラの体（minecraft.py）。つなぐ先があるときだけ。出来事は、話の切れ目に心が知らせる（why 'game'）
-        body = minecraft.Body(minecraft.URL, voice.say_latest, diary=ciel_diary) if minecraft.URL else None
+        # マイクラの体（minecraft.py）。つなぐ先があり、アプリの設定でオンにしたときだけつなぐ。
+        # 出来事は、話の切れ目に心が知らせる（why 'game'）
+        body = (minecraft.Body(minecraft.URL, voice.say_latest, diary=ciel_diary, board=tasks, notify=notify)
+                if minecraft.URL else None)
         session.userdata.body = body
         if body is not None:
-            body.start()
+            ctx.room.on('data_received', body.on_data)
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
@@ -578,6 +580,9 @@ async def entrypoint(ctx: JobContext) -> None:
         book.notify()
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
+    # マイクラの体へつなげない会話サーバー：アプリがオンにしたら、つなげないと返す（minecraft.py）
+    if session.userdata.body is None:
+        ctx.room.on('data_received', minecraft.refuse(notify))
     # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す
     ctx.room.on('data_received', soundcheck.SoundCheck(agent.aizuchi if AIZUCHI else None, notify).on_data)
     # アプリが部屋に入った直後に送った知らせは、会話サーバーの受け取りの準備ができる前で、届かないことがある

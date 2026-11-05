@@ -20,7 +20,7 @@ import debug_log
 log = logging.getLogger('ciel-agent.mouth')
 
 WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
-       'game')   # comment：配信のコメントへの返事。game：マイクラの出来事の知らせ（minecraft.py）
+       'game')   # comment：配信のコメントへの返事。game：マイクラの出来事・頼まれた技の結果（minecraft.py）
 FREE_POLL = 0.25
 
 
@@ -68,11 +68,16 @@ class Mouth:
             await asyncio.sleep(FREE_POLL)
         return not self.busy()
 
-    def say_latest(self, why: str, *, settle: float = 0.0, wait: float = 30.0, **kwargs) -> None:
+    def say_latest(self, why: str, *, settle: float = 0.0, wait: float = 30.0, merge: bool = False, **kwargs) -> None:
         """知らせを、切れ目を待ってから言う（待ったあとは言う）。待っているあいだに同じ why の知らせが来たら、最新の 1 つだけを言う。
         長い話の途中で議事録を始めて終えたとき、「とり始めた」「まとめて送る」「送った」を話し終わりにまとめて言い、
         返事より後ろに古い知らせが続いた（2026-10-30）"""
         waiting = why in self._latest
+        if merge and waiting and kwargs.get('instructions'):
+            # 待っているあいだに届いた知らせを、1 つにまとめて 1 回で言う（マイクラの「降りられた」と「スケルトンを倒した」を
+            # 別々の知らせにすると、2 回続けて話し、2 回目は古いことを言った。1 つだけ残すと、前の知らせが消えた。2026-11-05）
+            old = self._latest[why].get('instructions', '')
+            kwargs = {**kwargs, 'instructions': '\n'.join(x for x in (old, kwargs['instructions']) if x)}
         self._latest[why] = kwargs
         if not waiting:
             asyncio.create_task(self._say_latest(why, settle, wait))

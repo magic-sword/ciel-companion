@@ -49,3 +49,17 @@ test('チャットはコマンドにしない・改行を消す・長さを切�
   assert.equal(p({ v: 1, type: 'chat', text: 'あ'.repeat(300) }).cmd.text.length, 256);
   assert.equal(p({ v: 1, type: 'chat', text: '   ' }).error, 'bad_args');
 });
+
+test('渡す技の引数', () => {
+  assert.deepEqual(p({ v: 1, type: 'do', id: 7, skill: 'give', args: { item: 'oak_log' } }).cmd.args, { item: 'oak_log' });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 7, skill: 'give', args: { item: 'oak_log', count: 5, player: 'Steve' } }).cmd.args,
+    { player: 'Steve', item: 'oak_log', count: 5 });
+  assert.equal(p({ v: 1, type: 'do', id: 7, skill: 'give', args: {} }).error, 'bad_args');
+  assert.equal(p({ v: 1, type: 'do', id: 7, skill: 'give', args: { item: 'oak_log', count: 0 } }).error, 'bad_args');
+});
+
+test('足元を掘る技の引数', () => {
+  assert.deepEqual(p({ v: 1, type: 'do', id: 8, skill: 'dig_down' }).cmd.args, {});
+  assert.deepEqual(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 3 } }).cmd.args, { depth: 3 });
+  assert.equal(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 100 } }).error, 'bad_args');
+});

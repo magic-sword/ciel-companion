@@ -28,6 +28,35 @@ async def come_here(context: RunContext) -> str:
 
 
 @function_tool
+async def go_to_place(context: RunContext, x: int, z: int) -> str:
+    """マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。"""
+    body = _body(context)
+    return _result(await body.do('go_to', {'x': x, 'z': z}) if body else {'status': 'unavailable'})
+
+
+@function_tool
+async def collect_blocks(context: RunContext, block: str, count: int) -> str:
+    """マイクラで、近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・cobblestone など）、count は 1〜64。"""
+    body = _body(context)
+    return _result(await body.do('collect', {'block': block, 'count': count}) if body else {'status': 'unavailable'})
+
+
+@function_tool
+async def give_item(context: RunContext, item: str, count: int | None = None) -> str:
+    """マイクラで、持ち物を持ち主に渡す（そばへ行って投げる）。item は英語の ID（oak_log など）。count を省けば持っている分すべて。"""
+    body = _body(context)
+    args = {'item': item, **({'count': count} if count is not None else {})}
+    return _result(await body.do('give', args) if body else {'status': 'unavailable'})
+
+
+@function_tool
+async def dig_down(context: RunContext, depth: int | None = None) -> str:
+    """マイクラで、足元を掘って降りる。depth を省けば、木の上から地面まで。葉・原木・土・石など自然のブロックだけ掘る。"""
+    body = _body(context)
+    return _result(await body.do('dig_down', {'depth': depth} if depth is not None else {}) if body else {'status': 'unavailable'})
+
+
+@function_tool
 async def stop_moving(context: RunContext) -> str:
     """マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。"""
     body = _body(context)
@@ -42,8 +71,9 @@ async def look_around(context: RunContext) -> str:
     return _result({'status': 'ok', 'state': text} if text else {'status': 'unavailable'})
 
 
-TOOLS = [follow_me, come_here, stop_moving, look_around]
+TOOLS = [follow_me, come_here, go_to_place, collect_blocks, give_item, dig_down, stop_moving, look_around]
 # 体の道具の名前（mind.py が、体とつながっていないときに外す）
 BODY_TOOLS = tuple(t.id for t in TOOLS)
 # 配信のコメントから使ってよいか（tools/__init__.py）。体を動かすのは持ち主だけ（docs/minecraft-design-ja.md の 6 章）
-FROM_COMMENTS = {follow_me: False, come_here: False, stop_moving: False, look_around: True}
+FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, give_item: False,
+                 dig_down: False, stop_moving: False, look_around: True}

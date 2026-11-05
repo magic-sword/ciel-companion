@@ -89,7 +89,11 @@ export class Guard {
       this._kills += 1;
       this.report('event', { kind: 'defeated', name: was.target.name });
     }
-    const plan = pickThreat(bot, this.owner);
+    // 逃げ始めたら、FLEE_DISTANCE まで離れるまで逃げ続ける。6 ブロックでやめると、クリーパーが近づくたびに
+    // 「逃げる・安全」を何十回も繰り返し、最後は爆発で 13.8 減った（2026-11-05）
+    const fleeing = was?.action === 'flee' && was.target.isValid !== false
+      && was.target.position.distanceTo(bot.entity.position) < FLEE_DISTANCE;
+    const plan = fleeing ? was : pickThreat(bot, this.owner);
     if (!plan) return this._end(true);
     if (!this.active) {
       this.active = true;

@@ -2,7 +2,7 @@
 // タブ：声と会話（シエルの声の大きさ・おしゃべり度・その場にいる人）、背景（CielBackground）、
 // 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、そのほか（PC では声のつなぎ方（ふだん・会議）と
 // マイクとスピーカー（CielConversationUI.Route.cs）、
-// Windows では配信用のウィンドウ（CielStreamWindow）、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
+// Windows では配信用のウィンドウ（CielStreamWindow）、マイクラで一緒に遊ぶ（CielConversation.Game.cs）、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -27,7 +27,8 @@ namespace Ciel.Conversation
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
-        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob;
+        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob, _gameSwitch, _gameKnob;
+        Text _gameNow;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -107,7 +108,7 @@ namespace Ciel.Conversation
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("議事録", BuildMinutesSection),
-                ("そのほか", c => { BuildDevicesSection(c); BuildStreamSection(c); BuildDevSection(c); }),
+                ("そのほか", c => { BuildDevicesSection(c); BuildStreamSection(c); BuildGameSection(c); BuildDevSection(c); }),
             };
             for (int i = 0; i < pages.Length; i++)
             {
@@ -368,6 +369,28 @@ namespace Ciel.Conversation
                 + "OBS のウィンドウキャプチャでこちらを取り込むと、設定・名前・ボタンは映りません。大きさを変えると、その大きさで描きます");
         }
 
+        // マイクラで一緒に遊ぶ（CielConversation.Game.cs。docs/minecraft-design-ja.md）
+        void BuildGameSection(RectTransform content)
+        {
+            var sec = Section(content);
+            SectionLabel(Row(sec, 20), "マイクラ");
+            (_gameSwitch, _gameKnob) = SwitchRow(sec, "マイクラで一緒に遊ぶ", () => _conversation.SetMinecraft(!_conversation.Minecraft));
+            _gameNow = Txt("Now", sec, 12, TextMain, TextAnchor.UpperLeft, true);
+            Note(sec, "自宅サーバーのマイクラの世界にいるシエルの体とつなぎ、声で「ついてきて」「木を集めて」と頼めるようにします。"
+                + "体を動かせるのは、一度に 1 つの会話だけです");
+        }
+
+        static string GameNow(CielConversation c)
+        {
+            if (!c.Minecraft) return "";
+            if (c.Status != CielConversation.State.Connected) return "いまは：つないだら、シエルの体とつなぎます";
+            if (!c.GameKnown) return "いまは：会話サーバーがマイクラに対応していません";
+            if (c.GameLinked) return c.GameInWorld ? "いまは：● シエルはマイクラの中にいます" : "いまは：体とつながりました（マイクラに入るのを待っています）";
+            return c.GameReason == "busy" ? "いまは：ほかの会話がシエルの体を使っています"
+                : c.GameReason == "unavailable" ? "いまは：この会話サーバーはマイクラにつなげません"
+                : "いまは：シエルの体へつないでいます…";
+        }
+
         void BuildDevSection(RectTransform content)
         {
             var sec = Section(content);
@@ -449,6 +472,8 @@ namespace Ciel.Conversation
             if (_exprPanel != null) _exprPanel.SetActive(expr);
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
+            ShowSwitch(_gameSwitch, _gameKnob, c.Minecraft);
+            _gameNow.text = GameNow(c);
             if (_stream != null) ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
             RefreshMinutesDestinations();
         }

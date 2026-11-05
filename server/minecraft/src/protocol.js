@@ -3,9 +3,11 @@
 
 export const VERSION = 1;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;        // マイクラのプレイヤー名
-const BLOCK = /^[a-z0-9_]{1,64}$/;           // ブロックの名前（oak_log など）
+const BLOCK = /^[a-z0-9_]{1,64}$/;           // ブロック・持ち物の名前（oak_log など）
 const CHAT_CHARS = 256;                      // マイクラのチャットの上限
 const COLLECT_MAX = 64;
+const DIG_MAX = 32;
+const GIVE_MAX = 64 * 36;   // 持ち物の欄すべて
 const COORD_MAX = 30_000_000;
 
 // 技と、その引数の確かめ方。返すのは整えた引数か、だめな理由
@@ -29,6 +31,19 @@ export const SKILLS = {
     const count = a.count === undefined ? 1 : a.count;
     if (!Number.isInteger(count) || count < 1 || count > COLLECT_MAX) return { error: 'bad_args' };
     return { args: { block: a.block, count } };
+  },
+  // 足元を掘って降りる。depth を省けば、木の上から地面まで（自然のブロックだけ掘る）
+  dig_down: (a) => {
+    if (a.depth === undefined) return { args: {} };
+    return Number.isInteger(a.depth) && a.depth >= 1 && a.depth <= DIG_MAX ? { args: { depth: a.depth } } : { error: 'bad_args' };
+  },
+  // 持ち物を渡す（そばへ行って投げる）。player を省けば持ち主。count を省けば持っている分すべて
+  give: (a) => {
+    if (typeof a.item !== 'string' || !BLOCK.test(a.item)) return { error: 'bad_args' };
+    if (a.count !== undefined && (!Number.isInteger(a.count) || a.count < 1 || a.count > GIVE_MAX)) return { error: 'bad_args' };
+    const p = player(a);
+    if (p.error) return p;
+    return { args: { ...p.args, item: a.item, ...(a.count !== undefined ? { count: a.count } : {}) } };
   },
 };
 

@@ -18,7 +18,8 @@ def state(**kw):
     s = {'type': 'state', 'connected': True, 'pos': {'x': 1, 'y': 64, 'z': 2}, 'health': 20, 'food': 20,
          'time': 14000, 'night': True, 'raining': False, 'held': 'iron_sword',
          'inventory': {'oak_log': 3, 'iron_sword': 1}, 'players': [{'name': 'Hakase', 'distance': 2.1}],
-         'hostiles': [{'name': 'zombie', 'distance': 6.0}], 'doing': {'id': 1, 'skill': 'follow', 'args': {}}}
+         'hostiles': [{'name': 'zombie', 'distance': 6.0}], 'doing': {'id': 1, 'skill': 'follow', 'args': {}},
+         'blocks': {'oak_log': 12, 'coal_ore': 3}}
     s.update(kw)
     return s
 
@@ -27,7 +28,7 @@ class Said:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, why, *, settle, instructions):
+    def __call__(self, why, *, settle, instructions, merge=False):
         self.calls.append((why, settle, instructions))
 
     def lines(self):
@@ -50,6 +51,7 @@ class BodyTest(unittest.TestCase):
         self.assertIn('夜（敵が出る）', text)
         self.assertIn('Hakase（持ち主） 2.1 ブロック', text)
         self.assertIn('zombie 6.0 ブロック', text)
+        self.assertIn('近くのブロック：oak_log×12、coal_ore×3', text)
 
     def test_context_when_not_linked_or_not_in_the_world(self):
         body = minecraft.Body('ws://test', Said())
@@ -77,8 +79,18 @@ class BodyTest(unittest.TestCase):
         self.assertEqual(said.lines(), ['[マイクラ：4.5 のダメージを受けた（体力 15.5/20）]', '[マイクラ：zombieを倒した]',
                                         '[マイクラ：creeperから逃げている（体力 12/20）]'])
         self.assertTrue(all(why == 'game' for why, _, _ in said.calls))
-        self.assertIn('[マイクラの様子]', said.calls[0][2])   # 知らせには、今の様子も添える
         self.assertEqual(said.calls[0][1], minecraft.URGENT_SETTLE)
+
+    def test_on_a_tree_is_shown_and_said(self):
+        said = Said()
+        body = linked_body(said)
+        body.on_message(json.dumps(state(footing={'on': 'oak_leaves', 'height': 12})))
+        self.assertIn('足元：oak_leaves（木の上。地面から約 12 ブロック', body.context())
+        body.on_message(json.dumps({'v': 1, 'type': 'event', 'kind': 'on_tree', 'on': 'oak_leaves', 'height': 12}))
+        self.assertEqual(said.lines(), ['[マイクラ：木の上にいる（足元：oak_leaves、地面から約 12 ブロック）。ふつうに歩いては降りられない]'])
+        body._asked[5] = '足元を掘って降りる'
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 5, 'ok': True, 'note': {'descended': 12, 'dug': 9}}))
+        self.assertEqual(said.lines()[-1], '[マイクラ：頼まれた「足元を掘って降りる」ができた（12 ブロック降りた）]')
 
     def test_same_kind_is_said_once_in_a_while(self):
         said = Said()
@@ -99,13 +111,92 @@ class BodyTest(unittest.TestCase):
     def test_done_is_said_when_gathered_or_failed(self):
         said = Said()
         body = linked_body(said)
-        body._skills.update({7: 'collect', 8: 'follow', 9: 'come', 10: 'follow'})
+        body._asked.update({7: 'oak_log を 3 個集める', 8: '持ち主についていく', 9: '持ち主のそばへ行く', 10: '持ち主についていく'})
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 7, 'ok': True, 'note': {'gained': {'oak_log': 3}}}))
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 8, 'ok': False, 'reason': 'player_not_visible'}))
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 9, 'ok': True}))   # 着いたのは見えるので言わない
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 10, 'ok': False, 'reason': 'stopped'}))   # 止めた
-        self.assertEqual(said.lines(), ['[マイクラ：頼まれたものを集め終えた（oak_log×3）]',
-                                        '[マイクラ：頼まれた「ついていく」の相手が見えなくなった（遠い・別の場所にいる）]'])
+        self.assertEqual(said.lines(), [
+            '[マイクラ：頼まれた「oak_log を 3 個集める」ができた（oak_log×3）]',
+            '[マイクラ：頼まれた「持ち主についていく」ができなかった。理由：相手が見えない（遠い・別の場所にいる）。'
+            'できたところ：なし。同じ頼みでうまくいかなかったのは 1 回目]'])
+
+    def test_failures_tell_the_reason_the_progress_and_how_many_times(self):
+        said = Said()
+        body = linked_body(said)
+        name = 'oak_log を 10 個集める'
+        body._asked.update({1: name, 2: name, 3: name, 4: name})
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 1, 'ok': True,
+                                    'note': {'gained': {'oak_log': 3}, 'wanted': 10, 'short': 'no_path'}}))
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 2, 'ok': False, 'reason': 'no_path',
+                                    'note': {'gained': {}, 'wanted': 10}}))
+        self.assertEqual(said.lines(), [
+            f'[マイクラ：頼まれた「{name}」は途中まで（できたところ：oak_log×3）。残りの理由：そこまでの道が見つからない'
+            '（遠い・高い・水や崖の向こう）。同じ頼みでうまくいかなかったのは 1 回目]',
+            f'[マイクラ：頼まれた「{name}」ができなかった。理由：そこまでの道が見つからない（遠い・高い・水や崖の向こう）。'
+            'できたところ：なし。同じ頼みでうまくいかなかったのは 2 回目]'])
+        # できたら数え直す。体のエラーは、その中身も添える
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 3, 'ok': True, 'note': {'gained': {'oak_log': 10}}}))
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 4, 'ok': False, 'reason': 'error', 'detail': 'Digging aborted'}))
+        self.assertIn('うまくいかなかった（体のエラー：Digging aborted）', said.lines()[-1])
+        self.assertIn('1 回目', said.lines()[-1])
+
+
+class BoardTest(unittest.IsolatedAsyncioTestCase):
+    async def test_skills_become_cards_and_are_not_taken_twice(self):
+        import board
+        tasks = board.Board()
+        body = minecraft.Body('ws://test', Said(), board=tasks)
+        body.on_message(json.dumps({'v': 1, 'type': 'hello', 'owner': 'Hakase', 'state': state()}))
+        body._ws = FakeWs(body, 'started')
+        self.assertEqual(await body.do('collect', {'block': 'oak_log', 'count': 10}), {'status': 'started'})
+        self.assertEqual(await body.do('collect', {'block': 'oak_log', 'count': 10}), {'status': 'already_doing'})
+        self.assertIn('oak_log を 10 個集める：実行中', tasks.context())
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 1, 'ok': True, 'note': {'gained': {'oak_log': 10}}}))
+        self.assertIn('oak_log を 10 個集める：完了', tasks.context())
+        await body.do('follow')
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 2, 'ok': False, 'reason': 'player_not_visible'}))
+        self.assertIn('持ち主についていく：失敗', tasks.context())
+        self.assertIn('相手が見えない', tasks.context())
+
+
+def packet(on, topic='ciel.game'):
+    return types.SimpleNamespace(topic=topic, data=json.dumps({'v': 1, 'type': 'game.link', 'on': on}).encode('utf-8'))
+
+
+class LinkTest(unittest.IsolatedAsyncioTestCase):
+    async def test_app_switch_links_and_unlinks(self):
+        shown = []
+        body = minecraft.Body('ws://test', Said(), notify=shown.append)
+        with mock.patch.object(minecraft.Body, '_run', new=mock.AsyncMock()):
+            body.on_data(packet(True, topic='ciel.style'))   # ほかの知らせでは動かない
+            self.assertIsNone(body._task)
+            body.on_data(packet(True))
+            self.assertIsNotNone(body._task)
+            self.assertEqual(shown[-1], {'v': 1, 'type': 'game.state', 'linked': False, 'in_world': False, 'reason': 'connecting'})
+            body.on_message(json.dumps({'v': 1, 'type': 'hello', 'owner': 'Hakase', 'state': state()}))
+            self.assertEqual(shown[-1]['linked'], True)
+            self.assertEqual(shown[-1]['in_world'], True)
+            n = len(shown)
+            body.on_message(json.dumps(state()))   # 変わらなければ知らせない
+            self.assertEqual(len(shown), n)
+            body.linked = False
+            await body.close()
+            self.assertEqual(shown[-1]['reason'], 'off')
+
+    async def test_busy_is_shown(self):
+        shown = []
+        body = minecraft.Body('ws://test', Said(), notify=shown.append)
+        body.on_message(json.dumps({'v': 1, 'type': 'busy'}))
+        self.assertEqual(shown[-1]['reason'], 'busy')
+
+    def test_server_without_a_body_refuses(self):
+        shown = []
+        on_data = minecraft.refuse(shown.append)
+        on_data(packet(False))
+        self.assertEqual(shown, [])
+        on_data(packet(True))
+        self.assertEqual(shown[-1]['reason'], 'unavailable')
 
 
 class FakeWs:
@@ -189,8 +280,10 @@ class MindGameTest(unittest.TestCase):
 class ToolTest(unittest.IsolatedAsyncioTestCase):
     async def test_tools_without_a_body_say_unavailable(self):
         ctx = types.SimpleNamespace(userdata=tools.State())
+        args = {'go_to_place': {'x': 1, 'z': 2}, 'collect_blocks': {'block': 'oak_log', 'count': 3},
+                'give_item': {'item': 'oak_log'}}
         for fn in tools.minecraft.TOOLS:
-            result = await fn(ctx)
+            result = await fn(ctx, **args.get(fn.id, {}))
             self.assertEqual(json.loads(result)['status'], 'unavailable', fn.id)
 
 

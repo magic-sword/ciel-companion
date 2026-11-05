@@ -8,10 +8,11 @@ import collectBlock from 'mineflayer-collectblock';
 import { WebSocketServer } from 'ws';
 
 import { message, parseCommand } from './protocol.js';
+import { Care } from './care.js';
 import { Guard } from './guard.js';
 import { carefulMovements } from './movements.js';
 import { Runner } from './skills.js';
-import { isNight, summarize } from './state.js';
+import { footing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
 const MC = {
@@ -26,6 +27,9 @@ const OWNER = env.MC_OWNER || null;
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
 const STATE_EVERY_MS = 2000;
+const BLOCKS_EVERY_MS = 10000;
+const SPAWN_LOOK_MS = 1500;
+const PATH_THINK_MS = 10000;   // 道を決めるのに使ってよい時間（既定の 5 秒では、木の多い森で決めきれなかった）
 const RETRY_MIN_MS = 5000;
 const RETRY_MAX_MS = 60000;
 
@@ -41,6 +45,7 @@ function send(type, fields) {
 
 const guard = new Guard(send, OWNER);
 const runner = new Runner(send, OWNER, guard);
+const care = new Care(send, guard);
 let bot = null;
 
 const wss = new WebSocketServer({ host: BODY_HOST, port: BODY_PORT });
@@ -53,7 +58,7 @@ wss.on('connection', (ws) => {
   }
   link = ws;
   log('会話とつながった');
-  send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: summarize(bot, runner.doing()) });
+  send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
   ws.on('message', (raw) => {
     const r = parseCommand(raw.toString());
     if (r.error) {
@@ -66,7 +71,7 @@ wss.on('connection', (ws) => {
     else if (cmd.type === 'chat') {
       if (bot?.entity) bot.chat(cmd.text);
       else send('error', { reason: 'not_spawned' });
-    } else if (cmd.type === 'state') send('state', summarize(bot, runner.doing()));
+    } else if (cmd.type === 'state') send('state', state());
   });
   ws.on('close', () => {
     if (link !== ws) return;
@@ -78,9 +83,19 @@ wss.on('connection', (ws) => {
 });
 wss.on('listening', () => log(`会話を待つ ws://${BODY_HOST}:${BODY_PORT}`));
 
+let blocks = {};
+const state = () => summarize(bot, runner.doing(), blocks);
 setInterval(() => {
-  if (link) send('state', summarize(bot, runner.doing()));
+  if (link) send('state', state());
 }, STATE_EVERY_MS);
+setInterval(() => {
+  if (!link) return;
+  try {
+    blocks = nearbyBlocks(bot);
+  } catch {
+    blocks = {};
+  }
+}, BLOCKS_EVERY_MS);
 
 // ---- マイクラ ----
 let retry = RETRY_MIN_MS;
@@ -98,9 +113,19 @@ function connect() {
     retry = RETRY_MIN_MS;
     runner.attach(b);
     guard.attach(b);
+    care.attach(b);
     b.pathfinder.setMovements(carefulMovements(b));
+    b.pathfinder.thinkTimeout = PATH_THINK_MS;
     log('入った');
     send('event', { kind: 'spawned' });
+  });
+  // 生き返った場所などが木の上なら知らせる（高い木の上で生き返り、降りられなかった。2026-11-05）。
+  // 降りるか（dig_down）はシエルが決める。足元のまわりを読み込むまで少し待つ
+  b.on('spawn', () => {
+    setTimeout(() => {
+      const f = bot === b ? footing(b) : null;
+      if (f?.height) send('event', { kind: 'on_tree', on: f.on, height: f.height });
+    }, SPAWN_LOOK_MS);
   });
   b.on('health', () => {
     // 体力は少しずつ回復するので、小数のまま比べる。送るのは小数 1 桁まで
@@ -139,6 +164,7 @@ function connect() {
       runner.stop('disconnected');
       runner.attach(null);
       guard.detach();
+      care.detach();
       bot = null;
     }
     send('event', { kind: 'disconnected' });

@@ -76,6 +76,18 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.05)
         self.assertEqual(s.calls, [{'instructions': 'まとめて送る'}, {'instructions': '送った'}])
 
+    async def test_merged_notices_are_said_once_together(self):
+        s = FakeSession()
+        s.user_state = 'speaking'
+        m = mouth.Mouth(s)
+        with mock.patch.object(mouth, 'FREE_POLL', 0.01):
+            m.say_latest('game', instructions='[降りられた]', merge=True)
+            m.say_latest('game', instructions='[スケルトンを倒した]', merge=True)
+            await asyncio.sleep(0.03)
+            s.user_state = 'listening'
+            await asyncio.sleep(0.05)
+        self.assertEqual(s.calls, [{'instructions': '[降りられた]' + chr(10) + '[スケルトンを倒した]'}])
+
     async def test_a_notice_told_in_a_reply_is_not_said_again(self):
         s = FakeSession()
         s.user_state = 'speaking'
