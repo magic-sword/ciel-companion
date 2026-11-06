@@ -5,20 +5,37 @@
 //   minecraft_search：手元に置いた Minecraft Wiki（1.21.11 の時点）を調べる（Wiki を取り出してから足す）
 // - 待ち受けは KNOWLEDGE_HOST（既定 127.0.0.1）だけ。体と同じく host のネットワークで動くので、全部のアドレスで開くと外から見える。
 // - MCP の streamable HTTP を、会話を覚えない形（stateless）で開く。呼ばれるたびに窓口を作って答える。
+import { existsSync } from 'node:fs';
 import http from 'node:http';
+import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 
 import { Facts, KINDS } from './facts.js';
+import { WikiIndex } from './wiki-index.js';
 
 const HOST = process.env.KNOWLEDGE_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.KNOWLEDGE_PORT ?? 8770);
 const VERSION = process.env.MC_VERSION ?? '1.21.11';
 const MAX_BODY = 64 * 1024;
+const DATA = process.env.KNOWLEDGE_DATA ?? '/app/knowledge-data';
+const WIKI = join(DATA, 'wiki.sqlite');
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const facts = new Facts(VERSION);
+// 手元の Wiki（wiki-fetch.js で取り出した物）。まだ無ければ、調べる道具は not_ready を返す。取り出し終えたら窓口を入れ直す
+let wiki = null;
+function openWiki() {
+  if (wiki || !existsSync(WIKI)) return wiki;
+  try {
+    wiki = new WikiIndex(WIKI);
+    log('手元の Wiki を開いた', JSON.stringify(wiki.counts()), JSON.stringify(wiki.meta()));
+  } catch (e) {
+    log('手元の Wiki を開けない', e?.message ?? e);
+  }
+  return wiki;
+}
 
 export function makeServer() {
   const server = new McpServer({ name: 'minecraft-knowledge', version: '1.0.0' });
@@ -36,6 +53,19 @@ export function makeServer() {
   }, async ({ kind, name }) => {
     const r = facts.lookup(kind, name);
     log('facts', kind, name, r.found ? 'found' : 'not_found');
+    return { content: [{ type: 'text', text: JSON.stringify(r) }] };
+  });
+  server.registerTool('minecraft_search', {
+    title: 'マイクラの知識を調べる',
+    description: `手元に置いた Minecraft Wiki（英語、Java ${VERSION} が出たころの版。本文と表）を調べ、合う見出しを 3 つまで返す。`
+      + '世界のどこに何があるか（鉱石の高さ・構造物・バイオーム）・どうすれば手に入るか・仕組み・遊び方を調べるときに使う。'
+      + 'question は英語の短い言葉（例 stone generation height、where to find sand、how to tame a wolf）。'
+      + '正確な数・作り方・要る道具は minecraft_facts のほうが確か。',
+    inputSchema: { question: z.string().min(2).max(200).describe('英語の短い言葉') },
+  }, async ({ question }) => {
+    const w = openWiki();
+    const r = w ? { status: 'ok', results: w.search(question) } : { status: 'not_ready' };
+    log('search', question, r.status, r.results?.length ?? 0);
     return { content: [{ type: 'text', text: JSON.stringify(r) }] };
   });
   return server;

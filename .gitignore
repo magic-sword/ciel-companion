@@ -61,3 +61,5 @@ __pycache__/
 # マイクラの体（server/minecraft）の依存と、マイクラのサーバーの世界
 /server/minecraft/node_modules/
 /server/minecraft/data/
+# 手元に取り出した Minecraft Wiki（CC BY-NC-SA 3.0。docs/game-knowledge-design-ja.md）
+/server/minecraft/knowledge/data/

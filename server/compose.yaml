@@ -156,6 +156,12 @@ services:
       - KNOWLEDGE_HOST=127.0.0.1
       - KNOWLEDGE_PORT=8770
       - MC_VERSION=1.21.11
+      - KNOWLEDGE_DATA=/app/knowledge-data
+    volumes:
+      # 手元に取り出した Minecraft Wiki（src/knowledge/wiki-fetch.js。Git・デプロイの外）。取り出すとき：
+      #   docker compose --env-file .env --env-file .env.minecraft --profile minecraft exec -d minecraft-knowledge
+      #     sh -c 'node src/knowledge/wiki-fetch.js > /app/knowledge-data/fetch.log 2>&1'
+      - ./minecraft/knowledge/data:/app/knowledge-data
     restart: unless-stopped
 
   # 記録の場所（PostgreSQL＋pgvector）。いまは「覚えている人」の名前と声の特徴だけを置く

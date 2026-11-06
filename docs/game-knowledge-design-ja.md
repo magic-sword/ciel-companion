@@ -1,6 +1,6 @@
 # ゲームの知識の窓口（設計）
 
-状態：試作中（2026-11-07）。facts の窓口を作り、開発用の会話サーバーにつないだ（6 章の 1）。Wiki（search）はまだ。前提は [マインクラフトで遊ぶ設計](minecraft-design-ja.md)（体）と [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)（心）。
+状態：試作中（2026-11-07）。facts と search の窓口を作り、開発用の会話サーバーにつないだ（6 章の 1・2）。前提は [マインクラフトで遊ぶ設計](minecraft-design-ja.md)（体）と [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)（心）。
 
 ## 1. 何をするか
 
@@ -118,7 +118,11 @@
    - 部品：`livekit-agents[mcp]` と `mcp==1.30.0`（会話サーバー）、`@modelcontextprotocol/sdk@1.32.2` と `zod@4.6.7`（窓口）。
    - 確かめた：手元で LiveKit の MCP の部品から窓口の道具を受け取り、`stone_pickaxe` の作り方を引けた。自宅サーバーで窓口が 127.0.0.1:8770 だけで開き、開発用の会話サーバーに `mcp` が入った。
    - まだ：声で「丸石は何で取れる？」と聞いて、心が facts を呼ぶかを確かめる。
-2. **Wiki を取り出す**：記事の一覧を作って数え、取り出して整え、索引を作る。「stone generation」「iron ore height」「where to find sand」で、合う見出しが返るかを確かめる。
+2. **Wiki を取り出す**（作った。2026-11-07）：`src/knowledge/wiki-fetch.js`（取り出す）・`wiki-text.js`（HTML を見出しごとのかたまりにする。表は「見出し：値」の行に）・`wiki-index.js`（SQLite の FTS5。node:sqlite）。
+   - 記事の一覧：17 のカテゴリ（Blocks・Items・Mobs・Biomes・Generated structures・Gameplay・Tutorials など）から 2 段下まで。2,548 記事から、スキンパック・LEGO・映画・予告編・データの形式などを外して約 2,400 記事。
+   - 置き場：自宅サーバーの `server/minecraft/knowledge/data/wiki.sqlite`（コンテナの `/app/knowledge-data`。Git・デプロイ・イメージの外）。取り出しの記録は同じ場所の `fetch.log`。
+   - 手元の Node（22.14）の SQLite には FTS5 が無いので、索引の試験はコンテナ（Node 22.23）の中で回す。
+   - 気づいたこと：2025-12 の版でも、次の版で足される物への言及が少し混ざる（鉄の鉱石の表に「Sulfur cube archetype」）。版の日付で切っても、Wiki が先に書いた予告は残る。
 3. **search をつなぐ**：プロンプトの 1 行を足し、「石のツルハシを作って」で、心が「土の下に石がある」を調べてから動くかを確かめる（体の「掘り下げる」技は、[マインクラフトで遊ぶ設計](minecraft-design-ja.md) の別の直しとして足す）。
 4. 次のゲームを足すときは、そのゲームの窓口を 3.1 の決まりで作り、`CIEL_GAME_KNOWLEDGE` に 1 つ足す。
 

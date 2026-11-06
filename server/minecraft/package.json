@@ -12,6 +12,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "canvas": "3.2.2",
+    "cheerio": "1.2.0",
     "mineflayer": "4.39.0",
     "mineflayer-collectblock": "1.6.0",
     "mineflayer-pathfinder": "2.4.5",
