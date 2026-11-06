@@ -32,6 +32,7 @@ services:
       - CIEL_MEMORY_SCOPE=dev
       # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。本番より先に、開発用だけでつなぐ
       - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
+      - CIEL_GAME_KNOWLEDGE=minecraft=http://127.0.0.1:8770/mcp
       # 本番の Webhook を使わないように、必ずここで上書きする
       - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
     volumes:

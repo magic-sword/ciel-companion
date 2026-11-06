@@ -46,6 +46,7 @@ import initiative
 import interruptions
 import listener
 import irodori_tts
+import game_knowledge
 import mind
 import minecraft
 import minutes
@@ -184,7 +185,9 @@ class Ciel(Agent):
         self.persona = persona
         self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
-        super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS)
+        # ゲームの知識の窓口（game_knowledge.py。MCP）の道具は、LiveKit が窓口から受け取って足す。渡すかは心が決める（mind.py）
+        super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS,
+                         mcp_servers=game_knowledge.servers() or None)
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）

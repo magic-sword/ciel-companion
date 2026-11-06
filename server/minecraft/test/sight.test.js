@@ -5,7 +5,8 @@ import { Vec3 } from 'vec3';
 
 import { blocksFor } from '../src/names.js';
 import { canSee, known, knows, notices, rememberAround } from '../src/sight.js';
-import { harvestable, missing, weakestTool } from '../src/skills.js';
+import { harvestable, weakestTool } from '../src/skills.js';
+import { planCraft } from '../src/craft-plan.js';
 import { nearbyBlocks } from '../src/state.js';
 
 const require = createRequire(import.meta.url);
@@ -107,10 +108,7 @@ test('掘る道具と、作る材料', () => {
   const pick = registry.itemsByName.wooden_pickaxe.id;
   bot.inventory.items = () => [{ name: 'wooden_pickaxe', type: pick, count: 1 }];
   assert.equal(harvestable(bot, registry.blocksByName.stone), true);
-  // 足りない材料（板 3 枚と棒 2 本の作り方）
-  const planks = registry.itemsByName.oak_planks.id, stick = registry.itemsByName.stick.id;
-  bot.inventory.items = () => [{ name: 'stick', type: stick, count: 2 }, { name: 'oak_planks', type: planks, count: 1 }];
-  assert.deepEqual(missing(bot, [{ delta: [{ id: planks, count: -3 }, { id: stick, count: -2 }, { id: pick, count: 1 }] }]), { oak_planks: 2 });
+
 });
 
 test('ふだんの歩き方：自然のブロックだけ壊し、手持ちの土・丸石を積み、4 段まで飛び降りる', async () => {
@@ -195,4 +193,32 @@ test('掘ったあと、まわりに落ちた物を拾いに行く（真ん中�
   assert.equal(went.length, 1);
   assert.ok(bot.entities[8]);
   assert.equal(bot.entities[7], undefined);
+});
+
+test('ツルハシを作る手順：原木から板・棒・作業台を先に作り、足りなければ原木の数で返す', () => {
+  const { Recipe } = require('prismarine-recipe')(registry);
+  const recipes = (id) => Recipe.find(id, null);
+  const steps = (p) => p.steps.map((s) => `${s.name}×${s.times}`);
+  // 原木 3 本・作業台なし：板 3 回（12 枚）→ 作業台 → 棒 → ツルハシ
+  let p = planCraft(registry, recipes, 'wooden_pickaxe', 1, { oak_log: 3 }, false);
+  assert.deepEqual(p.missing, {});
+  assert.equal(p.steps.at(-1).name, 'wooden_pickaxe');
+  assert.ok(steps(p).includes('crafting_table×1'));
+  assert.ok(p.steps.every((s) => !/^(cherry|acacia|birch)_/.test(s.name)));
+  // 近くに作業台があれば、原木 2 本で足りる
+  p = planCraft(registry, recipes, 'wooden_pickaxe', 1, { oak_log: 2 }, true);
+  assert.deepEqual(p.missing, {});
+  assert.ok(!steps(p).includes('crafting_table×1'));
+  // 何も無ければ、オークの原木の数で返す（持っていない桜の板とは言わない）
+  p = planCraft(registry, recipes, 'wooden_pickaxe', 1, {}, true);
+  assert.deepEqual(p.missing, { oak_log: 2 });
+  // 白樺の原木を持っていれば、白樺の板で作る
+  p = planCraft(registry, recipes, 'wooden_pickaxe', 1, { birch_log: 2 }, true);
+  assert.deepEqual(p.missing, {});
+  assert.ok(steps(p).some((s) => s.startsWith('birch_planks')));
+  // 石のツルハシ：丸石は作らず、集める物として返す
+  p = planCraft(registry, recipes, 'stone_pickaxe', 1, { oak_log: 1 }, true);
+  assert.deepEqual(p.missing, { cobblestone: 3 });
+  // 作り方の無い物
+  assert.equal(planCraft(registry, recipes, 'oak_log', 1, {}, true).cannot, true);
 });

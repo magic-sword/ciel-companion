@@ -28,6 +28,7 @@ import clock
 import debug_log
 import models
 import tools as toolbox
+import game_knowledge
 from tools.minecraft import BODY_TOOLS
 from jst import JST
 from summaries import live
@@ -158,6 +159,9 @@ class Mind:
         # マイクラの体とつながっていなければ、体の道具は渡さない
         if not self._body_linked():
             tools = [t for t in tools if getattr(t, 'id', None) not in BODY_TOOLS]
+        # ゲームの知識の窓口の道具（game_knowledge.py）は、そのゲームで遊んでいる間だけ
+        playing = {'minecraft': self._body_linked()}
+        tools = [t for t in tools if (g := game_knowledge.game_of(t)) is None or playing.get(g, False)]
         # 配信のコメントへの返事では、コメントから使ってよい道具だけ（tools/ の FROM_COMMENTS）
         return toolbox.for_comments(tools) if self.from_comment else tools
 

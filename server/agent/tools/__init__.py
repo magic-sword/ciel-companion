@@ -10,6 +10,7 @@
 """
 from dataclasses import dataclass
 
+import game_knowledge
 from speakers import SpeakerBook
 
 
@@ -41,7 +42,7 @@ MODULES = (people, memory, minutes, conversation, research, thoughts, clock, sin
 TOOLS = [t for m in MODULES for t in m.TOOLS]
 # 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
 # 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。
-# ここに無い道具（MCP など）は、コメントからは使わない
+# ここに無い道具は、コメントからは使わない。ただしゲームの知識の窓口（MCP。game_knowledge.py）の道具は、読むだけなので使ってよい
 FROM_COMMENTS = {t.id: ok for m in MODULES for t, ok in m.FROM_COMMENTS.items()}
 _undecided = [t.id for t in TOOLS if t.id not in FROM_COMMENTS]
 if _undecided:
@@ -50,4 +51,4 @@ if _undecided:
 
 def for_comments(tools: list) -> list:
     """コメントからの返事に渡してよい道具だけにする"""
-    return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False)]
+    return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False) or game_knowledge.game_of(t) is not None]

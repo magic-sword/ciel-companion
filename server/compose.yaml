@@ -24,6 +24,7 @@ services:
       - CIEL_MODEL=pipeline
       # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけがつなぐ
       - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
+      - CIEL_GAME_KNOWLEDGE=minecraft=http://127.0.0.1:8770/mcp   # ゲームの知識の窓口（docs/game-knowledge-design-ja.md）
       # 覚えている人の記録（speaker_store.py）。開発用も同じ DB を使い、印（main・dev）で分ける（docs/shared-memory-ja.md）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=main
@@ -139,6 +140,22 @@ services:
       - EYE_PORT=3007                   # 目（src/eye.js）の視点のページ。BODY_HOST（このマシンの中）だけで開く
     depends_on:
       - minecraft
+    restart: unless-stopped
+
+  # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/game-knowledge-design-ja.md）。体と同じイメージで、別のコンテナ。
+  # 会話サーバーは CIEL_GAME_KNOWLEDGE で http://127.0.0.1:8770/mcp へつなぐ。このマシンの中だけで開く
+  minecraft-knowledge:
+    profiles: [minecraft]
+    build:
+      context: ./minecraft
+      network: host
+    image: ciel-minecraft-body
+    network_mode: host
+    command: ["node", "src/knowledge/main.js"]
+    environment:
+      - KNOWLEDGE_HOST=127.0.0.1
+      - KNOWLEDGE_PORT=8770
+      - MC_VERSION=1.21.11
     restart: unless-stopped
 
   # 記録の場所（PostgreSQL＋pgvector）。いまは「覚えている人」の名前と声の特徴だけを置く

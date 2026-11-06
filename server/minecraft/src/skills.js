@@ -5,6 +5,7 @@ import pathfinderPkg from 'mineflayer-pathfinder';
 import { Vec3 } from 'vec3';
 
 import { guarded } from './guard.js';
+import { planCraft } from './craft-plan.js';
 import { blocksFor } from './names.js';
 import { knows, rememberAround } from './sight.js';
 import { footing } from './state.js';
@@ -36,7 +37,8 @@ const SCAFFOLD_SOURCES = ['dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt', '
 const DIG_LIMIT = 48;       // 足元を掘って降りるとき、掘るのはここまで
 const DANGER = /^(lava|water)$/;
 const TABLE_SEARCH = 32;    // 作業台を探す距離
-const TABLE_RANGE = 2;      // 作業台を使うときに近づく距離
+const TABLE_RANGE = 2;
+const CRAFT_SETTLE_TICKS = 4;      // 作業台を使うときに近づく距離
 // 掘る道具の段（弱い順）。要る道具を言うとき、いちばん弱いものを言う
 const TOOL_TIERS = ['wooden', 'golden', 'stone', 'copper', 'iron', 'diamond', 'netherite'];
 
@@ -412,35 +414,35 @@ const SKILL_RUN = {
     return note;
   },
 
-  // 持ち物から物を作る（板・棒・作業台・ツルハシなど）。作業台が要るものは、近くの作業台を使い、無ければ持っている作業台を置く。
-  // 材料が足りなければ、足りない物を返す（何を先に作る・集めるかは心が決める）
+  // 持ち物から物を作る（板・棒・作業台・ツルハシなど）。途中の物（板・棒・作業台）が足りなければ、持っている原木から先に作る。
+  // 作業台が要るものは、近くの作業台を使い、無ければ作って置く。それでも足りなければ、元の材料（原木など）で足りない物を返す。
+  // 1 段しか作れず、原木だけ持っていて「板と棒が足りない」で終わり、心が次の手順を呼ばずに止まった（2026-11-07）
   async craft(bot, args, token, { guard }) {
-    const item = bot.registry.itemsByName[args.item];
     const before = counts(bot);
+    const knownTable = bot.findBlocks({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: TABLE_SEARCH, count: 8 })
+      .some((p) => knows(bot, p));
+    const plan = planCraft(bot.registry, (id) => bot.recipesAll(id, null, true), args.item, args.count, counts(bot),
+      knownTable || (before.crafting_table ?? 0) > 0);
+    if (plan.cannot) throw new Failed('cannot_craft');
+    if (Object.keys(plan.missing).length) {
+      throw new Failed(plan.needsTable ? 'no_table' : 'missing_materials', { needs: plan.missing, steps: plan.steps.map((st) => st.name) });
+    }
     let table = null;
-    let recipe = bot.recipesFor(item.id, null, 1, null)[0];
-    if (!recipe) {
-      const all = bot.recipesAll(item.id, null, true);
-      if (!all.length) throw new Failed('cannot_craft');
-      const needsTable = all.every((r) => r.requiresTable);
-      if (needsTable) {
+    for (const step of plan.steps) {
+      if (token.cancelled) break;
+      if (step.recipe.requiresTable && !table) {
         table = await findTable(bot, guard, token);
-        if (token.cancelled) return undefined;
-        recipe = table ? bot.recipesFor(item.id, null, 1, table)[0] : null;
+        if (token.cancelled) break;
+        if (!table) throw new Failed('no_table');
       }
-      if (!recipe) throw new Failed(needsTable && !table ? 'no_table' : 'missing_materials', { needs: missing(bot, all) });
+      await bot.craft(step.recipe, step.times, step.recipe.requiresTable ? table : undefined);
+      await bot.waitForTicks(CRAFT_SETTLE_TICKS);   // 持ち物の更新を待つ（作ってすぐの作業台が、まだ持ち物に見えなかった）
     }
-    const made = () => (counts(bot)[args.item] ?? 0) - (before[args.item] ?? 0);
-    while (!token.cancelled && made() < args.count && recipe) {
-      await bot.craft(recipe, 1, table ?? undefined);
-      recipe = bot.recipesFor(item.id, null, 1, table)[0];
-    }
-    const note = { gained: made() > 0 ? { [args.item]: made() } : {}, wanted: args.count };
-    if (!token.cancelled && made() < args.count) {
-      const needs = missing(bot, bot.recipesAll(item.id, null, table ?? true));
-      if (made() === 0) throw new Failed('missing_materials', { ...note, needs });
+    const made = (counts(bot)[args.item] ?? 0) - (before[args.item] ?? 0);
+    const note = { gained: made > 0 ? { [args.item]: made } : {}, wanted: args.count };
+    if (!token.cancelled && made < args.count) {
+      if (made <= 0) throw new Failed('missing_materials', note);
       note.short = 'missing_materials';
-      note.needs = needs;
     }
     return note;
   },
@@ -503,24 +505,6 @@ export function weakestTool(bot, blocks) {
   return tools.sort((a, b) => tier(a) - tier(b))[0] ?? null;
 }
 
-// 材料のいちばん少なく足りない作り方で、足りない物と数
-export function missing(bot, recipes) {
-  const have = counts(bot);
-  let best = null;
-  for (const r of recipes) {
-    const need = {};
-    for (const d of r.delta ?? []) {
-      if (d.count >= 0) continue;
-      const name = bot.registry.items[d.id]?.name;
-      if (!name) continue;
-      const short = -d.count - (have[name] ?? 0);
-      if (short > 0) need[name] = (need[name] ?? 0) + short;
-    }
-    if (!best || total(need) < total(best)) best = need;
-  }
-  return best ?? {};
-}
-
 // 近くの作業台（見て知っているもの）。無ければ、持っている作業台を足元のそばに置く。どちらも無ければ null
 async function findTable(bot, guard, token) {
   const id = bot.registry.blocksByName.crafting_table.id;
@@ -532,7 +516,11 @@ async function findTable(bot, guard, token) {
 }
 
 async function placeTable(bot) {
-  const item = bot.inventory.items().find((i) => i.name === 'crafting_table');
+  let item = null;
+  for (let i = 0; i < 20 && !item; i++) {
+    item = bot.inventory.items().find((it) => it.name === 'crafting_table');
+    if (!item) await bot.waitForTicks(1);
+  }
   if (!item) return null;
   const feet = bot.entity.position.floored();
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {

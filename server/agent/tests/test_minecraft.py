@@ -90,7 +90,7 @@ class BodyTest(unittest.TestCase):
         self.assertEqual(said.lines(), ['[マイクラ：木の上にいる（足元：oak_leaves、地面から約 12 ブロック）。ふつうに歩いては降りられない]'])
         body._asked[5] = '足元を掘って降りる'
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 5, 'ok': True, 'note': {'descended': 12, 'dug': 9}}))
-        self.assertEqual(said.lines()[-1], '[マイクラ：頼まれた「足元を掘って降りる」ができた（12 ブロック降りた）]')
+        self.assertEqual(said.lines()[-1], '[マイクラ：頼まれた「足元を掘って降りる」ができた（12 ブロック降りた）。目的の途中なら、次の段の道具を呼んで続ける]')
 
     def test_same_kind_is_said_once_in_a_while(self):
         said = Said()
@@ -117,7 +117,7 @@ class BodyTest(unittest.TestCase):
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 9, 'ok': True}))   # 着いたのは見えるので言わない
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 10, 'ok': False, 'reason': 'stopped'}))   # 止めた
         self.assertEqual(said.lines(), [
-            '[マイクラ：頼まれた「oak_log を 3 個集める」ができた（oak_log×3）]',
+            '[マイクラ：頼まれた「oak_log を 3 個集める」ができた（oak_log×3）。目的の途中なら、次の段の道具を呼んで続ける]',
             '[マイクラ：頼まれた「持ち主についていく」ができなかった。理由：相手が見えない（遠い・別の場所にいる）。'
             'できたところ：なし。同じ頼みでうまくいかなかったのは 1 回目]'])
 

@@ -367,7 +367,9 @@ class Body:
         if m.get('ok') and not note.get('short'):
             self._fails.pop(name, None)
             if got:   # 集め終えた。そばへ行く・場所へ行くは、着いたのが見えるので言わない
-                self._tell('done', f'[マイクラ：頼まれた「{name}」ができた（{got}）]', SETTLE, limit=False)
+                # 目的の途中（原木を集めた → ツルハシを作る）なら、心が次の段を呼ぶ。言うだけで止まった（2026-11-07）
+                self._tell('done', f'[マイクラ：頼まれた「{name}」ができた（{got}）。目的の途中なら、次の段の道具を呼んで続ける]',
+                           SETTLE, limit=False)
             return
         if not m.get('ok') and (reason in QUIET_REASONS or reason == 'died'):   # 倒れたことは died の出来事で言う
             return
