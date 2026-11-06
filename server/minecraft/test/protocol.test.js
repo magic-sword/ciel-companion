@@ -62,7 +62,7 @@ test('渡す技の引数', () => {
 });
 
 test('足元を掘る技の引数', () => {
-  assert.deepEqual(p({ v: 1, type: 'do', id: 8, skill: 'dig_down' }).cmd.args, {});
+  assert.equal(p({ v: 1, type: 'do', id: 8, skill: 'dig_down' }).error, 'bad_args');   // 深さは要る
   assert.deepEqual(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 3 } }).cmd.args, { depth: 3 });
   assert.equal(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 100 } }).error, 'bad_args');
 });

@@ -87,7 +87,7 @@ def title(skill: str, args: dict) -> str:
     if skill == 'collect':
         return f"{args.get('block')} を {args.get('count', 1)} 個集める"
     if skill == 'dig_down':
-        return f"足元を {args['depth']} ブロック掘る" if 'depth' in args else '足元を掘って降りる'
+        return f"足元を {args.get('depth')} ブロック掘る"
     if skill == 'craft':
         return f"{args.get('item')} を {args.get('count', 1)} 個作る"
     if skill == 'give':
@@ -340,9 +340,7 @@ class Body:
         near += [f"{h['name']} {h['distance']} ブロック" for h in s.get('hostiles') or []]
         lines = ['[マイクラの様子]', 'シエル：' + '・'.join(me), f'時刻：{when}', '近く：' + ('、'.join(near) if near else 'だれもいない')]
         foot = s.get('footing') or {}
-        if foot.get('height'):
-            lines.append(f"足元：{foot.get('on')}（木の上。地面から約 {foot['height']} ブロック。ふつうに歩いては降りられない）")
-        elif foot.get('on'):
+        if foot.get('on'):
             lines.append(f"足元：{foot['on']}")
         blocks = sorted((s.get('blocks') or {}).items(), key=lambda kv: -kv[1])[:BLOCKS_SHOWN]
         if blocks:
@@ -411,9 +409,6 @@ class Body:
             amount, health = m.get('amount') or 0, m.get('health') or 0
             if amount >= BIG_HURT or (health <= LOW_HEALTH and amount > 0):
                 self._tell(kind, f'[マイクラ：{amount} のダメージを受けた（体力 {health}/20）]', URGENT_SETTLE)
-        elif kind == 'on_tree':
-            self._tell(kind, f"[マイクラ：木の上にいる（足元：{m.get('on')}、地面から約 {m.get('height')} ブロック）。"
-                             'ふつうに歩いては降りられない]', SETTLE)
         elif kind == 'defeated':
             self._remember(f"マイクラで {m.get('name')} を倒した")
             self._tell(kind, f"[マイクラ：{m.get('name')}を倒した]", SETTLE)

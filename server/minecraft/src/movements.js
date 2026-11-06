@@ -15,8 +15,6 @@ export function carefulMovements(bot) {
 
 // 掘ってよい、自然のブロック（葉・原木・土・砂・石など）。板・ガラス・レンガなど、建物に使われやすいものは入れない
 export const NATURAL = /_leaves$|_log$|_wood$|^(dirt|grass_block|coarse_dirt|podzol|rooted_dirt|mycelium|sand|red_sand|gravel|snow|snow_block|vine|short_grass|tall_grass|fern|large_fern|moss_block|moss_carpet|mud|clay|stone|deepslate|andesite|diorite|granite|tuff|netherrack|azalea|flowering_azalea|mangrove_roots)$/;
-// 木の上にいるかを見るブロック
-export const TREE = /_leaves$|_log$|_wood$/;
 
 const ESCAPE_DROP_MAX = 12;   // 体力が十分なら、ここまで飛び降りる（ダメージ 9）
 const KEEP_HEALTH = 8;        // 飛び降りたあとに残す体力（20 まで）

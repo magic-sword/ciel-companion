@@ -14,23 +14,11 @@ export function isNight(timeOfDay) {
 
 const round = (v) => Math.round(v * 10) / 10;
 const BLOCKS_NEAR = 16;
-const TREE = /_leaves$|_log$|_wood$/;
-const GROUND_SCAN = 40;
-
-// 足元のブロックと、木の上なら地面からの高さ（葉・原木・空気を下へ数える）。木の上でなければ height は null
+// 足元のブロック（立っているブロックの名前）。木の上かどうかのような決まった場面の判断はしない（心が様子を見て決める。2026-11-07）
 export function footing(bot) {
   if (!bot?.entity) return null;
-  const feet = bot.entity.position.floored();
-  const below = bot.blockAt(feet.offset(0, -1, 0));
-  if (!below) return null;
-  if (!TREE.test(below.name)) return { on: below.name, height: null };
-  let height = 0;
-  for (let dy = 1; dy <= GROUND_SCAN; dy++) {
-    const b = bot.blockAt(feet.offset(0, -dy, 0));
-    if (!b || !(TREE.test(b.name) || b.boundingBox === 'empty')) break;
-    height = dy;
-  }
-  return { on: below.name, height };
+  const below = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0));
+  return below ? { on: below.name } : null;
 }
 // 向いている方角（マイクラの yaw：0 が北、北から西へ回る。mineflayer の yaw はラジアン）
 const DIRECTIONS = ['north', 'northwest', 'west', 'southwest', 'south', 'southeast', 'east', 'northeast'];

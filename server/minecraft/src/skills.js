@@ -8,8 +8,7 @@ import { guarded } from './guard.js';
 import { planCraft } from './craft-plan.js';
 import { blocksFor } from './names.js';
 import { knows, rememberAround } from './sight.js';
-import { footing } from './state.js';
-import { escapeMovements, NATURAL, playerMovements, SCAFFOLD, TREE } from './movements.js';
+import { escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
 
 const { goals } = pathfinderPkg;
 const FOLLOW_RANGE = 2;     // ついていくときに空ける距離
@@ -27,7 +26,7 @@ const PICKUP_WAIT_MS = 1500;  // そばへ行ってから、拾えるまで待�
 const GROUND_WAIT_MS = 2000; // 掘る前に、足が地面に着くのを待つ上限
 const SLOW_DIG_MS = 5000;    // これより時間のかかる掘り方は、ログに残す     // 動いたとみなす距離（ブロック）
 const STUCK_MS = 8000;      // ついていくとき、離れたまま、これだけ近づけず、その場から動けなければ、詰まったとみなす
-const STUCK_MOVE = 4;       // その場から動いたとみなす距離（ブロック。木の上で旋回しても、ここまでは動く）
+const STUCK_MOVE = 4;       // その場から動いたとみなす距離（ブロック。その場で旋回しても、ここまでは動く）
 const CLOSER = 1;           // 近づいたとみなす距離（ブロック）
 const SCAFFOLD_WANT = 4;    // 足場が無いとき、集める数
 const SCAFFOLD_SEARCH = 8;  // 足場にするブロックを探す距離
@@ -290,7 +289,7 @@ const SKILL_RUN = {
     follow();
     // 止めるまで続く。相手が見えなくなったら終える。守り終えたら、またついていく。
     // 離れたまま近づけず、その場から動けない（旋回している）なら詰まり：1 度目は足場を集めて、高い段差も飛び降りる
-    // 歩き方に替える。それでも詰まれば、道が無いとして終え、心に返す（木の上なら dig_down などを心が選ぶ）
+    // 歩き方に替える。それでも詰まれば、道が無いとして終え、心に返す（どうするかは心が様子を見て決める）
     let generation = guard?.generation;
     let tries = 0;
     const reset = () => ({ at: Date.now(), pos: bot.entity.position.clone(), best: target.position.distanceTo(bot.entity.position) });
@@ -317,15 +316,11 @@ const SKILL_RUN = {
       } else if (distance < mark.best - CLOSER || bot.entity.position.distanceTo(mark.pos) > STUCK_MOVE) {
         mark = reset();   // 近づいている・その場を離れて動いている（相手が走って離れていくときも）
       } else if (Date.now() - mark.at > STUCK_MS) {
-        // 1 度目：足場を集め、高めの段差も飛び降りる。2 度目：木の上なら足元を掘って降りる。それでもだめなら終える
-        const onTree = footing(bot)?.height;
-        if (tries >= 2 || (tries === 1 && !onTree)) throw new Failed('no_path', { stuck: true, distance: Math.round(distance) });
+        // 1 度目：足場を集め、高めの段差も飛び降りる。それでもだめなら終える
+        if (tries >= 1) throw new Failed('no_path', { stuck: true, distance: Math.round(distance) });
         tries += 1;
         bot.pathfinder.setGoal(null);
-        if (tries === 1) await gatherScaffold(bot, guard, token);
-        else await descend(bot, undefined, token, guard).catch((err) => {
-          if (!(err instanceof Failed)) throw err;
-        });
+        await gatherScaffold(bot, guard, token);
         if (token.cancelled) break;
         follow(escapeMovements);
         mark = reset();
@@ -351,7 +346,7 @@ const SKILL_RUN = {
     });
   },
 
-  // 足元を掘って降りる。depth を省けば、木の上から地面まで。自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
+  // 足元を depth ブロック掘って降りる。自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
   async dig_down(bot, args, token, { guard }) {
     return descend(bot, args.depth, token, guard);
   },
@@ -449,12 +444,12 @@ const SKILL_RUN = {
 };
 
 
-// 足元を掘って降りる（技 dig_down と、木の上でついていけないとき）。depth を省けば、木の上から地面まで。
+// 足元を depth ブロック掘って降りる（技 dig_down）。
 // 自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
 async function descend(bot, depth, token, guard) {
   const startY = bot.entity.position.y;
   let dug = 0;
-  for (let i = 0; i < (depth ?? DIG_LIMIT) && !token.cancelled; i++) {
+  for (let i = 0; i < Math.min(depth, DIG_LIMIT) && !token.cancelled; i++) {
     if (guard?.active) await guard.idle();
     if (token.cancelled) break;
     const feet = bot.entity.position.floored();
@@ -464,7 +459,6 @@ async function descend(bot, depth, token, guard) {
       await bot.waitForTicks(5);
       continue;
     }
-    if (depth === undefined && !TREE.test(below.name)) break;   // 地面に着いた
     if (!NATURAL.test(below.name) || !bot.canDigBlock(below)) {
       throw new Failed('cannot_dig', { descended: Math.round(startY - bot.entity.position.y), dug, blocked_by: below.name });
     }

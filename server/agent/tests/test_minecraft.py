@@ -81,16 +81,18 @@ class BodyTest(unittest.TestCase):
         self.assertTrue(all(why == 'game' for why, _, _ in said.calls))
         self.assertEqual(said.calls[0][1], minecraft.URGENT_SETTLE)
 
-    def test_on_a_tree_is_shown_and_said(self):
+    def test_footing_is_just_the_block_and_digging_down_is_told(self):
         said = Said()
         body = linked_body(said)
-        body.on_message(json.dumps(state(footing={'on': 'oak_leaves', 'height': 12})))
-        self.assertIn('足元：oak_leaves（木の上。地面から約 12 ブロック', body.context())
+        body.on_message(json.dumps(state(footing={'on': 'oak_leaves'})))
+        self.assertIn('足元：oak_leaves', body.context())
+        self.assertNotIn('木の上', body.context())   # 決まった場面の判断はしない（心が様子を見て決める）
         body.on_message(json.dumps({'v': 1, 'type': 'event', 'kind': 'on_tree', 'on': 'oak_leaves', 'height': 12}))
-        self.assertEqual(said.lines(), ['[マイクラ：木の上にいる（足元：oak_leaves、地面から約 12 ブロック）。ふつうに歩いては降りられない]'])
-        body._asked[5] = '足元を掘って降りる'
+        self.assertEqual(said.lines(), [])
+        self.assertEqual(minecraft.title('dig_down', {'depth': 12}), '足元を 12 ブロック掘る')
+        body._asked[5] = '足元を 12 ブロック掘る'
         body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 5, 'ok': True, 'note': {'descended': 12, 'dug': 9}}))
-        self.assertEqual(said.lines()[-1], '[マイクラ：頼まれた「足元を掘って降りる」ができた（12 ブロック降りた）。目的の途中なら、次の段の道具を呼んで続ける]')
+        self.assertEqual(said.lines()[-1], '[マイクラ：頼まれた「足元を 12 ブロック掘る」ができた（12 ブロック降りた）。目的の途中なら、次の段の道具を呼んで続ける]')
 
     def test_same_kind_is_said_once_in_a_while(self):
         said = Said()
@@ -345,7 +347,7 @@ class ToolTest(unittest.IsolatedAsyncioTestCase):
     async def test_tools_without_a_body_say_unavailable(self):
         ctx = types.SimpleNamespace(userdata=tools.State())
         args = {'go_to_place': {'x': 1, 'z': 2}, 'collect_blocks': {'block': 'oak_log', 'count': 3},
-                'craft_item': {'item': 'stick'},
+                'craft_item': {'item': 'stick'}, 'dig_down': {'depth': 3},
                 'give_item': {'item': 'oak_log'}}
         for fn in tools.minecraft.TOOLS:
             result = await fn(ctx, **args.get(fn.id, {}))

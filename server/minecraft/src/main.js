@@ -13,7 +13,7 @@ import { Eye } from './eye.js';
 import { Guard } from './guard.js';
 import { carefulMovements } from './movements.js';
 import { Runner } from './skills.js';
-import { facing, footing, isNight, nearbyBlocks, summarize } from './state.js';
+import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
 const MC = {
@@ -30,7 +30,6 @@ const BODY_PORT = Number(env.BODY_PORT ?? 8768);
 const EYE_PORT = Number(env.EYE_PORT ?? 3007);   // 目（eye.js）の視点のページ。BODY_HOST だけで開く
 const STATE_EVERY_MS = 2000;
 const BLOCKS_EVERY_MS = 10000;
-const SPAWN_LOOK_MS = 1500;
 const PATH_THINK_MS = 10000;   // 道を決めるのに使ってよい時間（既定の 5 秒では、木の多い森で決めきれなかった）
 const RETRY_MIN_MS = 5000;
 const RETRY_MAX_MS = 60000;
@@ -135,14 +134,6 @@ function connect() {
     b.pathfinder.thinkTimeout = PATH_THINK_MS;
     log('入った');
     send('event', { kind: 'spawned' });
-  });
-  // 生き返った場所などが木の上なら知らせる（高い木の上で生き返り、降りられなかった。2026-11-05）。
-  // 降りるか（dig_down）はシエルが決める。足元のまわりを読み込むまで少し待つ
-  b.on('spawn', () => {
-    setTimeout(() => {
-      const f = bot === b ? footing(b) : null;
-      if (f?.height) send('event', { kind: 'on_tree', on: f.on, height: f.height });
-    }, SPAWN_LOOK_MS);
   });
   b.on('health', () => {
     // 体力は少しずつ回復するので、小数のまま比べる。送るのは小数 1 桁まで

@@ -59,10 +59,10 @@ async def give_item(context: RunContext, item: str, count: int | None = None) ->
 
 
 @function_tool
-async def dig_down(context: RunContext, depth: int | None = None) -> str:
-    """マイクラで、足元を掘って降りる。depth を省けば、木の上から地面まで。葉・原木・土・石など自然のブロックだけ掘る。"""
+async def dig_down(context: RunContext, depth: int) -> str:
+    """マイクラで、足元を depth ブロック（1〜32）掘って降りる。葉・原木・土・石など自然のブロックだけ掘る。"""
     body = _body(context)
-    return _result(await body.do('dig_down', {'depth': depth} if depth is not None else {}) if body else {'status': 'unavailable'})
+    return _result(await body.do('dig_down', {'depth': depth}) if body else {'status': 'unavailable'})
 
 
 @function_tool

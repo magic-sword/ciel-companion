@@ -45,19 +45,10 @@ test('アカウントの確認なしのサーバーでの ID（自宅サーバ�
   assert.equal(offlineUuid('Ciel'), 'f9bc7f17-3069-38fd-aa6d-e59c0a825a27');
 });
 
-test('木の上にいれば、地面からの高さを数える', () => {
-  // 足元から下へ：葉・葉・空気・原木・原木・草（地面）
-  const column = ['oak_leaves', 'oak_leaves', 'air', 'oak_log', 'oak_log', 'grass_block'];
-  const bot = {
-    entity: { position: new Vec3(0.5, 80, 0.5) },
-    blockAt: (p) => {
-      const name = column[79 - p.y] ?? 'stone';
-      return { name, boundingBox: name === 'air' ? 'empty' : 'block' };
-    },
-  };
-  assert.deepEqual(footing(bot), { on: 'oak_leaves', height: 5 });
-  bot.blockAt = () => ({ name: 'grass_block', boundingBox: 'block' });
-  assert.deepEqual(footing(bot), { on: 'grass_block', height: null });
+test('足元のブロックの名前だけを返す（木の上かどうかは決めない）', () => {
+  const bot = { entity: { position: new Vec3(0.5, 80, 0.5) }, blockAt: () => ({ name: 'oak_leaves', boundingBox: 'block' }) };
+  assert.deepEqual(footing(bot), { on: 'oak_leaves' });
+  assert.equal(footing({ entity: null }), null);
 });
 
 test('向いている方角（mineflayer の yaw は北が 0、西が π/2）', () => {

@@ -33,9 +33,8 @@ export const SKILLS = {
     if (!Number.isInteger(count) || count < 1 || count > COLLECT_MAX) return { error: 'bad_args' };
     return { args: { block: a.block, count } };
   },
-  // 足元を掘って降りる。depth を省けば、木の上から地面まで（自然のブロックだけ掘る）
+  // 足元を depth ブロック掘って降りる（自然のブロックだけ掘る）
   dig_down: (a) => {
-    if (a.depth === undefined) return { args: {} };
     return Number.isInteger(a.depth) && a.depth >= 1 && a.depth <= DIG_MAX ? { args: { depth: a.depth } } : { error: 'bad_args' };
   },
   // 持ち物から物を作る（板・棒・作業台・ツルハシなど）。count は作りたい数
