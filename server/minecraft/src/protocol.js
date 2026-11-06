@@ -6,6 +6,7 @@ const NAME = /^[A-Za-z0-9_]{1,16}$/;        // マイクラのプレイヤー名
 const BLOCK = /^[a-z0-9_]{1,64}$/;           // ブロック・持ち物の名前（oak_log など）
 const CHAT_CHARS = 256;                      // マイクラのチャットの上限
 const COLLECT_MAX = 64;
+const CRAFT_MAX = 64;
 const DIG_MAX = 32;
 const GIVE_MAX = 64 * 36;   // 持ち物の欄すべて
 const COORD_MAX = 30_000_000;
@@ -25,7 +26,7 @@ export const SKILLS = {
     const y = coord(a.y);
     return y === null ? { error: 'bad_args' } : { args: { x, y, z } };
   },
-  // 近くのブロックを掘って集める
+  // 近くのブロックを掘って集める。block はブロックの ID か、flower・log・dirt・coal のような呼び名（names.js）
   collect: (a) => {
     if (typeof a.block !== 'string' || !BLOCK.test(a.block)) return { error: 'bad_args' };
     const count = a.count === undefined ? 1 : a.count;
@@ -36,6 +37,13 @@ export const SKILLS = {
   dig_down: (a) => {
     if (a.depth === undefined) return { args: {} };
     return Number.isInteger(a.depth) && a.depth >= 1 && a.depth <= DIG_MAX ? { args: { depth: a.depth } } : { error: 'bad_args' };
+  },
+  // 持ち物から物を作る（板・棒・作業台・ツルハシなど）。count は作りたい数
+  craft: (a) => {
+    if (typeof a.item !== 'string' || !BLOCK.test(a.item)) return { error: 'bad_args' };
+    const count = a.count === undefined ? 1 : a.count;
+    if (!Number.isInteger(count) || count < 1 || count > CRAFT_MAX) return { error: 'bad_args' };
+    return { args: { item: a.item, count } };
   },
   // 持ち物を渡す（そばへ行って投げる）。player を省けば持ち主。count を省けば持っている分すべて
   give: (a) => {

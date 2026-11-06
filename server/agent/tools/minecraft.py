@@ -36,9 +36,18 @@ async def go_to_place(context: RunContext, x: int, z: int) -> str:
 
 @function_tool
 async def collect_blocks(context: RunContext, block: str, count: int) -> str:
-    """マイクラで、近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・cobblestone など）、count は 1〜64。"""
+    """マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy など）か、
+    呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。"""
     body = _body(context)
     return _result(await body.do('collect', {'block': block, 'count': count}) if body else {'status': 'unavailable'})
+
+
+@function_tool
+async def craft_item(context: RunContext, item: str, count: int = 1) -> str:
+    """マイクラで、持ち物から物を作る（oak_planks・stick・crafting_table・wooden_pickaxe など）。item は英語の ID、count は作りたい数（1〜64）。
+    作業台が要る物は、近くの作業台か、持っている作業台を置いて使う。材料が足りなければ、足りない物が返る。"""
+    body = _body(context)
+    return _result(await body.do('craft', {'item': item, 'count': count}) if body else {'status': 'unavailable'})
 
 
 @function_tool
@@ -81,10 +90,10 @@ async def look_at_view(context: RunContext) -> str:
     return _result(r)
 
 
-TOOLS = [follow_me, come_here, go_to_place, collect_blocks, give_item, dig_down, stop_moving, look_around, look_at_view]
+TOOLS = [follow_me, come_here, go_to_place, collect_blocks, craft_item, give_item, dig_down, stop_moving, look_around, look_at_view]
 # 体の道具の名前（mind.py が、体とつながっていないときに外す）
 BODY_TOOLS = tuple(t.id for t in TOOLS)
 # 配信のコメントから使ってよいか（tools/__init__.py）。体を動かすのは持ち主だけ（docs/minecraft-design-ja.md の 6 章）
-FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, give_item: False,
+FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, craft_item: False, give_item: False,
                  dig_down: False, stop_moving: False, look_around: True,
                  look_at_view: False}   # 景色の絵は 1 枚 0.3 円ほどかかるので、コメントからは見ない

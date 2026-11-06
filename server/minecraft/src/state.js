@@ -1,4 +1,7 @@
 // 体の様子を、会話サーバーへ送る形にまとめる（2 秒ごと、と頼まれたとき）。docs/minecraft-design-ja.md の 4.2。
+// ブロックと敵は、シエルの目から見えるものだけを入れる（sight.js。地中の鉱石を話して不自然だった。2026-11-06）
+import { FLOWER_NAMES } from './names.js';
+import { canSee, notices, remember } from './sight.js';
 
 const NEAR = 16;          // 近くとみなす距離（ブロック）
 const INVENTORY_ITEMS = 12;
@@ -38,17 +41,20 @@ export function facing(bot) {
 }
 
 const BLOCKS_COUNT = 256;
-// 「何が見える？」「木を集めて」に答えるための、近くのブロック（原木・鉱石・危ないもの・使えるもの）
-const INTERESTING = /_log$|_ore$|^(lava|crafting_table|chest|furnace|ancient_debris)$/;
+// 「何が見える？」「木を集めて」に答えるための、近くのブロック（原木・鉱石・草花・危ないもの・使えるもの）
+const INTERESTING = /_log$|_ore$|^(lava|water|crafting_table|chest|furnace|ancient_debris)$/;
+const interesting = (name) => INTERESTING.test(name) || FLOWER_NAMES.includes(name);
 
-// 近くのブロックの種類と数（重いので、呼ぶのは 10 秒に 1 回ほど。main.js）
+// 近くの、今見えるブロックの種類と数（重いので、呼ぶのは 10 秒に 1 回ほど。main.js）。見えたブロックは覚える（集めるときに使う）
 export function nearbyBlocks(bot) {
   if (!bot?.entity) return {};
-  const ids = Object.values(bot.registry.blocksByName).filter((b) => INTERESTING.test(b.name)).map((b) => b.id);
+  const ids = Object.values(bot.registry.blocksByName).filter((b) => interesting(b.name)).map((b) => b.id);
   const counts = {};
   for (const p of bot.findBlocks({ matching: ids, maxDistance: BLOCKS_NEAR, count: BLOCKS_COUNT })) {
     const name = bot.blockAt(p)?.name;
-    if (name) counts[name] = (counts[name] ?? 0) + 1;
+    if (!name || !canSee(bot, p)) continue;
+    remember(bot, p, name);
+    counts[name] = (counts[name] ?? 0) + 1;
   }
   return counts;
 }
@@ -75,7 +81,7 @@ export function summarize(bot, doing, blocks = {}) {
     held: bot.heldItem?.name ?? null,
     inventory: Object.fromEntries(top),
     players: near.filter(({ e }) => e.type === 'player').map(({ e, distance }) => ({ name: e.username, distance })),
-    hostiles: near.filter(({ e }) => e.type === 'hostile').map(({ e, distance }) => ({ name: e.name, distance })),
+    hostiles: near.filter(({ e }) => e.type === 'hostile' && notices(bot, e)).map(({ e, distance }) => ({ name: e.name, distance })),
     blocks,
     footing: footing(bot),
     doing: doing ?? null,

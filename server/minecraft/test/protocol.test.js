@@ -11,6 +11,7 @@ test('技の命令を整えて受ける', () => {
     { block: 'oak_log', count: 10 });
   assert.deepEqual(p({ v: 1, type: 'do', id: 5, skill: 'go_to', args: { x: 10, z: -3.5 } }).cmd.args, { x: 10, z: -3.5 });
   assert.deepEqual(p({ v: 1, type: 'do', id: 6, skill: 'come', args: { player: 'Steve_1' } }).cmd.args, { player: 'Steve_1' });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 7, skill: 'craft', args: { item: 'wooden_pickaxe' } }).cmd.args, { item: 'wooden_pickaxe', count: 1 });
 });
 
 test('一覧に無い技は動かさない', () => {
@@ -25,6 +26,8 @@ test('形の違う引数は動かさない', () => {
     { skill: 'collect', args: { block: 'oak_log', count: 65 } },
     { skill: 'collect', args: { block: 'oak_log', count: 1.5 } },
     { skill: 'collect', args: { block: '../x' } },
+    { skill: 'craft', args: { item: 'stick', count: 65 } },
+    { skill: 'craft', args: {} },
     { skill: 'go_to', args: { x: 'a', z: 1 } },
     { skill: 'go_to', args: { x: 1, z: Infinity } },
     { skill: 'go_to', args: { x: 1e9, z: 1 } },

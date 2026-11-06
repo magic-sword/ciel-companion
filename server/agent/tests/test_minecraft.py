@@ -225,6 +225,30 @@ class BodyDoTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(minecraft, 'START_TIMEOUT', 0.05):
             self.assertEqual(await body.do('follow'), {'status': 'no_answer'})
 
+    async def test_refusal_before_starting_tells_why(self):
+        # 体が始める前に断ったら（道具が無い・名前が違う）、理由の文を道具の返事に入れる。心はその場で正直に言える
+        body = linked_body()
+
+        class Refuse(FakeWs):
+            async def send(self, raw):
+                m = json.loads(raw)
+                self.body.on_message(json.dumps({'v': 1, 'type': 'error', 'id': m['id'], 'reason': 'needs_tool',
+                                                 'note': {'tool': 'wooden_pickaxe'}}))
+        body._ws = Refuse(body, None)
+        r = await body.do('collect', {'block': 'stone', 'count': 3})
+        self.assertEqual(r['status'], 'error')
+        self.assertIn('掘る道具が無い', r['why'])
+        self.assertIn('wooden_pickaxe', r['why'])
+        self.assertFalse(body._cards)
+
+    def test_missing_materials_are_told(self):
+        said = []
+        body = linked_body(lambda why, **kw: said.append(kw['instructions']))
+        body._asked[5] = 'wooden_pickaxe を 1 個作る'
+        body.on_message(json.dumps({'v': 1, 'type': 'done', 'id': 5, 'ok': False, 'reason': 'missing_materials',
+                                    'note': {'needs': {'stick': 2}}}))
+        self.assertIn('材料が足りない（足りない物：stick×2）', said[-1])
+
     async def test_look_hands_the_view_to_the_eyes(self):
         import base64
         import eyes
@@ -287,6 +311,8 @@ class MindGameTest(unittest.TestCase):
         m = mind.Mind(Conversation(), body=body)
         self.assertEqual(m.route(ctx_with('ついてきて'), {'seconds': 1.0}), 'mind')
         self.assertEqual(m.route(ctx_with('ちょっと待って'), {'seconds': 1.0}), 'mind')
+        self.assertEqual(m.route(ctx_with('今何が見えてる、シエル？'), {'seconds': 1.0}), 'mind')
+        self.assertEqual(m.route(ctx_with('ツルハシ作れる？'), {'seconds': 1.0}), 'mind')
         self.assertEqual(m.route(ctx_with('あれ、ついてくるの止められないかな？'), {'seconds': 1.0}), 'mind')
         self.assertEqual(m.route(ctx_with('うまくできてる'), {'seconds': 1.0}), 'talker')
         body.linked = False
@@ -319,6 +345,7 @@ class ToolTest(unittest.IsolatedAsyncioTestCase):
     async def test_tools_without_a_body_say_unavailable(self):
         ctx = types.SimpleNamespace(userdata=tools.State())
         args = {'go_to_place': {'x': 1, 'z': 2}, 'collect_blocks': {'block': 'oak_log', 'count': 3},
+                'craft_item': {'item': 'stick'},
                 'give_item': {'item': 'oak_log'}}
         for fn in tools.minecraft.TOOLS:
             result = await fn(ctx, **args.get(fn.id, {}))

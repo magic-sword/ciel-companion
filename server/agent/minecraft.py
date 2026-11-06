@@ -51,8 +51,15 @@ BLOCKS_SHOWN = 8
 WHY_FAILED = {
     'player_not_visible': '相手が見えない（遠い・別の場所にいる）',
     'no_owner': '相手が分からない（持ち主のプレイヤー名が設定されていない）',
-    'not_found': '近くに見つからない（16〜48 ブロックの中に無い）',
+    'not_found': '見える所に無い（今いる所から見えない・まだ見ていない。地中に埋まっている物は分からない）',
     'cannot_harvest': '掘れない（その道具を持っていない）',
+    'needs_tool': '掘る道具が無い（素手では取れない）',
+    'unknown_block': 'そういう名前のブロックが無い',
+    'unknown_item': 'そういう名前の物が無い',
+    'cannot_craft': '作れない物（作り方が無い）',
+    'missing_materials': '材料が足りない',
+    'no_table': '作業台が要る（近くに無く、持ってもいない）',
+    'no_room': '作業台を置く場所が無い',
     'no_path': 'そこまでの道が見つからない（遠い・高い・水や崖の向こう）',
     'not_spawned': 'マイクラに入っていない',
     'not_have': 'その物を持っていない',
@@ -65,7 +72,7 @@ WHY_FAILED = {
 }
 QUIET_REASONS = ('stopped', 'replaced', 'unlinked', 'disconnected')
 SKILL_NAMES = {'follow': 'ついていく', 'come': 'そばへ行く', 'go_to': '場所へ行く', 'collect': '集める', 'give': '渡す',
-               'dig_down': '足元を掘って降りる'}
+               'dig_down': '足元を掘って降りる', 'craft': '作る'}
 
 
 def title(skill: str, args: dict) -> str:
@@ -81,9 +88,30 @@ def title(skill: str, args: dict) -> str:
         return f"{args.get('block')} を {args.get('count', 1)} 個集める"
     if skill == 'dig_down':
         return f"足元を {args['depth']} ブロック掘る" if 'depth' in args else '足元を掘って降りる'
+    if skill == 'craft':
+        return f"{args.get('item')} を {args.get('count', 1)} 個作る"
     if skill == 'give':
         return f"{args.get('item')} を{' ' + str(args['count']) + ' 個' if 'count' in args else ''}{who}に渡す"
     return skill
+
+
+def reasons(reason: str, note: dict) -> str:
+    """うまくいかなかった理由の文（足りない材料・要る道具も添える）"""
+    why = WHY_FAILED.get(reason, WHY_FAILED['error'])
+    if note.get('needs'):
+        why += '（足りない物：' + '、'.join(f'{k}×{n}' for k, n in note['needs'].items()) + '）'
+    if note.get('tool'):
+        why += f"（要る道具：{note['tool']} 以上）"
+    return why
+
+
+def refused(m: dict) -> dict:
+    """体が始める前に断った（error）。理由の文も添え、心が道具の返事を見て、その場で正直に言えるようにする"""
+    reason = m.get('reason')
+    r = {'status': 'error', 'reason': reason}
+    if reason in WHY_FAILED:
+        r['why'] = reasons(reason, m.get('note') or {})
+    return r
 
 
 def _link_wanted(packet) -> bool | None:
@@ -222,7 +250,7 @@ class Body:
             if f is not None and not f.done():
                 f.set_result({'status': 'started'} if kind == 'started' else
                              {'status': 'seen', 'message': m} if kind == 'seen' else
-                             {'status': 'error', 'reason': m.get('reason')})
+                             refused(m))
         elif kind == 'done':
             self.on_done(m)
         elif kind == 'event':
@@ -343,7 +371,7 @@ class Body:
             return
         if not m.get('ok') and (reason in QUIET_REASONS or reason == 'died'):   # 倒れたことは died の出来事で言う
             return
-        why = WHY_FAILED.get(note.get('short') or reason, WHY_FAILED['error'])
+        why = reasons(note.get('short') or reason, note)
         if reason == 'error' and m.get('detail'):
             why += f"（体のエラー：{m['detail']}）"
         times = self._fails[name] = self._fails.get(name, 0) + 1
