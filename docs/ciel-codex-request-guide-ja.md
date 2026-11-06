@@ -92,7 +92,7 @@ powershell -File scripts/codex/run-codex.ps1 -PromptFile .local/codex/req-NN-名
 3. **単色の背景から切り出した線**：境目の色が緑の補色（赤紫）に寄ることがある。気になる場合は伝える。
 4. **current へ入れる**：`assets/ciel/current/layers/` の同じ名前の PNG を置き換える（古い版は残さない）。
 5. **Cubism へ入れる**：元の PSD と同じレイヤー名・同じ順の PSD を作り、「差し替え」で取り込む。
-   - 元の層の画像は、`.cmo3` の中（CAFF の `imageFileBuf_N.png`、全キャンバスの PNG）から取り出せる。顔まわりは `ciel-v14c.psd`、体まわりは `ciel-v19-body.psd`。
+   - 元の層の画像は、顔まわりは `ciel-v14c.psd`、体まわりは `ciel-v19-body.psd`。
    - PSD は `scripts/live2d/gimp/build_layers_psd.py`（`visible` も反映）で作る。
    - Cubism で PSD を開き、モデルを選び、「[ciel-v14c.psd] を差し替え」。保存時の「未使用の原画を削除しますか」は「はい」。
    - 部品の形が変わったら、メッシュも作り直す（顔の土台は `scripts/live2d/remesh-face-contour.py`）。

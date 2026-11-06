@@ -7,7 +7,6 @@
 | --- | --- |
 | `scripts/live2d/cubism_core.py` | Unity SDK の `Live2DCubismCore.dll` を Python から呼ぶ。書き出したモデルに値を与え、Cubism と同じ計算で頂点・不透明度・描画順を得る |
 | `scripts/live2d/render-moc.py` | その結果を画像に描く（全身 1 枚 2〜3 秒）。Unity の描画と形が一致することを確認済み。クリッピングの縁に小さな点が出る差が残る |
-| `scripts/live2d/analyze-rig.py`（2026-11-07 削除） | `.cmo3` からデフォーマの木、`.moc3` から角度X・Y ±30 での各メッシュの動き（頭の幅で割った比）を表にした |
 
 実行例：
 ```

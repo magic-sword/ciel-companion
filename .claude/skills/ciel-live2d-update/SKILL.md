@@ -23,7 +23,7 @@ description: シエルの Live2D モデルに部品・表情・動き（パラ�
 
 作業ファイルはすべて `.local/<作業名>/` に置く（Git 外）。版ごとのフォルダを Git に作らない。
 
-**`.cmo3` の中身をスクリプトで読み書きしない**（Live2D の非公開形式。Cubism Editor の使用許諾に配慮して、読み書きの道具は 2026-11-07 に削除した）。`.cmo3` の編集はすべて Cubism Editor で行う。スクリプトが扱うのは、ハッシュの確認と、Cubism が書き出した SDK（`.moc3`・`.model3.json`・`.physics3.json`・`.motion3.json`・`.exp3.json`）だけ。
+**`.cmo3` の中身をスクリプトで読み書きしない**（Live2D の非公開形式。Cubism Editor の使用許諾に配慮する）。`.cmo3` の編集はすべて Cubism Editor で行う。スクリプトが扱うのは、ハッシュの確認と、Cubism が書き出した SDK（`.moc3`・`.model3.json`・`.physics3.json`・`.motion3.json`・`.exp3.json`）だけ。
 
 1. **正式モデルのコピーで始める**：`rig/ciel.cmo3` を `.local/<作業名>/` に写し、`official.py` でハッシュを確かめる。
 2. **新しい絵の取り込みと組み込み（Cubism）**：PSD を作り（`scripts/live2d/gimp/build_layers_psd.py`）、ユーザーに Cubism で取り込んでもらうか、computer-use で操作する（java.exe の許可が要る）。メッシュ・デフォーマ・パラメーター・キーフォームも Cubism の画面で作る。

@@ -336,17 +336,7 @@ Cubism Editor 5.3.04 FREE版を使用した目の検証モデルはある。現�
 
 FREE 版でも取り込み・メッシュ・パラメーター・保存はできるが、書き出しの前のテクスチャアトラスで止まる：テクスチャは 1 モデル 1 枚・2048px まで、アートメッシュ 100 個・デフォーマ 50 個まで（公式の比較表とフォーラムの報告。最新の数値は購入前に確認する）。基準画像の解像度のまま書き出すには PRO 版が要る。PRO 版のトライアル（42 日、1 台 1 回）は 2026-10-08 に開始し、11/19 前後に切れる。期限後に FREE 版へ戻ると 2048px を超えるモデルの保存・書き出しができなくなる報告があるので、期限前に書き出しまで済ませるか、購入する（ユーザーが検討）。商用利用は、FREE 版は年間売上 1,000 万円未満の個人・小規模事業者に限られる（公式の記載）。
 
-### 12.4 `.cmo3` の直接操作（廃止）
-
-2026-11-07 に、`.cmo3` を読み書きするスクリプト（`caff.py`・`cmo3_tool.py`・`cmo3_editor.py`・`mesh_ops.py`）を削除した。Live2D の非公開形式を解析して編集するのは、Cubism Editor の使用許諾に配慮してやめる。今後 `.cmo3` の編集は Cubism Editor で行う（手順はスキル `ciel-live2d-update`）。以下は当時の記録。
-
-`.cmo3` は CAFF（Live2D の非公開コンテナ）。`scripts/live2d/caff.py`（オープンソースの `caff-archive` の仕様を参照）で読み書きし、`cmo3_tool.py` で中の XML（`main.xml` → `contents`）を文字列の置換で編集する（XML は再整形しない）。何も変えずに保存し直すと、XML が完全に一致する。
-- キーフォームの構造：`CArtMeshSource` の `keyforms`、`KeyformGridSource` の `keyformsOnGrid`・`keyformBindings`、`KeyformBindingSource`（パラメーターの guid とキーの値）。`CFormGuid` の `xs.id` は文書内で一意、`xs.idx` は通し番号。
-- ワープデフォーマの子のメッシュは、`positions` がデフォーマの元の格子の範囲を 0〜1 とした正規化座標。格子はメッシュの外に定義して `xs.ref` で参照する（埋め込むと読み込み時に NullPointerException）。
-- CAFF の中の PNG のバイト数を変えると Cubism が開けない（JDOMParseException）。画像を変えるときは PSD の差し替えで取り込む。
-- 書き換える前に Cubism で保存してコミットしておく。Cubism で開いているファイルを、別のプロセスで上書きしない（`.local/` に別名で出力し、開いて確かめてから置く）。
-
-### 12.5 Unity での確認
+### 12.4 Unity での確認
 
 - テクスチャのインポート設定は最大サイズ 4096（既定の 2048 だと縮む）。Cubism SDK が `Ciel.prefab`・`Ciel.controller`・`Ciel.asset` と `.meta` を自動で作る（Git 管理）。
 - `unity/Assets/Editor/CielRenderCheck.cs`：`Unity.exe -projectPath unity -executeMethod Ciel.EditorTools.CielRenderCheck.Run -logFile <log>`（`-batchmode` は付けない。付けると再生モードへ移れず止まる）。`.local/render-check/request` を置いてから起動すると、パラメーターを変えて撮影し、`.local/render-check/` に保存して終了する。撮影ごとにインスタンスを置き直す（同じインスタンスで撮り続けると 2 枚目以降が背景だけになることがあった）。各ドローアブルの UV の範囲を `uvrects.txt` に書く。
