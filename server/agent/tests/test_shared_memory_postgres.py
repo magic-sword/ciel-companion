@@ -6,13 +6,13 @@ from unittest.mock import patch
 
 import numpy as np
 
-from speaker_store import Store, Relationship
+from speaker_store import Store, Relationship, SharedPersonError
 
 
 @unittest.skipUnless(os.environ.get('CIEL_TEST_DB_URL'), 'isolated PostgreSQL not configured')
 class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.env = patch.dict(os.environ, {'CIEL_DB_URL': os.environ['CIEL_TEST_DB_URL']})
+        self.env = patch.dict(os.environ, {'CIEL_DB_URL': os.environ['CIEL_TEST_DB_URL'], 'CIEL_MEMORY_SCOPE': 'main'})
         self.env.start()
         self.addCleanup(self.env.stop)
         # Never run migration or writes against an application database.
@@ -26,8 +26,11 @@ class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.a)
         self.assertIsNotNone(self.b)
         self.pid = await self.a.remember_person('Synthetic person', [np.ones(192)])
+        self.extra: list[int] = []
 
     async def asyncTearDown(self):
+        for pid in self.extra:
+            await self.a.delete_person(pid)
         await self.a.delete_person(self.pid)
         await self.a.close()
         await self.b.close()
@@ -113,3 +116,43 @@ class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
             'SELECT channel, count(*) FROM voiceprints WHERE person_id=%s GROUP BY channel ORDER BY channel NULLS FIRST',
             (self.pid,))).fetchall()
         self.assertEqual(rows, [(None, 1), ('device:x', 20)])
+
+    async def test_dev_sees_only_shared_and_its_own_people(self):
+        """本番（main）と開発用（dev）が同じ DB を使う（docs/shared-memory-ja.md）"""
+        dev = Store(self.a.conn, 'dev')
+        guest = await self.a.remember_person('Synthetic guest', [np.ones(192)])
+        self.extra.append(guest)
+        trial = await dev.remember_person('Synthetic trial', [np.ones(192)])
+        self.extra.append(trial)
+        main_ids = {row[0] for row in await self.a.load_all()}
+        self.assertTrue({self.pid, guest} <= main_ids)
+        self.assertNotIn(trial, main_ids)
+        self.assertNotIn(trial, await self.a.versions())
+        seen = {row[0] for row in await dev.load_all()}
+        self.assertIn(trial, seen)
+        self.assertNotIn(self.pid, seen)
+        await self.a.conn.execute('UPDATE people SET shared = true WHERE id = %s', (self.pid,))
+        seen = {row[0] for row in await dev.load_all()}
+        self.assertIn(self.pid, seen)
+        self.assertNotIn(guest, seen)
+        self.assertIn(self.pid, await dev.versions())
+
+    async def test_dev_writes_reach_main_but_cannot_delete_the_shared_person(self):
+        dev = Store(self.a.conn, 'dev')
+        await self.a.conn.execute('UPDATE people SET shared = true WHERE id = %s', (self.pid,))
+        snapshot = await dev.memory_snapshot(self.pid)
+        self.assertTrue(await dev.apply_notes(self.pid, snapshot, ['tea'], {}, []))
+        self.assertEqual([t for _, t in await self.a.notes(self.pid)], ['tea'])
+        origin = await (await self.a.conn.execute(
+            'SELECT origin FROM person_notes WHERE person_id = %s', (self.pid,))).fetchone()
+        self.assertEqual(origin[0], 'dev')
+        self.assertTrue(await dev.request_forget(self.pid, 'tea'))
+        self.assertTrue((await self.a.memory_snapshot(self.pid))['blocked'])
+        with self.assertRaises(SharedPersonError):
+            await dev.delete_person(self.pid)
+        with self.assertRaises(SharedPersonError):
+            await dev.rename(self.pid, 'Renamed')
+        await self.a.pair_device('test-device-3', 'hash-d', self.pid)
+        self.assertEqual(await dev.device_owner('test-device-3', 'hash-d'), self.pid)
+        self.assertFalse(await dev.unpair_device('test-device-3', 'hash-d'))
+        self.assertIsNotNone(await self.a.identity(self.pid))

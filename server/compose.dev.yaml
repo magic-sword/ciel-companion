@@ -4,7 +4,9 @@
 # 読み上げ（Irodori-TTS、127.0.0.1:8766）と DB のコンテナは、本番のものを共通で使う。
 # - 名前 ciel-dev を付ける。アプリが「ciel-dev を呼ぶ」部屋（設定画面の開発スイッチ）にだけ入る。本番の会話サーバーはその部屋に入らない。
 # - デバッグ用の会話ログはいつも残す（data/debug、7 日で消える）。
-# - 覚えている人の記録は、本番と同じ DB のコンテナの中の別のデータベース ciel_dev（試験の登録が本番の記憶に混ざらない）。
+# - 覚えている人の記録は、本番と同じデータベース ciel を使う（docs/shared-memory-ja.md）。CIEL_MEMORY_SCOPE=dev で、見えるのは
+#   本番と共有している人（持ち主のハカセ）と、開発用で覚えた人だけ。開発用で覚えた人は本番から見えない。シエルの日記・好みは本番と 1 つ。
+#   開発用からは、共有している人を消す・呼び名を変える・端末の持ち主をやめることはできない（「忘れて」は効く）。
 # - 議事録の下書きは、開発用の Discord のチャンネルへ（server/.env.dev の CIEL_DEV_DISCORD_WEBHOOK。空ならサーバーに保存するだけ）。
 # 秘密情報は本番のものを読む：OpenAI・LiveKit のキーは本番の agent/.env、DB のパスワードは本番の server/.env（deploy-remote.sh が --env-file で渡す）。
 name: ciel-dev
@@ -26,7 +28,8 @@ services:
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
       # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
-      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel_dev
+      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
+      - CIEL_MEMORY_SCOPE=dev
       # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。本番より先に、開発用だけでつなぐ
       - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
       # 本番の Webhook を使わないように、必ずここで上書きする

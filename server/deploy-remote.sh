@@ -14,11 +14,13 @@ if [ "${1:-}" = dev ]; then
     (umask 077; printf '# 開発用の Discord のチャンネルの Webhook の URL（Git に入れない）\nCIEL_DEV_DISCORD_WEBHOOK=\n' > .env.dev)
     echo '開発用の設定を作った（server/.env.dev。議事録の送り先は空）'
   fi
-  # 覚えている人の記録：本番と同じ DB のコンテナの中の、別のデータベース
-  if ! docker exec ciel-db-1 psql -U ciel -d ciel -tAc "SELECT 1 FROM pg_database WHERE datname = 'ciel_dev'" | grep -q 1; then
-    docker exec ciel-db-1 createdb -U ciel ciel_dev
-    echo '開発用のデータベース ciel_dev を作った'
-  fi
+  # 覚えている人の記録：本番と同じデータベース ciel を、印で分けて使う（docs/shared-memory-ja.md）。
+  # 開発中のコードが起動のときに表を作り替えるので、その前に毎回バックアップを取る（新しい 14 個を残す。Git・デプロイの外）
+  BACKUPS=../../ciel-db-backups
+  mkdir -p $BACKUPS && chmod 700 $BACKUPS
+  docker exec ciel-db-1 pg_dump -U ciel -d ciel | gzip > $BACKUPS/ciel-$(date +%Y%m%d-%H%M%S).sql.gz
+  ls -1t $BACKUPS/ciel-*.sql.gz | tail -n +15 | xargs -r rm -f
+  echo "DB のバックアップ：$(ls -1t $BACKUPS/ciel-*.sql.gz | head -1)"
   docker compose -f compose.dev.yaml --env-file $PROD/.env --env-file .env.dev up -d --build 2>&1 | tail -6
   exit 0
 fi

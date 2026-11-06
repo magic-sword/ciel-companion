@@ -24,8 +24,9 @@ services:
       - CIEL_MODEL=pipeline
       # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけがつなぐ
       - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
-      # 覚えている人の記録（speaker_store.py）
+      # 覚えている人の記録（speaker_store.py）。開発用も同じ DB を使い、印（main・dev）で分ける（docs/shared-memory-ja.md）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
+      - CIEL_MEMORY_SCOPE=main
     volumes:
       # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
       - ./agent/config:/app/config:ro

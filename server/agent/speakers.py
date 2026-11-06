@@ -1205,6 +1205,8 @@ class SpeakerBook:
                     entry.name = new
             return f'呼び名を「{old}」から「{new}」に直しました（この会話の間だけ。声は保存していません）。'
         if self.store is not None:
+            if await self._shared_elsewhere(sp.person_id):
+                return f'{old}さんは本番の会話サーバーと共有している人なので、ここ（開発用）では呼び名を変えられません。本番で頼んでください。'
             await self.store.rename(sp.person_id, new)
         else:
             return '記録の場所が使えないので、保存済みの呼び名は変更できません。'
@@ -1240,6 +1242,12 @@ class SpeakerBook:
         parts = [(s.name or s.label) + ('（声を覚えている人）' if s.person_id is not None else '') for s in self.speakers]
         return 'この会話で声を聞いた人：' + '、'.join(parts)
 
+    async def _shared_elsewhere(self, person_id: int) -> bool:
+        """開発用の会話サーバーから見た、本番と共有している人（消す・呼び名を変えることはできない。speaker_store.py）"""
+        if getattr(self.store, 'scope', None) != 'dev':
+            return False
+        return await self.store.protected(person_id)
+
     async def forget(self, name: str) -> str:
         async with self._identity_lock:
             return await self._forget(name)
@@ -1251,6 +1259,8 @@ class SpeakerBook:
             return 'ご本人からの依頼のときだけ消せます。消したい方ご本人に、もう一度お願いしてもらってください。'
         pid = sp.person_id
         if self.store is not None:
+            if await self._shared_elsewhere(pid):
+                return f'{sp.name}さんは本番の会話サーバーと共有している人なので、ここ（開発用）では消せません。本番で頼んでください。'
             await self.store.delete_person(pid)
         self.known = [k for k in self.known if k.person_id != pid]
         if self.owner_id == pid:
@@ -1445,7 +1455,10 @@ class SpeakerBook:
             sp = self._by_id(msg.get('speaker_id'))
             if sp is None or sp is not self.last or not self.last_sure or sp.person_id is None:
                 return 'not_current_speaker'
-            await self.store.pair_device(device_id, secret_hash, sp.person_id)
+            try:
+                await self.store.pair_device(device_id, secret_hash, sp.person_id)
+            except PermissionError:   # speaker_store.SharedPersonError
+                return 'shared_owner'   # 開発用から、本番の持ち主を別の人へ付け替えない
             self.owner_id = sp.person_id
             log.info('話者：#%d を端末の持ち主にした', sp.person_id)
             return 'paired'

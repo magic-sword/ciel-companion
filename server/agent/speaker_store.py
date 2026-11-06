@@ -11,6 +11,10 @@
 - ciel_like_history：育った好みを足した・変えた・外した記録（いつ・何を・根拠・理由）。あとから見直すため
 - device_owners：端末の持ち主（アプリの端末 ID と、端末だけが持つ合言葉のハッシュ）。合言葉そのものは置かない
 - voiceprints.channel：その見本を録った経路（端末の ID など。マイクや経路で声の特徴が変わるので、同じ経路の見本を優先して比べる）
+- people.origin・people.shared・person_notes.origin：本番（main）と開発用（dev）の会話サーバーが同じ DB を使うための印
+  （docs/shared-memory-ja.md）。CIEL_MEMORY_SCOPE が見える人を決める。本番は origin='main' の人、開発用は origin='dev' の人と
+  shared の人（持ち主のハカセ）。開発用からは、自分の印でない人を消す・呼び名を変える・端末の持ち主をやめることはできない。
+  シエル自身の出来事・好みは、両方で 1 つ（印なし）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。
 人を消すと、声の特徴もメモも関係も一緒に消える。管理（一覧・削除）は speaker_admin.py。
 """
@@ -145,7 +149,30 @@ CREATE TABLE IF NOT EXISTS ciel_like_history (
     why text NOT NULL DEFAULT '',
     evidence jsonb NOT NULL DEFAULT '[]'
 );
+ALTER TABLE people ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'main';
+ALTER TABLE people ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT false;
+ALTER TABLE person_notes ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'main';
 """
+SCOPES = ('main', 'dev')
+
+
+def memory_scope() -> str:
+    """どちらの会話サーバーか（CIEL_MEMORY_SCOPE。既定は本番の main）"""
+    scope = os.environ.get('CIEL_MEMORY_SCOPE', 'main').strip() or 'main'
+    if scope not in SCOPES:
+        raise ValueError('CIEL_MEMORY_SCOPE は ' + '・'.join(SCOPES) + ' のどれか')
+    return scope
+
+
+def visible(scope: str, alias: str = 'p') -> str:
+    """その会話サーバーから見える人の条件（SQL）。本番は main の人、開発用は dev の人と共有する人"""
+    if scope == 'main':
+        return f"{alias}.origin = 'main'"
+    return f"({alias}.origin = 'dev' OR ({alias}.origin = 'main' AND {alias}.shared))"
+
+
+class SharedPersonError(PermissionError):
+    """開発用から、本番と共有している人を消そうとした・呼び名を変えようとした"""
 MAX_NOTES = 50   # 1 人あたりのメモの上限（多すぎたら古いものから消す）
 
 
@@ -176,8 +203,9 @@ def serialized(method):
 
 
 class Store:
-    def __init__(self, conn: psycopg.AsyncConnection) -> None:
+    def __init__(self, conn: psycopg.AsyncConnection, scope: str | None = None) -> None:
         self.conn = conn
+        self.scope = scope or memory_scope()
         self._lock = asyncio.Lock()
         self._owner = None
 
@@ -190,12 +218,13 @@ class Store:
             return None
         conn = None
         try:
+            scope = memory_scope()
             conn = await psycopg.AsyncConnection.connect(url, autocommit=True, connect_timeout=5)
             async with conn.transaction():
                 await conn.execute('SELECT pg_advisory_xact_lock(734921864)')
                 await conn.execute(SCHEMA)
             await register_vector_async(conn)
-            return cls(conn)
+            return cls(conn, scope)
         except Exception as e:
             if conn is not None:
                 await conn.close()
@@ -210,7 +239,7 @@ class Store:
         rows = await (await self.conn.execute(
             'SELECT p.id, p.name, p.last_seen_at, p.notes_consented_at IS NOT NULL, '
             '(SELECT count(*) FROM person_notes n WHERE n.person_id = p.id), v.embedding '
-            'FROM people p JOIN voiceprints v ON v.person_id = p.id ORDER BY p.id, v.id'
+            'FROM people p JOIN voiceprints v ON v.person_id = p.id WHERE ' + visible(self.scope) + ' ORDER BY p.id, v.id'
         )).fetchall()
         people: dict[int, tuple] = {}
         for pid, name, seen, notes_ok, n_notes, emb in rows:
@@ -219,7 +248,24 @@ class Store:
 
     # ---- 端末の持ち主（合言葉はハッシュだけを置く。照らし合わせは時間の差が出ない比べ方で） ----
 
+    async def protected(self, person_id: int) -> bool:
+        """この会話サーバーから消す・呼び名を変えることができない人か（開発用から見た、本番の人）"""
+        if self.scope == 'main':
+            return False
+        row = await (await self.conn.execute('SELECT origin FROM people WHERE id = %s', (person_id,))).fetchone()
+        return row is not None and row[0] != self.scope
+
+    async def _guard(self, person_id: int) -> None:
+        if await self.protected(person_id):
+            raise SharedPersonError(person_id)
+
     async def pair_device(self, device_id: str, secret_hash: str, person_id: int) -> None:
+        if self.scope != 'main':
+            # 開発用からは、本番の人の持ち主の登録を、別の人へ付け替えない
+            row = await (await self.conn.execute(
+                'SELECT person_id FROM device_owners WHERE device_id = %s', (device_id,))).fetchone()
+            if row is not None and row[0] != person_id:
+                await self._guard(row[0])
         await self.conn.execute(
             'INSERT INTO device_owners (device_id, secret_hash, person_id) VALUES (%s, %s, %s) '
             'ON CONFLICT (device_id) DO UPDATE SET secret_hash = EXCLUDED.secret_hash, person_id = EXCLUDED.person_id, '
@@ -231,7 +277,8 @@ class Store:
         return row[1] if row is not None and hmac.compare_digest(row[0], secret_hash) else None
 
     async def unpair_device(self, device_id: str, secret_hash: str) -> bool:
-        if await self.device_owner(device_id, secret_hash) is None:
+        pid = await self.device_owner(device_id, secret_hash)
+        if pid is None or await self.protected(pid):
             return False
         await self.conn.execute('DELETE FROM device_owners WHERE device_id = %s', (device_id,))
         return True
@@ -300,10 +347,11 @@ class Store:
             for i in delete:
                 await cur.execute('DELETE FROM person_notes WHERE id = %s AND person_id = %s', (i, person_id))
             for i, text in update.items():
-                await cur.execute('UPDATE person_notes SET text = %s, updated_at = now() WHERE id = %s AND person_id = %s',
-                                  (text, i, person_id))
+                await cur.execute('UPDATE person_notes SET text = %s, origin = %s, updated_at = now() '
+                                  'WHERE id = %s AND person_id = %s', (text, self.scope, i, person_id))
             for text in add:
-                await cur.execute('INSERT INTO person_notes (person_id, text) VALUES (%s, %s)', (person_id, text))
+                await cur.execute('INSERT INTO person_notes (person_id, text, origin) VALUES (%s, %s, %s)',
+                                  (person_id, text, self.scope))
             await cur.execute(
                 'DELETE FROM person_notes WHERE person_id = %s AND id NOT IN '
                 '(SELECT id FROM person_notes WHERE person_id = %s ORDER BY updated_at DESC, id DESC LIMIT %s)',
@@ -328,7 +376,8 @@ class Store:
             (person_id, r.stage, r.feeling, r.mood, r.sessions, r.stage_sessions))
 
     async def add_person(self, name: str) -> int:
-        row = await (await self.conn.execute('INSERT INTO people (name) VALUES (%s) RETURNING id', (name,))).fetchone()
+        row = await (await self.conn.execute('INSERT INTO people (name, origin) VALUES (%s, %s) RETURNING id',
+                                            (name, self.scope))).fetchone()
         return row[0]
 
     async def remember_person(self, name: str, embeddings: list[np.ndarray], person_id: int | None = None,
@@ -351,6 +400,11 @@ class Store:
         return {'name': row[0], 'notes_consented': row[1], 'voice_sample_count': row[2]} if row else None
 
     async def rename(self, person_id: int, name: str) -> None:
+        if await self.protected(person_id):
+            row = await (await self.conn.execute('SELECT name FROM people WHERE id = %s', (person_id,))).fetchone()
+            if row is not None and row[0] == name:
+                return   # 同じ名前で覚え直すだけ（声を足す）なら、変えずに続ける
+            raise SharedPersonError(person_id)
         await self.conn.execute('UPDATE people SET name = %s WHERE id = %s', (name, person_id))
 
     async def add_voiceprints(self, person_id: int, embeddings: list[np.ndarray], seconds: float | None,
@@ -380,10 +434,13 @@ class Store:
         await self.conn.execute('UPDATE people SET last_seen_at = now() WHERE id = %s', (person_id,))
 
     async def delete_person(self, person_id: int) -> None:
+        await self._guard(person_id)
         await self.conn.execute('DELETE FROM people WHERE id = %s', (person_id,))
 
     async def versions(self) -> dict[int, int]:
-        return dict(await (await self.conn.execute('SELECT person_id, revision FROM memory_versions')).fetchall())
+        return dict(await (await self.conn.execute(
+            'SELECT v.person_id, v.revision FROM memory_versions v JOIN people p ON p.id = v.person_id WHERE '
+            + visible(self.scope))).fetchall())
 
     async def memory_snapshot(self, person_id: int) -> dict | None:
         # One statement: revision, notes and forget barriers describe the same committed snapshot.

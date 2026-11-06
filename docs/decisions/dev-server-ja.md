@@ -13,7 +13,7 @@
 | コードの場所（自宅サーバー） | `~/work/ciel-companion/server` | `~/work/ciel-companion-dev/server`（`deploy-server.sh --dev`。本番の `compose.yaml` は送らない） |
 | 会話サーバー | 名前なし（ふつうの部屋に自動で入る） | 名前 `ciel-dev`（「ciel-dev を呼ぶ」部屋にだけ入る）。Compose のプロジェクト `ciel-dev`、状態確認の口 8091 |
 | デバッグ用の会話ログ | 切っている（[決定記録](debug-log-ja.md)） | いつも残す（7 日で消える） |
-| 覚えている人の記録 | DB のコンテナの `ciel` | 同じ DB のコンテナの `ciel_dev`（試験の登録・メモが本番の記憶に混ざらない。消せばやり直せる） |
+| 覚えている人の記録 | DB のコンテナの `ciel`（`CIEL_MEMORY_SCOPE=main`） | 同じ `ciel`（`CIEL_MEMORY_SCOPE=dev`）。持ち主のハカセの記憶とシエルの日記・好みは本番と共有し、開発用で覚えた人は本番から見えない（2026-11-06 に変更。[開発用と本番の記憶の共有](../shared-memory-ja.md)）。それまでは別のデータベース `ciel_dev` だった |
 | 議事録の下書き | 本番の Discord | 開発用の Discord のチャンネル（`server/.env.dev` の `CIEL_DEV_DISCORD_WEBHOOK`。利用者が書く。空ならサーバーに保存するだけ。本番の Webhook は必ず上書きして使わない） |
 | 読み上げ（Irodori-TTS） | 共通 | 共通（GPU は 1 つ。同時に話すと順番待ちが少し起きる。会話ごとに順番を回す） |
 | アプリ | ふだん | 設定 ＞ そのほか ＞ 開発「開発用のサーバーにつなぐ」。入れると、トークンを頼むときに部屋の設定 `room_config.agents = [{agent_name: "ciel-dev"}]` を添えて、つなぎ直す。左上に「C I E L ・ 開発用」 |
