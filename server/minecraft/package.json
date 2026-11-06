@@ -10,9 +10,12 @@
     "node": ">=22"
   },
   "dependencies": {
+    "canvas": "3.2.2",
     "mineflayer": "4.39.0",
     "mineflayer-collectblock": "1.6.0",
     "mineflayer-pathfinder": "2.4.5",
+    "playwright": "1.64.1",
+    "prismarine-viewer": "1.33.0",
     "ws": "8.22.1"
   },
   "devDependencies": {

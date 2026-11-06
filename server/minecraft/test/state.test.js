@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Vec3 } from 'vec3';
 
-import { footing, isNight, summarize } from '../src/state.js';
+import { facing, footing, isNight, summarize } from '../src/state.js';
 
 test('夜の範囲', () => {
   assert.equal(isNight(6000), false);
@@ -58,4 +58,14 @@ test('木の上にいれば、地面からの高さを数える', () => {
   assert.deepEqual(footing(bot), { on: 'oak_leaves', height: 5 });
   bot.blockAt = () => ({ name: 'grass_block', boundingBox: 'block' });
   assert.deepEqual(footing(bot), { on: 'grass_block', height: null });
+});
+
+test('向いている方角（mineflayer の yaw は北が 0、西が π/2）', () => {
+  const at = (yaw) => facing({ entity: { yaw } });
+  assert.equal(at(0), 'north');
+  assert.equal(at(Math.PI / 2), 'west');
+  assert.equal(at(Math.PI), 'south');
+  assert.equal(at(-Math.PI / 2), 'east');
+  assert.equal(at(Math.PI / 4), 'northwest');
+  assert.equal(facing(null), null);
 });

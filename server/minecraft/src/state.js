@@ -29,6 +29,14 @@ export function footing(bot) {
   }
   return { on: below.name, height };
 }
+// 向いている方角（マイクラの yaw：0 が北、北から西へ回る。mineflayer の yaw はラジアン）
+const DIRECTIONS = ['north', 'northwest', 'west', 'southwest', 'south', 'southeast', 'east', 'northeast'];
+export function facing(bot) {
+  if (!bot?.entity) return null;
+  const turn = ((bot.entity.yaw / (2 * Math.PI)) % 1 + 1) % 1;
+  return DIRECTIONS[Math.round(turn * 8) % 8];
+}
+
 const BLOCKS_COUNT = 256;
 // 「何が見える？」「木を集めて」に答えるための、近くのブロック（原木・鉱石・危ないもの・使えるもの）
 const INTERESTING = /_log$|_ore$|^(lava|crafting_table|chest|furnace|ancient_debris)$/;

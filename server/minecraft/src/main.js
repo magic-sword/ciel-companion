@@ -9,10 +9,11 @@ import { WebSocketServer } from 'ws';
 
 import { message, parseCommand } from './protocol.js';
 import { Care } from './care.js';
+import { Eye } from './eye.js';
 import { Guard } from './guard.js';
 import { carefulMovements } from './movements.js';
 import { Runner } from './skills.js';
-import { footing, isNight, nearbyBlocks, summarize } from './state.js';
+import { facing, footing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
 const MC = {
@@ -26,6 +27,7 @@ const MC = {
 const OWNER = env.MC_OWNER || null;
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
+const EYE_PORT = Number(env.EYE_PORT ?? 3007);   // 目（eye.js）の視点のページ。BODY_HOST だけで開く
 const STATE_EVERY_MS = 2000;
 const BLOCKS_EVERY_MS = 10000;
 const SPAWN_LOOK_MS = 1500;
@@ -46,6 +48,7 @@ function send(type, fields) {
 const guard = new Guard(send, OWNER);
 const runner = new Runner(send, OWNER, guard);
 const care = new Care(send, guard);
+const eye = new Eye({ host: BODY_HOST, port: EYE_PORT, log });
 let bot = null;
 
 const wss = new WebSocketServer({ host: BODY_HOST, port: BODY_PORT });
@@ -72,6 +75,7 @@ wss.on('connection', (ws) => {
       if (bot?.entity) bot.chat(cmd.text);
       else send('error', { reason: 'not_spawned' });
     } else if (cmd.type === 'state') send('state', state());
+    else if (cmd.type === 'look') look(cmd.id);
   });
   ws.on('close', () => {
     if (link !== ws) return;
@@ -82,6 +86,18 @@ wss.on('connection', (ws) => {
   ws.on('error', () => {});
 });
 wss.on('listening', () => log(`会話を待つ ws://${BODY_HOST}:${BODY_PORT}`));
+
+// 景色を 1 枚撮って返す。向いている方角も添える（「北を向いている」）
+async function look(id) {
+  const started = Date.now();
+  const r = await eye.look();
+  if (r.error) {
+    send('error', { id, reason: r.error });
+    return;
+  }
+  log(`景色を撮った（${r.jpeg.length} バイト、${Date.now() - started} ms）`);
+  send('seen', { id, jpeg: r.jpeg.toString('base64'), width: r.width, height: r.height, facing: facing(bot) });
+}
 
 let blocks = {};
 const state = () => summarize(bot, runner.doing(), blocks);
@@ -114,6 +130,7 @@ function connect() {
     runner.attach(b);
     guard.attach(b);
     care.attach(b);
+    eye.attach(b);
     b.pathfinder.setMovements(carefulMovements(b));
     b.pathfinder.thinkTimeout = PATH_THINK_MS;
     log('入った');
@@ -165,6 +182,7 @@ function connect() {
       runner.attach(null);
       guard.detach();
       care.detach();
+      eye.detach();
       bot = null;
     }
     send('event', { kind: 'disconnected' });
@@ -179,6 +197,7 @@ connect();
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     log('終える');
+    eye.close();
     bot?.quit();
     wss.close();
     process.exit(0);

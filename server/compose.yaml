@@ -132,6 +132,7 @@ services:
       - MC_OWNER=${MC_OWNER:-}
       - BODY_HOST=127.0.0.1
       - BODY_PORT=8768
+      - EYE_PORT=3007                   # 目（src/eye.js）の視点のページ。BODY_HOST（このマシンの中）だけで開く
     depends_on:
       - minecraft
     restart: unless-stopped

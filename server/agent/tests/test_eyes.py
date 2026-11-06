@@ -87,6 +87,31 @@ class EyesTest(unittest.TestCase):
         self.assertEqual(self.eyes.context(), '[見せてもらった画像]\n#1（2 分前）：白い犬の耳の女の子のイラスト')
 
 
+class SourceTest(unittest.TestCase):
+    def test_views_and_shown_pictures_are_kept_apart(self):
+        said = Said()
+        e = eyes.Eyes(said)
+        shown = e.receive(JPEG, 'cat.jpg')
+        for _ in range(4):
+            view = e.see_minecraft(JPEG, '北を向いている')
+        # 景色を何枚見ても、見せてもらった画像は押し出されない
+        self.assertIn(shown, e.pictures)
+        self.assertEqual(len([p for p in e.pictures if p.source == eyes.MINECRAFT]), eyes.KEEP)
+        self.assertEqual(len(said.calls), 1)   # 口に頼むのは、見せてもらった画像だけ
+        # 新しいものから見る。前の景色は、見ていなくても、もう添えない
+        self.assertIn('[わたしの目に見えている景色 #5（マイクラの中で、今わたしが見ているもの。北を向いている）]',
+                      e.message_for_reply('何が見える？').content[0])
+        self.assertIn('[見せてもらった画像 #1', e.message_for_reply('').content[0])
+        self.assertIsNone(e.message_for_reply(''))
+        shown.caption, view.caption = '猫の写真', '川と森の景色'
+        ctx = e.context()
+        self.assertIn('[見せてもらった画像]\n#1', ctx)
+        self.assertIn('[わたしの目で見た景色（マイクラ）]\n#5', ctx)
+
+    def test_not_an_image_view_is_dropped(self):
+        self.assertIsNone(eyes.Eyes(Said()).see_minecraft(b'nope'))
+
+
 class Reader:
     def __init__(self, chunks, name='x.jpg'):
         self.chunks, self.info = chunks, types.SimpleNamespace(name=name)

@@ -445,6 +445,8 @@ async def entrypoint(ctx: JobContext) -> None:
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
         # 目（eyes.py）：アプリから送られた画像を受け取り、話の切れ目に心が見て話す（why 'image'）
         seeing = eyes_.Eyes(voice.say_latest, agent.persona.image_caption_instructions, notify=notify)
+        if body is not None:
+            body.eyes = seeing   # マイクラの体の目で撮った景色も、同じ目の係が受ける
         ctx.room.register_byte_stream_handler(eyes_.TOPIC, seeing.on_stream)
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,

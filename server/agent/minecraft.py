@@ -10,8 +10,12 @@
   どう話すかは config/prompts/minecraft.md。
 - つなぐ先は環境変数 CIEL_MINECRAFT_URL（例 ws://127.0.0.1:8768）。空ならつながない（道具も心に渡さない。mind.py）。
   空のときにアプリがオンにしたら、unavailable と返す（refuse）。
+- 目：頼まれたら（道具 look_at_view）体に景色を 1 枚撮ってもらい（look → seen）、目の係（eyes.py）に渡す。
+  道具の返事の続きで、心がその絵を見て話す。docs/minecraft-vision-design-ja.md。
 """
 import asyncio
+import base64
+import binascii
 import itertools
 import json
 import logging
@@ -30,6 +34,9 @@ URL = os.environ.get('CIEL_MINECRAFT_URL', '')
 TOPIC = 'ciel.game'
 VERSION = 1
 START_TIMEOUT = 3.0       # 技を頼んでから「始めた」が返るまでの上限
+LOOK_TIMEOUT = 25.0       # 景色を頼んでから絵が返るまでの上限（初めはブラウザを開いて描き終えるまで 10 秒ほど）
+FACING = {'north': '北', 'northwest': '北西', 'west': '西', 'southwest': '南西', 'south': '南', 'southeast': '南東',
+          'east': '東', 'northeast': '北東'}
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
 BIG_HURT = 4              # 一度にこれだけ減ったら言う（体力は 20 まで）
 LOW_HEALTH = 6
@@ -105,6 +112,7 @@ class Body:
         self.diary = diary           # diary.Diary（倒した・倒れたなど、本当にあったことを残す）
         self.board = board           # board.Board（頼まれた技を付箋にする。同じ頼みを二重に受けない）
         self.notify = notify         # アプリへの知らせ（game.state）
+        self.eyes = None             # eyes.Eyes（撮った景色を渡す先。agent.py が置く）
         self.reason = 'off'          # つながっていない理由（off・connecting・busy）
         self._shown: tuple | None = None
         self._cards: dict[int, object] = {}   # 技の id → 付箋
@@ -209,10 +217,12 @@ class Body:
         elif kind == 'state':
             self.state = m
             self.publish()
-        elif kind in ('started', 'error'):
+        elif kind in ('started', 'error', 'seen'):
             f = self._pending.pop(m.get('id'), None)
             if f is not None and not f.done():
-                f.set_result({'status': 'started'} if kind == 'started' else {'status': 'error', 'reason': m.get('reason')})
+                f.set_result({'status': 'started'} if kind == 'started' else
+                             {'status': 'seen', 'message': m} if kind == 'seen' else
+                             {'status': 'error', 'reason': m.get('reason')})
         elif kind == 'done':
             self.on_done(m)
         elif kind == 'event':
@@ -241,6 +251,32 @@ class Body:
         if result.get('status') == 'started' and self.board is not None:
             self._cards[id_] = self.board.add('game', name, tasks.RUNNING, 'ciel', ref=str(id_))
         return result
+
+    async def look(self) -> dict:
+        """今の景色を 1 枚撮ってもらい、目の係に渡す。道具の返事の続きで、心がその絵を見る"""
+        if not self.linked or self._ws is None or self.eyes is None:
+            return {'status': 'unavailable'}
+        id_ = next(self._ids)
+        f = asyncio.get_running_loop().create_future()
+        self._pending[id_] = f
+        await self._send({'type': 'look', 'id': id_})
+        try:
+            result = await asyncio.wait_for(f, LOOK_TIMEOUT)
+        except asyncio.TimeoutError:
+            self._pending.pop(id_, None)
+            return {'status': 'no_answer'}
+        if result.get('status') != 'seen':
+            return result
+        m = result['message']
+        try:
+            jpeg = base64.b64decode(m.get('jpeg') or '', validate=True)
+        except (binascii.Error, ValueError):
+            return {'status': 'error', 'reason': 'bad_image'}
+        facing = FACING.get(m.get('facing') or '')
+        pic = self.eyes.see_minecraft(jpeg, f'{facing}を向いている' if facing else '')
+        if pic is None:
+            return {'status': 'error', 'reason': 'bad_image'}
+        return {'status': 'seen', 'view': pic.id, 'facing': facing}
 
     async def stop(self) -> dict:
         if not self.linked or self._ws is None:

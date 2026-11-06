@@ -71,9 +71,20 @@ async def look_around(context: RunContext) -> str:
     return _result({'status': 'ok', 'state': text} if text else {'status': 'unavailable'})
 
 
-TOOLS = [follow_me, come_here, go_to_place, collect_blocks, give_item, dig_down, stop_moving, look_around]
+@function_tool
+async def look_at_view(context: RunContext) -> str:
+    """マイクラで、自分の目で今の景色を見る（向いている方向の 1 枚の絵。呼んだあと、その絵が見える）。"""
+    body = _body(context)
+    r = await body.look() if body else {'status': 'unavailable'}
+    if r.get('status') == 'seen':
+        r['note'] = f"景色の絵は「[わたしの目に見えている景色 #{r['view']}]」として、この続きで見える"
+    return _result(r)
+
+
+TOOLS = [follow_me, come_here, go_to_place, collect_blocks, give_item, dig_down, stop_moving, look_around, look_at_view]
 # 体の道具の名前（mind.py が、体とつながっていないときに外す）
 BODY_TOOLS = tuple(t.id for t in TOOLS)
 # 配信のコメントから使ってよいか（tools/__init__.py）。体を動かすのは持ち主だけ（docs/minecraft-design-ja.md の 6 章）
 FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, give_item: False,
-                 dig_down: False, stop_moving: False, look_around: True}
+                 dig_down: False, stop_moving: False, look_around: True,
+                 look_at_view: False}   # 景色の絵は 1 枚 0.3 円ほどかかるので、コメントからは見ない

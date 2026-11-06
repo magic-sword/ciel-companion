@@ -225,10 +225,48 @@ class BodyDoTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(minecraft, 'START_TIMEOUT', 0.05):
             self.assertEqual(await body.do('follow'), {'status': 'no_answer'})
 
+    async def test_look_hands_the_view_to_the_eyes(self):
+        import base64
+        import eyes
+        body = linked_body()
+        body.eyes = eyes.Eyes(Said())
+        jpeg = eyes.MAGIC[0][0] + b'0' * 50
+
+        class LookWs(FakeWs):
+            async def send(self, raw):
+                m = json.loads(raw)
+                self.sent.append(m)
+                self.body.on_message(json.dumps({'v': 1, 'type': 'seen', 'id': m['id'], 'facing': 'west',
+                                                 'jpeg': base64.b64encode(jpeg).decode()}))
+        body._ws = LookWs(body, None)
+        self.assertEqual(await body.look(), {'status': 'seen', 'view': 1, 'facing': '西'})
+        self.assertEqual(body._ws.sent[0], {'v': 1, 'type': 'look', 'id': 1})
+        pic = body.eyes.pictures[-1]
+        self.assertEqual(pic.source, eyes.MINECRAFT)
+        self.assertIn('西を向いている', pic.label())
+        # 口には頼まない（道具の返事の続きで見る）
+        self.assertEqual(body.eyes.say.calls, [])
+
+    async def test_look_errors_and_silence(self):
+        import eyes
+        body = linked_body()
+        body.eyes = eyes.Eyes(Said())
+
+        class ErrWs(FakeWs):
+            async def send(self, raw):
+                m = json.loads(raw)
+                self.body.on_message(json.dumps({'v': 1, 'type': 'error', 'id': m['id'], 'reason': 'eye_unavailable'}))
+        body._ws = ErrWs(body, None)
+        self.assertEqual(await body.look(), {'status': 'error', 'reason': 'eye_unavailable'})
+        body._ws = FakeWs(body, None)
+        with mock.patch.object(minecraft, 'LOOK_TIMEOUT', 0.05):
+            self.assertEqual(await body.look(), {'status': 'no_answer'})
+
     async def test_unlinked_body_does_nothing(self):
         body = minecraft.Body('ws://test', Said())
         self.assertEqual(await body.do('follow'), {'status': 'unavailable'})
         self.assertEqual(await body.stop(), {'status': 'unavailable'})
+        self.assertEqual(await body.look(), {'status': 'unavailable'})
 
 
 def ctx_with(text):

@@ -88,6 +88,10 @@ export function parseCommand(raw) {
     }
     case 'state':
       return { cmd: { type: 'state' } };
+    // 今の景色を 1 枚撮る（eye.js）。返事は seen（JPEG を base64）か error
+    case 'look':
+      if (id === undefined) return { error: 'bad_id' };
+      return { cmd: { type: 'look', id } };
     default:
       return { error: 'unknown_type' };
   }
