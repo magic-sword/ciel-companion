@@ -3,7 +3,7 @@
 書き出し先：.local/cheek-integration/draft/runtime（Cubism の「moc3 ファイル書き出し」で、ここへ書き出しておく）。
 ほっぺの揺れ：押す量（ParamCielCheekPoke{L,R}）を入力に、短くて硬い振り子を揺らし、その角度を ParamCielCheekJiggle{L,R} へ出す。
 押した瞬間と、離した瞬間（押す量が急に 0 へ戻る）に振り子が振れ、数回揺れて止まる。揺れはワープの押す量に足される
-（integrate-cheek.py：押す量 + 0.6 × 揺れ）ので、離したあと、ほっぺが小さくふくらんだり戻ったりする。
+（v64 の組み込み：押す量 + 0.6 × 揺れ）ので、離したあと、ほっぺが小さくふくらんだり戻ったりする。
 """
 from pathlib import Path
 import copy

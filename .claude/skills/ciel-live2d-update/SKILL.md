@@ -23,13 +23,12 @@ description: シエルの Live2D モデルに部品・表情・動き（パラ�
 
 作業ファイルはすべて `.local/<作業名>/` に置く（Git 外）。版ごとのフォルダを Git に作らない。
 
-1. **組み込み（スクリプト）**：正式モデルを入力に、部品・パラメーター・ワープを足すスクリプトを `scripts/live2d/vNN/` に書く。
-   - 最初の入力は `official.require_official_rig(src)` で確かめる。Cubism で保存し直した途中のモデルは `official.require_current_lineage(src)`。
-   - .cmo3 の編集は `cmo3_tool.Cmo3`（文字列）と `cmo3_editor.Editor`（ElementTree：define・add_param・opacity_binding・replace_image・flush）。手本は `scripts/live2d/v64/`。
-   - 複数のパラメーターのキーフォームは、**最初のパラメーターが一番速く変わる順**に並べる（Cubism の書き出しは並び順でキーを引く。逆にすると別のキーの形が出る）。
-   - `forms.clear()` は属性も消すので `xs.n`・`count` を付け直す。
-   - ワープの子の座標は割合（0〜1）、回転の子は回転の中の画素。親を変えるときはキーフォームを変換する。
-2. **新しい絵の取り込み（Cubism）**：PSD を作り、ユーザーに Cubism で取り込んでもらうか、computer-use で操作する（java.exe の許可が要る）。取り込んだ層は「位置調整用デフォーマ」の下に入る。4頂点のメッシュは `crop_quad_mesh` で絵の範囲に切り詰めてから、スクリプトで親・座標・キーを付ける。
+**`.cmo3` の中身をスクリプトで読み書きしない**（Live2D の非公開形式。Cubism Editor の使用許諾に配慮して、読み書きの道具は 2026-11-07 に削除した）。`.cmo3` の編集はすべて Cubism Editor で行う。スクリプトが扱うのは、ハッシュの確認と、Cubism が書き出した SDK（`.moc3`・`.model3.json`・`.physics3.json`・`.motion3.json`・`.exp3.json`）だけ。
+
+1. **正式モデルのコピーで始める**：`rig/ciel.cmo3` を `.local/<作業名>/` に写し、`official.py` でハッシュを確かめる。
+2. **新しい絵の取り込みと組み込み（Cubism）**：PSD を作り（`scripts/live2d/gimp/build_layers_psd.py`）、ユーザーに Cubism で取り込んでもらうか、computer-use で操作する（java.exe の許可が要る）。メッシュ・デフォーマ・パラメーター・キーフォームも Cubism の画面で作る。
+   - 手順・キーの値・ワープの形は、作業前に文章と図でユーザーと決めてから操作する。computer-use で操作する場合も、区切りごとに保存して画面を見せる。
+   - 途中で保存し直したモデルはハッシュが変わるので、書き出した SDK を `official.py <書き出し>/Ciel.model3.json` で確かめる（今の SDK の部品・パラメーターが欠けていたら止まる）。
 3. **Cubism で開いて確かめ、書き出す**：エラーはログ `%APPDATA%\Live2D\Cubism5.3_Editor\logs\log.txt` で見る。
    - 新しいメッシュは「テクスチャアトラスに配置されていない」と出る。既存のアトラスで自動レイアウトすると大きな部品が押し出されるので、**小さい新しいテクスチャを追加**して、そこへ「選択要素をテクスチャアトラスに配置」し、座標（X・Y）か自動レイアウトで並べる。
    - 保存は数分かかる。書き出しは「ファイル > 組み込み用ファイル書き出し > moc3 ファイル書き出し」。
@@ -45,6 +44,6 @@ description: シエルの Live2D モデルに部品・表情・動き（パラ�
 
 ## Git には現行だけ
 
-- Git に置くのは `assets/ciel/{current,rig,runtime,master,reference}` と `rig/proofs/current`、共通の道具（`scripts/live2d/` の cmo3_tool・cmo3_editor・cubism_core・render-moc・official・prepare-current-runtime など）と最新の版のスクリプトだけ。
+- Git に置くのは `assets/ciel/{current,rig,runtime,master,reference}` と `rig/proofs/current`、共通の道具（`scripts/live2d/` の cubism_core・render-moc・official・prepare-current-runtime など）と最新の版のスクリプトだけ。
 - 古い版は Git の履歴（タグ `archive/pre-history-cleanup` など）とローカルの `.local/history/` にある。Git から外すときは、先にタグを付け、`.local/history/` へ写してから消す。
 - ローカルのファイルは、ユーザーが頼まない限り消さない。

@@ -86,7 +86,7 @@ def check():
 
 
 def adopt():
-    official.require_current_lineage(EDITED)
+    official.require_current_export(DRAFT/'Ciel.model3.json')
     assert read(PROOF/'runtime-verification.json')['moc_sha256'] == sha(DRAFT/'Ciel.moc3'), 'run --check first'
     approved = read(CURRENT/'approved.json')
     previous = approved['rig_sha256']

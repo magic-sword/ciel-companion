@@ -153,8 +153,6 @@ Claude Code は、この経過で見た目の評価を 3 回甘く報告した�
 | --- | --- |
 | `scripts/live2d/gimp/build_layers_psd.py` | 層の一覧（JSON）から Cubism 用の PSD を作る |
 | `scripts/live2d/cubism_core.py`・`render-moc.py` | 書き出したモデルを、Cubism Core の計算で描く（Unity を起動せずに数秒） |
-| `scripts/live2d/analyze-rig.py` | リグの構造と、角度ごとの各メッシュの動きの量を表にする |
-| `scripts/live2d/caff.py`・`cmo3_tool.py`・`mesh_ops.py` | `.cmo3` の読み書きと、描画順・不透明度・メッシュの一括編集 |
 | `unity/Assets/Editor/CielRenderCheck.cs` | Unity でパラメーターを変えて撮影する |
 | `scripts/codex/run-codex.ps1` | Codex への依頼（`codex exec`） |
 
