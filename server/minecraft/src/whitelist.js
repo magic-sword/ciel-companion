@@ -1,7 +1,7 @@
 // アカウントの確認なし（online-mode=false）のサーバー用の whitelist.json を出す。
 // そのサーバーでのプレイヤーの ID は「OfflinePlayer:名前」の MD5 から作る（UUID v3）。rcon-cli の whitelist add は
 // ふつうのアカウントの ID で登録するので、そのままでは入れない（2026-11-05、自宅サーバーで確かめた）。
-//   node src/whitelist.js Ciel Hakase4364 > whitelist.json
+//   node src/whitelist.js Ciel Hakase4364 Ciel_Debug > whitelist.json
 import { createHash } from 'node:crypto';
 
 export function offlineUuid(name) {

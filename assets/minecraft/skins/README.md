@@ -6,6 +6,7 @@
 |---|---|---|---|
 | `Ciel.png` | シエル（ボットのプレイヤー名 `Ciel`） | スリム（腕 3 px） | 顔は候補 D。Ears の設定（左下 x 0〜3・y 32〜35）と、立体の耳（x 24〜39・y 0〜7、裏 x 56〜63・y 28〜43）・尻尾（x 56〜63・y 16〜27）の絵入り |
 | `Hakase4364.png` | 博士（持ち主のプレイヤー名） | ふつう（腕 4 px） | 黒髪・琥珀色の目・灰色のコート |
+| `Ciel_Debug.png` | デバッグ用のボット `Ciel_Debug` | スリム（腕 3 px） | シエルの 2P カラー。形・Ears の設定は `Ciel.png` と同じで、色だけ黒い服と緑のターミナル色の光（2026-11-07） |
 
 ファイル名はプレイヤー名なので変えない。
 
@@ -15,7 +16,7 @@
 
 1. ランチャーの起動構成（今は「CIEL」、ゲームディレクトリ `D:\CIEL\apps\minecraft\data1`）のバージョンを `fabric-loader-0.20.1-1.21.11` にする。
 2. ゲームディレクトリの `mods\` に、CustomSkinLoader（`CustomSkinLoader_Universal-15.1.jar`）と Ears（`ears-fabric-1.21.11-2.2.1-c.jar`）を置く（どちらも Modrinth）。
-3. `CustomSkinLoader\LocalSkin\skins\` に、このフォルダの 2 枚を置く。
+3. `CustomSkinLoader\LocalSkin\skins\` に、このフォルダの 3 枚を置く。
 4. 一度起動すると `CustomSkinLoader\CustomSkinLoader.json` ができる。`loadlist` を `LocalSkin` だけにする（既定では Mojang や外部のスキンサービスを先に探し、別人の「ciel」のスキンが出た。外部への問い合わせも止まる）。
 
 既存の `.minecraft` の `mods\` には Forge 1.20.1 の Mod があるので、同じフォルダに入れない。ランチャーを開いたまま `launcher_profiles.json` を書き換えると、ランチャーに上書きされる（2026-11-06、足した起動構成が消えた）。

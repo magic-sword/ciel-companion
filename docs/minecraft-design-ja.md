@@ -182,7 +182,7 @@ Node.js（Mineflayer ＋ mineflayer-pathfinder ＋ mineflayer-collectblock）。
 2. 起動：`docker compose --env-file .env --env-file .env.minecraft --profile minecraft up -d --build minecraft minecraft-body`（入れ直し・止めるときも、同じ `--env-file` と `--profile` を付ける。付けないと、別の設定で作り直したり、何もしなかったりする）
 3. ホワイトリスト：
    ```sh
-   docker compose exec -T minecraft-body node src/whitelist.js Ciel （持ち主のプレイヤー名） | docker compose exec -T minecraft sh -c 'cat > whitelist.json'
+   docker compose exec -T minecraft-body node src/whitelist.js Ciel （持ち主のプレイヤー名） Ciel_Debug | docker compose exec -T minecraft sh -c 'cat > whitelist.json'
    docker compose exec -T minecraft rcon-cli whitelist reload
    ```
 4. 体は、外されても 5〜60 秒あけて入り直す。すぐ入れたいときは 2 と同じ形で `restart minecraft-body`。
@@ -296,3 +296,7 @@ docker compose logs -f minecraft-body
 - **掘る前に地面を待つ**（`groundedDig`）：mineflayer は掘り始めた瞬間に掘る時間を決め、足が浮いていると 5 倍にする。足が地面に着くのを 2 秒まで待ってから掘る。5 秒以上かかる掘り方はログに残す。
 - **落ちた物を拾う**（`pickUpNear`）：collectblock は、掘ったブロックの真ん中から 0.5 以内に落ちた物しか拾わない。掘ったあと、まわり 4 ブロックに落ちている物を拾いに行く。
 - **スポーンの守り**：「原木を集めて」で、掘っても掘っても原木が減らず空振りした（2026-11-06）。原因は、マイクラのサーバーの `spawn-protection=16`。スポーンから 16 ブロックの中は管理者しか壊せず、管理者でないシエルが掘ると、サーバーが元に戻す。この守りは管理者が 1 人もいないあいだは働かず、持ち主を管理者にした（`op`）ことで働き始めた。`server/compose.yaml` の `SPAWN_PROTECTION=0` で切った。切ったあと、同じ場所で原木 3 本を 15 秒で掘って拾えた。上の水・地面・拾う直しは、この調べの途中で見つけた別の手当て。
+
+## 20. デバッグ用のボット `Ciel_Debug`（2026-11-07）
+
+体や目を試すときに、シエル（`Ciel`）とは別に入れるボットの名前は `Ciel_Debug` にする（前は `CielEye`）。配信に映っても、デバッグ役だとひと目で分かるように。見た目はシエルの 2P カラー（形はそのまま、黒い服に緑のターミナル色の光）で、スキンは [assets/minecraft/skins/](../assets/minecraft/skins/README.md)。ホワイトリストには `Ciel`・持ち主・`Ciel_Debug` の 3 人を入れる（初回の 3）。試作の `~/work/ciel-eye-proto/proto.js`（自宅サーバー、Git の外）もこの名前で入る。
