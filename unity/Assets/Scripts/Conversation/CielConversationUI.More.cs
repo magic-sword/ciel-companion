@@ -30,7 +30,7 @@ namespace Ciel.Conversation
             area.gameObject.AddComponent<SafeArea>();
 
             var rows = new List<(string icon, Action click, Action<Image, Text> keep)>();
-            if (WindowsFileDialog.Available)
+            if (CielConversation.CanPickImage)
                 rows.Add(("image", () => { ShowMorePop(false); _conversation.PickAndShareImage(); },
                           (i, t) => (_moreImageIcon, _moreImageText) = (i, t)));
             rows.Add(("minutes", () => { ShowMorePop(false); ShowSummary(true); },

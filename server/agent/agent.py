@@ -449,7 +449,7 @@ async def entrypoint(ctx: JobContext) -> None:
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body,
-                               eyes=seeing)
+                               eyes=seeing, self_image=agent.persona.self_image)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 

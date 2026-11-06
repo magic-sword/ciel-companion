@@ -128,6 +128,15 @@ class MindTest(unittest.TestCase):
         self.assertTrue(any(isinstance(c, llm.ImageContent) for i in deep.items for c in getattr(i, 'content', [])))
         self.assertEqual(m.route(ctx_with('ありがとう'), {'seconds': 1.0}), 'talker')
 
+    def test_ciels_own_picture_always_follows_the_instructions(self):
+        m = mind.Mind(Conversation(), self_image='data:image/jpeg;base64,AAAA')
+        ctx = ctx_with('こんにちは')
+        for built in (m.build(ctx, turn={}), m.build(ctx, talker_instructions='短い指示', turn={})):
+            first = built.items[1]
+            self.assertEqual(built.items[0].role, 'system')
+            self.assertIn('[わたしの姿]', first.content[0])
+            self.assertIsInstance(first.content[1], llm.ImageContent)
+
     def test_the_notice_alone_shows_the_picture(self):
         e = eyes.Eyes(Said())
         m = mind.Mind(Conversation(), eyes=e)

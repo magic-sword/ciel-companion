@@ -62,7 +62,8 @@ BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まっ�
 
 class Mind:
     def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
-                 brief_instructions: str = '', client=None, board=None, body=None, eyes=None) -> None:
+                 brief_instructions: str = '', client=None, board=None, body=None, eyes=None,
+                 self_image: str = '') -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
@@ -70,6 +71,10 @@ class Mind:
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.body = body              # minecraft.Body（マイクラの体。つなぐときだけ）
         self.eyes = eyes              # eyes.Eyes（見せてもらった画像）
+        # シエル自身の姿の絵（data URL）。指示のすぐ後ろにいつも置き、自分の姿を絵としても知っているようにする。
+        # 毎回同じ始まりなので、OpenAI のキャッシュで安くなる。画像を見せたときだけ添えると、関係ない画像にも
+        # 自分を探しにいくおそれがあった（ユーザーの方針。2026-11-06）
+        self.self_image = self_image
         self.quiet_turn = quiet_turn  # ひかえめのときの念押し（config/prompts/talk_quiet_turn.md）
         self.brief_instructions = brief_instructions   # config/prompts/mind_brief.md
         self._client = client
@@ -185,6 +190,10 @@ class Mind:
             out.add_message(role='system', content=talker_instructions)
         elif instructions is not None:
             out.items.append(instructions)
+        if self.self_image:
+            out.items.append(llm.ChatMessage(role='user', content=[
+                '[わたしの姿]（わたし、シエルの見た目の絵。いつも知っている自分の姿）',
+                llm.ImageContent(image=self.self_image, inference_detail='low')]))
         for t in self._recent(TALKER_TURNS if talker_instructions is not None else DEEP_TURNS):
             text = t.text[:TURN_CHARS]
             if t.role == 'user':

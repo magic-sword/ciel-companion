@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """会話開始時に、TOML の指定に従って Markdown のプロンプトを読み込む。"""
+import base64
 import hashlib
 import json
 import os
@@ -52,6 +53,8 @@ class Persona:
     minecraft_instructions: str
     image_voice_instructions: str
     image_caption_instructions: str
+    # シエル自身の姿の絵（data URL。無ければ空）。心と小脳へ、会話の最初にいつも置く（mind.py の build）
+    self_image: str = ''
 
     @property
     def fingerprint(self) -> str:
@@ -69,7 +72,8 @@ class Persona:
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
              self.mind_brief_instructions, self.listener_instructions, self.tasks_instructions,
              self.initiative_open_nudge, self.research_found_nudge, self.minecraft_instructions,
-             self.image_voice_instructions, self.image_caption_instructions],
+             self.image_voice_instructions, self.image_caption_instructions,
+             hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
             ensure_ascii=False,
         )
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -113,4 +117,13 @@ def load_persona() -> Persona:
         if not content.strip():
             raise ValueError(f'プロンプトが空です ({file_key}): {prompt_path}')
         values[key] = content
+    # シエル自身の姿の絵（任意）。長い辺 768 ほどの JPEG を置く。キャッシュで安く渡せるよう、毎回同じ中身にする
+    image = config.get('self_image_file')
+    if isinstance(image, str) and image.strip():
+        image_path = Path(image) if Path(image).is_absolute() else path.parent / image
+        try:
+            data = image_path.read_bytes()
+        except OSError as exc:
+            raise ValueError(f'シエルの姿の絵を読み込めません (self_image_file): {image_path}: {exc}') from exc
+        values['self_image'] = 'data:image/jpeg;base64,' + base64.b64encode(data).decode('ascii')
     return Persona(**values)

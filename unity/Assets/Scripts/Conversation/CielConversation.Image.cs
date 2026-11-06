@@ -1,5 +1,5 @@
 // 会話（CielConversation）のうち、シエルに画像を見せる（docs/vision-design-ja.md）。
-// 画像を選び（Windows：WindowsFileDialog）、長い辺 MaxSide に縮めて JPEG にし、LiveKit のファイル送信（topic ciel.image）で
+// 画像を選び（Windows：WindowsFileDialog、Android：Plugins/Android/CielImagePicker.java の標準の選ぶ画面）、長い辺 MaxSide に縮めて JPEG にし、LiveKit のファイル送信（topic ciel.image）で
 // 会話サーバー（server/agent/eyes.py）へ送る。受け取ったか・だめだった理由は、会話サーバーが image.state で返す。
 // 送るために一時ファイルを書き、送り終えたら消す。
 using System;
@@ -17,8 +17,10 @@ namespace Ciel.Conversation
         const int JpegQuality = 85;
         const long MaxSourceBytes = 40_000_000;
 
-        /// 画像を見せられるか（今は Windows だけ。つないでいるとき）
-        public bool CanShareImage => WindowsFileDialog.Available && Status == State.Connected;
+        /// この端末で画像を選べるか（Windows・Android）
+        public static bool CanPickImage => WindowsFileDialog.Available || Application.platform == RuntimePlatform.Android;
+        /// 画像を見せられるか（選べる端末で、つないでいるとき）
+        public bool CanShareImage => CanPickImage && Status == State.Connected;
         /// 見せた画像の様子：sending・received・failed（と理由 ImageReason）。空なら何もしていない
         public string ImageState { get; private set; } = "";
         public string ImageReason { get; private set; } = "";
@@ -30,8 +32,35 @@ namespace Ciel.Conversation
         public void PickAndShareImage()
         {
             if (!CanShareImage || _sendingImage) return;
+            if (Application.platform == RuntimePlatform.Android)
+            {
+                StartCoroutine(PickOnAndroid());
+                return;
+            }
             var path = WindowsFileDialog.PickImage("シエルに見せる画像を選ぶ");
             if (!string.IsNullOrEmpty(path)) StartCoroutine(ShareImage(path));
+        }
+
+        // Android：標準の選ぶ画面を開き、選び終わるのを待つ。選んだ画像は Java の側で縮めた JPEG になっている（あとで消す）
+        IEnumerator PickOnAndroid()
+        {
+            _sendingImage = true;
+            string picked = null;
+            try
+            {
+                using var picker = new AndroidJavaClass("com.ciel.companion.CielImagePicker");
+                using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+                {
+                    if (!picker.CallStatic<bool>("pick", activity)) yield break;
+                }
+                while ((picked = picker.CallStatic<string>("poll")) == null)
+                    yield return new WaitForSecondsRealtime(0.2f);
+            }
+            finally { _sendingImage = false; }
+            if (picked == "") yield break;   // 取り消した・読めなかった
+            yield return ShareImage(picked);
+            try { File.Delete(picked); } catch (Exception) { }
         }
 
         IEnumerator ShareImage(string path)

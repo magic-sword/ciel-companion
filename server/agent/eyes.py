@@ -134,7 +134,8 @@ class Eyes:
         if pic.caption is None and self.caption_instructions:
             self._spawn(self._caption(pic))
         debug_log.record('image_shown', id=pic.id)
-        return llm.ChatMessage(role='user', content=[f'[見せてもらった画像 #{pic.id}{"（" + pic.name + "）" if pic.name else ""}]',
+        label = f'[見せてもらった画像 #{pic.id}{"（" + pic.name + "）" if pic.name else ""}]'
+        return llm.ChatMessage(role='user', content=[label,
                                                      llm.ImageContent(image=pic.data_url, inference_detail='auto')])
 
     def context(self) -> str | None:

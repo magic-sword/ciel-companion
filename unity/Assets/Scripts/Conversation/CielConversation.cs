@@ -526,6 +526,7 @@ namespace Ciel.Conversation
             _room.TrackUnsubscribed += OnTrackUnsubscribed;
             _room.DataReceived += OnDataReceived;
             _room.ParticipantConnected += OnParticipantConnected;
+            _room.ParticipantDisconnected += OnParticipantDisconnected;   // 会話サーバーが出ていった（CielConversation.Agent.cs）
             _room.ParticipantAttributesChanged += OnParticipantAttributesChanged;
             _room.Disconnected += OnRoomDisconnected;
             _room.ActiveSpeakersChanged += OnActiveSpeakersChanged;
@@ -539,6 +540,7 @@ namespace Ciel.Conversation
             SetMinutesRecording(false);   // 会話サーバーは部屋ごとに新しく入るので、議事録はとっていない
             SetSongState("idle");
             SetStatus(State.Connected);
+            StartAgentWatch();   // 会話サーバーが来るかを見始める（CielConversation.Agent.cs）
             if (_restartAfterConnect)
             {
                 // つないでいる途中で、本番・開発用が切り替えられた。選ばれたほうの部屋につなぎ直す
@@ -729,6 +731,7 @@ namespace Ciel.Conversation
         // 会話サーバーが後から部屋に入っても、今のモードが伝わるように送り直す
         void OnParticipantConnected(Participant participant)
         {
+            NoteAgentJoined(participant);
             SendStyle();
             SendVolume();
             SendDeviceHello();
@@ -738,6 +741,7 @@ namespace Ciel.Conversation
         void OnParticipantAttributesChanged(Participant participant)
         {
             if (participant == null || participant.Attributes == null) return;
+            NoteAgentJoined(participant);
             if (!participant.Attributes.TryGetValue(AgentStateAttribute, out var state) || state == AgentState) return;
             AgentState = state;
             if (state == "speaking") _thinkingSince = -1f;   // 声が出たので、考え終わった
@@ -1396,6 +1400,7 @@ namespace Ciel.Conversation
                 _room.TrackUnsubscribed -= OnTrackUnsubscribed;
                 _room.DataReceived -= OnDataReceived;
                 _room.ParticipantConnected -= OnParticipantConnected;
+                _room.ParticipantDisconnected -= OnParticipantDisconnected;
                 _room.ParticipantAttributesChanged -= OnParticipantAttributesChanged;
                 _room.Disconnected -= OnRoomDisconnected;
                 _room.ActiveSpeakersChanged -= OnActiveSpeakersChanged;
@@ -1421,6 +1426,7 @@ namespace Ciel.Conversation
             PresenceReason = "";
             AgentState = "";
             _thinkingSince = -1f;
+            ResetAgentWatch();
             SetStatus(State.Disconnected);
         }
 

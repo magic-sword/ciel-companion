@@ -169,7 +169,7 @@ namespace Ciel.Conversation
             {
                 var s = _conversation.Status;
                 if (s == CielConversation.State.Failed || s == CielConversation.State.Disconnected) _conversation.StartConversation();
-                else if (s == CielConversation.State.Connected && _conversation.ProblemStopped) _conversation.Reconnect();
+                else if (s == CielConversation.State.Connected && (_conversation.ProblemStopped || _conversation.AgentMissing != "")) _conversation.Reconnect();
             });
             var dot = Rect("Dot", link, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(6, 0), new Vector2(6, 6));
             _linkDot = Img(dot, "circle", Mint);
@@ -402,6 +402,8 @@ namespace Ciel.Conversation
                 CielConversation.State.Connecting => (Amber, "つないでいます…"),
                 CielConversation.State.Failed => (Alert, "つながらない・タップで再試行"),
                 CielConversation.State.Disconnected => (Idle, "未接続・タップでつなぐ"),
+                _ when c.AgentMissing == "never" => (Alert, "シエルのサーバーが応答しません・タップで再試行"),
+                _ when c.AgentMissing == "left" => (Alert, "シエルのサーバーから切れました・タップでつなぐ"),
                 _ when problem != "" && c.ProblemStopped => (Alert, $"止まっています・{ProblemLabel(problem)}"),
                 _ when problem != "" => (Amber, $"{ServiceLabel(c.ProblemService)}に失敗・{ProblemLabel(problem)}"),
                 _ => (Mint, "つながっています"),
@@ -448,6 +450,7 @@ namespace Ciel.Conversation
                 CielConversation.State.Connecting => ("シエルに接続しています…", ""),
                 CielConversation.State.Failed => ("接続できませんでした", ""),
                 CielConversation.State.Disconnected => ("接続していません", ""),
+                _ when c.AgentMissing != "" => ("シエルのサーバーとつながりません", "サーバーが止まっているかもしれません"),
                 _ when c.ProblemStopped => ("シエルが止まっています", "左上をタップすると、つなぎ直します"),
                 _ when speaking => ("話しています", "S P E A K I N G"),
                 _ when Thinking(c) => ("考えています…", "T H I N K I N G"),   // 聞き終えて、返事を考えている（声が出るまでの間も、聞こえたと分かるように）
