@@ -16,7 +16,15 @@ const COME_RANGE = 2;
 const SEARCH_DISTANCE = 48; // 集めるブロックを探す距離
 const FIND_COUNT = 64;
 const TRIES_PER_ITEM = 3;   // 1 個あたりに試すブロックの数（掘れないものが続いたらあきらめる）
-const PATH_ERRORS = /Timeout|NoPath|No path|decide path|GoalChanged|PathStopped/i;
+const PATH_ERRORS = /Timeout|NoPath|No path|decide path|GoalChanged|PathStopped|Stuck/i;
+const STILL_MS = 8000;      // 歩く・集めるあいだ、動かず・掘らず・置かずがこれだけ続いたら、行き先を取り消す（watched）
+const STILL_MOVE = 0.3;
+const PICKUP_RANGE = 4;       // 掘ったブロックから、拾いに行く範囲（ブロック）
+const PICKUP_MAX = 4;         // 1 つのブロックのあとに拾いに行く数
+const PICKUP_SETTLE_TICKS = 6;
+const PICKUP_WAIT_MS = 1500;  // そばへ行ってから、拾えるまで待つ
+const GROUND_WAIT_MS = 2000; // 掘る前に、足が地面に着くのを待つ上限
+const SLOW_DIG_MS = 5000;    // これより時間のかかる掘り方は、ログに残す     // 動いたとみなす距離（ブロック）
 const STUCK_MS = 8000;      // ついていくとき、離れたまま、これだけ近づけず、その場から動けなければ、詰まったとみなす
 const STUCK_MOVE = 4;       // その場から動いたとみなす距離（ブロック。木の上で旋回しても、ここまでは動く）
 const CLOSER = 1;           // 近づいたとみなす距離（ブロック）
@@ -53,6 +61,7 @@ export class Runner {
 
   attach(bot) {
     this.bot = bot;
+    if (bot) groundedDig(bot);
   }
 
   doing() {
@@ -141,12 +150,88 @@ function gained(before, after) {
 
 const total = (g) => Object.values(g).reduce((a, b) => a + b, 0);
 
+// 掘る前に、足が地面に着くのを待つ（GROUND_WAIT_MS まで）。mineflayer は掘り始めた瞬間に掘る時間を決め、足が浮いていると
+// 5 倍にする（地面に降りても戻さない）。着いた直後の跳ねている瞬間に掘り始め、原木 1 本に 15 秒、腕を振り続けて
+// 空振りに見えた（2026-11-06）。時間のかかる掘り方をしたら、あとで確かめられるようログに残す
+export function groundedDig(bot, log = console.log) {
+  if (bot.__groundedDig) return;
+  bot.__groundedDig = true;
+  const dig = bot.dig.bind(bot);
+  bot.dig = async (block, ...rest) => {
+    const end = Date.now() + GROUND_WAIT_MS;
+    while (bot.entity && !bot.entity.onGround && !bot.entity.isInWater && Date.now() < end) await bot.waitForTicks(1);
+    const ms = bot.digTime(block);
+    if (ms >= SLOW_DIG_MS) {
+      log(`掘るのに時間がかかる block=${block?.name} ms=${ms} onGround=${bot.entity?.onGround} inWater=${bot.entity?.isInWater} held=${bot.heldItem?.name ?? "なし"}`);
+    }
+    return dig(block, ...rest);
+  };
+}
+
+// 掘ったブロックのまわり（PICKUP_RANGE）に落ちている物を拾いに行く。collectblock は、掘ったブロックの真ん中から 0.5 以内に
+// 落ちた物しか拾わず、少しずれて落ちた原木や、高い所から落ちた原木を拾わなかった（4 本掘って 0 本。2026-11-06）
+export async function pickUpNear(bot, pos, guard, token) {
+  const center = pos.offset(0.5, 0.5, 0.5);
+  await bot.waitForTicks(PICKUP_SETTLE_TICKS);   // 落ちきるのを待つ
+  for (let i = 0; i < PICKUP_MAX && !token.cancelled; i++) {
+    const me = bot.entity.position;
+    const item = Object.values(bot.entities)
+      .filter((e) => e.name === 'item' && e.position && e.position.distanceTo(center) <= PICKUP_RANGE)
+      .sort((a, b) => a.position.distanceTo(me) - b.position.distanceTo(me))[0];
+    if (!item) return;
+    try {
+      await guarded(guard, token, () => {
+        bot.pathfinder.setMovements(playerMovements(bot));
+        const p = item.position;
+        return watched(bot, () => bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 1)));
+      });
+    } catch (err) {
+      if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+      return;
+    }
+    const end = Date.now() + PICKUP_WAIT_MS;
+    while (bot.entities[item.id] && Date.now() < end) await bot.waitForTicks(2);
+    if (bot.entities[item.id]) return;   // 拾えない（葉の上など）。あきらめる
+  }
+}
+
+// 見張り：run（経路探索を使う処理）のあいだ、体が動かず・掘らず・置かずのままなら、行き先を取り消して Stuck で終える。
+// mineflayer-pathfinder は、道を歩き終えたのに行き先に届いていない（原木が葉に隠れて見えない位置で止まった）と、
+// 道を探し直さずに待ち続ける。止める合図（stop）もその状態では効かず、原木を集める技が 14 分止まった（2026-11-06）
+export async function watched(bot, run, stillMs = STILL_MS) {
+  let last = bot.entity.position.clone();
+  let at = Date.now();
+  let fired = false;
+  const timer = setInterval(() => {
+    // 掘っているあいだだけは、動かなくても待つ。足場を積むときは体が上がるので動いたと分かる（積もうとして跳ね続け、
+    // 天井の葉で上がれずに止まったとき、積んでいる最中とみなして待ち続けた。2026-11-06）
+    const busy = bot.targetDigBlock;
+    if (busy || bot.entity.position.distanceTo(last) > STILL_MOVE) {
+      last = bot.entity.position.clone();
+      at = Date.now();
+    } else if (!fired && Date.now() - at > stillMs) {
+      fired = true;
+      bot.pathfinder.setGoal(null);   // goto は GoalChanged で終わる（collectblock の中でも）
+    }
+  }, 1000);
+  const stuck = () => Object.assign(new Error('Stuck: no progress'), { name: 'Stuck' });
+  try {
+    const r = await run();
+    if (fired) throw stuck();
+    return r;
+  } catch (err) {
+    throw fired ? stuck() : err;
+  } finally {
+    clearInterval(timer);
+  }
+}
+
 // 歩いて行く。ふつうのプレイヤーの歩き方（飛び降りる・自然のブロックを壊す・足場を積む）で行き、道が無ければ、
 // 足場が無いなら近くで集め、少し高い段差も飛び降りる歩き方でもう一度。守りに割り込まれたら、守り終えてから続ける（guarded）
 async function walk(bot, guard, token, goal) {
   const go = (movements) => guarded(guard, token, () => {
     bot.pathfinder.setMovements(movements(bot));
-    return bot.pathfinder.goto(goal());
+    return watched(bot, () => bot.pathfinder.goto(goal()));
   });
   try {
     return await go(playerMovements);
@@ -179,8 +264,9 @@ export async function gatherScaffold(bot, guard, token) {
     try {
       await guarded(guard, token, () => {
         bot.collectBlock.movements = playerMovements(bot);
-        return bot.collectBlock.collect(target);
+        return watched(bot, () => bot.collectBlock.collect(target));
       });
+      await pickUpNear(bot, pos, guard, token);
     } catch (err) {
       if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
     }
@@ -305,9 +391,10 @@ const SKILL_RUN = {
         try {
           await guarded(guard, token, () => {
             bot.collectBlock.movements = playerMovements(bot);   // 守る係が歩き方を変えたあとでも、掘れるように戻す
-            return bot.collectBlock.collect(target);
+            return watched(bot, () => bot.collectBlock.collect(target));
           });
           rememberAround(bot, pos, (n) => names.has(n));   // 木の幹の上のほうも、続けて集められる
+          await pickUpNear(bot, pos, guard, token);
         } catch (err) {
           // そのブロックへの道が見つからない・決めきれない。技全体はやめずに、次のブロックへ
           // （遠くの木で「Took to long to decide path」になり、集めるのを丸ごとやめた。2026-11-05）

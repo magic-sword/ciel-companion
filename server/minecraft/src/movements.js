@@ -20,6 +20,7 @@ export const TREE = /_leaves$|_log$|_wood$/;
 
 const ESCAPE_DROP_MAX = 12;   // 体力が十分なら、ここまで飛び降りる（ダメージ 9）
 const KEEP_HEALTH = 8;        // 飛び降りたあとに残す体力（20 まで）
+const LIQUID_COST = 10;   // 水・溶岩の 1 マスを、ふつうの 10 歩分の遠回りとみなす（既定は 1）
 const PLAYER_DROP = 4;   // ふだん飛び降りる高さ（ダメージは 1 まで）
 // 足場に積んでよい、手持ちのブロック（自然のもの。板・原木のように、作るのに使う物は積まない）
 export const SCAFFOLD = ['dirt', 'cobblestone', 'cobbled_deepslate', 'netherrack', 'stone', 'andesite', 'diorite', 'granite',
@@ -34,6 +35,9 @@ export function playerMovements(bot) {
   m.canDig = true;
   m.maxDropDown = PLAYER_DROP;
   m.allow1by1towers = true;
+  // 水の中はなるべく通らず、水の中で止まって掘らない（水の中では掘るのが 5 倍遅く、原木 1 本に 15 秒かかった。
+  // 泳ぎながらでは進めず、落ちた原木も拾えなかった。2026-11-06）
+  m.liquidCost = LIQUID_COST;
   m.scafoldingBlocks = SCAFFOLD.map((n) => bot.registry.itemsByName[n]?.id).filter((id) => id !== undefined);
   for (const b of Object.values(bot.registry.blocksByName)) {
     if (!NATURAL.test(b.name)) m.blocksCantBreak.add(b.id);
