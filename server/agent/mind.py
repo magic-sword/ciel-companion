@@ -29,6 +29,7 @@ import debug_log
 import models
 import tools as toolbox
 import game_knowledge
+from tools.goals import GOAL_TOOLS
 from tools.minecraft import BODY_TOOLS
 from jst import JST
 from summaries import live
@@ -72,6 +73,7 @@ class Mind:
         self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.body = body              # minecraft.Body（マイクラの体。つなぐときだけ）
+        self.goals = None             # goals.GoalRunner（長い目的の係。agent.py が置く）
         self.eyes = eyes              # eyes.Eyes（見せてもらった画像）
         # シエル自身の姿の絵（data URL）。指示のすぐ後ろにいつも置き、自分の姿を絵としても知っているようにする。
         # 毎回同じ始まりなので、OpenAI のキャッシュで安くなる。画像を見せたときだけ添えると、関係ない画像にも
@@ -158,7 +160,7 @@ class Mind:
             tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
         # マイクラの体とつながっていなければ、体の道具は渡さない
         if not self._body_linked():
-            tools = [t for t in tools if getattr(t, 'id', None) not in BODY_TOOLS]
+            tools = [t for t in tools if getattr(t, 'id', None) not in BODY_TOOLS + GOAL_TOOLS]
         # ゲームの知識の窓口の道具（game_knowledge.py）は、そのゲームで遊んでいる間だけ
         playing = {'minecraft': self._body_linked()}
         tools = [t for t in tools if (g := game_knowledge.game_of(t)) is None or playing.get(g, False)]
@@ -272,6 +274,8 @@ class Mind:
             lines.append(self.eyes.context())    # 見せてもらった画像の説明文
         if self.body is not None:
             lines.append(self.body.context())    # マイクラの様子（小脳も、見ていないことを言わないように読む）
+        if self.goals is not None:
+            lines.append(self.goals.context())   # 今の目的（goals.py。小脳も、していないことを言わないように読む）
         if deep and self.minutes is not None:
             lines.append(self.minutes.context())
             note = self.minutes.take_note()

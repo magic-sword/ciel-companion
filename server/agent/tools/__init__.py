@@ -27,6 +27,7 @@ class State:
     preamble: object | None = None   # emotion.PreambleCut（道具を呼んだ返事の前置きを止める）
     mouth: object | None = None   # mouth.Mouth（シエルを話させる入り口）
     body: object | None = None   # minecraft.Body（マイクラの体。つなぐときだけ）
+    goals: object | None = None   # goals.GoalRunner（長い目的の係。ゲームの体があるときだけ）
 
 
 def cut_preamble(context) -> None:
@@ -36,9 +37,9 @@ def cut_preamble(context) -> None:
         cut.request(getattr(context, 'speech_handle', None))
 
 
-from . import memory, minutes, people, conversation, research, thoughts, clock, singing, minecraft  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation, research, thoughts, clock, singing, minecraft, goals  # noqa: E402  State の後に読む
 
-MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, minecraft)
+MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, minecraft, goals)
 TOOLS = [t for m in MODULES for t in m.TOOLS]
 # 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
 # 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。

@@ -35,6 +35,8 @@ TOPIC = 'ciel.game'
 VERSION = 1
 START_TIMEOUT = 3.0       # 技を頼んでから「始めた」が返るまでの上限
 LOOK_TIMEOUT = 25.0       # 景色を頼んでから絵が返るまでの上限（初めはブラウザを開いて描き終えるまで 10 秒ほど）
+PLAN_TIMEOUT = 5.0        # 目的の計画（plan → planned）を待つ上限
+STEP_TIMEOUT = 900.0      # 目的の段（技 1 つ）が終わるまで待つ上限
 FACING = {'north': '北', 'northwest': '北西', 'west': '西', 'southwest': '南西', 'south': '南', 'southeast': '南東',
           'east': '東', 'northeast': '北東'}
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
@@ -67,6 +69,10 @@ WHY_FAILED = {
     'danger': 'すぐ下が溶岩か水で危ない',
     'died': '途中で倒れた',
     'unlinked': '体から切れた',
+    'stopped': '止められた',
+    'replaced': 'ほかの頼みに替えた',
+    'mind_failed': '自分では進められなかった',
+    'no_answer': '体から返事が無い',
     'disconnected': 'マイクラから出た',
     'error': 'うまくいかなかった',
 }
@@ -156,6 +162,8 @@ class Body:
         self._said: dict[str, float] = {}
         self._task: asyncio.Task | None = None
         self._closed = False
+        self._waiting: dict[int, asyncio.Future] = {}   # 目的の係が頼んだ技（id → 終わりを待つ）。付箋・知らせは目的の係が持つ
+        self.goals = None            # goals.GoalRunner（目的の係。体が止められたら、目的も止めて待つ）
 
     # ---- つなぐ ----
 
@@ -219,6 +227,10 @@ class Body:
                     if not f.done():
                         f.set_result({'status': 'unavailable'})
                 self._pending.clear()
+                for f in self._waiting.values():   # 目的の係が待っている技
+                    if not f.done():
+                        f.set_result({'ok': False, 'reason': 'unlinked'})
+                self._waiting.clear()
                 for id_ in list(self._cards):   # 終わりを聞けなくなった技の付箋
                     self._close_card({'id': id_, 'ok': False, 'reason': 'unlinked'})
                 self.publish()
@@ -245,13 +257,19 @@ class Body:
         elif kind == 'state':
             self.state = m
             self.publish()
-        elif kind in ('started', 'error', 'seen'):
+        elif kind in ('started', 'error', 'seen', 'planned'):
             f = self._pending.pop(m.get('id'), None)
             if f is not None and not f.done():
                 f.set_result({'status': 'started'} if kind == 'started' else
                              {'status': 'seen', 'message': m} if kind == 'seen' else
-                             refused(m))
+                             {'status': 'planned', 'steps': m.get('steps') or [], 'inventory': m.get('inventory') or {}}
+                             if kind == 'planned' else refused(m))
         elif kind == 'done':
+            waiting = self._waiting.pop(m.get('id'), None)
+            if waiting is not None:   # 目的の係が頼んだ技：知らせ・付箋は目的の係が持つ
+                if not waiting.done():
+                    waiting.set_result(m)
+                return
             self.on_done(m)
         elif kind == 'event':
             self.on_event(m)
@@ -279,6 +297,46 @@ class Body:
         if result.get('status') == 'started' and self.board is not None:
             self._cards[id_] = self.board.add('game', name, tasks.RUNNING, 'ciel', ref=str(id_))
         return result
+
+    async def run_skill(self, skill: str, args: dict) -> dict:
+        """目的の係が頼む技：始めて、終わりまで待って、体の done（ok・reason・note）を返す。付箋も知らせも作らない"""
+        if not self.linked or self._ws is None:
+            return {'ok': False, 'reason': 'unlinked'}
+        id_ = next(self._ids)
+        started = asyncio.get_running_loop().create_future()
+        done = asyncio.get_running_loop().create_future()
+        self._pending[id_] = started
+        self._waiting[id_] = done
+        await self._send({'type': 'do', 'id': id_, 'skill': skill, 'args': args})
+        try:
+            r = await asyncio.wait_for(started, START_TIMEOUT)
+        except asyncio.TimeoutError:
+            self._pending.pop(id_, None)
+            self._waiting.pop(id_, None)
+            return {'ok': False, 'reason': 'no_answer'}
+        if r.get('status') != 'started':   # 始める前に断った（名前が違う・道具が無い）
+            self._waiting.pop(id_, None)
+            return {'ok': False, 'reason': r.get('reason') or 'error', 'note': r.get('note') or {}, 'why': r.get('why')}
+        try:
+            return await asyncio.wait_for(done, STEP_TIMEOUT)
+        except asyncio.TimeoutError:
+            self._waiting.pop(id_, None)
+            await self.stop()
+            return {'ok': False, 'reason': 'error', 'detail': 'timeout'}
+
+    async def plan(self, item: str, count: int) -> dict:
+        """目的（物を作る）の段の一覧を、体に決めてもらう（体の plan → planned）"""
+        if not self.linked or self._ws is None:
+            return {'status': 'unavailable'}
+        id_ = next(self._ids)
+        f = asyncio.get_running_loop().create_future()
+        self._pending[id_] = f
+        await self._send({'type': 'plan', 'id': id_, 'item': item, 'count': count})
+        try:
+            return await asyncio.wait_for(f, PLAN_TIMEOUT)
+        except asyncio.TimeoutError:
+            self._pending.pop(id_, None)
+            return {'status': 'no_answer'}
 
     async def look(self) -> dict:
         """今の景色を 1 枚撮ってもらい、目の係に渡す。道具の返事の続きで、心がその絵を見る"""
@@ -433,3 +491,104 @@ class Body:
                 self.diary.add('minecraft', text)
             except Exception as e:
                 log.info('日記に書けない：%s', type(e).__name__)
+
+
+# ---- 目的の係（goals.py）のマイクラの係。docs/goal-runner-design-ja.md の 2.2 ----
+
+# よく使う物の日本語の呼び名（見せる言葉。無ければ英語の ID を読みやすくする）
+JA_NAMES = {
+    'oak_log': 'オークの原木', 'birch_log': 'シラカバの原木', 'spruce_log': 'トウヒの原木', 'jungle_log': 'ジャングルの原木',
+    'acacia_log': 'アカシアの原木', 'dark_oak_log': 'ダークオークの原木', 'cherry_log': 'サクラの原木', 'mangrove_log': 'マングローブの原木',
+    'log': '原木', 'oak_planks': 'オークの板材', 'stick': '棒', 'crafting_table': '作業台', 'furnace': 'かまど', 'chest': 'チェスト',
+    'cobblestone': '丸石', 'stone': '石', 'dirt': '土', 'sand': '砂', 'gravel': '砂利', 'coal': '石炭', 'charcoal': '木炭',
+    'raw_iron': '鉄の原石', 'iron_ingot': '鉄インゴット', 'raw_copper': '銅の原石', 'copper_ingot': '銅インゴット',
+    'raw_gold': '金の原石', 'gold_ingot': '金インゴット', 'diamond': 'ダイヤモンド', 'wheat': '小麦', 'bread': 'パン',
+    'torch': '松明', 'flower': '花', 'string': '糸', 'wool': '羊毛', 'white_wool': '白い羊毛', 'bed': 'ベッド',
+    'wooden_pickaxe': '木のツルハシ', 'stone_pickaxe': '石のツルハシ', 'iron_pickaxe': '鉄のツルハシ', 'diamond_pickaxe': 'ダイヤのツルハシ',
+    'wooden_axe': '木の斧', 'stone_axe': '石の斧', 'iron_axe': '鉄の斧', 'wooden_sword': '木の剣', 'stone_sword': '石の剣',
+    'iron_sword': '鉄の剣', 'wooden_shovel': '木のシャベル', 'stone_shovel': '石のシャベル', 'iron_shovel': '鉄のシャベル',
+    'shield': '盾', 'bucket': 'バケツ', 'boat': 'ボート', 'oak_boat': 'オークのボート',
+}
+# 決まった直し方（計画し直す）で直る理由
+REPLAN_REASONS = ('missing_materials', 'needs_tool', 'cannot_harvest', 'no_table')
+
+
+def ja(item: str) -> str:
+    return JA_NAMES.get(item) or item.replace('_', ' ')
+
+
+def step_label(kind: str, item: str, count: int) -> str:
+    n = f' {count} 個' if count > 1 else ''   # 「オークの原木を 3 個集める」
+    if kind == 'gather':
+        return f'{ja(item)}を{n}集める' if n else f'{ja(item)}を集める'
+    if kind == 'craft':
+        return f'{ja(item)}を{n}作る' if n else f'{ja(item)}を作る'
+    return f'{ja(item)}を{n}手に入れる' if n else f'{ja(item)}を手に入れる'
+
+
+class Goals:
+    """マイクラの係：体（Body）と、体の作り方の木（plan）で、目的の段を決めて動かす"""
+
+    def __init__(self, body: Body) -> None:
+        self.body = body
+
+    def available(self) -> bool:
+        return bool(self.body.linked)
+
+    def _steps(self, planned: list[dict]) -> list[dict]:
+        out = []
+        for p in planned:
+            kind, item, count = p.get('kind'), p.get('item'), int(p.get('count') or 1)
+            args = {'item': item, 'count': count}
+            if kind == 'mind':
+                args['text'] = step_label('mind', item, count)
+            out.append({'kind': kind, 'args': args, 'label': step_label(kind, item, count),
+                        'progress': [0, count] if kind == 'gather' else None})
+        return out
+
+    async def plan(self, goal) -> list[dict] | dict | None:
+        make = (goal.spec or {}).get('make')
+        if not make:
+            return None   # 作る目的でなければ、係では分けられない（心が進める）
+        r = await self.body.plan(make, int(goal.spec.get('count') or 1))
+        if r.get('status') != 'planned':
+            return {'error': r.get('reason') or r.get('status'), 'why': r.get('why')}
+        return self._steps(r['steps'])
+
+    async def run(self, goal, step) -> dict:
+        a = step.args
+        if step.kind == 'gather':
+            got = (step.progress or [0, a['count']])[0]
+            r = await self.body.run_skill('collect', {'block': a['item'], 'count': max(1, a['count'] - got)})
+        elif step.kind == 'craft':
+            r = await self.body.run_skill('craft', {'item': a['item'], 'count': a['count']})
+        else:
+            return {'ok': False, 'reason': 'error'}
+        note = r.get('note') or {}
+        if r.get('ok') and note.get('short'):   # 頼んだ数に届かなかった
+            r = {**r, 'ok': False, 'reason': note['short']}
+        return r
+
+    def check(self, goal, step, result) -> tuple[bool, list | None]:
+        if step.kind == 'gather':
+            got = (step.progress or [0, step.args['count']])[0]
+            got += int(((result or {}).get('note') or {}).get('gained', {}).get(step.args['item'], 0))
+            got = min(got, step.args['count'])
+            return got >= step.args['count'], [got, step.args['count']]
+        return bool((result or {}).get('ok')), step.progress
+
+    async def repair(self, goal, step, result) -> tuple[list[dict], str] | None:
+        reason = (result or {}).get('reason')
+        if reason not in REPLAN_REASONS or not (goal.spec or {}).get('make'):
+            return None
+        r = await self.body.plan(goal.spec['make'], int(goal.spec.get('count') or 1))
+        if r.get('status') != 'planned' or not r['steps']:
+            return None
+        return self._steps(r['steps']), f'{self.why(reason, result)}ので、計画を直した'
+
+    def why(self, reason: str, result: dict | None = None) -> str:
+        note = (result or {}).get('note') or {}
+        return reasons(reason, note).split('（')[0] if reason in WHY_FAILED else WHY_FAILED['error']
+
+    async def stop(self) -> None:
+        await self.body.stop()

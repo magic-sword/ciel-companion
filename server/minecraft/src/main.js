@@ -10,8 +10,10 @@ import { WebSocketServer } from 'ws';
 import { message, parseCommand } from './protocol.js';
 import { Care } from './care.js';
 import { Eye } from './eye.js';
+import { planGoal } from './goal-plan.js';
 import { Guard } from './guard.js';
 import { carefulMovements } from './movements.js';
+import { knows } from './sight.js';
 import { Runner } from './skills.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
@@ -75,6 +77,7 @@ wss.on('connection', (ws) => {
       else send('error', { reason: 'not_spawned' });
     } else if (cmd.type === 'state') send('state', state());
     else if (cmd.type === 'look') look(cmd.id);
+    else if (cmd.type === 'plan') plan(cmd);
   });
   ws.on('close', () => {
     if (link !== ws) return;
@@ -96,6 +99,21 @@ async function look(id) {
   }
   log(`景色を撮った（${r.jpeg.length} バイト、${Date.now() - started} ms）`);
   send('seen', { id, jpeg: r.jpeg.toString('base64'), width: r.width, height: r.height, facing: facing(bot) });
+}
+
+// 目的（物を作る）を、今の持ち物と近くの作業台から段の一覧にする（goal-plan.js。会話サーバーの目的の係が使う）
+function plan({ id, item, count }) {
+  if (!bot?.entity) {
+    send('error', { id, reason: 'not_spawned' });
+    return;
+  }
+  const inv = {};
+  for (const i of bot.inventory.items()) inv[i.name] = (inv[i.name] ?? 0) + i.count;
+  const tableId = bot.registry.blocksByName.crafting_table.id;
+  const hasTable = bot.findBlocks({ matching: tableId, maxDistance: 32, count: 8 }).some((p) => knows(bot, p));
+  const r = planGoal(bot.registry, (rid) => bot.recipesAll(rid, null, true), item, count, inv, hasTable);
+  if (r.error) send('error', { id, reason: r.error });
+  else send('planned', { id, steps: r.steps, inventory: inv });
 }
 
 let blocks = {};

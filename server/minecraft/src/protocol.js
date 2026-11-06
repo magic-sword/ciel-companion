@@ -95,6 +95,13 @@ export function parseCommand(raw) {
     }
     case 'state':
       return { cmd: { type: 'state' } };
+    // 目的（物を作る）を段の一覧にする（goal-plan.js）。返事は planned（steps）か error
+    case 'plan': {
+      if (id === undefined) return { error: 'bad_id' };
+      const item = m.item, count = m.count === undefined ? 1 : m.count;
+      if (typeof item !== 'string' || !BLOCK.test(item) || !Number.isInteger(count) || count < 1 || count > CRAFT_MAX) return { error: 'bad_args', id };
+      return { cmd: { type: 'plan', id, item, count } };
+    }
     // 今の景色を 1 枚撮る（eye.js）。返事は seen（JPEG を base64）か error
     case 'look':
       if (id === undefined) return { error: 'bad_id' };

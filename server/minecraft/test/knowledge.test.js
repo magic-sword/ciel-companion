@@ -92,3 +92,23 @@ test('手元の Wiki を調べる（FTS5 があるときだけ）', async (t) =>
   w.addPage('Sand', { oldid: 3, url: 'u3', chunks: [{ section: 'Overview', text: 'Sand is a gravity block.' }] });
   assert.equal(w.search('deserts').length, 0);
 });
+
+test('目的を段に分ける：道具が要る材料は、先に道具を作る段を足す', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { planGoal } = await import('../src/goal-plan.js');
+  const registry = require('prismarine-registry')('1.21.11');
+  const { Recipe } = require('prismarine-recipe')(registry);
+  const recipes = (id) => Recipe.find(id, null);
+  const kinds = (r) => r.steps.map((s) => `${s.kind} ${s.item}${s.count > 1 ? ` ${s.count}` : ''}`);
+  assert.deepEqual(kinds(planGoal(registry, recipes, 'stone_pickaxe', 1, {}, false)),
+    ['gather oak_log 3', 'craft wooden_pickaxe', 'gather cobblestone 3', 'craft stone_pickaxe']);
+  // 作業台に原木を使って、木のつるはしの原木が 1 本足りなかった件（2026-11-07）：足りない 1 本を集める段から始める
+  assert.deepEqual(kinds(planGoal(registry, recipes, 'stone_pickaxe', 1, { oak_log: 1, crafting_table: 1 }, false)),
+    ['gather oak_log', 'craft wooden_pickaxe', 'gather cobblestone 3', 'craft stone_pickaxe']);
+  assert.deepEqual(kinds(planGoal(registry, recipes, 'stone_pickaxe', 1, { wooden_pickaxe: 1, stick: 2 }, true)),
+    ['gather cobblestone 3', 'craft stone_pickaxe']);
+  // 集める元のブロックが無い材料（鉄のインゴットは焼いて作る）は、心に任せる段
+  assert.equal(planGoal(registry, recipes, 'iron_pickaxe', 1, {}, true).steps[0].kind, 'mind');
+  assert.equal(planGoal(registry, recipes, 'nope', 1, {}, true).error, 'unknown_item');
+});

@@ -47,6 +47,7 @@ import interruptions
 import listener
 import irodori_tts
 import game_knowledge
+import goals
 import mind
 import minecraft
 import minutes
@@ -443,6 +444,15 @@ async def entrypoint(ctx: JobContext) -> None:
         body = (minecraft.Body(minecraft.URL, voice.say_latest, diary=ciel_diary, board=tasks, notify=notify)
                 if minecraft.URL else None)
         session.userdata.body = body
+        # 長い目的の係（goals.py）。ゲームの体があるときだけ。目的と段はアプリと配信の画面へ goal.state で送る（topic ciel.goal）
+        goal_runner = None
+        if body is not None:
+            goal_runner = goals.GoalRunner(voice.say_latest, publish=lambda m: asyncio.create_task(send(goals.TOPIC, m)))
+            goal_runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
+            goal_runner.presence = lambda: style.presence
+            goal_runner.owner_name = lambda: (book.owner_name() or None) if book is not None else None
+            body.goals = goal_runner
+        session.userdata.goals = goal_runner
         if body is not None:
             ctx.room.on('data_received', body.on_data)
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
@@ -455,6 +465,7 @@ async def entrypoint(ctx: JobContext) -> None:
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body,
                                eyes=seeing, self_image=agent.persona.self_image)
+        agent.mind.goals = goal_runner
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 
