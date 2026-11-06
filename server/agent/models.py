@@ -27,6 +27,7 @@ ROLES = {
     'relationship': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),         # 関係（relationship.py。メモと同じモデル）
     'growth': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),               # 出来事から育つ好み（growth.py。メモと同じモデル）
     'research': ('CIEL_RESEARCH_MODEL', 'gpt-5.4-mini'),          # 調べもの（web_research.py）
+    'eyes': ('CIEL_EYES_MODEL', 'gpt-5.4-mini'),                  # 見せてもらった画像の説明文（eyes.py）
 }
 
 # モデル → (入力, キャッシュ, 出力) の単価。Realtime は文字と音声で入力の単価が違う（AUDIO_INPUT）

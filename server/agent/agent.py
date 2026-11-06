@@ -38,6 +38,7 @@ import clock
 import curiosity
 import debug_log
 import diary
+import eyes as eyes_
 import emotion
 import growth
 import health
@@ -252,7 +253,8 @@ class Ciel(Agent):
         parts = [p.instructions + p.emotion_instructions, p.self_instructions, self.grown, p.touch_instructions,
                  p.talker_instructions,
                  p.tasks_instructions, self._presence_text(presence), self._talk_text(talk),
-                 p.minecraft_instructions if PIPELINE and minecraft.URL else '']
+                 p.minecraft_instructions if PIPELINE and minecraft.URL else '',
+                 p.image_voice_instructions if PIPELINE else '']
         return '\n\n'.join(part.strip('\n') for part in parts if part)
 
     def _presence_text(self, presence: str) -> str:
@@ -284,6 +286,7 @@ class Ciel(Agent):
             parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
             if minecraft.URL:
                 parts.append(p.minecraft_instructions)   # マイクラで一緒に遊ぶ（minecraft.py。体へつなぐときだけ）
+            parts.append(p.image_voice_instructions)     # 見せてもらった画像（eyes.py）
         if VOICE == 'irodori':
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
@@ -440,9 +443,13 @@ async def entrypoint(ctx: JobContext) -> None:
         if body is not None:
             ctx.room.on('data_received', body.on_data)
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
+        # 目（eyes.py）：アプリから送られた画像を受け取り、話の切れ目に心が見て話す（why 'image'）
+        seeing = eyes_.Eyes(voice.say_latest, agent.persona.image_caption_instructions, notify=notify)
+        ctx.room.register_byte_stream_handler(eyes_.TOPIC, seeing.on_stream)
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
-                               brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body)
+                               brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body,
+                               eyes=seeing)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 
@@ -580,6 +587,9 @@ async def entrypoint(ctx: JobContext) -> None:
         book.notify()
     # シエルの声の大きさ（volume.py。アプリの設定画面が知らせる）
     ctx.room.on('data_received', agent.volume.on_data)
+    # 画像を見られない会話サーバー（pipeline でない）：送られたら、見られないと返す（eyes.py）
+    if not PIPELINE:
+        ctx.room.register_byte_stream_handler(eyes_.TOPIC, eyes_.refuse(notify))
     # マイクラの体へつなげない会話サーバー：アプリがオンにしたら、つなげないと返す（minecraft.py）
     if session.userdata.body is None:
         ctx.room.on('data_received', minecraft.refuse(notify))

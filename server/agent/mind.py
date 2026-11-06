@@ -39,7 +39,7 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment', 'game')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment', 'game', 'image')   # 心が返事を作る、口（mouth.py）の why
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -62,13 +62,14 @@ BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まっ�
 
 class Mind:
     def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
-                 brief_instructions: str = '', client=None, board=None, body=None) -> None:
+                 brief_instructions: str = '', client=None, board=None, body=None, eyes=None) -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
         self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.body = body              # minecraft.Body（マイクラの体。つなぐときだけ）
+        self.eyes = eyes              # eyes.Eyes（見せてもらった画像）
         self.quiet_turn = quiet_turn  # ひかえめのときの念押し（config/prompts/talk_quiet_turn.md）
         self.brief_instructions = brief_instructions   # config/prompts/mind_brief.md
         self._client = client
@@ -126,7 +127,8 @@ class Mind:
         # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
         # 黙る返事は声にならないので、心で受けても遅れは気にならない
         quiet = self.style is not None and self.style.talk == 'quiet'
-        why = ('notice' if self._waiting()
+        why = ('image' if self.eyes is not None and self.eyes.wants(rest)
+               else 'notice' if self._waiting()
                else 'request' if REQUEST.search(rest)
                else 'game' if self._body_linked() and GAME_ASK.search(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
@@ -202,6 +204,11 @@ class Mind:
                 notes = '\n\n'.join(x for x in (notes, f'[まだ伝えていない知らせ]\n{text}') if x)
         if notes:
             out.add_message(role='system', content=notes)
+        if talker_instructions is None and self.eyes is not None:
+            # 見ていない画像・画像を指した話のときだけ、この返事に画像を添える（小脳には添えない）
+            picture = self.eyes.message_for_reply(_user_text(tail))
+            if picture is not None:
+                out.items.append(picture)
         speaker = '\n'.join(x for x in (turn.get('tag'), turn.get('touch')) if x)
         if speaker and tail_users:
             out.add_message(role='system', content=speaker)   # 今回の発言の話者（とタッチ）
@@ -247,6 +254,8 @@ class Mind:
                 lines.append(self._state)
         if self.board is not None:
             lines.append(self.board.context())   # 今どうなっているか（小脳も、していないことを言わないように読む）
+        if self.eyes is not None:
+            lines.append(self.eyes.context())    # 見せてもらった画像の説明文
         if self.body is not None:
             lines.append(self.body.context())    # マイクラの様子（小脳も、見ていないことを言わないように読む）
         if deep and self.minutes is not None:

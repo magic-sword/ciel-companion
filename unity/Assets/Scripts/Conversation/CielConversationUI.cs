@@ -113,6 +113,7 @@ namespace Ciel.Conversation
             BuildVoiceStatus(_safe);
             BuildBottomRow(_safe);
             BuildVolumePop(_canvasRect);
+            BuildMorePop(_canvasRect);
             BuildSheet(_canvasRect);
             BuildResearch(_safe);
             BuildPeople(_safe);
@@ -241,20 +242,21 @@ namespace Ciel.Conversation
             _micButton.onClick.AddListener(() => _conversation.SetMicEnabled(!_conversation.MicEnabled));
             mic.gameObject.AddComponent<PressScale>();
 
-            // 議事録
-            var minutes = Rect("MinutesButton", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(-132, 74), new Vector2(64, 92));
-            var mHit = Img(minutes, null, Color.clear, raycast: true);
-            var mCircle = Rect("Circle", minutes, new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(52, 52));
+            // ほか（＋）：ときどき使うもの（画像を見せる・まとめ）のメニューを開く（CielConversationUI.More.cs）。
+            // 下に出すのは、よく使うマイクと声だけにする（スマホの幅で、ボタンが画面の外へ出ないように）
+            var more = Rect("MoreButton", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(-132, 74), new Vector2(64, 92));
+            var mHit = Img(more, null, Color.clear, raycast: true);
+            var mCircle = Rect("Circle", more, new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(52, 52));
             _minutesBg = Img(mCircle, "circle", Glass);
             _minutesEdge = Edge(mCircle, WithAlpha(Cyan, 0.45f));
-            _minutesIcon = Icon(mCircle, "minutes", 20, Hex(0xE6F8FF));
-            _minutesLabel = Txt("Label", minutes, 11, TextSub, TextAnchor.MiddleCenter);
+            _minutesIcon = Icon(mCircle, "plus", 20, Hex(0xE6F8FF));
+            _minutesLabel = Txt("Label", more, 11, TextSub, TextAnchor.MiddleCenter);
             Place(_minutesLabel.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 16), new Vector2(90, 16));
-            _minutesButton = minutes.gameObject.AddComponent<Button>();
+            _minutesButton = more.gameObject.AddComponent<Button>();
             _minutesButton.targetGraphic = mHit;
             _minutesButton.transition = Selectable.Transition.None;
-            _minutesButton.onClick.AddListener(() => ShowSummary(!_summaryPanel.activeSelf));
-            minutes.gameObject.AddComponent<PressScale>();
+            _minutesButton.onClick.AddListener(() => ShowMorePop(!_morePop.activeSelf));
+            more.gameObject.AddComponent<PressScale>();
 
             // 声の出力（Android：タップでスピーカー・受話口、長押しで声の大きさ。PC：タップで声の大きさ）
             var speaker = Rect("SpeakerButton", root, new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(132, 74), new Vector2(64, 92));
@@ -367,14 +369,13 @@ namespace Ciel.Conversation
             _ringDots.gameObject.SetActive(on);
             _ringBreath.color = WithAlpha(Cyan, on ? 0.6f : usable ? 0.35f : 0.12f);
 
-            // 議事録：とっているあいだは琥珀
-            _minutesButton.interactable = connected;
+            // ほか（＋）：議事録をとっているあいだは琥珀（メニューの中の「まとめ」が動いている印）
             var rec = c.MinutesOn;
             _minutesBg.color = rec ? AmberGlass : Glass;
             _minutesEdge.color = rec ? WithAlpha(Amber, 0.8f) : WithAlpha(Cyan, connected ? 0.45f : 0.18f);
-            _minutesIcon.color = rec ? Amber : WithAlpha(Hex(0xE6F8FF), connected ? 1f : 0.4f);
-            _minutesLabel.text = rec ? "記録中" : "まとめ";
+            _minutesIcon.color = rec ? Amber : Hex(0xE6F8FF);
             _minutesLabel.color = rec ? Amber : TextSub;
+            RefreshMorePop();
 
             // 声の出力
             var phone = c.CanUseSpeakerphone;
@@ -475,6 +476,7 @@ namespace Ciel.Conversation
             var on = c.MicEnabled && c.Status == CielConversation.State.Connected;
             UpdatePeople();
             UpdateSummary();
+            _minutesLabel.text = MoreLabel(c, t);
             UpdateSong();
 
             if (on)

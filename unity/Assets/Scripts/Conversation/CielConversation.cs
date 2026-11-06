@@ -27,6 +27,7 @@
 // 画面からの名前の直しは FixSpeaker で送る（topic ciel.speakers。この会話の間だけ）。
 // 端末の持ち主：端末の ID と合言葉をこの端末の中で作って持ち（PlayerPrefs）、つないだとき・会話サーバーが入ってきたときに
 // 送る（hello。会話サーバーが device.hello_request で求めたときも）。会話サーバーは合言葉のハッシュで持ち主を確かめ、ひとり・身近な人のときは持ち主の声を優先して聞き分ける。
+// 画像：PickAndShareImage（画面の「見せる」）で、選んだ画像をシエルに見せる（CielConversation.Image.cs）。
 // マイクラ：SetMinecraft（設定画面のスイッチ）で、一緒に遊ぶかを会話サーバーへ送る（CielConversation.Game.cs）。
 // 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
 // つなぐ部屋にする。トークンを頼むときに「ciel-dev を呼ぶ」部屋の設定（room_config）を添える。本番の会話サーバーはその部屋に入らない。
@@ -975,6 +976,7 @@ namespace Ciel.Conversation
             public int hearts;
             public string comment;
             public bool linked, in_world;   // game.state
+            public int id;   // image.state
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -1060,6 +1062,7 @@ namespace Ciel.Conversation
             else if (e.type == "voice.test") OnVoiceTest(e);
             else if (e.type == "agent.problem") OnProblem(e);
             else if (e.type == "game.state") OnGameState(e);   // マイクラの体とつながったか（CielConversation.Game.cs）
+            else if (e.type == "image.state") OnImageState(e);   // 見せた画像を受け取ったか（CielConversation.Image.cs）
             else if (e.type == "device.hello_request")
             {
                 // 会話サーバーが入った直後に送った知らせは届かないことがあるので、準備ができたと言われたら送り直す
