@@ -22,6 +22,8 @@ services:
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
       # （docs/conversation-improvements-2026-10-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=pipeline
+      # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけがつなぐ
+      - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
       # 覚えている人の記録（speaker_store.py）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
     volumes:
