@@ -65,8 +65,8 @@ WHY_FAILED = {
     'no_path': 'そこまでの道が見つからない（遠い・高い・水や崖の向こう）',
     'not_spawned': 'マイクラに入っていない',
     'not_have': 'その物を持っていない',
-    'cannot_dig': '足元が掘れないブロック（建物に使うもの・素手では掘れないもの）',
-    'danger': 'すぐ下が溶岩か水で危ない',
+    'cannot_dig': '掘れないブロックに当たった（建物に使うもの・素手では掘れないもの）',
+    'danger': '掘った先に溶岩か水があって危ない',
     'died': '途中で倒れた',
     'unlinked': '体から切れた',
     'stopped': '止められた',
@@ -78,7 +78,7 @@ WHY_FAILED = {
 }
 QUIET_REASONS = ('stopped', 'replaced', 'unlinked', 'disconnected')
 SKILL_NAMES = {'follow': 'ついていく', 'come': 'そばへ行く', 'go_to': '場所へ行く', 'collect': '集める', 'give': '渡す',
-               'dig_down': '足元を掘って降りる', 'craft': '作る'}
+               'dig_down': '足元を掘って降りる', 'craft': '作る', 'find': '探す'}
 
 
 def title(skill: str, args: dict) -> str:
@@ -96,6 +96,8 @@ def title(skill: str, args: dict) -> str:
         return f"足元を {args.get('depth')} ブロック掘る"
     if skill == 'craft':
         return f"{args.get('item')} を {args.get('count', 1)} 個作る"
+    if skill == 'find':
+        return f"{args.get('block')} を探す"
     if skill == 'give':
         return f"{args.get('item')} を{' ' + str(args['count']) + ' 個' if 'count' in args else ''}{who}に渡す"
     return skill
@@ -417,6 +419,8 @@ class Body:
         self._close_card(m)
         note = m.get('note') or {}
         got = '、'.join(f'{k}×{n}' for k, n in (note.get('gained') or {}).items())
+        if note.get('found'):   # 探して見つけた（find）
+            got = '、'.join(x for x in (got, f"{note['found']} を見つけた") if x)
         if note.get('descended'):
             got = '、'.join(x for x in (got, f"{note['descended']} ブロック降りた") if x)
         reason = m.get('reason') or 'error'
@@ -562,12 +566,17 @@ class Goals:
             r = await self.body.run_skill('collect', {'block': a['item'], 'count': max(1, a['count'] - got)})
         elif step.kind == 'craft':
             r = await self.body.run_skill('craft', {'item': a['item'], 'count': a['count']})
+        elif step.kind == 'find':
+            r = await self.body.run_skill('find', {'block': a['item'], 'how': a.get('how', 'auto')})
         else:
             return {'ok': False, 'reason': 'error'}
         note = r.get('note') or {}
         if r.get('ok') and note.get('short'):   # 頼んだ数に届かなかった
             r = {**r, 'ok': False, 'reason': note['short']}
         return r
+
+    def _find_step(self, item: str) -> dict:
+        return {'kind': 'find', 'args': {'item': item, 'how': 'auto'}, 'label': f'{ja(item)}を探す', 'progress': None}
 
     def check(self, goal, step, result) -> tuple[bool, list | None]:
         if step.kind == 'gather':
@@ -579,6 +588,11 @@ class Goals:
 
     async def repair(self, goal, step, result) -> tuple[list[dict], str] | None:
         reason = (result or {}).get('reason')
+        # 集める物が見える所に無い：先に探す段を足す（探しても無ければ、探す段の失敗として心に相談する）
+        if reason == 'not_found' and step.kind == 'gather':
+            rest = [s for s in goal.steps if s.status != 'done']
+            keep = [{'kind': s.kind, 'args': s.args, 'label': s.label, 'progress': s.progress} for s in rest]
+            return [self._find_step(step.args['item'])] + keep, f'{ja(step.args["item"])}が見える所に無いので、探す段を足した'
         if reason not in REPLAN_REASONS or not (goal.spec or {}).get('make'):
             return None
         r = await self.body.plan(goal.spec['make'], int(goal.spec.get('count') or 1))

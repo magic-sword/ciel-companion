@@ -20,6 +20,12 @@ test('一覧に無い技は動かさない', () => {
   assert.deepEqual(p({ v: 1, type: 'do', id: 1, skill: '__proto__' }), { error: 'unknown_skill', id: 1 });
 });
 
+test('探す技', () => {
+  assert.deepEqual(p({ v: 1, type: 'do', id: 3, skill: 'find', args: { block: 'stone' } }).cmd.args, { block: 'stone', how: 'auto' });
+  assert.deepEqual(p({ v: 1, type: 'do', id: 3, skill: 'find', args: { block: 'oak_log', how: 'walk' } }).cmd.args, { block: 'oak_log', how: 'walk' });
+  assert.equal(p({ v: 1, type: 'do', id: 3, skill: 'find', args: { block: 'stone', how: 'fly' } }).error, 'bad_args');
+  assert.equal(p({ v: 1, type: 'do', id: 3, skill: 'find', args: { block: 'stone', how: 'dig', max: 99 } }).error, 'bad_args');
+});
 test('目的の計画を頼む', () => {
   assert.deepEqual(p({ v: 1, type: 'plan', id: 9, item: 'stone_pickaxe' }).cmd, { type: 'plan', id: 9, item: 'stone_pickaxe', count: 1 });
   assert.equal(p({ v: 1, type: 'plan', item: 'stone_pickaxe' }).error, 'bad_id');

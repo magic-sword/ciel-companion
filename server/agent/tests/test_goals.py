@@ -181,6 +181,7 @@ class MinecraftGoalsTest(unittest.IsolatedAsyncioTestCase):
         body = FakeBody([[{'kind': 'gather', 'item': 'oak_log', 'count': 3}, {'kind': 'craft', 'item': 'wooden_pickaxe', 'count': 1}],
                          [{'kind': 'gather', 'item': 'oak_log', 'count': 1}, {'kind': 'craft', 'item': 'wooden_pickaxe', 'count': 1}]],
                         [{'ok': True, 'note': {'gained': {'oak_log': 2}, 'short': 'not_found'}},
+                         {'ok': True, 'note': {'found': 'oak_log'}},
                          {'ok': True, 'note': {'gained': {'oak_log': 1}}},
                          {'ok': False, 'reason': 'missing_materials', 'note': {'needs': {'oak_log': 1}}},
                          {'ok': True, 'note': {'gained': {'oak_log': 1}}},
@@ -191,14 +192,30 @@ class MinecraftGoalsTest(unittest.IsolatedAsyncioTestCase):
         r = await runner.start('minecraft', '木のツルハシを作る', {'make': 'wooden_pickaxe', 'count': 1})
         self.assertEqual(r['steps'], ['オークの原木を 3 個集める', '木のツルハシを作る'])
         await settle(runner)
-        # 2 本で見える所に無くなった → 心に相談して止まる。続けると、残り 1 本だけ集める
-        self.assertEqual(runner.goal.status, 'paused')
-        self.assertEqual(runner.goal.steps[0].progress, [2, 3])
-        runner.resume()
-        await settle(runner)
-        self.assertEqual(body.asked[1], ('collect', {'block': 'oak_log', 'count': 1}))
+        # 2 本で見える所に無くなった → 探す段を足し、見つけてから残り 1 本だけ集める。作るときに足りなければ計画し直す
+        self.assertEqual(body.asked[1], ('find', {'block': 'oak_log', 'how': 'auto'}))
+        self.assertEqual(body.asked[2], ('collect', {'block': 'oak_log', 'count': 1}))
         self.assertEqual(runner.goal.status, 'done')
-        self.assertIn('材料が足りないので、計画を直した', runner.state()['changes'][0])
+        self.assertEqual(runner.state()['changes'][0], 'オークの原木が見える所に無いので、探す段を足した')
+        self.assertIn('材料が足りないので、計画を直した', runner.state()['changes'][1])
+
+
+    async def test_not_found_adds_a_find_step_before_gathering(self):
+        # 丸石が見える所に無く止まった件（2026-11-07）：先に探す段を足して、見つけてから集める
+        body = FakeBody([[{'kind': 'gather', 'item': 'cobblestone', 'count': 3},
+                          {'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]],
+                        [{'ok': False, 'reason': 'not_found', 'note': {'gained': {}}},
+                         {'ok': True, 'note': {'found': 'stone'}},
+                         {'ok': True, 'note': {'gained': {'cobblestone': 3}}},
+                         {'ok': True, 'note': {'gained': {'stone_pickaxe': 1}}}])
+        runner = goals.GoalRunner(Said())
+        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
+        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
+        await settle(runner)
+        self.assertEqual([a[0] for a in body.asked], ['collect', 'find', 'collect', 'craft'])
+        self.assertEqual(body.asked[1][1], {'block': 'cobblestone', 'how': 'auto'})
+        self.assertEqual(runner.goal.status, 'done')
+        self.assertEqual(runner.state()['changes'], ['丸石が見える所に無いので、探す段を足した'])
 
 
 if __name__ == '__main__':

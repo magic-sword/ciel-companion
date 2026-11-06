@@ -1,6 +1,6 @@
 # 目的の係（長い目的をやり遂げる仕組み・設計）
 
-状態：6 章の 1 を作った（2026-11-07）。見える化（goal.state を送る所まで。アプリと配信の画面の札はまだ）・探す技・心が分ける目的・会話をまたぐ置き場は、まだ。調べたことは [長い目的をやり遂げる仕組み（調べたこと）](long-horizon-planning-research-ja.md)。前提は [ゲームの知識の窓口](game-knowledge-design-ja.md)・[マインクラフトで遊ぶ設計](minecraft-design-ja.md)・[会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)。
+状態：6 章の 1 を作った（2026-11-07）。見える化（goal.state を送る所まで。アプリと配信の画面の札はまだ）・心が分ける目的・会話をまたぐ置き場は、まだ。調べたことは [長い目的をやり遂げる仕組み（調べたこと）](long-horizon-planning-research-ja.md)。前提は [ゲームの知識の窓口](game-knowledge-design-ja.md)・[マインクラフトで遊ぶ設計](minecraft-design-ja.md)・[会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)。
 
 ## 1. 何をするか
 
@@ -177,7 +177,7 @@
 1. **目的の係と、マイクラの係の作る目的**（作った。2026-11-07）：`goals.py`（GoalRunner）、`tools/goals.py`（start_goal・stop_goal・resume_goal・finish_step・goal_status）、`minecraft.py` の `Goals`（マイクラの係）と `Body.run_skill`・`Body.plan`、体の `src/goal-plan.js`（命令 plan）。使い方は `config/prompts/minecraft.md`。今は会話の中だけで持つ（DB はまだ）。goal.state は topic `ciel.goal` で送っている。本物の体で、原木 1 本と作業台を持った状態（止まったときと同じ）から石のつるはしを頼むと「原木を 1 本集める → 木のつるはしを作る → 丸石を 3 個集める → 石のつるはしを作る」になった。
    はじめに書いたこと：`goals.py`（決まった流れ・付箋・DB）、心の道具（start_goal・stop_goal・finish_step・goal_status）、体の命令 `plan`、マイクラの係の run・check・repair（gather・craft）。「石のつるはしを作って」で、原木の不足を心を通さずに直して最後まで作れるかを、Ciel_Debug と声で確かめる。
 2. **見える化**：goal.state を送り、配信用のウィンドウとアプリに札を出す。
-3. **探す技**：体に「掘り下げる」「探し歩く」を足し、`find` の段と `not_found` の直し方をつなぐ（丸石が見えずに止まった件）。
+3. **探す技**（作った。2026-11-07）：体の技 `find`（walk・dig・auto）と心の道具 `find_blocks`。集める段が `not_found` なら、先に探す段を足す。[マインクラフトで遊ぶ設計](minecraft-design-ja.md) の 25 章。
 4. **心が分ける目的**：作り方で決まらない目的（建てる・探す）を、心と知識の窓口で段に分ける。
 5. **覚える**：うまくいった段の列をゲームごとに残して、次の計画に使う。
 

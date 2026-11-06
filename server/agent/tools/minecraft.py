@@ -51,6 +51,16 @@ async def craft_item(context: RunContext, item: str, count: int = 1) -> str:
 
 
 @function_tool
+async def find_blocks(context: RunContext, block: str, how: str = 'auto') -> str:
+    """マイクラで、見える所に無いブロックを探す（見つけたら止まる。集めるのは collect_blocks）。block は英語の ID か呼び名。
+    how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。"""
+    body = _body(context)
+    if how not in ('walk', 'dig', 'auto'):
+        how = 'auto'
+    return _result(await body.do('find', {'block': block, 'how': how}) if body else {'status': 'unavailable'})
+
+
+@function_tool
 async def give_item(context: RunContext, item: str, count: int | None = None) -> str:
     """マイクラで、持ち物を持ち主に渡す（そばへ行って投げる）。item は英語の ID（oak_log など）。count を省けば持っている分すべて。"""
     body = _body(context)
@@ -90,10 +100,11 @@ async def look_at_view(context: RunContext) -> str:
     return _result(r)
 
 
-TOOLS = [follow_me, come_here, go_to_place, collect_blocks, craft_item, give_item, dig_down, stop_moving, look_around, look_at_view]
+TOOLS = [follow_me, come_here, go_to_place, collect_blocks, find_blocks, craft_item, give_item, dig_down, stop_moving, look_around, look_at_view]
 # 体の道具の名前（mind.py が、体とつながっていないときに外す）
 BODY_TOOLS = tuple(t.id for t in TOOLS)
 # 配信のコメントから使ってよいか（tools/__init__.py）。体を動かすのは持ち主だけ（docs/minecraft-design-ja.md の 6 章）
-FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, craft_item: False, give_item: False,
+FROM_COMMENTS = {follow_me: False, come_here: False, go_to_place: False, collect_blocks: False, find_blocks: False,
+                 craft_item: False, give_item: False,
                  dig_down: False, stop_moving: False, look_around: True,
                  look_at_view: False}   # 景色の絵は 1 枚 0.3 円ほどかかるので、コメントからは見ない

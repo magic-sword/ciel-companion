@@ -35,6 +35,11 @@ const SCAFFOLD_SOURCES = ['dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt', '
   'diorite', 'granite', 'tuff', 'netherrack'];
 const DIG_LIMIT = 48;       // 足元を掘って降りるとき、掘るのはここまで
 const DANGER = /^(lava|water)$/;
+const FIND_NEAR = 32;        // 探しているあいだ、見回す距離
+const WALK_RINGS = [16, 32, 48];   // 歩いて探すとき、始めた所から広げる距離（8 方向ずつ）
+const WAYPOINT_MS = 30000;   // 歩いて探すとき、1 か所へ向かう上限（水辺を回り込み続けて 90 秒かかった。2026-11-07）
+const DIG_MAX = 24;          // 掘って探すとき、掘り下げる段の上限
+const FLUIDS = /^(lava|water|bubble_column)$/;
 const TABLE_SEARCH = 32;    // 作業台を探す距離
 const TABLE_RANGE = 2;
 const CRAFT_SETTLE_TICKS = 4;      // 作業台を使うときに近づく距離
@@ -347,6 +352,51 @@ const SKILL_RUN = {
   },
 
   // 足元を depth ブロック掘って降りる。自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
+  // 見える所に無いブロックを探す（docs/minecraft-design-ja.md の 25 章）。how：
+  //   walk：始めた所から 8 方向へ、少しずつ遠くまで歩いて見回す（木・花・砂・水辺など、地面の上の物）
+  //   dig：向いている方へ階段状に掘り下げながら見る（石・鉱石など、地中の物。上り道が残る）
+  //   auto：ツルハシが要るブロック（石・鉱石）なら dig、ほかは walk（どちらで探すかは、ふつう心が知識を見て決める）
+  // 見つけたら止める（集めるのは collect）。見つけたブロックは覚えるので、続けて collect すれば掘れる
+  async find(bot, args, token, { guard }) {
+    const blocks = blocksFor(bot.registry, args.block);
+    if (!blocks.length) throw new Failed('unknown_block');
+    const ids = blocks.map((b) => b.id);
+    const how = args.how === 'auto' || !args.how ? (blocks.some((b) => b.harvestTools) ? 'dig' : 'walk') : args.how;
+    const start = bot.entity.position.clone();
+    const seen = () => {
+      const p = bot.findBlocks({ matching: ids, maxDistance: FIND_NEAR, count: FIND_COUNT }).find((q) => knows(bot, q));
+      return p ? { found: bot.blockAt(p)?.name, at: { x: p.x, y: p.y, z: p.z } } : null;
+    };
+    const first = seen();
+    if (first) return { ...first, how, already: true };
+    if (how === 'dig') return digToFind(bot, args.max ?? DIG_MAX, token, guard, seen, start);
+    // walk：8 方向・3 つの輪
+    let visited = 0;
+    for (const r of WALK_RINGS) {
+      for (let k = 0; k < 8 && !token.cancelled; k++) {
+        const a = (k / 8) * 2 * Math.PI;
+        const x = Math.round(start.x + r * Math.cos(a)), z = Math.round(start.z + r * Math.sin(a));
+        const limit = setTimeout(() => bot.pathfinder.setGoal(null), WAYPOINT_MS);   // 長くかかる方は、あきらめて次の方へ
+        try {
+          // 1 回だけ向かう（walk のやり直し・足場集めはしない。行けない方は飛ばして次の方へ）
+          await guarded(guard, token, () => {
+            bot.pathfinder.setMovements(playerMovements(bot));
+            return watched(bot, () => bot.pathfinder.goto(new goals.GoalNear(x, bot.entity.position.y, z, 4)));
+          });
+        } catch (err) {
+          if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;   // 行けない方は飛ばす
+        } finally {
+          clearTimeout(limit);
+        }
+        visited += 1;
+        const hit = seen();
+        if (hit) return { ...hit, how, visited };
+      }
+    }
+    if (token.cancelled) return undefined;
+    throw new Failed('not_found', { how, visited });
+  },
+
   async dig_down(bot, args, token, { guard }) {
     return descend(bot, args.depth, token, guard);
   },
@@ -444,6 +494,59 @@ const SKILL_RUN = {
 };
 
 
+// 向いている方へ、階段状に掘り下げながら探す（find の dig）。1 段ごとに：前の足の高さ・頭の高さ・前の 1 段下を掘り、そこへ降りる。
+// 自然のブロックだけ掘る。水・溶岩に当たりそうなら止める（danger）。素手で掘れない（落ちない）ブロックに当たったら止める（needs_tool）
+async function digToFind(bot, max, token, guard, seen, start) {
+  const yaw = bot.entity.yaw;
+  // マイクラの yaw：0 が北（-z）、π/2 が西（-x）。いちばん近い 4 方向にする
+  const dirs = [new Vec3(0, 0, -1), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(1, 0, 0)];
+  const dir = dirs[Math.round(((yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 2)) % 4];
+  let dug = 0;
+  for (let i = 0; i < max && !token.cancelled; i++) {
+    if (guard?.active) await guard.idle();
+    const feet = bot.entity.position.floored();
+    const front = feet.plus(dir);
+    const step = front.offset(0, -1, 0);
+    const targets = [front.offset(0, 1, 0), front, step];
+    for (const p of targets) {
+      // 掘った先や隣に水・溶岩があれば、流れ込むので止める
+      const around = [p, p.offset(1, 0, 0), p.offset(-1, 0, 0), p.offset(0, 0, 1), p.offset(0, 0, -1), p.offset(0, 1, 0)];
+      const fluid = around.map((q) => bot.blockAt(q)).find((b) => b && FLUIDS.test(b.name));
+      if (fluid) throw new Failed('danger', { how: 'dig', dug, descended: Math.round(start.y - bot.entity.position.y), below: fluid.name });
+    }
+    const floor = bot.blockAt(step.offset(0, -1, 0));
+    if (!floor || floor.boundingBox !== 'block') {   // 降りた先の足場が無い（洞窟の上など）：そこで見回して終える
+      const hit = seen();
+      if (hit) return { ...hit, how: 'dig', dug };
+      throw new Failed('not_found', { how: 'dig', dug, descended: Math.round(start.y - bot.entity.position.y), stopped_at: 'cave' });
+    }
+    for (const p of targets) {
+      const b = bot.blockAt(p);
+      if (!b || b.boundingBox === 'empty') continue;
+      if (!NATURAL.test(b.name) || !bot.canDigBlock(b)) {
+        throw new Failed('cannot_dig', { how: 'dig', dug, blocked_by: b.name });
+      }
+      if (!harvestable(bot, b) && b.harvestTools) {
+        throw new Failed('needs_tool', { how: 'dig', dug, tool: weakestTool(bot, [b]) });
+      }
+      await bot.dig(b, true);
+      dug += 1;
+    }
+    try {
+      await guarded(guard, token, () => {
+        bot.pathfinder.setMovements(playerMovements(bot));
+        return watched(bot, () => bot.pathfinder.goto(new goals.GoalBlock(step.x, step.y, step.z)));
+      });
+    } catch (err) {
+      if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+    }
+    const hit = seen();
+    if (hit) return { ...hit, how: 'dig', dug, descended: Math.round(start.y - bot.entity.position.y) };
+  }
+  if (token.cancelled) return undefined;
+  throw new Failed('not_found', { how: 'dig', dug, descended: Math.round(start.y - bot.entity.position.y) });
+}
+
 // 足元を depth ブロック掘って降りる（技 dig_down）。
 // 自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
 async function descend(bot, depth, token, guard) {
@@ -476,6 +579,9 @@ async function descend(bot, depth, token, guard) {
 
 // 始める前に確かめる。だめなら { reason, note }（started の代わりに error で返す）
 const SKILL_PREPARE = {
+  find(bot, args) {
+    return blocksFor(bot.registry, args.block).length ? null : { reason: 'unknown_block' };
+  },
   collect(bot, args) {
     const blocks = blocksFor(bot.registry, args.block);
     if (!blocks.length) return { reason: 'unknown_block' };

@@ -33,6 +33,14 @@ export const SKILLS = {
     if (!Number.isInteger(count) || count < 1 || count > COLLECT_MAX) return { error: 'bad_args' };
     return { args: { block: a.block, count } };
   },
+  // 見える所に無いブロックを探す。how：walk（歩いて見回す）・dig（階段状に掘り下げる）・auto（体が選ぶ）。max は dig の段の上限
+  find: (a) => {
+    if (typeof a.block !== 'string' || !BLOCK.test(a.block)) return { error: 'bad_args' };
+    const how = a.how === undefined ? 'auto' : a.how;
+    if (!['walk', 'dig', 'auto'].includes(how)) return { error: 'bad_args' };
+    if (a.max !== undefined && (!Number.isInteger(a.max) || a.max < 1 || a.max > 48)) return { error: 'bad_args' };
+    return { args: { block: a.block, how, ...(a.max !== undefined ? { max: a.max } : {}) } };
+  },
   // 足元を depth ブロック掘って降りる（自然のブロックだけ掘る）
   dig_down: (a) => {
     return Number.isInteger(a.depth) && a.depth >= 1 && a.depth <= DIG_MAX ? { args: { depth: a.depth } } : { error: 'bad_args' };

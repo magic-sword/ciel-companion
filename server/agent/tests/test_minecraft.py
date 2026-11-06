@@ -347,7 +347,7 @@ class ToolTest(unittest.IsolatedAsyncioTestCase):
     async def test_tools_without_a_body_say_unavailable(self):
         ctx = types.SimpleNamespace(userdata=tools.State())
         args = {'go_to_place': {'x': 1, 'z': 2}, 'collect_blocks': {'block': 'oak_log', 'count': 3},
-                'craft_item': {'item': 'stick'}, 'dig_down': {'depth': 3},
+                'craft_item': {'item': 'stick'}, 'dig_down': {'depth': 3}, 'find_blocks': {'block': 'stone'},
                 'give_item': {'item': 'oak_log'}}
         for fn in tools.minecraft.TOOLS:
             result = await fn(ctx, **args.get(fn.id, {}))
