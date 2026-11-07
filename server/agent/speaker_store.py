@@ -9,6 +9,9 @@
   話していても同じ記録を使うので、相手の名前や事情は書かない。古いものから消す
 - ciel_likes：出来事から育ったシエルの好み（好き・ちょっと苦手・気になっている。growth.py が書く）。根拠の出来事を写して持つ
 - ciel_like_history：育った好みを足した・変えた・外した記録（いつ・何を・根拠・理由）。あとから見直すため
+- route_examples：遊んでいるあいだ、相手の発言を心へ回すかを見分ける例文のうち、遊びながら育ったもの（router.py が書く）。
+  持ち主の発言の短い写し（60 字まで）・呼んだ道具の名前（小脳でよい発言は空）・ベクトル。ゲームごとに上限、古いものから消す。
+  シエル自身の振る舞いの記録なので、本番と開発用で 1 つ（印なし）
 - device_owners：端末の持ち主（アプリの端末 ID と、端末だけが持つ合言葉のハッシュ）。合言葉そのものは置かない
 - voiceprints.channel：その見本を録った経路（端末の ID など。マイクや経路で声の特徴が変わるので、同じ経路の見本を優先して比べる）
 - people.origin・people.shared・person_notes.origin：本番（main）と開発用（dev）の会話サーバーが同じ DB を使うための印
@@ -148,6 +151,16 @@ CREATE TABLE IF NOT EXISTS ciel_like_history (
     text text NOT NULL DEFAULT '',
     why text NOT NULL DEFAULT '',
     evidence jsonb NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS route_examples (
+    id bigserial PRIMARY KEY,
+    at timestamptz NOT NULL DEFAULT now(),
+    game text NOT NULL,
+    tool text,
+    text text NOT NULL,
+    source text NOT NULL DEFAULT '',
+    embedding vector(256) NOT NULL,
+    UNIQUE (game, text)
 );
 ALTER TABLE people ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'main';
 ALTER TABLE people ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT false;
@@ -297,6 +310,27 @@ class Store:
         """新しい順に（番号、日時、種類、文）"""
         return await (await self.conn.execute(
             'SELECT id, at, kind, text FROM ciel_events ORDER BY at DESC, id DESC LIMIT %s', (limit,))).fetchall()
+
+    async def route_examples(self, game: str) -> list[tuple[str, str | None, np.ndarray]]:
+        """育った振り分けの例文（文、道具の名前、ベクトル）。古い順"""
+        rows = await (await self.conn.execute(
+            'SELECT text, tool, embedding FROM route_examples WHERE game = %s ORDER BY at, id', (game,))).fetchall()
+        return [(t, tool, np.asarray(v, dtype=np.float32)) for t, tool, v in rows]
+
+    async def add_route_example(self, game: str, tool: str | None, text: str, embedding, source: str, keep: int) -> None:
+        """例文を足す（同じ文があれば印を書き換える）。keep 個を超えたら古いものから消す"""
+        async with self.conn.transaction():
+            await self.conn.execute(
+                'INSERT INTO route_examples (game, tool, text, source, embedding) VALUES (%s, %s, %s, %s, %s) '
+                'ON CONFLICT (game, text) DO UPDATE SET tool = EXCLUDED.tool, source = EXCLUDED.source, at = now(), '
+                'embedding = EXCLUDED.embedding',
+                (game, tool, text, source, np.asarray(embedding, dtype=np.float32)))
+            await self.conn.execute(
+                'DELETE FROM route_examples WHERE game = %s AND id NOT IN '
+                '(SELECT id FROM route_examples WHERE game = %s ORDER BY at DESC, id DESC LIMIT %s)', (game, game, keep))
+
+    async def remove_route_example(self, game: str, text: str) -> None:
+        await self.conn.execute('DELETE FROM route_examples WHERE game = %s AND text = %s', (game, text))
 
     async def ciel_likes(self) -> list[tuple[int, str, str, str, list]]:
         """育った好み（番号、種類、文、きっかけ、根拠の出来事の写し）。古い順"""

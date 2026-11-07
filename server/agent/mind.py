@@ -58,6 +58,12 @@ MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
 GAME_ASK = re.compile(r'つい(て|と)(き|来|く|こ|い)|付いて|こっち|おいで|来て|止ま|止め|とまっ|待って|ストップ|やめて|'
                       r'見え(る|て)|見て|何がある|なにがある|周り|まわり|大丈夫|体力|マイクラ|集め|取って|とって|掘って|掘る|ちょうだい|渡して|くれる|行って|降り|おり|'
                       r'作って|つくって|作れる|クラフト|ツルハシ|つるはし')
+# 相手の発言で呼ぶゲームの道具（育つ例文の印）。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を終える）は除く
+GAME_CALLS = frozenset(BODY_TOOLS + GOAL_TOOLS) - {'add_subgoal', 'finish_step'}
+MOVING_CALLS = GAME_CALLS - {'look_around', 'look_at_view', 'goal_status'}
+# 小脳が体の動きを約束した言い方（シエル自身の口ぐせなので、相手の言い方よりそろっている）。約束しても小脳は道具を持たないので、
+# 話し終えたら心が続きをする（「すぐに渡しますね」と言うだけで渡さなかった。2026-11-07）
+PROMISE = re.compile(r'(渡し|作り|作って|集め|集めて|取って|取り|掘り|掘って|探し|探して|持って|置き|置いて|拾い|拾って|降り|向かい|ついていき|ついて行き|そっちに行き|行き|あげ|止まり|待ち)(ます|ますね|ますよ|ましょう|きます|おきます|いきます|るのです|ますのです)')
 FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
@@ -93,6 +99,13 @@ class Mind:
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
         self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
+        # 遊んでいるあいだの振り分けの 2 段目（router.Router。道具ごとのきっかけとの意味の近さ）。agent.py が置く
+        self.router = None
+        self.is_owner = lambda: True      # 今の発言が持ち主のものか（育つ例文は持ち主の発言だけ。agent.py が置く）
+        self.last_why: str | None = None  # 最後に心へ回した理由（semantic なら、道具を使わなければ小脳の例文にする）
+        self.semantic_tool: str | None = None   # 意味で心へ回したときの、いちばん近いきっかけの道具
+        self._promised: str | None = None # 小脳が体の動きを約束だけした発言（心が道具でやったら、その道具の例文にする）
+        self.on_promise = None            # 呼ぶと、心に約束の続きをさせる（agent.py が置く。口の why 'game'）
 
     @property
     def client(self):
@@ -111,6 +124,7 @@ class Mind:
     def route(self, chat_ctx: llm.ChatContext, turn: dict | None = None) -> str:
         """この返事を心（'mind'）と小脳（'talker'）のどちらが作るか（コードで決める）。turn は turns.py の pipeline_turn"""
         tail = _tail(list(chat_ctx.items))
+        self.last_why = self.semantic_tool = None
         if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
             return 'mind'   # 道具の結果を受けた続き
         if self._deep:
@@ -145,11 +159,59 @@ class Mind:
                else 'named' if quiet and NAME.search(text)
                else 'quiet' if quiet
                else None)
+        self.last_why = why
         if why is None:
             return 'talker'
         log.info('心：考えて返す（%s）', why)
         debug_log.record('mind_route', why=why)
         return 'mind'
+
+    def playing(self) -> bool:
+        """体がつながっていて、マイクラの中にいる"""
+        return self._body_linked() and bool((getattr(self.body, 'state', None) or {}).get('connected'))
+
+    async def second_look(self, chat_ctx: llm.ChatContext) -> str:
+        """1 段目で小脳に決まった発言を、遊んでいるあいだだけ、道具ごとのきっかけとの意味の近さで見直す（router.py）。
+        決まった言葉に「欲しい」「ピッケル」が無く、「石のピッケルが欲しいな」が道具の無い小脳へ回り、
+        「渡しますね」と言うだけだった（2026-11-07）"""
+        if self.router is None or not self.playing():
+            return 'talker'
+        text = latest_user_text(chat_ctx)
+        tool = await self.router.wants_mind(self._strip(text)) if text else None
+        if tool is None:
+            return 'talker'
+        self.last_why, self.semantic_tool = 'semantic', tool
+        log.info('心：考えて返す（semantic・%s）', tool)
+        debug_log.record('mind_route', why='semantic', tool=tool)
+        return 'mind'
+
+    def after_reply(self, chat_ctx: llm.ChatContext, who: str, text: str, calls: list[str], done: bool) -> None:
+        """返事のあと：振り分けの例文を育て、小脳が体の動きを約束だけしたら心に続きをさせる"""
+        if self.router is None or not self.playing() or not done:
+            return
+        said = latest_user_text(chat_ctx)
+        game = [c for c in calls if c in GAME_CALLS or game_knowledge.game_of_name(c) is not None]
+        if who == 'mind' and game:
+            if self._promised:   # 小脳が約束だけした発言を、心が道具でやった：取りこぼしの例文
+                self._learn(self._promised, game[0], 'promise')
+                self._promised = None
+            elif said and self.is_owner():
+                self._learn(said, game[0], 'tool')
+        elif (who == 'mind' and self.last_why == 'semantic' and self.semantic_tool in MOVING_CALLS and said
+              and self.is_owner() and '[silent]' not in text):
+            # 体を動かす頼みに近いとして心へ回したのに、道具を使わなかった：回しすぎ。見る・進み具合・知識の頼みは、
+            # 心が様子から道具なしで答えることもあるので、小脳の例文にしない
+            self._learn(said, None, 'no_tool')
+        elif who == 'talker' and said and PROMISE.search(text):
+            # 小脳が「渡しますね」と約束だけした：話し終えたら、心が道具で続きをする（取りこぼしの受け皿）
+            self._promised = said if self.is_owner() else None
+            debug_log.record('mind_route', why='promise', said=said[:60], text=text[:80])
+            if self.on_promise is not None:
+                self.on_promise(said, text)
+
+    def _learn(self, text: str, tool: str | None, source: str) -> None:
+        task = asyncio.create_task(self.router.learn(self._strip(text), tool, source))
+        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
     def tools_for(self, chat_ctx: llm.ChatContext, tools: list) -> list:
         """心に渡す道具。議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ渡す（付箋になった頼みは除く）。
@@ -384,6 +446,12 @@ def one_body_call(chunk, taken: list):
     if not kept and not delta.content and getattr(chunk, 'usage', None) is None:
         return None, dropped
     return chunk.model_copy(update={'delta': delta.model_copy(update={'tool_calls': kept})}), dropped
+
+
+def latest_user_text(chat_ctx) -> str:
+    """今回の分の、最後の相手の発言"""
+    tail = _tail(list(chat_ctx.items))
+    return next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
 
 
 def _tail(items: list) -> list:

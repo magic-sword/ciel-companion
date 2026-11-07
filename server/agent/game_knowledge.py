@@ -47,6 +47,11 @@ def servers() -> list:
     return out
 
 
+def game_of_name(name: str) -> str | None:
+    """道具の名前が窓口の道具なら、そのゲームの名前"""
+    return next((g for g in GAMES if (name or '').startswith(g + '_')), None)
+
+
 def game_of(tool) -> str | None:
     """窓口の道具なら、そのゲームの名前（minecraft_facts → minecraft）。窓口の道具でなければ None"""
     name = getattr(tool, 'id', None) or ''

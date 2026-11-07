@@ -50,6 +50,7 @@ import errors
 import game_knowledge
 import goals
 import mind
+import router
 import minecraft
 import minutes
 import mode
@@ -216,6 +217,8 @@ class Ciel(Agent):
         if self.ear is not None:
             await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
         who = self.mind.route(chat_ctx, turn)
+        if who == 'talker':
+            who = await self.mind.second_look(chat_ctx)   # 遊んでいるあいだは、意味の近さでもう一度見る（router.py）
         if who == 'skip':
             return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
         if who == 'mind':
@@ -257,6 +260,10 @@ class Ciel(Agent):
         finally:
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
+            try:
+                self.mind.after_reply(chat_ctx, who, ''.join(text), calls, done)   # 例文を育てる・約束の受け皿
+            except Exception:
+                logger.exception('心：返事のあとの振り分けの処理に失敗')
 
     def talker_instructions_for(self, talk: str, presence: str) -> str:
         """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
@@ -486,6 +493,21 @@ async def entrypoint(ctx: JobContext) -> None:
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body,
                                eyes=seeing, self_image=agent.persona.self_image)
         agent.mind.goals = goal_runner
+        if body is not None:
+            # 遊んでいるあいだの振り分けの 2 段目：道具ごとのきっかけ（config/routes/minecraft.json）と、遊びながら育った例文
+            # （DB の route_examples）との意味の近さで、小脳に決まった発言を見直す（router.py）
+            agent.mind.router = router.Router('minecraft', store=store)
+            agent.mind.router.start()
+            agent.mind.is_owner = lambda: (book is None or book.owner_id is None
+                                           or (book.last is not None and book.last.person_id == book.owner_id))
+            # 小脳が「渡しますね」と約束だけしたら、話し終えたあとに心が体の道具で続きをする（取りこぼしの受け皿）
+            agent.mind.on_promise = lambda said, text: voice.say_latest(
+                'game', settle=1.0,
+                instructions=f'[さっき相手の「{said[:60]}」に、小脳が「{text[:80]}」と答えたが、体の道具はまだ使っていない。'
+                             '小脳は会話の流れを読み違えることがある。まず会話を見て、相手が本当にそれを頼んだかを確かめる。'
+                             '頼んでいたら、今、体の道具で実際にやり、やったことだけを短く言う。読み違いなら道具は使わず、'
+                             '相手が頼んだことを短く確かめる（「石のつるはしを作る、で合っていますか」）。'
+                             'もう済んでいる・できないなら、そのことを短く言う]')
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 

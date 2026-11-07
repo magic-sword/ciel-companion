@@ -299,7 +299,10 @@ export async function gatherScaffold(bot, guard, token) {
   return scaffoldCount(bot) - start;
 }
 
-const TOSS_RANGE = 3;      // 渡すときに近づく距離
+const TOSS_RANGE = 2;      // 渡すときに近づく距離（3 では投げた物が相手を越えて落ちることがあった）
+const GIVE_SPAWN_TICKS = 4;  // 投げた物が見えるまで待つ
+const GIVE_SEARCH = 6;       // 投げた物を探す距離
+const GIVE_WAIT_MS = 6000;   // 相手が拾うのを待つ（拾えるまで 2 秒かかる）
 
 const SKILL_RUN = {
   async follow(bot, args, token, { owner, guard }) {
@@ -418,11 +421,36 @@ const SKILL_RUN = {
       return new goals.GoalNear(p.x, p.y, p.z, TOSS_RANGE);
     });
     if (token.cancelled) return undefined;
-    await bot.lookAt(target.position.offset(0, 1.6, 0), true);
+    // 胸のあたりへ軽く投げる（頭の高さへ投げると、相手を越えて穴や水に落ちることがあった）
+    await bot.lookAt(target.position.offset(0, 0.8, 0), true);
     const total = have.reduce((n, i) => n + i.count, 0);
     const count = Math.min(args.count ?? total, total);
-    await bot.toss(have[0].type, null, count);
-    return { gave: { [args.item]: count } };
+    // 渡せたかを、相手が拾ったか（playerCollect）で確かめる。拾われずに落ちたままなら、自分で拾い直して not_received
+    // （投げた石のつるはしが相手に届かず、なくなった。2026-11-07）
+    const before = new Set(Object.values(bot.entities).filter((e) => e.name === 'item').map((e) => e.id));
+    const taken = new Map();   // 落とした物の id → 拾った人
+    const onCollect = (collector, collected) => taken.set(collected.id, collector);
+    bot.on('playerCollect', onCollect);
+    try {
+      await bot.toss(have[0].type, null, count);
+      await bot.waitForTicks(GIVE_SPAWN_TICKS);
+      const mine = Object.values(bot.entities).filter((e) => e.name === 'item' && !before.has(e.id)
+        && e.position && e.position.distanceTo(bot.entity.position) <= GIVE_SEARCH);
+      const end = Date.now() + GIVE_WAIT_MS;
+      while (mine.some((e) => bot.entities[e.id] && !taken.has(e.id)) && Date.now() < end && !token.cancelled) {
+        await bot.waitForTicks(2);
+      }
+      const byTarget = mine.filter((e) => taken.get(e.id)?.username === target.username).length;
+      const left = mine.filter((e) => bot.entities[e.id] && !taken.has(e.id));
+      if (left.length && !byTarget) {
+        for (const e of left) await pickUpNear(bot, e.position.floored(), guard, token);   // 自分で拾い直す
+        throw new Failed('not_received', { item: args.item });
+      }
+      if (!byTarget && mine.some((e) => taken.get(e.id) === bot.entity)) throw new Failed('not_received', { item: args.item });
+      return { gave: { [args.item]: count }, received: byTarget > 0 || !mine.length };
+    } finally {
+      bot.removeListener('playerCollect', onCollect);
+    }
   },
 
   // 近くのブロックを掘って集める。掘るのは、シエルが見て知っているブロックだけ（sight.js。埋まった鉱石へ掘り進まない）
