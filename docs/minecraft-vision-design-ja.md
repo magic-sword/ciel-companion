@@ -1,5 +1,7 @@
 # シエルの目から見る（マイクラ・設計）
 
+> **2026-11-07 から：** 会話サーバーとのつなぎ方を、MCP の「ゲームの環境」に変えた（[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md)）。この文書の `minecraft.py`・`tools/minecraft.py`・`config/prompts/minecraft.md`・WebSocket の決まりは、そのときまでの形。今は、体の MCP の入口（`server/minecraft/src/ciel/`）がシエル向けの言葉・道具・遊び方の指示を持ち、会話サーバーは `game_env.py` でつなぐ。
+
 状態：作った（2026-11-06）。試作で A を確かめ、体に組み込んだ。前提は [マインクラフトで遊ぶ設計](minecraft-design-ja.md)（体）と [シエルに画像を見せる設計](vision-design-ja.md)（目の係）。
 
 ## 1. 何をするか

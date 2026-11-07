@@ -93,10 +93,10 @@ class SourceTest(unittest.TestCase):
         e = eyes.Eyes(said)
         shown = e.receive(JPEG, 'cat.jpg')
         for _ in range(4):
-            view = e.see_minecraft(JPEG, '北を向いている')
+            view = e.see_game(JPEG, '北を向いている', 'マイクラ')
         # 景色を何枚見ても、見せてもらった画像は押し出されない
         self.assertIn(shown, e.pictures)
-        self.assertEqual(len([p for p in e.pictures if p.source == eyes.MINECRAFT]), eyes.KEEP)
+        self.assertEqual(len([p for p in e.pictures if p.source == eyes.GAME]), eyes.KEEP)
         self.assertEqual(len(said.calls), 1)   # 口に頼むのは、見せてもらった画像だけ
         # 新しいものから見る。前の景色は、見ていなくても、もう添えない
         self.assertIn('[わたしの目に見えている景色 #5（マイクラの中で、今わたしが見ているもの。北を向いている）]',
@@ -109,7 +109,7 @@ class SourceTest(unittest.TestCase):
         self.assertIn('[わたしの目で見た景色（マイクラ）]\n#5', ctx)
 
     def test_not_an_image_view_is_dropped(self):
-        self.assertIsNone(eyes.Eyes(Said()).see_minecraft(b'nope'))
+        self.assertIsNone(eyes.Eyes(Said()).see_game(b'nope'))
 
 
 class Reader:

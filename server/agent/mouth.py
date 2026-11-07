@@ -20,7 +20,7 @@ import debug_log
 log = logging.getLogger('ciel-agent.mouth')
 
 WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
-       'game', 'image')   # comment：配信のコメントへの返事。game：マイクラの出来事・頼まれた技の結果（minecraft.py）。
+       'game', 'image')   # comment：配信のコメントへの返事。game：ゲームの出来事・頼まれた技の結果（game_env.py）。
                           # image：見せてもらった画像を見る（eyes.py）
 FREE_POLL = 0.25
 

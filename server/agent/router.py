@@ -3,8 +3,8 @@
 docs/conversation-pipeline-ja.md の 3 章、docs/decisions/semantic-route-ja.md。
 
 - 1 段目は今までどおり決まった言葉（mind.py の GAME_ASK など）。そこで小脳に決まった発言だけを、ここで見直す。
-- 例文：道具ごとの「呼ぶきっかけ」（config/routes/<game>.json の tools。スキルのトリガーと同じ考え方で、道具の横に
-  どんな頼みで呼ぶかを書いておく）と、小脳でよい発言（talker）、遊びながら育った例文（DB の route_examples。実際に
+- 例文：道具ごとの「呼ぶきっかけ」（ゲームの道具の _meta の ciel/triggers と、ゲームの決まりの goal_triggers・
+  talker_examples。game_env.py の seeds。スキルのトリガーと同じ考え方で、道具の横にどんな頼みで呼ぶかを書いておく）と、小脳でよい発言（talker）、遊びながら育った例文（DB の route_examples。実際に
   呼んだ道具の名前つき）。発言と例文をベクトルにして、いちばん近いきっかけの例文が THRESHOLD 以上で、
   いちばん近い小脳の例文より MARGIN 以上近ければ、心へ回す。名前（シエル）と記号は外して比べる（「おはよう、シエル」に
   引っぱられ、「シエルどこにいる？」が小脳へ回った。2026-11-07）。
@@ -64,8 +64,9 @@ def seeds(game: str) -> list[tuple[str, str | None]]:
 
 
 class Router:
-    def __init__(self, game: str, *, store=None, client=None) -> None:
+    def __init__(self, game: str, *, store=None, client=None, seeds=None) -> None:
         self.game = game
+        self._seeds = seeds         # 最初の例文（無ければ config/routes/<game>.json）
         self.store = store          # speaker_store.Store（育った例文。無ければ最初の例文だけ）
         self._client = client
         self._texts: list[str] = []
@@ -91,7 +92,7 @@ class Router:
             self._ready = asyncio.create_task(self._load())
 
     async def _load(self) -> None:
-        s = seeds(self.game)
+        s = list(self._seeds) if self._seeds is not None else seeds(self.game)
         texts, tools = [t for t, _ in s], [tool for _, tool in s]
         vecs = await self._embed(texts) if texts else np.zeros((0, DIMS), dtype=np.float32)
         if self.store is not None:

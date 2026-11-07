@@ -1,11 +1,11 @@
-"""目的の係（goals.py）と、マイクラの係（minecraft.py の Goals）"""
+"""目的の係（goals.py）。ゲームの係の中身（計画・段・直し方）はゲームの側の試験（server/minecraft/test/ciel.test.js）、
+ゲームの MCP を通した流れは tests/test_game_env.py"""
 import asyncio
 import json
 import unittest
 import unittest.mock
 
 import goals
-import minecraft
 
 
 class Said:
@@ -284,92 +284,6 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runner.goal.status, 'done')
 
 
-class FakeBody:
-    def __init__(self, planned, done):
-        self.linked, self.planned, self.done, self.asked = True, list(planned), list(done), []
-
-    async def plan(self, item, count):
-        return {'status': 'planned', 'steps': self.planned.pop(0)}
-
-    async def run_skill(self, skill, args):
-        self.asked.append((skill, args))
-        return self.done.pop(0)
-
-    async def stop(self):
-        pass
-
-
-class MinecraftGoalsTest(unittest.IsolatedAsyncioTestCase):
-    async def test_plan_labels_gather_progress_and_repair(self):
-        body = FakeBody([[{'kind': 'gather', 'item': 'oak_log', 'count': 3}, {'kind': 'craft', 'item': 'wooden_pickaxe', 'count': 1}],
-                         [{'kind': 'gather', 'item': 'oak_log', 'count': 1}, {'kind': 'craft', 'item': 'wooden_pickaxe', 'count': 1}]],
-                        [{'ok': True, 'note': {'gained': {'oak_log': 2}, 'short': 'not_found'}},
-                         {'ok': True, 'note': {'found': 'oak_log'}},
-                         {'ok': True, 'note': {'gained': {'oak_log': 1}}},
-                         {'ok': False, 'reason': 'missing_materials', 'note': {'needs': {'oak_log': 1}}},
-                         {'ok': True, 'note': {'gained': {'oak_log': 1}}},
-                         {'ok': True, 'note': {'gained': {'wooden_pickaxe': 1}}}])
-        said = Said()
-        runner = goals.GoalRunner(said)
-        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
-        r = await runner.start('minecraft', '木のツルハシを作る', {'make': 'wooden_pickaxe', 'count': 1})
-        self.assertEqual(r['steps'], ['オークの原木を 3 個集める', '木のツルハシを作る'])
-        await settle(runner)
-        # 2 本で見える所に無くなった → 探す段を足し、見つけてから残り 1 本だけ集める。作るときに足りなければ計画し直す
-        self.assertEqual(body.asked[1], ('find', {'block': 'oak_log', 'how': 'auto'}))
-        self.assertEqual(body.asked[2], ('collect', {'block': 'oak_log', 'count': 1}))
-        self.assertEqual(runner.goal.status, 'done')
-        self.assertEqual(runner.state()['changes'][0], 'オークの原木が見える所に無いので、探す段を足した')
-        self.assertIn('材料が足りないので、計画を直した', runner.state()['changes'][1])
-
-
-    async def test_not_found_adds_a_find_step_before_gathering(self):
-        # 丸石が見える所に無く止まった件（2026-11-07）：先に探す段を足して、見つけてから集める
-        body = FakeBody([[{'kind': 'gather', 'item': 'cobblestone', 'count': 3},
-                          {'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]],
-                        [{'ok': False, 'reason': 'not_found', 'note': {'gained': {}}},
-                         {'ok': True, 'note': {'found': 'stone'}},
-                         {'ok': True, 'note': {'gained': {'cobblestone': 3}}},
-                         {'ok': True, 'note': {'gained': {'stone_pickaxe': 1}}}])
-        runner = goals.GoalRunner(Said())
-        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
-        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
-        await settle(runner)
-        self.assertEqual([a[0] for a in body.asked], ['collect', 'find', 'collect', 'craft'])
-        self.assertEqual(body.asked[1][1], {'block': 'cobblestone', 'how': 'auto'})
-        self.assertEqual(runner.goal.status, 'done')
-        self.assertEqual(runner.state()['changes'], ['丸石が見える所に無いので、探す段を足した'])
-
-    async def test_the_same_plan_again_is_not_a_repair(self):
-        # 計画し直しても同じ「作る」だけの計画で、「計画を直した」を 3 回くり返した件（2026-11-07）
-        same = [{'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]
-        body = FakeBody([same, same], [{'ok': False, 'reason': 'missing_materials', 'note': {'needs': {'cobblestone': 2}}}])
-        runner = goals.GoalRunner(Said())
-        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
-        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
-        await settle(runner)
-        self.assertEqual(runner.goal.status, 'paused')
-        self.assertEqual(runner.state()['changes'], [])
-        self.assertIn('材料が足りない', runner.goal.attention)
-
-    async def test_gather_done_but_short_of_the_item_goes_on(self):
-        # 体が丸石 2 個と土 1 個で「3 個集めた」と終え、理由なしで止まった件（2026-11-07）：足りない分を探して続ける
-        body = FakeBody([[{'kind': 'gather', 'item': 'cobblestone', 'count': 3},
-                          {'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]],
-                        [{'ok': True, 'note': {'gained': {'cobblestone': 2, 'dirt': 1}}},
-                         {'ok': True, 'note': {'found': 'stone'}},
-                         {'ok': True, 'note': {'gained': {'cobblestone': 1}}},
-                         {'ok': True, 'note': {'gained': {'stone_pickaxe': 1}}}])
-        runner = goals.GoalRunner(Said())
-        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
-        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
-        await settle(runner)
-        self.assertEqual([a[0] for a in body.asked], ['collect', 'find', 'collect', 'craft'])
-        self.assertEqual(body.asked[2][1], {'block': 'cobblestone', 'count': 1})
-        self.assertEqual(runner.goal.status, 'done')
-
-
-
 class OneBodyCallTest(unittest.TestCase):
     def test_only_one_moving_tool_per_reply(self):
         # 集めると作るを同時に呼び、体の技が取り合いになって両方失敗した件（2026-11-07）
@@ -379,13 +293,14 @@ class OneBodyCallTest(unittest.TestCase):
             calls = [llm.FunctionToolCall(name=n, arguments='{}', call_id=f'c{i}') for i, n in enumerate(names)]
             return llm.ChatChunk(id='x', delta=llm.ChoiceDelta(role='assistant', tool_calls=calls))
         taken = []
-        out, dropped = mind.one_body_call(chunk('collect_blocks', 'look_around', 'craft_item'), taken)
+        moving = {'collect_blocks', 'craft_item'} | mind.GOAL_ONE   # ゲームの act の道具と、目的の道具（Mind.one_call_tools）
+        out, dropped = mind.one_body_call(chunk('collect_blocks', 'look_around', 'craft_item'), taken, moving)
         self.assertEqual([c.name for c in out.delta.tool_calls], ['collect_blocks', 'look_around'])
         self.assertEqual(dropped, ['craft_item'])
-        out, dropped = mind.one_body_call(chunk('start_goal'), taken)   # 同じ返事の続きの chunk でも
+        out, dropped = mind.one_body_call(chunk('start_goal'), taken, moving)   # 同じ返事の続きの chunk でも
         self.assertIsNone(out)
         self.assertEqual(dropped, ['start_goal'])
-        out, dropped = mind.one_body_call(chunk('remember_about_speaker'), [])
+        out, dropped = mind.one_body_call(chunk('remember_about_speaker'), [], moving)
         self.assertEqual(dropped, [])
 
 

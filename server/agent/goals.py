@@ -5,7 +5,8 @@
   計画し直し）→ それでもだめなら心に相談 → 同じ段で何度もだめなら止めて持ち主に聞く。
 - 目的は木にできる（6 章）。段が失敗して決まった直し方が無いとき、心が小さな目標（add_subgoal）を作る。小さな目標が
   できたら、親の失敗した段からやり直す。深さは決め打ちしない。ループは「同じ目標が先祖にいる」「進んでいない」「予算」で止める。
-- ゲームを知らない。ゲームごとの係（adapter）が、段の中身・実行・確かめ方・見せる言葉を持つ（マイクラは minecraft.py の Goals）。
+- ゲームを知らない。ゲームごとの係（adapter）が、段の中身・実行・確かめ方・見せる言葉を持つ（ゲームの MCP の道具を使う game_env.py の GoalsAdapter。
+  段の中身はゲームの側が持つ。マイクラは server/minecraft の src/ciel/goals.js）。
 - 「できた」は確かめた結果で決める。心の言葉では決めない（「作り始めました」と言ったあと体が断っても、目的の段は正しい）。
 - 心へは、会話の後ろにいつも短く「[今の目的]」を渡す。口（mouth.py）の知らせは区切りだけ（始めた・直した・相談・できた）。
 - 今の目的と段は、変わるたびにアプリと配信の画面へ goal.state で送る（topic ciel.goal）。
@@ -115,6 +116,8 @@ class GoalRunner:
     # ---- 心の道具から ----
 
     async def start(self, game: str, title: str, spec: dict, *, why: str = '', by: str = 'owner', first: bool = False) -> dict:
+        if not game:   # ゲームを言わなければ、つないでいるゲーム（今は 1 つだけ）
+            game = next(iter(self.adapters), '')
         adapter = self.adapters.get(game)
         if adapter is None or not adapter.available():
             return {'status': 'unavailable'}

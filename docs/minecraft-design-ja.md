@@ -1,5 +1,7 @@
 # シエルとマインクラフトで遊ぶ（設計）
 
+> **2026-11-07 から：** 会話サーバーとのつなぎ方を、MCP の「ゲームの環境」に変えた（[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md)）。この文書の `minecraft.py`・`tools/minecraft.py`・`config/prompts/minecraft.md`・WebSocket の決まりは、そのときまでの形。今は、体の MCP の入口（`server/minecraft/src/ciel/`）がシエル向けの言葉・道具・遊び方の指示を持ち、会話サーバーは `game_env.py` でつなぐ。
+
 状態：B1（マイクラのサーバーと体）と B2（会話サーバーとつなぐ）を作った（2026-11-05）。B2 は開発用の会話サーバーだけでつないでいる（`compose.dev.yaml` の `CIEL_MINECRAFT_URL`）。声で「ついてきて」「止まって」と頼み、体が動くのを確かめた（使い方は 12・13 章）。
 
 ## 1. 何を解くか

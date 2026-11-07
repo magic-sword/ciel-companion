@@ -9,7 +9,6 @@ import numpy as np
 
 import router
 from tools.goals import GOAL_TOOLS
-from tools.minecraft import BODY_TOOLS
 
 KEYS = ('渡', '欲し', 'ちょうだい', '作', '集め', 'えらい', 'こんばん', '見え', 'どこ')
 
@@ -53,13 +52,11 @@ def make(store=None, seeds=None):
 
 
 class SeedsTest(unittest.TestCase):
-    def test_every_tool_she_is_asked_for_has_triggers(self):
-        # 道具を足したら、きっかけも書く（スキルのトリガーと同じ。書き忘れると、その頼みは意味では心へ回らない）
-        data = json.loads((router.SEEDS_DIR / 'minecraft.json').read_text(encoding='utf-8'))
-        asked = set(BODY_TOOLS + GOAL_TOOLS) - set(data['internal'])
-        self.assertEqual(asked - set(data['tools']), set())
-        self.assertTrue(all(data['tools'][t] for t in data['tools']))
-        self.assertGreater(len(data['talker']), 10)
+    # 道具ごとのきっかけはゲームの側が持つ（server/minecraft の src/ciel/routes.json。書き忘れは test/ciel.test.js が確かめる）
+
+    def test_seeds_given_by_the_game_are_used(self):
+        r = router.Router('test', client=None, seeds=[('跳んで', 'test_jump'), ('えらいね', None)])
+        self.assertEqual(r._seeds, [('跳んで', 'test_jump'), ('えらいね', None)])
 
     def test_the_name_and_marks_are_dropped_before_comparing(self):
         self.assertEqual(router.norm('シエル、どこにいる？'), 'どこにいる')
@@ -104,11 +101,25 @@ class RouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await r.wants_mind('それちょうだい'))
 
 
+class FakeBody:
+    """ゲームの環境（game_env.GameEnv）のうち、心が見るところ。道具の役目はゲームの決まりから"""
+    ROLES = {'act': {'give_item', 'craft_item'}, 'look': {'look_around'}, 'know': set()}
+
+    def __init__(self):
+        self.linked, self.in_world, self.route_words = True, True, None
+
+    def playing(self):
+        return self.linked and self.in_world
+
+    def tool_ids(self, *roles):
+        return frozenset(n for r in roles for n in self.ROLES.get(r, ()))
+
+
 class AfterReplyTest(unittest.IsolatedAsyncioTestCase):
     def make_mind(self):
         import mind
         m = mind.Mind(None)
-        m.body = SimpleNamespace(linked=True, state={'connected': True})
+        m.body = FakeBody()
         m.router = SimpleNamespace(learn=Mock(side_effect=lambda *a: asyncio.sleep(0)))
         m.on_promise = Mock()
         return m
@@ -144,7 +155,7 @@ class AfterReplyTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_not_playing_learns_nothing(self):
         m = self.make_mind()
-        m.body.state = {'connected': False}
+        m.body.in_world = False
         m.after_reply(self.ctx('それくれる？'), 'mind', '', ['give_item'], True)
         m.router.learn.assert_not_called()
 
