@@ -719,8 +719,7 @@ namespace Ciel.EditorTools
             void Save(string name)
             {
                 var rt = (RenderTexture)typeof(Ciel.Conversation.CielStreamWindow).GetField("_rt", flags).GetValue(w);
-                if (rt == null) { File.AppendAllText(log, $"{name}: 絵が無い
-"); return; }
+                if (rt == null) { File.AppendAllText(log, $"{name}: 絵が無い\n"); return; }
                 var prev = RenderTexture.active;
                 RenderTexture.active = rt;
                 var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
@@ -728,8 +727,7 @@ namespace Ciel.EditorTools
                 tex.Apply();
                 RenderTexture.active = prev;
                 File.WriteAllBytes(Path.Combine(OutDir, name + ".png"), tex.EncodeToPNG());
-                File.AppendAllText(log, $"{name}: {rt.width}x{rt.height} 隅={tex.GetPixel(2, 2)} 真ん中={tex.GetPixel(rt.width / 2, rt.height / 2)}
-");
+                File.AppendAllText(log, $"{name}: {rt.width}x{rt.height} 隅={tex.GetPixel(2, 2)} 真ん中={tex.GetPixel(rt.width / 2, rt.height / 2)}\n");
                 Object.Destroy(tex);
             }
             if (step == 2)
