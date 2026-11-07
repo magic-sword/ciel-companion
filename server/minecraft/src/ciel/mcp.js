@@ -89,13 +89,13 @@ export function makeServer(hub, sessionId) {
   server.registerTool('minecraft_collect_blocks', {
     title: '集める',
     description: 'マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy など）か、'
-      + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。',
+      + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。必要な道具がなければ材料を集めて作ってから続ける。',
     inputSchema: { block: z.string(), count: z.number().int() }, ...ACT('minecraft_collect_blocks', { 'ciel/long_running': true }),
   }, ({ block, count }) => body((l) => l.do('collect', { block, count })));
   server.registerTool('minecraft_find_blocks', {
     title: '探す',
     description: 'マイクラで、見える所に無いブロックを探す（見つけたら止まる。集めるのは minecraft_collect_blocks）。block は英語の ID か呼び名。'
-      + 'how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。',
+      + 'how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。掘る探索では目的の鉱石に必要な道具を先に用意し、装備する。',
     inputSchema: { block: z.string(), how: z.string().optional() }, ...ACT('minecraft_find_blocks', { 'ciel/long_running': true }),
   }, ({ block, how }) => body((l) => l.do('find', { block, how: ['walk', 'dig', 'auto'].includes(how) ? how : 'auto' })));
   server.registerTool('minecraft_craft_item', {
