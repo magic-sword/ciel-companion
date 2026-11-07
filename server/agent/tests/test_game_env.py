@@ -106,7 +106,7 @@ class LinkTest(EnvCase):
         self.assertFalse(env.wanted)
         await self.link()
         self.assertTrue(env.playing())
-        self.assertEqual(self.shown[-1], {'v': 1, 'type': 'game.state', 'linked': True, 'in_world': True, 'reason': ''})
+        self.assertEqual(self.shown[-1], {'v': 1, 'type': 'game.state', 'linked': True, 'in_world': True, 'reason': ''})   # 以前のアプリへ
         self.assertEqual(env.context(), '[テストの様子]\nシエル：元気')
         # 様子が変わったという知らせで読み直す
         await self.fake.changed(text='シエル：疲れた')
@@ -122,6 +122,18 @@ class LinkTest(EnvCase):
         await until(lambda: self.shown and self.shown[-1]['reason'] == 'busy')
         self.assertFalse(self.env.linked)
 
+    async def test_env_list_and_env_link_name_the_game(self):
+        self.assertEqual(game_env.listing(self.env), {'v': 1, 'type': 'env.list', 'games': [{'game': 'test', 'label': 'テスト'}]})
+        self.assertEqual(game_env.listing(None)['games'], [])
+        other = types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'other', 'on': True}).encode())
+        self.env.on_data(other)   # ほかのゲームのスイッチでは動かない
+        self.assertFalse(self.env.wanted)
+        self.env.on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'test', 'on': True}).encode()))
+        await until(lambda: self.env.linked)
+        states = [m for m in self.shown if m['type'] == 'env.state']
+        self.assertEqual(states[-1], {'v': 1, 'type': 'env.state', 'game': 'test', 'label': 'テスト', 'linked': True,
+                                      'playing': True, 'reason': ''})
+
     def test_server_without_a_game_refuses(self):
         shown = []
         on_data = game_env.refuse(shown.append)
@@ -129,6 +141,8 @@ class LinkTest(EnvCase):
         self.assertEqual(shown, [])
         on_data(packet(True))
         self.assertEqual(shown[-1]['reason'], 'unavailable')
+        on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'x', 'on': True}).encode()))
+        self.assertEqual([m['type'] for m in shown[-2:]], ['env.state', 'game.state'])
 
 
 class EventTest(EnvCase):
@@ -229,7 +243,7 @@ class MindGameTest(EnvCase):
             self.assertTrue(any('[テストの様子]' in (i.text_content or '') for i in built.items))
 
     async def test_moving_the_body_is_not_for_comments(self):
-        with mock.patch.dict(tools.GAME_FROM_COMMENTS, self.env.from_comments()):
+        with mock.patch.dict(tools.ENV_FROM_COMMENTS, self.env.from_comments()):
             allowed = {t.id for t in tools.for_comments(tools.TOOLS + self.env.tools)}
         self.assertIn('test_facts', allowed)
         self.assertNotIn('test_jump', allowed)

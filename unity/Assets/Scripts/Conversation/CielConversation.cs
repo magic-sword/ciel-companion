@@ -28,7 +28,7 @@
 // 端末の持ち主：端末の ID と合言葉をこの端末の中で作って持ち（PlayerPrefs）、つないだとき・会話サーバーが入ってきたときに
 // 送る（hello。会話サーバーが device.hello_request で求めたときも）。会話サーバーは合言葉のハッシュで持ち主を確かめ、ひとり・身近な人のときは持ち主の声を優先して聞き分ける。
 // 画像：PickAndShareImage（画面の「見せる」）で、選んだ画像をシエルに見せる（CielConversation.Image.cs）。
-// マイクラ：SetMinecraft（設定画面のスイッチ）で、一緒に遊ぶかを会話サーバーへ送る（CielConversation.Game.cs）。
+// ゲーム：SetGameWanted（設定画面のスイッチ）で、一緒に遊ぶかを会話サーバーへ送る（CielConversation.Game.cs。ゲームの名前は会話サーバーの env.list から）。
 // 開発用のサーバー：SetDevServer（設定画面の開発スイッチ）で、開発用の会話サーバー（ciel-dev、server/compose.dev.yaml）に
 // つなぐ部屋にする。トークンを頼むときに「ciel-dev を呼ぶ」部屋の設定（room_config）を添える。本番の会話サーバーはその部屋に入らない。
 // LiveKit の Agents サンプル（Samples~/Agents、Apache-2.0）の接続手順を参考にした。
@@ -465,6 +465,7 @@ namespace Ciel.Conversation
             ResetGame();
             ResetYouTube();
             ResetGoal();
+            Card = null;
             Changed?.Invoke();
         }
 
@@ -556,6 +557,7 @@ namespace Ciel.Conversation
             SendDeviceHello();
             SendGame();
             SendYouTube();
+            SendAppHello();   // アプリが出せる道具（CielConversation.App.cs）
             if (InMeeting) SetMicEnabled(true);   // 会議の音は、マイクを入れておかないと届かない
         }
 
@@ -983,7 +985,9 @@ namespace Ciel.Conversation
             public bool heart;
             public int hearts;
             public string comment;
-            public bool linked, in_world;   // game.state
+            public bool linked, in_world;   // game.state（以前の会話サーバー）
+            public string game, label;   // env.state（linked・reason も）
+            public bool playing;
             public int id;   // image.state
             public string title;   // youtube.state（state・reason も）
             public int received, replied;
@@ -1000,6 +1004,11 @@ namespace Ciel.Conversation
             if (topic == "ciel.summary")
             {
                 OnSummaryPart(data);
+                return;
+            }
+            if (topic == AppTopic)
+            {
+                OnAppData(data);   // アプリの道具の呼び出し（CielConversation.App.cs）
                 return;
             }
             if (topic == "ciel.goal")
@@ -1076,7 +1085,9 @@ namespace Ciel.Conversation
             }
             else if (e.type == "voice.test") OnVoiceTest(e);
             else if (e.type == "agent.problem") OnProblem(e);
-            else if (e.type == "game.state") OnGameState(e);   // マイクラの体とつながったか（CielConversation.Game.cs）
+            else if (e.type == "env.list") OnEnvList(data);   // つなげるゲームの一覧（CielConversation.Game.cs）
+            else if (e.type == "env.state") OnEnvState(e);   // ゲームの体を受け持ったか（CielConversation.Game.cs）
+            else if (e.type == "game.state") OnGameState(e);   // 以前の会話サーバーの形
             else if (e.type == "image.state") OnImageState(e);   // 見せた画像を受け取ったか（CielConversation.Image.cs）
             else if (e.type == "youtube.state") OnYouTubeState(e);   // 配信のコメントの様子（CielConversation.YouTube.cs）
             else if (e.type == "device.hello_request")
@@ -1088,6 +1099,7 @@ namespace Ciel.Conversation
                 SendDeviceHello();
                 SendGame();
                 SendYouTube();
+                SendAppHello();
             }
             else if (e.type == "minutes.destination")
             {
@@ -1400,6 +1412,7 @@ namespace Ciel.Conversation
             ResetGame();
             ResetYouTube();
             ResetGoal();
+            Card = null;
             DisposeVoice();
             DisposeAizuchi();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);

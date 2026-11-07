@@ -53,6 +53,8 @@ research_found_nudge_file = "prompts/research_found.md"
 # ゲームで一緒に遊ぶ（game_env.py）。どのゲームでも同じシエルの振る舞い。ゲームの環境へつなげたときだけ会話の指示に足す。
 # ゲームの攻略と道具の使い方は、ゲームの側の遊び方の指示（MCP の prompt play。マイクラは server/minecraft/src/ciel/play.md）
 game_instructions_file = "prompts/game.md"
+# アプリの道具（app_env.py）。道具の中身の説明はアプリが道具の説明に書く。ここは、どの道具にも同じ使い方だけ
+app_instructions_file = "prompts/app.md"
 # 見せてもらった画像（eyes.py）：見たときの話し方（心と小脳）と、説明文を書く係への指示
 image_voice_instructions_file = "prompts/image_voice.md"
 image_caption_instructions_file = "prompts/image_caption.md"

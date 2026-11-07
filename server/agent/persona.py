@@ -51,6 +51,7 @@ class Persona:
     initiative_open_nudge: str
     research_found_nudge: str
     game_instructions: str
+    app_instructions: str
     image_voice_instructions: str
     image_caption_instructions: str
     comment_instructions: str
@@ -72,7 +73,7 @@ class Persona:
              self.conversation_instructions, self.research_instructions, self.research_voice_instructions,
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
              self.mind_brief_instructions, self.listener_instructions, self.tasks_instructions,
-             self.initiative_open_nudge, self.research_found_nudge, self.game_instructions,
+             self.initiative_open_nudge, self.research_found_nudge, self.game_instructions, self.app_instructions,
              self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions,
              hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
             ensure_ascii=False,
@@ -102,7 +103,7 @@ def load_persona() -> Persona:
                 'conversation_instructions',
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
                 'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'tasks_instructions',
-                'initiative_open_nudge', 'research_found_nudge', 'game_instructions',
+                'initiative_open_nudge', 'research_found_nudge', 'game_instructions', 'app_instructions',
                 'image_voice_instructions', 'image_caption_instructions', 'comment_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)

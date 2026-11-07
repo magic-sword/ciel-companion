@@ -44,9 +44,10 @@ TOOLS = [t for m in MODULES for t in m.TOOLS]
 errors.ERRORS.wrap_tools(TOOLS)
 # 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
 # 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。
-# ここに無い道具は、コメントからは使わない。ゲームの道具（game_env.py）は、ゲームの決まりの ciel/from_comments で足す（GAME_FROM_COMMENTS）
+# ここに無い道具は、コメントからは使わない。ゲームの道具（game_env.py）とアプリの道具（app_env.py）は、それぞれの _meta の
+# ciel/from_comments で足す（ENV_FROM_COMMENTS）
 FROM_COMMENTS = {t.id: ok for m in MODULES for t, ok in m.FROM_COMMENTS.items()}
-GAME_FROM_COMMENTS: dict[str, bool] = {}
+ENV_FROM_COMMENTS: dict[str, bool] = {}
 _undecided = [t.id for t in TOOLS if t.id not in FROM_COMMENTS]
 if _undecided:
     raise RuntimeError(f'コメントから使ってよいかが決まっていない道具：{_undecided}（モジュールの FROM_COMMENTS に書く）')
@@ -55,4 +56,4 @@ if _undecided:
 def for_comments(tools: list) -> list:
     """コメントからの返事に渡してよい道具だけにする"""
     return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False)
-            or GAME_FROM_COMMENTS.get(getattr(t, 'id', None), False)]
+            or ENV_FROM_COMMENTS.get(getattr(t, 'id', None), False)]

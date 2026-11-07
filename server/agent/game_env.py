@@ -85,20 +85,35 @@ def _json(text: str) -> dict:
     return v if isinstance(v, dict) else {'status': 'ok', 'value': v}
 
 
-def _link_wanted(packet) -> bool | None:
+def _link_wanted(packet) -> tuple[str | None, bool] | None:
+    """アプリのスイッチ：(ゲーム, オンか)。env.link {game, on}。以前のアプリの game.link {on} は、ゲームを言わない（None）"""
     if getattr(packet, 'topic', None) != TOPIC:
         return None
     try:
         m = json.loads(packet.data.decode('utf-8'))
     except (ValueError, AttributeError, UnicodeDecodeError):
         return None
-    return bool(m.get('on')) if isinstance(m, dict) and m.get('type') == 'game.link' else None
+    if not isinstance(m, dict):
+        return None
+    if m.get('type') == 'env.link' and isinstance(m.get('game'), str):
+        return m['game'], bool(m.get('on'))
+    return (None, bool(m.get('on'))) if m.get('type') == 'game.link' else None
+
+
+def listing(env: 'GameEnv | None') -> dict:
+    """アプリへ：つなげるゲームの一覧（env.list）。アプリは、ここの名前でスイッチを出す（アプリはゲームの名前を持たない）"""
+    games = [{'game': env.game, 'label': env.label}] if env is not None and env.profile else []
+    return {'v': VERSION, 'type': 'env.list', 'games': games}
 
 
 def refuse(notify: Callable[[dict], None]) -> Callable:
     """つなぐ先の無い会話サーバー：アプリがオンにしたら、つなげないと返す"""
     def on_data(packet) -> None:
-        if _link_wanted(packet):
+        wanted = _link_wanted(packet)
+        if wanted and wanted[1]:
+            if wanted[0] is not None:
+                notify({'v': VERSION, 'type': 'env.state', 'game': wanted[0], 'label': '', 'linked': False, 'playing': False,
+                        'reason': 'unavailable'})
             notify({'v': VERSION, 'type': 'game.state', 'linked': False, 'in_world': False, 'reason': 'unavailable'})
     return on_data
 
@@ -227,10 +242,12 @@ class GameEnv:
         log.info('ゲーム（%s）の道具 %d 個', self.game, len(self.tools))
 
     def on_data(self, packet) -> None:
-        """アプリの設定「マイクラで一緒に遊ぶ」（game.link）。オンで体を受け持ち、オフで離す（体はその場で待つ）"""
-        on = _link_wanted(packet)
-        if on is None:
+        """アプリの設定「（ゲーム）で一緒に遊ぶ」（env.link、以前のアプリは game.link）。オンで体を受け持ち、オフで離す
+        （体はその場で待つ）"""
+        wanted = _link_wanted(packet)
+        if wanted is None or wanted[0] not in (None, self.game):
             return
+        on = wanted[1]
         self.wanted = on
         if self._session is None:
             self.reason = 'connecting' if on else 'off'
@@ -297,6 +314,9 @@ class GameEnv:
         if shown == self._shown or self.notify is None:
             return
         self._shown = shown
+        self.notify({'v': VERSION, 'type': 'env.state', 'game': self.game, 'label': self.label, 'linked': shown[0],
+                     'playing': shown[1], 'reason': shown[2]})
+        # 以前のアプリ（env.state を読まない）のため。E6 で消す
         self.notify({'v': VERSION, 'type': 'game.state', 'linked': shown[0], 'in_world': shown[1], 'reason': shown[2]})
 
     # ---- 道具 ----

@@ -200,6 +200,9 @@ sequenceDiagram
 | `ciel.volume` | アプリ → 会話サーバー | `{"v":1,"type":"voice.volume","volume":0.7}` | シエルの声の大きさ（0〜1）。アプリの声の再生には音量を変える手段がないので、会話サーバーが送る前に声を小さくする（`server/agent/volume.py`） |
 | `ciel.minutes` | アプリ・管理用のコマンド（サーバーの API）→ 会話サーバー | `{"v":1,"type":"minutes.control","action":"start"}`（終わりは `"finish"`） | 議事録の始めと終わり（[議事録の決定記録](decisions/meeting-minutes-ja.md)） |
 | `ciel.research` | 会話サーバー → アプリ | `research.result`・`research.text`・`research.source`・`research.complete` | 調査本文と出典を小さいパケットに分けて送る。[Web 調査](decisions/web-research-ja.md) |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"env.list","games":[{"game":"minecraft","label":"マイクラ"}]}`、`{"v":1,"type":"env.state","game":"minecraft","label":"マイクラ","linked":true,"playing":true,"reason":""}` | つなげるゲームの一覧と、体を受け持ったか（`game_env.py`）。アプリはゲームの名前を持たず、ここの名前でスイッチを出す。[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md) |
+| `ciel.game` | アプリ → 会話サーバー | `{"v":1,"type":"env.link","game":"minecraft","on":true}` | そのゲームで一緒に遊ぶか（設定のスイッチ）。以前の形 `game.link`・`game.state` も、移り終えるまで受け付ける |
+| `ciel.app` | アプリ ↔ 会話サーバー | `app.hello`（アプリ → 会話サーバー。出せる道具の一覧、MCP の tools/list の形）、`app.call`（会話サーバー → アプリ。id・tool・args）、`app.result`（アプリ → 会話サーバー。id・result） | アプリの道具（`app_env.py`）。心が呼ぶ：`app_gesture`（シエルの体の動き）・`app_show_card`（画面のカード） |
 
 ## 会議に参加するとき（多人数）
 

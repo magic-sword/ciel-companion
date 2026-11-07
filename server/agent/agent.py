@@ -47,6 +47,7 @@ import interruptions
 import listener
 import irodori_tts
 import errors
+import app_env
 import game_env
 import goals
 import mind
@@ -311,6 +312,7 @@ class Ciel(Agent):
                   p.inner_thoughts_voice_instructions]
         if PIPELINE:
             parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
+            parts.append(p.app_instructions)     # アプリの道具（app_env.py。アプリが出せる道具だけが渡る）
             if self._game_text():
                 parts.append(self._game_text())   # ゲームで一緒に遊ぶ（game_env.py。ゲームの環境へつなげたときだけ）
             parts.append(p.image_voice_instructions)     # 見せてもらった画像（eyes.py）
@@ -386,7 +388,7 @@ async def entrypoint(ctx: JobContext) -> None:
         await game.close()
         game = None
     if game is not None:
-        tools.GAME_FROM_COMMENTS.update(game.from_comments())
+        tools.ENV_FROM_COMMENTS.update(game.from_comments())
     agent = Ciel(growth.context(grown), game=game)
     session.userdata.preamble = agent.preamble
     # シエルを話させる入り口は 1 つ（mouth.py）。返事・話しかけ・議事録・歌・タッチ・声の登録・あいさつが、ここを通る
@@ -673,11 +675,21 @@ async def entrypoint(ctx: JobContext) -> None:
     # ゲームの環境へつなげない会話サーバー：アプリがオンにしたら、つなげないと返す（game_env.py）
     if game is None:
         ctx.room.on('data_received', game_env.refuse(notify))
+    # アプリの道具（app_env.py）。アプリが知らせた道具（カードを出す・体の動き など）を、心が呼べる道具にする（心だけが使う）
+    if PIPELINE:
+        app = app_env.AppEnv(lambda m: send(app_env.TOPIC, m))
+
+        def app_tools_changed() -> None:
+            tools.ENV_FROM_COMMENTS.update(app.from_comments())
+            asyncio.create_task(agent.update_tools(tools.TOOLS + (list(game.tools) if game is not None else []) + app.tools))
+        app.on_tools = app_tools_changed
+        ctx.room.on('data_received', app.on_data)
     # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す
     ctx.room.on('data_received', soundcheck.SoundCheck(agent.aizuchi if AIZUCHI else None, notify).on_data)
     # アプリが部屋に入った直後に送った知らせは、会話サーバーの受け取りの準備ができる前で、届かないことがある
     # （2026-10-24、開発用の試験で 3 回に 2 回、hello か会話のしかたが届かなかった）。準備ができたので、もう一度送ってもらう
-    await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})
+    # つなげるゲームの一覧（game_env.py の env.list）も、送り直してもらう前に送る（アプリは、これでスイッチの名前を出す）
+    await send('ciel.event', game_env.listing(game), {'v': 1, 'type': 'device.hello_request'})
     # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
     # 今の日付・時間帯（clock.py）も添える（「おはよう」「こんばんは」を合わせる）
     await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
