@@ -462,6 +462,7 @@ namespace Ciel.Conversation
             SetMinutesRecording(false);
             SetSongState("idle");
             ResetGame();
+            ResetGoal();
             Changed?.Invoke();
         }
 
@@ -996,6 +997,11 @@ namespace Ciel.Conversation
                 OnSummaryPart(data);
                 return;
             }
+            if (topic == "ciel.goal")
+            {
+                OnGoalData(data);   // シエルの今の目的（CielConversation.Goal.cs）
+                return;
+            }
             if (topic != "ciel.event") return;
             EventJson e;
             try { e = JsonUtility.FromJson<EventJson>(System.Text.Encoding.UTF8.GetString(data)); }
@@ -1385,6 +1391,7 @@ namespace Ciel.Conversation
             SetMinutesRecording(false);
             SetSongState("idle");
             ResetGame();
+            ResetGoal();
             DisposeVoice();
             DisposeAizuchi();
             if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);

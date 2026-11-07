@@ -324,10 +324,10 @@ class Mind:
         }
         model = models.model('brief')
         try:
-            r = await self.client.chat.completions.create(
-                model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=BRIEF_TIMEOUT,
+            r = await models.client_for('brief', self.client).chat.completions.create(**models.options(
+                'brief', model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=BRIEF_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.brief_instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
             models.record('brief', model, getattr(r, 'usage', None))
             result = json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 書けなくても、会話は続ける（次の機会に回す）
@@ -357,6 +357,28 @@ def only_given(chunk, fns: list):
     given = {getattr(t, 'id', None) for t in fns}
     kept = [c for c in delta.tool_calls if c.name in given]
     dropped = [c.name for c in delta.tool_calls if c.name not in given]
+    if not dropped:
+        return chunk, []
+    if not kept and not delta.content and getattr(chunk, 'usage', None) is None:
+        return None, dropped
+    return chunk.model_copy(update={'delta': delta.model_copy(update={'tool_calls': kept})}), dropped
+
+
+def one_body_call(chunk, taken: list):
+    """1 つの返事で、体を動かす道具（体の道具・目的の道具）は 1 つだけ通す。体の技は一度に 1 つなので、同時に呼ぶと
+    取り合いになって両方失敗した（集めると作るを同時に呼んだ。2026-11-07）。taken は、この返事ですでに通した呼び出しの名前。
+    （通す chunk, 落とした道具の名前）を返し、全部落として何も残らなければ chunk は None"""
+    delta = None if isinstance(chunk, str) else getattr(chunk, 'delta', None)
+    if delta is None or not delta.tool_calls:
+        return chunk, []
+    moving = set(BODY_TOOLS + GOAL_TOOLS) - {'look_around', 'look_at_view', 'goal_status'}   # 見るだけの道具は、いくつでもよい
+    kept, dropped = [], []
+    for c in delta.tool_calls:
+        if c.name in moving and any(n in moving for n in taken):
+            dropped.append(c.name)
+            continue
+        taken.append(c.name)
+        kept.append(c)
     if not dropped:
         return chunk, []
     if not kept and not delta.content and getattr(chunk, 'usage', None) is None:

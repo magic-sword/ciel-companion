@@ -42,9 +42,50 @@ AUDIO_INPUT = {'gpt-realtime-2.1-mini': (10.00, 0.30)}   # 音声の入力・そ
 PER_MINUTE = {'gpt-realtime-whisper': 0.017, 'gpt-live-transcribe': 0.017}
 
 
+# ローカル LLM（server/local-llm。docs/local-llm-ja.md）。CIEL_LOCAL_ROLES に書いた役目だけ、OpenAI ではなくここへ送る。
+# 裏で動く役目（内なる考え・まとめ・メモ・関係・育つ好み）向け：少し遅れても会話は止まらない（1 回 13〜50 秒）
+LOCAL_URL = os.environ.get('CIEL_LOCAL_LLM_URL', '')                    # 例 http://127.0.0.1:8094/v1
+LOCAL_ROLES = {r.strip() for r in os.environ.get('CIEL_LOCAL_ROLES', '').split(',') if r.strip()}
+LOCAL_MODEL = os.environ.get('CIEL_LOCAL_LLM_MODEL', 'local')             # llama-server の --alias
+LOCAL_TIMEOUT = float(os.environ.get('CIEL_LOCAL_TIMEOUT', '90'))           # 1 回の上限（秒）。歌を聴くあいだは CPU の形で遅い
+_local_client = None
+
+
+def is_local(role: str) -> bool:
+    return bool(LOCAL_URL) and role in LOCAL_ROLES
+
+
 def model(role: str) -> str:
+    if is_local(role):
+        return LOCAL_MODEL
     env, default = ROLES[role]
     return os.environ.get(env, default)
+
+
+def client_for(role: str, default):
+    """その役目の呼び先（ローカルなら llama-server の OpenAI 互換の窓口。そうでなければ default をそのまま）"""
+    global _local_client
+    if not is_local(role):
+        return default
+    if _local_client is None:
+        import openai
+        _local_client = openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0)
+    return _local_client
+
+
+def options(role: str, **kwargs) -> dict:
+    """chat.completions.create の引数を、その役目の呼び先に合わせる。ローカルなら：モデルの名前を替え、考える段（thinking）を
+    切り（Qwen3.5 は切らないと、書ける量を考える段に使い切って答えが空になった）、reasoning_effort は送らず、時間の上限を延ばす"""
+    if not is_local(role):
+        return kwargs
+    kwargs = dict(kwargs)
+    kwargs['model'] = LOCAL_MODEL
+    kwargs.pop('reasoning_effort', None)
+    kwargs['timeout'] = max(float(kwargs.get('timeout') or 0), LOCAL_TIMEOUT)
+    extra = dict(kwargs.get('extra_body') or {})
+    extra['chat_template_kwargs'] = {'enable_thinking': False}
+    kwargs['extra_body'] = extra
+    return kwargs
 
 
 def cost(model_name: str, input_tokens: int, cached: int, output_tokens: int,

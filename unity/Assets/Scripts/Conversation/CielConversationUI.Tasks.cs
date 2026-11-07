@@ -89,6 +89,7 @@ namespace Ciel.Conversation
             _researchTask.dot.color = WithAlpha(Cyan, pulse);
             _summaryTask.dot.color = WithAlpha(Amber, pulse);
             _songTask.dot.color = WithAlpha(Mint, pulse);
+            UpdateGoal(connected);   // 目的の札（CielConversationUI.Goal.cs）
         }
 
         static void SetTask((GameObject go, Text label, Image dot) task, bool on, string text)

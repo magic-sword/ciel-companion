@@ -111,11 +111,11 @@ class Grower:
             'events': [{'id': i, 'date': f'{at.astimezone(JST):%Y-%m-%d}', 'text': text} for i, at, _, text in events],
         }
         try:
-            r = await self.client.chat.completions.create(
-                model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=TIMEOUT,
+            r = await models.client_for('growth', self.client).chat.completions.create(**models.options(
+                'growth', model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=TIMEOUT,
                 messages=[{'role': 'system', 'content': self.instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-            models.record('growth', MODEL, getattr(r, 'usage', None))
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+            models.record('growth', models.LOCAL_MODEL if models.is_local('growth') else MODEL, getattr(r, 'usage', None))
             change = json.loads(r.choices[0].message.content or '{}').get('change') or {}
         except Exception as e:   # 育てられなくても、会話の後片付けは続ける
             log.warning('好みを見直せない: %s', type(e).__name__)

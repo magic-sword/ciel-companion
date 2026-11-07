@@ -12,12 +12,14 @@
 """
 import asyncio
 import itertools
+import json
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import Callable
 
 import debug_log
+from errors import ERRORS
 
 log = logging.getLogger('ciel-agent.goals')
 
@@ -153,11 +155,26 @@ class GoalRunner:
             self._cancel()
             self._publish()
 
+    def on_data(self, packet) -> None:
+        """アプリの「止める」「続ける」（topic ciel.goal の goal.control）"""
+        if getattr(packet, 'topic', None) != TOPIC:
+            return
+        try:
+            m = json.loads(packet.data.decode('utf-8'))
+        except (ValueError, AttributeError, UnicodeDecodeError):
+            return
+        if not isinstance(m, dict) or m.get('type') != 'goal.control':
+            return
+        if m.get('action') == 'stop':
+            asyncio.create_task(self.stop())
+        elif m.get('action') == 'resume':
+            self.resume()
+
     # ---- 流れ ----
 
     def _run(self) -> None:
         self._cancel()
-        self._task = asyncio.create_task(self._loop())
+        self._task = ERRORS.spawn(self._loop(), 'goals')
 
     def _cancel(self) -> None:
         if self._task is not None and not self._task.done() and self._task is not asyncio.current_task():
@@ -216,7 +233,7 @@ class GoalRunner:
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            log.warning('目的の流れが止まった：%s', type(e).__name__)
+            ERRORS.report('goals', e, kind='task')   # 記録とアプリへの知らせ（errors.py）
             g.status = 'paused'
             g.attention = 'うまくいかなかった'
             self._publish()
@@ -291,7 +308,10 @@ class GoalRunner:
         if g is None:
             return {'v': VERSION, 'type': 'goal.state', 'goal': None, 'steps': [], 'changes': [], 'next': [], 'attention': None}
         public = self.presence() == 'public'
-        name = None if public else self.owner_name()
+        try:
+            name = None if public else self.owner_name()
+        except Exception:   # 呼び名が読めなくても、目的は見せる（呼び名の読み違いで目的の係ごと止まった。2026-11-07）
+            name = None
         return {
             'v': VERSION, 'type': 'goal.state',
             'goal': {'id': g.id, 'game': g.game, 'game_label': self.labels.get(g.game, g.game), 'title': g.title,

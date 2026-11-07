@@ -597,11 +597,11 @@ class Initiative:
                if any(t.offered for t in sent) else {}),
         }
         try:
-            r = await self.client.chat.completions.create(
-                model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=THINK_TIMEOUT,
+            r = await models.client_for('thought', self.client).chat.completions.create(**models.options(
+                'thought', model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=THINK_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-            models.record('thought', MODEL, getattr(r, 'usage', None))
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+            models.record('thought', models.LOCAL_MODEL if models.is_local('thought') else MODEL, getattr(r, 'usage', None))
             result = json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 考えられなくても、会話は続ける
             log.warning('内なる考え：考えられない：%s', type(e).__name__)

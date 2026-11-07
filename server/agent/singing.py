@@ -28,6 +28,11 @@ URL = os.environ.get('CIEL_SINGING_URL', 'http://127.0.0.1:8767/analyze')
 LIVE_URL = os.environ.get('CIEL_SINGING_LIVE_URL', 'http://127.0.0.1:8767/live')
 # 分析の前に、読み上げに作業用の GPU のメモリーを手放してもらう（同じ GPU に分析が入らないため。server/tts-irodori の /release）
 TTS_RELEASE_URL = os.environ.get('CIEL_TTS_RELEASE_URL', 'http://127.0.0.1:8766/release')
+# ローカル LLM（server/local-llm）も同じ GPU を約 2.6 GB 使う。歌を聴くあいだは CPU だけの形にしてもらい、分析が終わったら戻す
+# （声・LLM・分析が同じ 12 GB に入らない。docs/local-llm-ja.md）。空なら何もしない
+LOCAL_LLM_CONTROL = os.environ.get('CIEL_LOCAL_LLM_CONTROL', '')
+LLM_SWITCH_TIMEOUT = 90.0
+LLM_BACK_AFTER_CANCEL = 35.0   # やめたとき：分析のモデルが外れる（server/singing の IDLE_SECONDS 30 秒）のを待ってから戻す
 TOPIC = 'ciel.song'
 SR = 16000                # speakers.AudioTap と同じ
 VOICE_DB = -42.0          # これより大きい 10 ms は歌声とみなす（自動で終えるため。分析の側はもっと細かく見る）
@@ -227,6 +232,7 @@ class SongListener:
         self._task: asyncio.Task | None = None
         self._http: aiohttp.ClientSession | None = None
         self._live: asyncio.Task | None = None
+        self._llm_task: asyncio.Task | None = None   # ローカル LLM を GPU の形に戻す（_llm_back）
         self._cues = LiveCues()
         self._telling = False         # 感想・結果を話している途中（アプリには idle を見せるが、シエルから話しかけない）
         self.on_end = None            # 歌が終わって感想を話し終えたとき（agent.py が内なる考えの interlude をつなぐ）
@@ -274,6 +280,7 @@ class SongListener:
             self._chunks = []
             self.state = IDLE
             self._notify()
+            self._llm_back(LLM_BACK_AFTER_CANCEL)
             self._task = asyncio.create_task(self._tell(LINES[CANCELLED], note=LINES[CANCELLED]))
 
     def on_data(self, packet: rtc.DataPacket) -> None:
@@ -422,6 +429,7 @@ class SongListener:
             if self.state != IDLE:
                 self.state = IDLE
                 self._notify()
+            self._llm_back()   # 分析が終わった（分析のモデルは外れた）ので、ローカル LLM を GPU の形に戻す
             if what is not None:
                 await self._tell(LINES[what], note=LINES[what])
 
@@ -464,7 +472,29 @@ class SongListener:
             log.warning('歌の出来事を会話に置けない: %s', type(e).__name__)
             return False
 
+    async def _llm_mode(self, mode: str, delay: float = 0.0) -> None:
+        """ローカル LLM の形を切り替える（cpu：GPU を空ける・gpu：戻す）。つながらなくても歌は続ける"""
+        if not LOCAL_LLM_CONTROL:
+            return
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            if self._http is None:
+                self._http = aiohttp.ClientSession()
+            async with self._http.post(f'{LOCAL_LLM_CONTROL}/mode', json={'mode': mode},
+                                       timeout=aiohttp.ClientTimeout(total=LLM_SWITCH_TIMEOUT)) as r:
+                r.raise_for_status()
+                log.info('ローカル LLM を %s の形にした %s', mode, await r.json())
+        except Exception as e:
+            log.warning('ローカル LLM の形を切り替えられない（%s） error=%s', mode, type(e).__name__)
+
+    def _llm_back(self, delay: float = 0.0) -> None:
+        self._llm_task = asyncio.create_task(self._llm_mode('gpu', delay))
+
     async def _release_tts(self) -> None:
+        if self._llm_task is not None and not self._llm_task.done():
+            self._llm_task.cancel()   # 前の歌のあとの「戻す」がまだなら、やめる（次の歌の途中で GPU に戻さない）
+        await self._llm_mode('cpu')   # 歌を聴くあいだは、ローカル LLM に GPU を空けてもらう（同じ形なら何もしない）
         try:
             async with self._http.post(TTS_RELEASE_URL, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 r.raise_for_status()
@@ -480,6 +510,8 @@ class SongListener:
             self.publish({'v': 1, 'type': 'song.state', 'state': self.state})
 
     async def close(self) -> None:
+        if self.state != IDLE:
+            await self._llm_mode('gpu')   # 歌の途中で会話が終わった：ローカル LLM を戻す（分析のモデルは 30 秒で外れる）
         if self._task is not None:
             self._task.cancel()
         if self._live is not None:

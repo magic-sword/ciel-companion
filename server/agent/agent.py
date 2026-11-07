@@ -46,6 +46,7 @@ import initiative
 import interruptions
 import listener
 import irodori_tts
+import errors
 import game_knowledge
 import goals
 import mind
@@ -229,12 +230,19 @@ class Ciel(Agent):
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
         text, calls, blocked, done = [], [], [], False
+        taken: list[str] = []   # この返事で通した道具（体を動かす道具は 1 つだけ。mind.one_body_call）
         try:
             async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
                 # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
                 chunk, dropped = mind.only_given(chunk, fns)
                 if dropped:
                     logger.warning('心：渡していない道具の呼び出しを止めた %s', dropped)
+                    blocked += dropped
+                if chunk is None:
+                    continue
+                chunk, dropped = mind.one_body_call(chunk, taken)
+                if dropped:
+                    logger.info('心：体を動かす道具は 1 つだけ通した（止めた：%s）', dropped)
                     blocked += dropped
                 if chunk is None:
                     continue
@@ -383,6 +391,9 @@ async def entrypoint(ctx: JobContext) -> None:
     def notify(msg: dict) -> None:
         # アプリへの知らせ（ciel.event）を、待たずに送る
         asyncio.create_task(send('ciel.event', msg))
+    # エラーの係（errors.py）：道具・裏の処理・体のエラーを記録し、アプリの接続の表示に知らせる
+    errors.ERRORS.notify = notify
+    errors.ERRORS.install(asyncio.get_running_loop())
     # 聞き取り・返事・読み上げの失敗（残高切れなど）と、それで会話が止まったことを、アプリの接続の表示に出す（health.py）
     checkup = health.Health(notify)
     session.on('error', checkup.on_error)
@@ -450,8 +461,9 @@ async def entrypoint(ctx: JobContext) -> None:
             goal_runner = goals.GoalRunner(voice.say_latest, publish=lambda m: asyncio.create_task(send(goals.TOPIC, m)))
             goal_runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
             goal_runner.presence = lambda: style.presence
-            goal_runner.owner_name = lambda: (book.owner_name() or None) if book is not None else None
+            goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
             body.goals = goal_runner
+            ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:
             ctx.room.on('data_received', body.on_data)

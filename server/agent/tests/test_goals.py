@@ -154,11 +154,29 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.runner.presence = lambda: 'public'
         self.assertEqual(self.runner.state()['goal']['by_label'], '持ち主のお願い')
         self.assertEqual(self.runner.state()['goal']['game_label'], 'マイクラ')
+        # 呼び名が読めなくても（名簿の読み違い）、目的は見せる（2026-11-07、目的の係ごと止まった）
+        self.runner.presence = lambda: 'solo'
+        self.runner.owner_name = lambda: (_ for _ in ()).throw(TypeError('not callable'))
+        self.assertEqual(self.runner.state()['goal']['by_label'], '持ち主のお願い')
 
     async def test_unavailable_game_and_stop(self):
         self.runner.register('mc', FakeAdapter([], [], linked=False), 'マイクラ')
         self.assertEqual((await self.runner.start('mc', 'x', {}))['status'], 'unavailable')
         self.assertEqual((await self.runner.stop())['status'], 'no_goal')
+
+
+    async def test_app_buttons_stop_and_resume(self):
+        import types
+        a = FakeAdapter([steps('A', 'B')], [{'ok': False, 'reason': 'not_found'}, {'ok': True}, {'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '目的', {'make': 'x'})
+        await settle(self.runner)
+        pkt = lambda action: types.SimpleNamespace(topic='ciel.goal', data=json.dumps({'v': 1, 'type': 'goal.control', 'action': action}).encode())
+        self.runner.on_data(types.SimpleNamespace(topic='ciel.other', data=b'{}'))
+        self.assertEqual(self.runner.goal.status, 'paused')
+        self.runner.on_data(pkt('resume'))
+        await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'done')
 
 
 class FakeBody:
@@ -216,6 +234,26 @@ class MinecraftGoalsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body.asked[1][1], {'block': 'cobblestone', 'how': 'auto'})
         self.assertEqual(runner.goal.status, 'done')
         self.assertEqual(runner.state()['changes'], ['丸石が見える所に無いので、探す段を足した'])
+
+
+
+class OneBodyCallTest(unittest.TestCase):
+    def test_only_one_moving_tool_per_reply(self):
+        # 集めると作るを同時に呼び、体の技が取り合いになって両方失敗した件（2026-11-07）
+        import mind
+        from livekit.agents import llm
+        def chunk(*names):
+            calls = [llm.FunctionToolCall(name=n, arguments='{}', call_id=f'c{i}') for i, n in enumerate(names)]
+            return llm.ChatChunk(id='x', delta=llm.ChoiceDelta(role='assistant', tool_calls=calls))
+        taken = []
+        out, dropped = mind.one_body_call(chunk('collect_blocks', 'look_around', 'craft_item'), taken)
+        self.assertEqual([c.name for c in out.delta.tool_calls], ['collect_blocks', 'look_around'])
+        self.assertEqual(dropped, ['craft_item'])
+        out, dropped = mind.one_body_call(chunk('start_goal'), taken)   # 同じ返事の続きの chunk でも
+        self.assertIsNone(out)
+        self.assertEqual(dropped, ['start_goal'])
+        out, dropped = mind.one_body_call(chunk('remember_about_speaker'), [])
+        self.assertEqual(dropped, [])
 
 
 if __name__ == '__main__':

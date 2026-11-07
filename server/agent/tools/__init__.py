@@ -10,6 +10,7 @@
 """
 from dataclasses import dataclass
 
+import errors
 import game_knowledge
 from speakers import SpeakerBook
 
@@ -41,6 +42,8 @@ from . import memory, minutes, people, conversation, research, thoughts, clock, 
 
 MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, minecraft, goals)
 TOOLS = [t for m in MODULES for t in m.TOOLS]
+# 道具の中のエラーは、エラーの係が受け止める（記録・アプリへの知らせ・心には tool_failed。errors.py）
+errors.ERRORS.wrap_tools(TOOLS)
 # 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
 # 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。
 # ここに無い道具は、コメントからは使わない。ただしゲームの知識の窓口（MCP。game_knowledge.py）の道具は、読むだけなので使ってよい

@@ -179,11 +179,11 @@ class NoteTaker:
                                  for o, who, text in window],
             }
             try:
-                r = await self._client.chat.completions.create(
-                    model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
+                r = await models.client_for('notes', self._client).chat.completions.create(**models.options(
+                    'notes', model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
                     messages=[{'role': 'system', 'content': self.instructions},
-                              {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-                models.record('notes', MODEL, getattr(r, 'usage', None))
+                              {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+                models.record('notes', models.LOCAL_MODEL if models.is_local('notes') else MODEL, getattr(r, 'usage', None))
                 result = json.loads(r.choices[0].message.content or '{}')
             except Exception as e:   # メモが書けなくても、会話は続ける（頼まれた分は次の機会に回す）
                 log.warning('メモを書けない：%s', type(e).__name__)

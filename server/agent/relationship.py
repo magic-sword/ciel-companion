@@ -112,11 +112,11 @@ class RelationKeeper:
             'conversation': [{'speaker': who, 'is_person': o is not None and o.person_id == pid, 'text': text}
                              for o, who, text in lines],
         }
-        r_ = await self._client.chat.completions.create(
-            model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
+        r_ = await models.client_for('relationship', self._client).chat.completions.create(**models.options(
+            'relationship', model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'},
             messages=[{'role': 'system', 'content': self.instructions},
-                      {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-        models.record('relationship', MODEL, getattr(r_, 'usage', None))
+                      {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+        models.record('relationship', models.LOCAL_MODEL if models.is_local('relationship') else MODEL, getattr(r_, 'usage', None))
         result = json.loads(r_.choices[0].message.content or '{}')
         before = r.stage
         if first:

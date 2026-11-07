@@ -582,14 +582,25 @@ const SKILL_PREPARE = {
   find(bot, args) {
     return blocksFor(bot.registry, args.block).length ? null : { reason: 'unknown_block' };
   },
+  // 始める前に分かること（取る道具が無い・見て知っている所に無い）は、ここで断る。始めたと返したあとですぐ失敗すると、
+  // 心は「今まさに作っている」と言い違えた（2026-11-07）
   collect(bot, args) {
     const blocks = blocksFor(bot.registry, args.block);
     if (!blocks.length) return { reason: 'unknown_block' };
-    if (blocks.some((b) => harvestable(bot, b))) return null;
-    return { reason: 'needs_tool', note: { tool: weakestTool(bot, blocks) } };
+    if (!blocks.some((b) => harvestable(bot, b))) return { reason: 'needs_tool', note: { tool: weakestTool(bot, blocks) } };
+    const ids = blocks.map((b) => b.id);
+    const seen = bot.findBlocks({ matching: ids, maxDistance: SEARCH_DISTANCE, count: FIND_COUNT }).some((p) => knows(bot, p));
+    return seen ? null : { reason: 'not_found', note: { gained: {}, wanted: args.count } };
   },
   craft(bot, args) {
-    return bot.registry.itemsByName[args.item] ? null : { reason: 'unknown_item' };
+    if (!bot.registry.itemsByName[args.item]) return { reason: 'unknown_item' };
+    const inv = counts(bot);
+    const hasTable = (inv.crafting_table ?? 0) > 0
+      || bot.findBlocks({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: TABLE_SEARCH, count: 8 }).some((p) => knows(bot, p));
+    const plan = planCraft(bot.registry, (id) => bot.recipesAll(id, null, true), args.item, args.count, inv, hasTable);
+    if (plan.cannot) return { reason: 'cannot_craft' };
+    if (Object.keys(plan.missing).length) return { reason: 'missing_materials', note: { needs: plan.missing } };
+    return null;
   },
 };
 

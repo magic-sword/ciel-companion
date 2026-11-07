@@ -27,6 +27,7 @@ import websockets
 
 import board as tasks
 import debug_log
+from errors import ERRORS
 
 log = logging.getLogger('ciel-agent.minecraft')
 
@@ -77,6 +78,13 @@ WHY_FAILED = {
     'error': 'うまくいかなかった',
 }
 QUIET_REASONS = ('stopped', 'replaced', 'unlinked', 'disconnected')
+# うまくいかなかったときの次の手（道具の返事と知らせに添える）。心が「石を探してから」と言うだけで探す道具を呼ばなかった・
+# 足りない物を集めずに同じ物を作り直した（2026-11-07）
+NEXT_STEP = {
+    'missing_materials': 'start_goal（make_item にその物）で目的にすると、足りない物を集める段から係が進める',
+    'needs_tool': 'start_goal で目的にすると、道具を作る段から係が進める',
+    'not_found': 'find_blocks で探せる（地中の物は how=dig、地面の上の物は how=walk）',
+}
 SKILL_NAMES = {'follow': 'ついていく', 'come': 'そばへ行く', 'go_to': '場所へ行く', 'collect': '集める', 'give': '渡す',
                'dig_down': '足元を掘って降りる', 'craft': '作る', 'find': '探す'}
 
@@ -114,11 +122,13 @@ def reasons(reason: str, note: dict) -> str:
 
 
 def refused(m: dict) -> dict:
-    """体が始める前に断った（error）。理由の文も添え、心が道具の返事を見て、その場で正直に言えるようにする"""
+    """体が始める前に断った（error）。理由の文と次の手も添え、心が道具の返事を見て、その場で正直に言って次へ進めるようにする"""
     reason = m.get('reason')
     r = {'status': 'error', 'reason': reason}
     if reason in WHY_FAILED:
         r['why'] = reasons(reason, m.get('note') or {})
+    if reason in NEXT_STEP:
+        r['next'] = NEXT_STEP[reason]
     return r
 
 
@@ -164,6 +174,7 @@ class Body:
         self._said: dict[str, float] = {}
         self._task: asyncio.Task | None = None
         self._closed = False
+        self._skill_of: dict[int, str] = {}   # 頼んだ技の名前（体のエラーを、どの技かで記録する）
         self._waiting: dict[int, asyncio.Future] = {}   # 目的の係が頼んだ技（id → 終わりを待つ）。付箋・知らせは目的の係が持つ
         self.goals = None            # goals.GoalRunner（目的の係。体が止められたら、目的も止めて待つ）
 
@@ -267,6 +278,9 @@ class Body:
                              {'status': 'planned', 'steps': m.get('steps') or [], 'inventory': m.get('inventory') or {}}
                              if kind == 'planned' else refused(m))
         elif kind == 'done':
+            skill = self._skill_of.pop(m.get('id'), None)
+            if not m.get('ok') and m.get('reason') == 'error':   # 体の中のエラー（errors.py で記録・アプリへ）
+                ERRORS.report_body(skill or 'skill', str(m.get('detail') or ''))
             waiting = self._waiting.pop(m.get('id'), None)
             if waiting is not None:   # 目的の係が頼んだ技：知らせ・付箋は目的の係が持つ
                 if not waiting.done():
@@ -290,6 +304,7 @@ class Body:
         f = asyncio.get_running_loop().create_future()
         self._pending[id_] = f
         self._asked[id_] = name
+        self._skill_of[id_] = skill
         await self._send({'type': 'do', 'id': id_, 'skill': skill, 'args': args})
         try:
             result = await asyncio.wait_for(f, START_TIMEOUT)
@@ -309,6 +324,7 @@ class Body:
         done = asyncio.get_running_loop().create_future()
         self._pending[id_] = started
         self._waiting[id_] = done
+        self._skill_of[id_] = skill
         await self._send({'type': 'do', 'id': id_, 'skill': skill, 'args': args})
         try:
             r = await asyncio.wait_for(started, START_TIMEOUT)
@@ -443,6 +459,9 @@ class Body:
         else:
             line = (f'[マイクラ：頼まれた「{name}」ができなかった。理由：{why}。できたところ：{got or "なし"}。'
                     f'同じ頼みでうまくいかなかったのは {times} 回目]')
+        hint = NEXT_STEP.get(note.get('short') or reason)
+        if hint:
+            line = line[:-1] + f'。次の手：{hint}]'
         self._tell('failed', line, SETTLE, limit=False)
 
     def _close_card(self, m: dict) -> None:

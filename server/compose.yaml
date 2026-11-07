@@ -57,6 +57,31 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
+  # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。会話サーバーの裏の役目（内なる考え・まとめ・メモなど）が使う。
+  # 重み（数十 GB）は Git・デプロイの外の LOCAL_LLM_DIR（既定 ~/models/llm）に置く。ふだんは起動しない（profile local-llm）：
+  #   docker compose --profile local-llm up -d local-llm
+  # GPU を約 2.6 GB 使う形で動き、歌を聴くあいだだけ CPU だけの形に切り替える（LLM は 127.0.0.1:8094、切り替えの窓口は 127.0.0.1:8095）
+  local-llm:
+    profiles: [local-llm]
+    build:
+      context: ./local-llm
+      network: host
+    network_mode: host
+    environment:
+      - LOCAL_LLM_MODEL=/models/${LOCAL_LLM_FILE:-Qwen3.5-35B-A3B-Q4_K_M.gguf}
+      - LOCAL_LLM_PORT=8094
+      - LOCAL_LLM_CONTROL_PORT=8095
+    volumes:
+      - ${LOCAL_LLM_DIR:-${HOME}/models/llm}:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
   # 歌を聴く（server/singing）。歌声から印象の手がかりを出す。読み上げと GPU を分け合う（約 2 GB）
   singing:
     build:

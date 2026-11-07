@@ -365,6 +365,7 @@ namespace Ciel.Conversation
             var sec = Section(content);
             SectionLabel(Row(sec, 20), "配信");
             (_streamSwitch, _streamKnob) = SwitchRow(sec, "配信用のウィンドウを開く", () => _stream.SetOpen(!_stream.IsOpen));
+            BuildStreamGoalSwitch(sec);   // いまの目的の札（CielConversationUI.Goal.cs）
             Note(sec, $"シエルと背景だけを映すウィンドウ「{CielStreamWindow.Title}」を開きます。"
                 + "OBS のウィンドウキャプチャでこちらを取り込むと、設定・名前・ボタンは映りません。大きさを変えると、その大きさで描きます");
         }
@@ -475,6 +476,7 @@ namespace Ciel.Conversation
             ShowSwitch(_gameSwitch, _gameKnob, c.Minecraft);
             _gameNow.text = GameNow(c);
             if (_stream != null) ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
+            RefreshStreamGoalSwitch();
             RefreshMinutesDestinations();
         }
 

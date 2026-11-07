@@ -119,6 +119,7 @@ namespace Ciel.Conversation
             BuildPeople(_safe);
             BuildSummary(_safe);
             BuildSong(_safe);
+            BuildGoal(_safe);   // シエルの今の目的（CielConversationUI.Goal.cs）。札の列（BuildTasks）のあと
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -405,6 +406,8 @@ namespace Ciel.Conversation
                 _ when c.AgentMissing == "never" => (Alert, "シエルのサーバーが応答しません・タップで再試行"),
                 _ when c.AgentMissing == "left" => (Alert, "シエルのサーバーから切れました・タップでつなぐ"),
                 _ when problem != "" && c.ProblemStopped => (Alert, $"止まっています・{ProblemLabel(problem)}"),
+                // シエルの中の誤り（server/agent/errors.py）。service に、どの道具・係か
+                _ when problem == "bug" => (Amber, $"シエルの中でエラー・{c.ProblemService}"),
                 _ when problem != "" => (Amber, $"{ServiceLabel(c.ProblemService)}に失敗・{ProblemLabel(problem)}"),
                 _ => (Mint, "つながっています"),
             };
