@@ -26,6 +26,8 @@ Unity 側の変更はアプリをビルドし直し、`server/` 側の変更は�
 - エディタを開かずに、コマンドからもビルドできるようにする。
 - Android の権限（マイクなど）を自動で足す（下の「Android の権限」）。
 
+日常版と配信用Windows版は同じUnityプロジェクトから作る。共通のRuntime Prefabと起動シーンの構成は [アプリの構成](app-composition-ja.md) を参照。配信版は `CIEL ＞ Build ＞ Windows Broadcast`（`Ciel.Companion.Editor.CielBuild.WindowsBroadcast`）で `unity/Builds/Broadcast/CIEL Broadcast.exe` に出力する。日常版・配信版をまとめて作る場合は `Ciel.Companion.Editor.CielBuild.WindowsAll`。Androidは日常版を作る。
+
 | メニュー | 出力（Git 管理外） | 用途 |
 |---|---|---|
 | **CIEL ＞ Build ＞ Windows** | `unity/Builds/Windows/CIEL Companion.exe` | PC で使う。会議に OBS で取り込む（[会議への参加](meeting-bridge-ja.md)） |

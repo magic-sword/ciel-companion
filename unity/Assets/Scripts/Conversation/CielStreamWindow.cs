@@ -19,7 +19,7 @@ namespace Ciel.Conversation
 {
     public sealed class CielStreamWindow : MonoBehaviour
     {
-        public const string Title = "CIEL Companion 配信";
+        public const string Title = "CIEL Broadcast 映像";
         const string ClassName = "CielStreamWindow";
         const string PrefKey = "ciel.streamWindow";
         const string WidthKey = "ciel.streamWindow.width", HeightKey = "ciel.streamWindow.height";
@@ -65,7 +65,8 @@ namespace Ciel.Conversation
         {
             _background = FindAnyObjectByType<CielBackground>();
             CurrentBackdrop = (Backdrop)Mathf.Clamp(PlayerPrefs.GetInt(BackdropKey, 0), 0, BackdropLabels.Length - 1);
-            if (Supported && PlayerPrefs.GetInt(PrefKey, Application.isEditor ? 0 : 1) == 1) Open();
+            var autoOpen = !Application.isEditor && CielAppComposition.Profile != null && CielAppComposition.Profile.openOutputOnStart;
+            if (Supported && PlayerPrefs.GetInt(PrefKey, autoOpen ? 1 : 0) == 1) Open();
         }
 
         void OnDisable() => Close();

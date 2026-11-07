@@ -43,6 +43,19 @@ namespace Ciel.EditorTools
         static double _t0;
         static bool _refreshed;
 
+        static void ShowSettingsPage(Ciel.Conversation.CielConversationUI ui, string label)
+        {
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var pages = (System.Collections.IList)ui.GetType().GetField("_pages", flags).GetValue(ui);
+            for (int i = 0; i < pages.Count; i++)
+            {
+                if (((RectTransform)pages[i]).name != "Page_" + label) continue;
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { i });
+                return;
+            }
+            throw new System.InvalidOperationException("Settings page is missing: " + label);
+        }
+
         static void Poll()
         {
             if (!File.Exists(RequestPath)) return;
@@ -53,7 +66,8 @@ namespace Ciel.EditorTools
                 if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.timeSinceStartup < 20) return;
                 if (!_refreshed) { _refreshed = true; AssetDatabase.Refresh(); return; }
                 SessionState.SetInt(Key, 1);
-                EditorSceneManager.OpenScene("Assets/Scenes/Conversation.unity");
+                var broadcast = File.ReadAllText(RequestPath).Contains("stream") || File.ReadAllText(RequestPath).Contains("broadcast");
+                EditorSceneManager.OpenScene(broadcast ? CielAppBuildSetup.BroadcastScene : CielAppBuildSetup.CompanionScene);
                 foreach (var c in Object.FindObjectsByType<Ciel.Conversation.CielConversation>())
                 {
                     var so = new SerializedObject(c);
@@ -65,7 +79,7 @@ namespace Ciel.EditorTools
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
                     || request.Contains("people") || request.Contains("summary") || request.Contains("status")
                     || request.Contains("research") || request.Contains("route") || request.Contains("stream") || request.Contains("appenv") || request.Contains("activity"))
-                    SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
+                    SessionState.SetInt(SizeKey, SetGameViewSize(broadcast ? 1100 : 540, broadcast ? 800 : 1170));
                 EditorApplication.isPlaying = true;
                 return;
             }
@@ -200,7 +214,7 @@ namespace Ciel.EditorTools
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = new[] { "ui-main", "ui-settings", "ui-settings-bg", "ui-settings-stream", "ui-volume" }[step - 3];
+                var name = new[] { "ui-main", "ui-settings", "ui-settings-bg", Ciel.Conversation.CielAppComposition.IsBroadcast ? "ui-settings-stream" : "ui-settings-other", "ui-volume" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 _captured = true;
                 _mark = now;
@@ -219,9 +233,9 @@ namespace Ciel.EditorTools
                     new UnityEngine.EventSystems.PointerEventData(es), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
                 var open = (bool)ui.GetType().GetField("_sheetOpen", flags).GetValue(ui);
                 File.AppendAllText(Path.Combine(OutDir, "ui.txt"), $"設定の中を押したあと：{(open ? "開いたまま" : "閉じた")}\n");
-                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 1 });
+                ShowSettingsPage(ui, "背景");
             }
-            if (step == 5) ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });   // 配信
+            if (step == 5) ShowSettingsPage(ui, Ciel.Conversation.CielAppComposition.IsBroadcast ? "配信" : "そのほか");
             if (step == 6)
             {
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { false });
@@ -758,7 +772,7 @@ namespace Ciel.EditorTools
                 var json = "{\"v\":1,\"type\":\"youtube.state\",\"state\":\"live\",\"reason\":\"\",\"title\":\"シエルと雑談\",\"received\":12,\"replied\":3}";
                 m.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null, kind, "ciel.event" });
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });   // 配信
+                ShowSettingsPage(ui, "配信");
                 _mark = now;
                 Next(3);
                 return;
@@ -822,7 +836,7 @@ namespace Ciel.EditorTools
                 c.SelectRoute(Ciel.Conversation.CielConversation.Route.Meeting);
                 type.GetField("_recording", flags).SetValue(c, true);   // マイクを入れている
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 4 });   // そのほか
+                ShowSettingsPage(ui, "そのほか");
                 Next(3);
                 return;
             }
@@ -911,7 +925,7 @@ namespace Ciel.EditorTools
             if (step == 4)
             {
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 4 });   // そのほか
+                ShowSettingsPage(ui, "そのほか");
             }
             if (step == 5) { FinishUiShots(); return; }
             Next(step + 1);

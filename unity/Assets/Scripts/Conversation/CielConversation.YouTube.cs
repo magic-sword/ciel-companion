@@ -23,13 +23,14 @@ namespace Ciel.Conversation
 
         void LoadYouTube()
         {
-            YouTube = PlayerPrefs.GetInt(YouTubeOnKey, 0) == 1;
-            YouTubeUrl = PlayerPrefs.GetString(YouTubeUrlKey, "");
+            YouTube = CielAppComposition.IsBroadcast && PlayerPrefs.GetInt(YouTubeOnKey, 0) == 1;
+            YouTubeUrl = CielAppComposition.IsBroadcast ? PlayerPrefs.GetString(YouTubeUrlKey, "") : "";
         }
 
         /// URL とスイッチを変える（同じなら送らない）
         public void SetYouTube(string url, bool on)
         {
+            if (!CielAppComposition.IsBroadcast) return;
             url = (url ?? "").Trim();
             if (url.Length == 0) on = false;
             if (url == YouTubeUrl && on == YouTube) return;

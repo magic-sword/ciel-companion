@@ -107,15 +107,15 @@ namespace Ciel.Conversation
             _sheetScroll.scrollSensitivity = 40;   // PC のマウスのホイール
             _sheetScroll.viewport = view;
 
-            var pages = new (string label, Action<RectTransform> build)[]
+            var pages = new List<(string label, Action<RectTransform> build)>
             {
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("議事録", BuildMinutesSection),
-                ("配信", c => { BuildStreamSection(c); BuildYouTubeSection(c); }),
                 ("そのほか", c => { BuildDevicesSection(c); BuildGameSection(c); BuildDevSection(c); }),
             };
-            for (int i = 0; i < pages.Length; i++)
+            if (Broadcast) pages.Insert(3, ("配信", c => { BuildStreamSection(c); BuildYouTubeSection(c); }));
+            for (int i = 0; i < pages.Count; i++)
             {
                 var content = Rect("Page_" + pages[i].label, view, new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, Vector2.zero);
                 content.anchorMin = new Vector2(0, 1);
@@ -545,9 +545,12 @@ namespace Ciel.Conversation
                 ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
                 ShowSelected(_backdropSegs, (int)_stream.CurrentBackdrop);
             }
-            ShowSwitch(_youtubeSwitch, _youtubeKnob, c.YouTube);
-            _youtubeNow.text = YouTubeNow(c);
-            if (!_youtubeUrl.isFocused && _youtubeUrl.text != c.YouTubeUrl) _youtubeUrl.SetTextWithoutNotify(c.YouTubeUrl);
+            if (_youtubeSwitch != null)
+            {
+                ShowSwitch(_youtubeSwitch, _youtubeKnob, c.YouTube);
+                _youtubeNow.text = YouTubeNow(c);
+                if (!_youtubeUrl.isFocused && _youtubeUrl.text != c.YouTubeUrl) _youtubeUrl.SetTextWithoutNotify(c.YouTubeUrl);
+            }
             RefreshStreamGoalSwitch();
             RefreshMinutesDestinations();
         }

@@ -72,6 +72,7 @@ namespace Ciel.EditorTools
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new InvalidOperationException("Could not save conversation scene.");
             AssetDatabase.SaveAssets();
+            CielAppBuildSetup.Run();
             Debug.Log("CIEL_CONVERSATION_SCENE_DONE " + ScenePath);
         }
 

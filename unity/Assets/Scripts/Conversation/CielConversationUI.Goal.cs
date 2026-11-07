@@ -2,8 +2,7 @@
 // （会話サーバーの goals.py が送る goal.state）。ゲームを問わない形なので、label・status・progress だけで描く。
 // - 操作用の画面：裏で進んでいる仕事の札の列に「目的：石のツルハシ 2/4」の札。タップで詳しいパネル（段・直したこと・あとで・
 //   止まっている理由・「止める」「続ける」）。
-// - 配信用のウィンドウ（CielStreamWindow）：配信用のカメラにだけ映る札（StreamOverlayLayer の層）。視聴者に見える。
-//   設定 → 配信 →「配信用のウィンドウに、いまの目的を見せる」で出す・出さない。
+// 配信用の映像への札は CielConversationUI.BroadcastOutput.cs が扱う。
 // - 目的ができた・やめたときは、札を少しのあいだ「できた！」「やめた」で見せて消す。
 using System.Text;
 using UnityEngine;
@@ -13,24 +12,14 @@ namespace Ciel.Conversation
 {
     partial class CielConversationUI
     {
-        const string StreamGoalPrefKey = "ciel.streamGoal";
         const float GoalEndShown = 8f;     // できた・やめたを見せておく秒数
-        const int StreamStepsShown = 5;    // 配信用の札に出す段の数（多ければ、済んだ段をたたむ）
         static readonly Color GoalGlass = new Color(0.05f, 0.22f, 0.36f, 0.72f);
 
         (GameObject go, Text label, Image dot) _goalTask;
         GameObject _goalPanel;
         Text _goalPanelTitle, _goalPanelBody;
         GameObject _goalStop, _goalResume;
-        object _goalShown;                 // パネル・配信の札に出している goal.state（変わったら書き直す）
-        // 配信用の札
-        Canvas _streamGoalCanvas;
-        RectTransform _streamGoalCard;
-        Text _streamGoalText;
-        Image _streamGoalSwitch, _streamGoalKnob;
-
-        bool StreamGoalOn => PlayerPrefs.GetInt(StreamGoalPrefKey, 1) == 1;
-
+        object _goalShown;                 // パネルに出している goal.state（変わったら書き直す）
         // 札の列（BuildTasks のあと）・パネル・配信用の札
         void BuildGoal(RectTransform root)
         {
@@ -64,59 +53,6 @@ namespace Ciel.Conversation
             _goalResume = resume.gameObject;
             _goalPanel.SetActive(false);
 
-            BuildStreamGoal();
-        }
-
-        // 配信用のカメラにだけ映るキャンバス（操作用のキャンバスとは別。カメラが無いあいだは出さない）
-        void BuildStreamGoal()
-        {
-            if (_stream == null) return;
-            var go = new GameObject("StreamGoalCanvas", typeof(Canvas), typeof(CanvasScaler));
-            go.transform.SetParent(transform, false);
-            _streamGoalCanvas = go.GetComponent<Canvas>();
-            _streamGoalCanvas.renderMode = RenderMode.ScreenSpaceCamera;
-            _streamGoalCanvas.planeDistance = 1f;
-            var scaler = go.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(540, 960);
-            scaler.matchWidthOrHeight = 0.5f;
-            var root = (RectTransform)go.transform;
-            _streamGoalCard = Rect("GoalCard", root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -18), new Vector2(320, 100));
-            Rounded(_streamGoalCard, new Color(0.03f, 0.10f, 0.17f, 0.78f), 14);
-            // 縁は板と同じ角の半径にする（Edge はカプセル形なので、背の高いカードだと大きな丸になる）
-            SetRadius(Img(_streamGoalCard, "circle_outline", WithAlpha(Cyan, 0.55f), child: true), 14);
-            var layout = _streamGoalCard.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(14, 14, 10, 12);
-            layout.childControlWidth = layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-            _streamGoalCard.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            _streamGoalText = Txt("Text", _streamGoalCard, 15, TextMain, TextAnchor.UpperLeft);
-            _streamGoalText.supportRichText = true;
-            SetLayer(go, CielStreamWindow.OverlayLayer);
-            go.SetActive(false);
-        }
-
-        static void SetLayer(GameObject go, int layer)
-        {
-            go.layer = layer;
-            foreach (Transform t in go.transform) SetLayer(t.gameObject, layer);
-        }
-
-        // 設定 → 配信（BuildStreamSection から）
-        void BuildStreamGoalSwitch(RectTransform sec)
-        {
-            (_streamGoalSwitch, _streamGoalKnob) = SwitchRow(sec, "配信用のウィンドウに、いまの目的を見せる", () =>
-            {
-                PlayerPrefs.SetInt(StreamGoalPrefKey, StreamGoalOn ? 0 : 1);
-                PlayerPrefs.Save();
-                Refresh();
-            });
-        }
-
-        void RefreshStreamGoalSwitch()
-        {
-            if (_streamGoalSwitch != null) ShowSwitch(_streamGoalSwitch, _streamGoalKnob, StreamGoalOn);
         }
 
         // 毎フレーム（UpdateTasks から）：札の出し入れ・中身が変わったら書き直す
@@ -134,15 +70,8 @@ namespace Ciel.Conversation
             {
                 _goalShown = g;
                 FillGoalPanel(g);
-                if (_streamGoalText != null) _streamGoalText.text = g != null && g.HasGoal ? StreamText(g) : "";
             }
-            if (_streamGoalCanvas != null)
-            {
-                var cam = _stream.StreamCamera;
-                var on = cam != null && StreamGoalOn && show;
-                if (on && _streamGoalCanvas.worldCamera != cam) _streamGoalCanvas.worldCamera = cam;
-                if (_streamGoalCanvas.gameObject.activeSelf != on) _streamGoalCanvas.gameObject.SetActive(on);
-            }
+
         }
 
         static (int done, int all, CielConversation.GoalStep now) Count(CielConversation.GoalState g)
@@ -212,29 +141,6 @@ namespace Ciel.Conversation
         }
 
         // 配信用の札：見出し・目的・段（5 つまで。多ければ済んだ段をたたむ）・直したこと（最後の 1 つ）・つぎ
-        static string StreamText(CielConversation.GoalState g)
-        {
-            var b = new StringBuilder();
-            b.Append($"<size=12><color=#9FDDF0>いまの目的・{Esc(g.goal.game_label)}</color></size>\n");
-            var st = g.goal.status;
-            var tail = st == "done" ? "  <color=#5BF0C8>できた！</color>" : st == "stopped" ? "  <color=#8FB3C3>やめた</color>" : "";
-            b.Append($"<b>{Esc(g.goal.title)}</b>{tail}\n<size=12><color=#8FB3C3>{Esc(g.goal.by_label)}</color></size>\n");
-            if (g.SubPath != null) b.Append($"<size=13><color=#9FDDF0>› 先に：{Esc(g.SubPath)}</color></size>\n");
-            var steps = g.steps ?? new CielConversation.GoalStep[0];
-            var (done, _, _) = Count(g);
-            var skip = Mathf.Max(0, Mathf.Min(done, steps.Length - StreamStepsShown));
-            if (skip > 0) b.Append($"<color=#5BF0C8>●</color> <color=#8FB3C3>済んだ段 {skip}</color>\n");
-            int shown = 0;
-            for (int i = 0, d = 0; i < steps.Length && shown < StreamStepsShown; i++)
-            {
-                if (steps[i].status == "done" && d++ < skip) continue;
-                b.Append($"{Mark(steps[i].status)} {Esc(steps[i].label)}{Progress(steps[i])}\n");
-                shown++;
-            }
-            if (!string.IsNullOrEmpty(g.attention)) b.Append($"<size=12><color=#FFC46B>止まっている：{Esc(g.attention)}</color></size>\n");
-            if (g.changes != null && g.changes.Length > 0) b.Append($"<size=12><color=#CDEFFA>直した：{Esc(g.changes[g.changes.Length - 1])}</color></size>\n");
-            if (g.next != null && g.next.Length > 0) b.Append($"<size=12><color=#CDEFFA>つぎ：{Esc(g.next[0])}</color></size>");
-            return b.ToString().TrimEnd('\n');
-        }
+
     }
 }

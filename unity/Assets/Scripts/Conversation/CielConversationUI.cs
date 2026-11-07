@@ -22,6 +22,14 @@ namespace Ciel.Conversation
         [SerializeField] CielConversation _conversation;
         [SerializeField] CielBackground _background;
         CielStreamWindow _stream;   // Windows だけ
+        CielAppProfile _profile;
+        bool Broadcast => _profile != null && _profile.broadcast;
+
+        public void Configure(CielAppProfile profile, CielStreamWindow stream)
+        {
+            _profile = profile;
+            _stream = stream;
+        }
 
         // 色：白磁・シアン・チャコールと、議事録の琥珀（企画設計の「シエル主観視界」の色の決まり）
         static readonly Color Cyan = Hex(0x7FE9FF), CyanDeep = Hex(0x2CC8EE), Ink = Hex(0x04293D);
@@ -64,7 +72,6 @@ namespace Ciel.Conversation
             if (_background == null) _background = FindAnyObjectByType<CielBackground>();
             if (_background == null) _background = gameObject.AddComponent<CielBackground>();
             if (FindAnyObjectByType<CielResizeGuard>() == null) gameObject.AddComponent<CielResizeGuard>();   // 画面の大きさが変わってもシエルを描く
-            if (CielStreamWindow.Supported) _stream = gameObject.AddComponent<CielStreamWindow>();   // OBS で取り込む、シエルだけのウィンドウ
             _font = Font.CreateDynamicFontFromOSFont(
                 new[] { "Yu Gothic UI", "Meiryo UI", "Meiryo", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP" }, 32);
             Build();
@@ -98,12 +105,13 @@ namespace Ciel.Conversation
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(390, 844);
+            scaler.referenceResolution = Broadcast ? new Vector2(960, 720) : new Vector2(390, 844);
             scaler.matchWidthOrHeight = 0.5f;
             _canvasRect = (RectTransform)canvasGo.transform;
 
             BuildScrims(_canvasRect);
-            BuildTouchLayer(_canvasRect);
+            if (Broadcast) BuildBroadcastSurface(_canvasRect);
+            else BuildTouchLayer(_canvasRect);
             _safe = Rect("SafeArea", _canvasRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             Stretch(_safe);
             _safe.gameObject.AddComponent<SafeArea>();
@@ -122,6 +130,11 @@ namespace Ciel.Conversation
             BuildGoal(_safe);   // シエルの今の目的（CielConversationUI.Goal.cs）。札の列（BuildTasks）のあと
             BuildActivity(_safe);   // いまのシエルの札とパネル（CielConversationUI.Activity.cs）。目的の札のあと
             BuildCard(_safe);   // シエルが画面に出すカード（CielConversationUI.Card.cs。アプリの道具 app_show_card）
+            if (Broadcast)
+            {
+                BuildStreamGoal();
+                BuildBroadcastMonitor(_safe);
+            }
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -350,7 +363,7 @@ namespace Ciel.Conversation
 
             UpdateLink();
             // 開発用のサーバー・会議につないでいることを、いつも見えるように（左上の名前の横）
-            _nameText.text = "C I E L" + (c.DevServer ? " ・ 開発用" : "") + (c.InMeeting ? " ・ 会議" : "");
+            _nameText.text = (Broadcast ? "C I E L ・ 配信" : "C I E L") + (c.DevServer ? " ・ 開発用" : "") + (c.InMeeting ? " ・ 会議" : "");
             _nameText.color = c.DevServer ? Amber : TextMain;
 
             var talk = (int)c.CurrentTalk;
@@ -487,6 +500,7 @@ namespace Ciel.Conversation
             _minutesLabel.text = MoreLabel(c, t);
             UpdateSong();
             UpdateCard(t);
+            if (Broadcast) UpdateBroadcastMonitor();
 
             if (on)
             {

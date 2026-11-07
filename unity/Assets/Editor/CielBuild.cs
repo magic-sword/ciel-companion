@@ -17,8 +17,6 @@ namespace Ciel.Companion.Editor
 {
     public static class CielBuild
     {
-        const string Scene = "Assets/Scenes/Conversation.unity";
-
         /// Windows：会議に OBS で取り込んで使う。OBS や会議のブラウザを操作しても会話が止まらないように、
         /// 前面でなくても動かし、ウィンドウで開く
         [MenuItem("CIEL/Build/Windows")]
@@ -27,7 +25,22 @@ namespace Ciel.Companion.Editor
             PlayerSettings.runInBackground = true;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.resizableWindow = true;
-            Build(BuildTarget.StandaloneWindows64, "Builds/Windows/CIEL Companion.exe");
+            Build(BuildTarget.StandaloneWindows64, "Builds/Windows/CIEL Companion.exe", Ciel.EditorTools.CielAppBuildSetup.CompanionScene, "CIEL Companion");
+        }
+
+        [MenuItem("CIEL/Build/Windows Broadcast")]
+        public static void WindowsBroadcast()
+        {
+            PlayerSettings.runInBackground = true;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.resizableWindow = true;
+            Build(BuildTarget.StandaloneWindows64, "Builds/Broadcast/CIEL Broadcast.exe", Ciel.EditorTools.CielAppBuildSetup.BroadcastScene, "CIEL Broadcast");
+        }
+
+        public static void WindowsAll()
+        {
+            Windows();
+            WindowsBroadcast();
         }
 
         /// Android：開発用の APK（Unity の開発用の鍵で署名）。端末へは adb install で入れる
@@ -38,11 +51,13 @@ namespace Ciel.Companion.Editor
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.forceInternetPermission = true;   // LiveKit へつなぐ
             EditorUserBuildSettings.buildAppBundle = false;          // ストア用の AAB ではなく、直接入れられる APK
-            Build(BuildTarget.Android, "Builds/Android/CIEL Companion.apk");
+            Build(BuildTarget.Android, "Builds/Android/CIEL Companion.apk", Ciel.EditorTools.CielAppBuildSetup.CompanionScene, "CIEL Companion");
         }
 
-        static void Build(BuildTarget target, string output)
+        static void Build(BuildTarget target, string output, string scene, string product)
         {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(Ciel.EditorTools.CielAppBuildSetup.RuntimePath) == null)
+                throw new InvalidOperationException("Run CIEL/Apps/Create Shared Runtime and App Scenes first.");
             AssetDatabase.SaveAssets();
             var group = BuildPipeline.GetBuildTargetGroup(target);
             if (!BuildPipeline.IsBuildTargetSupported(group, target))
@@ -51,13 +66,20 @@ namespace Ciel.Companion.Editor
                 EditorUserBuildSettings.SwitchActiveBuildTarget(group, target);   // 初回は素材の読み込み直しで時間がかかる
 
             Directory.CreateDirectory(Path.GetDirectoryName(output));
-            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            var previousProduct = PlayerSettings.productName;
+            BuildReport report;
+            try
             {
-                scenes = new[] { Scene },
-                locationPathName = output,
-                target = target,
-                options = BuildOptions.None,
-            });
+                PlayerSettings.productName = product;   // 設定の保存先も日常版と配信版で分ける
+                report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { scene },
+                    locationPathName = output,
+                    target = target,
+                    options = BuildOptions.None,
+                });
+            }
+            finally { PlayerSettings.productName = previousProduct; AssetDatabase.SaveAssets(); }
             var s = report.summary;
             if (s.result != BuildResult.Succeeded)
                 throw new InvalidOperationException($"CIEL_BUILD_FAILED: {target} {s.result}（エラー {s.totalErrors} 件）");

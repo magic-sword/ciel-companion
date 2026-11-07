@@ -81,7 +81,7 @@ namespace Ciel.Conversation
         static string WhoName(string who) => who == "talker" ? "小脳" : who == "mind" ? "心" : "";
 
         // 札の文言・点の色・出すか
-        static (string text, Color color, bool show) ActivityChip(CielConversation c, CielConversation.ActivityState a)
+        static (string text, Color color, bool show) ActivityChip(CielConversation c, CielConversation.ActivityState a, bool activeOnly = false)
         {
             if (a.calls != null && a.calls.Length > 0)
                 return ($"いま：{a.calls[0].label}の結果を待っている {Sec(c.ActivitySeconds(a.calls[0].for_s))}", Amber, true);
@@ -92,9 +92,9 @@ namespace Ciel.Conversation
                 return ($"いま：{(WhoName(a.who) != "" ? WhoName(a.who) + "が" : "")}考えている {Sec(c.ActivitySeconds(a.mind_for))}", Mint, true);
             if (a.mind == "speaking") return ("いま：話している", Mint, true);
             if (!string.IsNullOrEmpty(a.doing)) return ($"いま：体が{a.doing}", Cyan, true);
-            if (a.log != null && a.log.Length > 0 && c.ActivitySeconds(a.log[0].ago) < ActivityRecent)
+            if (!activeOnly && a.log != null && a.log.Length > 0 && c.ActivitySeconds(a.log[0].ago) < ActivityRecent)
                 return ($"いま：{a.log[0].text}", KindColor(a.log[0].kind), true);
-            if (c.GameLinked) return ("いま：待っている", Idle, true);
+            if (!activeOnly && c.GameLinked) return ("いま：待っている", Idle, true);
             return ("", Idle, false);
         }
 
