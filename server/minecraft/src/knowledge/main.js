@@ -7,7 +7,8 @@
 // - MCP の streamable HTTP を、会話を覚えない形（stateless）で開く。呼ばれるたびに窓口を作って答える。
 import { existsSync } from 'node:fs';
 import http from 'node:http';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
@@ -124,7 +125,9 @@ const httpServer = http.createServer(async (req, res) => {
   }
 });
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) {
+// 直接起動したときだけ待ち受ける。体（src/main.js）が道具だけを読み込むときは開かない（ファイルの名前だけで比べると、
+// 体の main.js と取り違えて :8770 を開こうとし、知識の窓口のコンテナとぶつかって体が落ちた。2026-11-07）
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   httpServer.listen(PORT, HOST, () => log(`マイクラの知識の窓口 http://${HOST}:${PORT}/mcp（版 ${VERSION}）`));
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { httpServer.close(); process.exit(0); });
 }

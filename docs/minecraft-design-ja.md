@@ -377,3 +377,12 @@ docker compose logs -f minecraft-body
   - 目的の係：計画し直しても今の残りの段と同じなら「直した」にしない（`minecraft.Goals.repair`）。理由を付けて止まり、心に相談する。
   - 目的の係：止まっている目的と同じ物の start_goal は、あとに並べず計画からやり直す（`goals.GoalRunner.start`）。
 - Ciel_Debug で、石のつるはし 1 本・丸石 1 個・棒 2 本から石のつるはしを頼むと、「丸石が 2 個足りない」と返るようになった（前は足りない物なし）。
+
+## 30. 体の MCP の入口を自宅サーバーに入れた（2026-11-07）
+
+[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md) の体の MCP の入口（:8771）を、自宅サーバーの体に入れた（ブランチ `game-env-mcp`）。本番の会話サーバーは今までどおり WebSocket（:8768）でつなぐ。
+
+- 入れた直後、体が起きられずに落ち続けた（11:09〜11:11 UTC、2 回）。1 回目は、送るときに `knowledge` を外したため `src/knowledge/` の新しい `main.js` が届かなかった。2 回目は、`src/knowledge/main.js` の「直接起動したか」の確かめがファイルの名前（`main.js`）だけで比べていて、体の `src/main.js` から読み込んだときにも :8770 を開こうとし、知識の窓口のコンテナとぶつかった。比べ方を、ファイルの場所全体にした。
+- 確かめたこと：開発用の会話サーバーのコンテナの中から、会話サーバーの `GameEnv` で体の MCP につないだ。準備 0.57 秒（道具 13 個・遊び方の指示）、受け持ち、様子、`minecraft_facts`、景色の絵（初めは 9 秒）、目的の計画、「来て」→「止まって」で付箋が「やめた」で閉じる、離す。WebSocket の入口も答える。
+- 体の `minecraft_search` は `not_ready`：本番の `compose.yaml` は体に手元の Wiki（`./minecraft/knowledge/data`）を渡していない。ブランチの `compose.yaml` では渡すので、本番に入れたら使える。
+
