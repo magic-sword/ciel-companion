@@ -25,6 +25,9 @@ namespace Ciel.Conversation
 
         const string PrefKey = "ciel.background";
 
+        /// 背景の板を置く層。配信用のカメラ（CielStreamWindow）は、グリーンバックなどのときにこの層を映さない
+        public const int Layer = 30;
+
         public string Current { get; private set; }
         public event Action Changed;
 
@@ -40,7 +43,7 @@ namespace Ciel.Conversation
             // シエル（Live2D）は URP の専用の描画（CubismRenderPassFeature）で、半透明の物より前に描かれる。
             // 背景は、それよりさらに前に描かれるよう、不透明の物の順番（Geometry）で描く。カメラの前の奥に置く
             _camera = Camera.main;
-            var go = new GameObject("Background");
+            var go = new GameObject("Background") { layer = Layer };
             go.transform.SetParent(_camera != null ? _camera.transform : transform, false);
             _renderer = go.AddComponent<SpriteRenderer>();
             var material = new Material(_renderer.sharedMaterial) { renderQueue = 2000 };

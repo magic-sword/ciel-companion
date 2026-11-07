@@ -55,5 +55,7 @@ minecraft_instructions_file = "prompts/minecraft.md"
 # 見せてもらった画像（eyes.py）：見たときの話し方（心と小脳）と、説明文を書く係への指示
 image_voice_instructions_file = "prompts/image_voice.md"
 image_caption_instructions_file = "prompts/image_caption.md"
+# YouTube の配信のコメントに返す（youtube_chat.py）。口の why comment の指示の頭。コメントの中身は下に JSON で付く
+comment_instructions_file = "prompts/comment.md"
 # シエル自身の姿の絵（設定画の上半身と三面図の正面・背面、長い辺 768 の JPEG）。心と小脳へ、会話の最初にいつも置く（mind.py）
 self_image_file = "ciel-self.jpg"

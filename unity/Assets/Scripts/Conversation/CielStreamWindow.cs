@@ -5,6 +5,9 @@
 // 絵は GPU から読み出して（AsyncGPUReadback）、GDI（StretchDIBits）でウィンドウに描く。アプリの画面より 1 フレームほど遅れる。
 // 絵の大きさはウィンドウの中の大きさに合わせる（大きさは自由に変えられる。次に開くときも同じ大きさ）。
 // ウィンドウを閉じると、設定（PlayerPrefs）も切る。ビルドしたアプリでは最初から開く。エディタでは設定で開く。
+// 配信の背景（Backdrop）：アプリと同じ絵か、一色（グリーンバック・ブルーバック）。一色のときは背景の板（CielBackground.Layer）を映さず、
+// その色で塗ってからシエルを描く。OBS ではウィンドウキャプチャに「クロマキー」のフィルタを付けて色を抜く。
+// ウィンドウキャプチャは透明（アルファ）を取り込めないので、透過はクロマキーで作る。
 using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -30,6 +33,22 @@ namespace Ciel.Conversation
         public Camera StreamCamera => _hwnd != IntPtr.Zero ? _camera : null;
         public event Action Changed;
 
+        /// 配信の背景。並びは設定画面の選ぶ順
+        public enum Backdrop { App, Green, Blue }
+        public static readonly string[] BackdropLabels = { "アプリと同じ", "グリーンバック", "ブルーバック" };
+        const string BackdropKey = "ciel.streamWindow.backdrop";
+        public Backdrop CurrentBackdrop { get; private set; }
+
+        public void SetBackdrop(Backdrop b)
+        {
+            CurrentBackdrop = b;
+            PlayerPrefs.SetInt(BackdropKey, (int)b);
+            PlayerPrefs.Save();
+            Changed?.Invoke();
+        }
+
+        static Color BackdropColor(Backdrop b) => b == Backdrop.Blue ? new Color(0f, 0f, 1f, 1f) : new Color(0f, 1f, 0f, 1f);
+
         static CielStreamWindow _instance;   // ウィンドウの知らせ（WndProc）から見る
 
         CielBackground _background;
@@ -43,6 +62,7 @@ namespace Ciel.Conversation
         void Start()
         {
             _background = FindAnyObjectByType<CielBackground>();
+            CurrentBackdrop = (Backdrop)Mathf.Clamp(PlayerPrefs.GetInt(BackdropKey, 0), 0, BackdropLabels.Length - 1);
             if (Supported && PlayerPrefs.GetInt(PrefKey, Application.isEditor ? 0 : 1) == 1) Open();
         }
 
@@ -123,8 +143,13 @@ namespace Ciel.Conversation
             _camera.orthographic = _main.orthographic;
             _camera.orthographicSize = _main.orthographicSize;
             _camera.fieldOfView = _main.fieldOfView;
-            _camera.backgroundColor = _main.backgroundColor;
-            if (_background != null) _background.CoverAspect = (float)w / h;   // 配信用のほうが横長でも、背景が足りるように
+            // 背景：アプリと同じ絵か、一色（背景の板の層を映さず、その色で塗る）
+            var plain = CurrentBackdrop != Backdrop.App;
+            _camera.clearFlags = plain ? CameraClearFlags.SolidColor : _main.clearFlags;
+            _camera.backgroundColor = plain ? BackdropColor(CurrentBackdrop) : _main.backgroundColor;
+            if (plain) _camera.cullingMask &= ~(1 << CielBackground.Layer);
+            else _camera.cullingMask |= _main.cullingMask & (1 << CielBackground.Layer);
+            if (_background != null) _background.CoverAspect = plain ? 0 : (float)w / h;   // 配信用のほうが横長でも、背景が足りるように
 
             // 読み出しは 1 つずつ（前のが終わってから）。ここで頼むと、前のフレームの絵が読める
             if (!_reading)

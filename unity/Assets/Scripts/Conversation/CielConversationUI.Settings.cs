@@ -1,8 +1,9 @@
 // 会話の画面（CielConversationUI）のうち、設定画面（下からすべり出る）。
 // タブ：声と会話（シエルの声の大きさ・おしゃべり度・その場にいる人）、背景（CielBackground）、
-// 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、そのほか（PC では声のつなぎ方（ふだん・会議）と
+// 議事録（送り先の Discord の Webhook を足す・消す・選ぶ。この端末の中に持つ）、
+// 配信（Windows では配信用のウィンドウとその背景（グリーンバックなど）、YouTube のコメントを受け取る（CielConversation.YouTube.cs））、そのほか（PC では声のつなぎ方（ふだん・会議）と
 // マイクとスピーカー（CielConversationUI.Route.cs）、
-// Windows では配信用のウィンドウ（CielStreamWindow）、マイクラで一緒に遊ぶ（CielConversation.Game.cs）、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
+// マイクラで一緒に遊ぶ（CielConversation.Game.cs）、開発：開発用のサーバーにつなぐ・表情の確認ボタン）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -28,7 +29,10 @@ namespace Ciel.Conversation
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
         Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob, _gameSwitch, _gameKnob;
-        Text _gameNow;
+        Text _gameNow, _youtubeNow;
+        readonly List<(Image fill, Image edge, Text label)> _backdropSegs = new List<(Image, Image, Text)>();
+        Image _youtubeSwitch, _youtubeKnob;
+        InputField _youtubeUrl;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -108,7 +112,8 @@ namespace Ciel.Conversation
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("議事録", BuildMinutesSection),
-                ("そのほか", c => { BuildDevicesSection(c); BuildStreamSection(c); BuildGameSection(c); BuildDevSection(c); }),
+                ("配信", c => { BuildStreamSection(c); BuildYouTubeSection(c); }),
+                ("そのほか", c => { BuildDevicesSection(c); BuildGameSection(c); BuildDevSection(c); }),
             };
             for (int i = 0; i < pages.Length; i++)
             {
@@ -368,6 +373,56 @@ namespace Ciel.Conversation
             BuildStreamGoalSwitch(sec);   // いまの目的の札（CielConversationUI.Goal.cs）
             Note(sec, $"シエルと背景だけを映すウィンドウ「{CielStreamWindow.Title}」を開きます。"
                 + "OBS のウィンドウキャプチャでこちらを取り込むと、設定・名前・ボタンは映りません。大きさを変えると、その大きさで描きます");
+
+            var bg = Section(content);
+            SectionLabel(Row(bg, 20), "配信の背景");
+            Segmented(bg, CielStreamWindow.BackdropLabels, i => _stream.SetBackdrop((CielStreamWindow.Backdrop)i), _backdropSegs);
+            Note(bg, "グリーンバック・ブルーバックは、配信用のウィンドウだけを一色にします（アプリの画面は「背景」タブの絵のまま）。"
+                + "OBS でウィンドウキャプチャを右クリック →「フィルタ」→「クロマキー」を足し、同じ色を選ぶと背景が透けます");
+        }
+
+        // YouTube の配信のコメント（CielConversation.YouTube.cs）。読むのは会話サーバー（API キーも会話サーバー）
+        void BuildYouTubeSection(RectTransform content)
+        {
+            var sec = Section(content);
+            SectionLabel(Row(sec, 20), "YouTube のコメント");
+            _youtubeUrl = NameField(Row(sec, 40), _conversation.YouTubeUrl, 0, "配信の URL（例：https://youtube.com/live/…）", 200);
+            _youtubeUrl.keyboardType = TouchScreenKeyboardType.URL;
+            _youtubeUrl.onEndEdit.AddListener(url => _conversation.SetYouTube(url, _conversation.YouTube && url.Trim().Length > 0));
+            (_youtubeSwitch, _youtubeKnob) = SwitchRow(sec, "コメントを受け取って返す",
+                () => _conversation.SetYouTube(_youtubeUrl.text, !_conversation.YouTube));
+            _youtubeNow = Txt("Now", sec, 12, TextMain, TextAnchor.UpperLeft, true);
+            Note(sec, "配信の URL（視聴ページ・共有の URL・YouTube Studio の配信の画面の URL）を貼ってスイッチを入れると、"
+                + "シエルがコメントを読み、話の切れ目に返します（話している人の声が先です）。スーパーチャットは先に読みます。"
+                + "ログインは要りません。公開・限定公開の配信だけ読めます。配信の前に入れておくと、始まるのを待ちます");
+        }
+
+        static string YouTubeNow(CielConversation c)
+        {
+            if (!c.YouTube) return "";
+            if (c.Status != CielConversation.State.Connected) return "いまは：つないだら、配信のコメントを受け取ります";
+            var title = c.YouTubeTitle.Length > 0 ? $"「{c.YouTubeTitle}」" : "配信";
+            switch (c.YouTubeState)
+            {
+                case "": return "いまは：会話サーバーの返事を待っています（古い会話サーバーは対応していません）";
+                case "connecting": return "いまは：配信につないでいます…";
+                case "waiting": return $"いまは：{title}が始まるのを待っています";
+                case "live": return $"いまは：● {title}のコメントを受け取っています（届いた {c.YouTubeReceived} 件・返した {c.YouTubeReplied} 件）";
+                case "off": return "いまは：止めています";
+            }
+            switch (c.YouTubeReason)
+            {
+                case "bad_url": return "いまは：URL から配信が分かりませんでした。視聴ページの URL を貼ってください";
+                case "no_key": return "いまは：会話サーバーに YouTube の API キーがありません（server/agent/.env の YOUTUBE_API_KEY）";
+                case "not_found": return "いまは：動画が見つかりません（非公開の配信は読めません）";
+                case "not_live": return "いまは：この動画は配信ではありません";
+                case "not_started": return "いまは：配信が始まりませんでした。始まってからスイッチを入れ直してください";
+                case "liveChatEnded": return "いまは：配信のチャットが終わりました";
+                case "liveChatDisabled": return "いまは：この配信はチャットがオフです";
+                case "quotaExceeded": return "いまは：今日の YouTube API の上限に達しました（日本時間の 16〜17 時に戻ります）";
+                case "keyInvalid": case "badRequest": return "いまは：会話サーバーの YouTube の API キーが使えません";
+            }
+            return $"いまは：配信につなげませんでした（{c.YouTubeReason}）";
         }
 
         // マイクラで一緒に遊ぶ（CielConversation.Game.cs。docs/minecraft-design-ja.md）
@@ -475,7 +530,14 @@ namespace Ciel.Conversation
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
             ShowSwitch(_gameSwitch, _gameKnob, c.Minecraft);
             _gameNow.text = GameNow(c);
-            if (_stream != null) ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
+            if (_stream != null)
+            {
+                ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);
+                ShowSelected(_backdropSegs, (int)_stream.CurrentBackdrop);
+            }
+            ShowSwitch(_youtubeSwitch, _youtubeKnob, c.YouTube);
+            _youtubeNow.text = YouTubeNow(c);
+            if (!_youtubeUrl.isFocused && _youtubeUrl.text != c.YouTubeUrl) _youtubeUrl.SetTextWithoutNotify(c.YouTubeUrl);
             RefreshStreamGoalSwitch();
             RefreshMinutesDestinations();
         }

@@ -344,6 +344,7 @@ namespace Ciel.Conversation
             VoiceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
             DevServer = PlayerPrefs.GetInt(DevServerPrefKey, 0) == 1;
             LoadGame();
+            LoadYouTube();
             if (_connectOnStart) StartConversation();
         }
 
@@ -462,6 +463,7 @@ namespace Ciel.Conversation
             SetMinutesRecording(false);
             SetSongState("idle");
             ResetGame();
+            ResetYouTube();
             ResetGoal();
             Changed?.Invoke();
         }
@@ -553,6 +555,7 @@ namespace Ciel.Conversation
             SendVolume();
             SendDeviceHello();
             SendGame();
+            SendYouTube();
             if (InMeeting) SetMicEnabled(true);   // 会議の音は、マイクを入れておかないと届かない
         }
 
@@ -982,6 +985,8 @@ namespace Ciel.Conversation
             public string comment;
             public bool linked, in_world;   // game.state
             public int id;   // image.state
+            public string title;   // youtube.state（state・reason も）
+            public int received, replied;
         }
 
         // 会話サーバーのイベント（仕様書 6 章）。表情（character.expression）と、議事録をとっているか（minutes.state）
@@ -1073,6 +1078,7 @@ namespace Ciel.Conversation
             else if (e.type == "agent.problem") OnProblem(e);
             else if (e.type == "game.state") OnGameState(e);   // マイクラの体とつながったか（CielConversation.Game.cs）
             else if (e.type == "image.state") OnImageState(e);   // 見せた画像を受け取ったか（CielConversation.Image.cs）
+            else if (e.type == "youtube.state") OnYouTubeState(e);   // 配信のコメントの様子（CielConversation.YouTube.cs）
             else if (e.type == "device.hello_request")
             {
                 // 会話サーバーが入った直後に送った知らせは届かないことがあるので、準備ができたと言われたら送り直す
@@ -1081,6 +1087,7 @@ namespace Ciel.Conversation
                 SendVolume();
                 SendDeviceHello();
                 SendGame();
+                SendYouTube();
             }
             else if (e.type == "minutes.destination")
             {
@@ -1391,6 +1398,7 @@ namespace Ciel.Conversation
             SetMinutesRecording(false);
             SetSongState("idle");
             ResetGame();
+            ResetYouTube();
             ResetGoal();
             DisposeVoice();
             DisposeAizuchi();

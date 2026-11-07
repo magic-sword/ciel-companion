@@ -2,7 +2,7 @@
 // 使い方：.local/render-check/playmode-request を置いて、エディタを起動する（-batchmode は付けない）。
 // 出力：.local/render-check/playmode-*.png と playmode.txt。終わるとエディタを終了する。
 // 要求の文字に "ui" を含めると、代わりに会話の画面を縦長（540×1170）で撮る：
-// ui-main.png（ふだん）、ui-settings.png・ui-settings-bg.png・ui-settings-other.png（設定のタブ）、ui-volume.png（その場の声の大きさ）。
+// ui-main.png（ふだん）、ui-settings.png・ui-settings-bg.png・ui-settings-stream.png（設定のタブ。配信）、ui-volume.png（その場の声の大きさ）。
 // 設定画面の中を押しても閉じないかを、押す操作を真似して確かめ、ui.txt に書く。
 // "touch" を含めると、縦長の画面でシエルに触れる操作を再現し、触れた点の表示（CielTouchVisual）を撮る：
 // touch-converge.png（触れ始め）、touch-hold.png（長く触れる）、touch-stroke-start.png（撫で始め）、touch-stroke.png（頭を撫で続ける）、touch-tap.png（ほっぺをつつく）、touch-none.png（反応しない胸）。
@@ -60,7 +60,7 @@ namespace Ciel.EditorTools
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
                     || request.Contains("people") || request.Contains("summary") || request.Contains("status")
-                    || request.Contains("research") || request.Contains("route"))
+                    || request.Contains("research") || request.Contains("route") || request.Contains("stream"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -97,6 +97,11 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("research"))
             {
                 ResearchShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("stream"))
+            {
+                StreamShots(step);
                 return;
             }
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("route"))
@@ -181,7 +186,7 @@ namespace Ciel.EditorTools
             if (!_captured)
             {
                 if (now - _mark < 1.0) return;
-                var name = new[] { "ui-main", "ui-settings", "ui-settings-bg", "ui-settings-other", "ui-volume" }[step - 3];
+                var name = new[] { "ui-main", "ui-settings", "ui-settings-bg", "ui-settings-stream", "ui-volume" }[step - 3];
                 ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
                 _captured = true;
                 _mark = now;
@@ -202,7 +207,7 @@ namespace Ciel.EditorTools
                 File.AppendAllText(Path.Combine(OutDir, "ui.txt"), $"設定の中を押したあと：{(open ? "開いたまま" : "閉じた")}\n");
                 ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 1 });
             }
-            if (step == 5) ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 2 });
+            if (step == 5) ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });   // 配信
             if (step == 6)
             {
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { false });
@@ -697,6 +702,79 @@ namespace Ciel.EditorTools
         }
 
         // 撮り終えたら（撮影は次の描画で書き出されるので、少し待ってから）元の大きさの一覧に戻して終える
+        // "stream"：配信用のウィンドウ（CielStreamWindow）をグリーンバック・ブルーバックで開き、その絵（RenderTexture）を
+        // stream-green.png・stream-blue.png・stream-app.png に書く。設定の配信タブに、つながった YouTube の様子を合成して ui-youtube.png に撮る。
+        // 隅と真ん中の画素の色を stream.txt に書く。終えたら、配信用のウィンドウ・背景・YouTube の設定を元に戻す
+        static (bool open, int backdrop, bool yt, string url) _streamBefore;
+
+        static void StreamShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var w = Object.FindAnyObjectByType<Ciel.Conversation.CielStreamWindow>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var type = typeof(Ciel.Conversation.CielConversation);
+            var log = Path.Combine(OutDir, "stream.txt");
+            void Save(string name)
+            {
+                var rt = (RenderTexture)typeof(Ciel.Conversation.CielStreamWindow).GetField("_rt", flags).GetValue(w);
+                if (rt == null) { File.AppendAllText(log, $"{name}: 絵が無い
+"); return; }
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+                tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                File.WriteAllBytes(Path.Combine(OutDir, name + ".png"), tex.EncodeToPNG());
+                File.AppendAllText(log, $"{name}: {rt.width}x{rt.height} 隅={tex.GetPixel(2, 2)} 真ん中={tex.GetPixel(rt.width / 2, rt.height / 2)}
+");
+                Object.Destroy(tex);
+            }
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null || w == null) return;
+                File.WriteAllText(log, "");
+                _streamBefore = (w.IsOpen, (int)w.CurrentBackdrop, c.YouTube, c.YouTubeUrl);
+                w.SetBackdrop(Ciel.Conversation.CielStreamWindow.Backdrop.Green);
+                w.SetOpen(true);
+                type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                c.SetYouTube("https://youtu.be/abcdefghijk", true);
+                var m = type.GetMethod("OnDataReceived", flags);
+                var kind = System.Enum.ToObject(m.GetParameters()[2].ParameterType, 0);
+                var json = "{\"v\":1,\"type\":\"youtube.state\",\"state\":\"live\",\"reason\":\"\",\"title\":\"シエルと雑談\",\"received\":12,\"replied\":3}";
+                m.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null, kind, "ciel.event" });
+                ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });   // 配信
+                _mark = now;
+                Next(3);
+                return;
+            }
+            if (now - _mark < 2.0) return;
+            _mark = now;
+            if (step == 3)
+            {
+                Save("stream-green");
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, "ui-youtube.png"));
+                w.SetBackdrop(Ciel.Conversation.CielStreamWindow.Backdrop.Blue);
+                Next(4);
+                return;
+            }
+            if (step == 4)
+            {
+                Save("stream-blue");
+                w.SetBackdrop(Ciel.Conversation.CielStreamWindow.Backdrop.App);
+                Next(5);
+                return;
+            }
+            Save("stream-app");
+            w.SetBackdrop((Ciel.Conversation.CielStreamWindow.Backdrop)_streamBefore.backdrop);
+            w.SetOpen(_streamBefore.open);
+            c.SetYouTube(_streamBefore.url, _streamBefore.yt);
+            FinishUiShots();
+        }
+
         // "route"：声のつなぎ方（設定のそのほか）を、合成の機器の一覧で撮る。
         // route-meeting.png（会議：見つけた仮想ケーブルと確かめ）、route-problem.png（会議の音が届き、声の確かめを流し、
         // 会話サーバーが残高切れで止まった）、route-everyday.png（ふだん）。表示の文を route.txt に書く
@@ -732,7 +810,7 @@ namespace Ciel.EditorTools
                 c.SelectRoute(Ciel.Conversation.CielConversation.Route.Meeting);
                 type.GetField("_recording", flags).SetValue(c, true);   // マイクを入れている
                 ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
-                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 3 });
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 4 });   // そのほか
                 Next(3);
                 return;
             }
