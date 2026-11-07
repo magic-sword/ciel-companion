@@ -17,6 +17,10 @@
 // 新しい調べものが届いても 2/4 のまま）、research-pending.png（調べものの札から、調べている最中の 4/4）。research.txt にページを書く。
 // summary-done.png（終えたあと：送った結果と、種類を選ぶボタン）。パネルの部品の数を summary.txt に書く。
 // "route" を含めると、合成の機器の一覧で声のつなぎ方（設定のそのほか）を撮る：route-meeting.png・route-problem.png・route-everyday.png（RouteShots）。
+// "appenv" を含めると、会話サーバーの知らせ（env.list・env.state）とアプリの道具の呼び出し（app.call）を流し込んで撮る（AppShots）：
+// app-card.png（app_show_card のカード）、app-tilt.png（app_gesture の首をかしげる途中）、app-settings-game.png（設定のそのほかの、
+// 会話サーバーの名前で出したゲームのスイッチ）。アプリの道具の結果とスイッチの文字を app.txt に書く。
+// "activity" を含めると、いまのシエル（activity.state）を流し込み、「いま」の札（activity-chip.png）とパネル（activity-panel.png）を撮る（ActivityShots）。
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -60,7 +64,7 @@ namespace Ciel.EditorTools
                 var request = File.ReadAllText(RequestPath);
                 if (request.Contains("ui") || request.Contains("resize") || request.Contains("touch") || request.Contains("cheek")
                     || request.Contains("people") || request.Contains("summary") || request.Contains("status")
-                    || request.Contains("research") || request.Contains("route") || request.Contains("stream"))
+                    || request.Contains("research") || request.Contains("route") || request.Contains("stream") || request.Contains("appenv") || request.Contains("activity"))
                     SessionState.SetInt(SizeKey, SetGameViewSize(540, 1170));
                 EditorApplication.isPlaying = true;
                 return;
@@ -102,6 +106,16 @@ namespace Ciel.EditorTools
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("stream"))
             {
                 StreamShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("activity"))
+            {
+                ActivityShots(step);
+                return;
+            }
+            if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("appenv"))
+            {
+                AppShots(step);
                 return;
             }
             if (step >= 2 && step < 9 && EditorApplication.isPlaying && File.ReadAllText(RequestPath).Contains("route"))
@@ -835,6 +849,120 @@ namespace Ciel.EditorTools
             }
             if (step == 4) c.SelectRoute(Ciel.Conversation.CielConversation.Route.Everyday);
             if (step == 5) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
+        // 会話サーバーの知らせとアプリの道具の呼び出しを、受け取ったことにする（会話サーバーにはつながない）
+        static void AppShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var type = typeof(Ciel.Conversation.CielConversation);
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var log = Path.Combine(OutDir, "app.txt");
+            void Event(string json)
+            {
+                var m = type.GetMethod("OnDataReceived", flags);
+                var kind = System.Enum.ToObject(m.GetParameters()[2].ParameterType, 0);
+                m.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null, kind, "ciel.event" });
+            }
+            void Call(int id, string tool, string args)
+            {
+                type.GetMethod("OnAppData", flags).Invoke(c, new object[] {
+                    System.Text.Encoding.UTF8.GetBytes($"{{\"v\":1,\"type\":\"app.call\",\"id\":{id},\"tool\":\"{tool}\",\"args\":{args}}}") });
+            }
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                Event("{\"v\":1,\"type\":\"env.list\",\"games\":[{\"game\":\"minecraft\",\"label\":\"マイクラ\"}]}");
+                type.GetProperty("GameWanted").GetSetMethod(true).Invoke(c, new object[] { true });   // 保存はしない（PlayerPrefs を変えない）
+                Event("{\"v\":1,\"type\":\"env.state\",\"game\":\"minecraft\",\"label\":\"マイクラ\",\"linked\":true,\"playing\":true,\"reason\":\"\"}");
+                Call(1, "app_show_card", "{\"title\":\"石のツルハシの材料\",\"body\":\"丸石 3 個と棒 2 本。作業台で作る。丸石は木のツルハシで石を掘ると取れる。\"}");
+                Call(2, "app_gesture", "{\"gesture\":\"wave\"}");   // 知らない動きは動かさない
+                File.AppendAllText(log, $"カード：{c.Card?.Title}／{c.Card?.Body}\n");
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < (step == 4 ? 0.8 : 1.0)) return;
+                var name = new[] { "app-card", "app-tilt", "app-settings-game" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                if (step == 5)
+                {
+                    foreach (var t in ui.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+                        if (t.text.Contains("一緒に遊ぶ") || t.text.Contains("いまは：● シエル") || t.text == "マイクラ")
+                            File.AppendAllText(log, $"設定：{t.text}\n");
+                }
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.3) return;
+            _captured = false;
+            if (step == 3)
+            {
+                c.CloseCard();
+                Call(3, "app_gesture", "{\"gesture\":\"tilt\"}");
+            }
+            if (step == 4)
+            {
+                ui.GetType().GetMethod("OpenSheet", flags).Invoke(ui, new object[] { true });
+                ui.GetType().GetMethod("ShowPage", flags).Invoke(ui, new object[] { 4 });   // そのほか
+            }
+            if (step == 5) { FinishUiShots(); return; }
+            Next(step + 1);
+        }
+
+        // いまのシエル（activity.state）を流し込み、「いま」の札とパネルを撮る（会話サーバーにはつながない）
+        static void ActivityShots(int step)
+        {
+            var now = EditorApplication.timeSinceStartup;
+            var ui = Object.FindAnyObjectByType<Ciel.Conversation.CielConversationUI>();
+            var c = Object.FindAnyObjectByType<Ciel.Conversation.CielConversation>();
+            var type = typeof(Ciel.Conversation.CielConversation);
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var log = Path.Combine(OutDir, "activity.txt");
+            void Event(string json)
+            {
+                var m = type.GetMethod("OnDataReceived", flags);
+                var kind = System.Enum.ToObject(m.GetParameters()[2].ParameterType, 0);
+                m.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null, kind, "ciel.event" });
+            }
+            if (step == 2)
+            {
+                if (now - _t0 < 1.5 || ui == null || c == null) return;
+                File.WriteAllText(log, "");
+                type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
+                Event("{\"v\":1,\"type\":\"env.list\",\"games\":[{\"game\":\"minecraft\",\"label\":\"マイクラ\"}]}");
+                Event("{\"v\":1,\"type\":\"env.state\",\"game\":\"minecraft\",\"label\":\"マイクラ\",\"linked\":true,\"playing\":true,\"reason\":\"\"}");
+                Event("{\"v\":1,\"type\":\"activity.state\",\"mind\":\"listening\",\"who\":\"\",\"mind_for\":2.0,"
+                    + "\"calls\":[{\"label\":\"集める\",\"for_s\":4.0}],\"tasks\":[{\"title\":\"oak_log を 3 個集める\",\"for_s\":12.0}],"
+                    + "\"doing\":\"oak_log を 3 個集める\",\"goal_step\":\"\",\"log\":["
+                    + "{\"id\":3,\"ago\":6.0,\"text\":\"心へ：作るが始めなかったのに言葉だけで止まったので、次の手をうながした\",\"kind\":\"wait\"},"
+                    + "{\"id\":2,\"ago\":9.0,\"text\":\"作る：始めなかった（材料が足りない（足りない物：cobblestone×3））\",\"kind\":\"error\"},"
+                    + "{\"id\":1,\"ago\":30.0,\"text\":\"体：oak_planks を 2 個作る（できた）\",\"kind\":\"ok\"}]}");
+                Next(3);
+                return;
+            }
+            if (!_captured)
+            {
+                if (now - _mark < 1.0) return;
+                var name = new[] { "activity-chip", "activity-panel" }[step - 3];
+                ScreenCapture.CaptureScreenshot(Path.Combine(OutDir, name + ".png"));
+                foreach (var t in ui.GetComponentsInChildren<UnityEngine.UI.Text>(false))
+                    if (t.text.StartsWith("いま：")) File.AppendAllText(log, $"{name} 札：{t.text}\n");
+                _captured = true;
+                _mark = now;
+                return;
+            }
+            if (now - _mark < 0.3) return;
+            _captured = false;
+            if (step == 3) ui.transform.Find("ConversationCanvas/SafeArea/Tasks/Activity").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            if (step == 4) { FinishUiShots(); return; }
             Next(step + 1);
         }
 

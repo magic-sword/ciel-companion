@@ -6,6 +6,7 @@ import { Vec3 } from 'vec3';
 
 import { guarded } from './guard.js';
 import { planCraft } from './craft-plan.js';
+import { planGoal } from './goal-plan.js';
 import { blocksFor } from './names.js';
 import { knows, rememberAround } from './sight.js';
 import { escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
@@ -387,6 +388,10 @@ const SKILL_RUN = {
     const auto = args.how === 'auto' || !args.how;
     const underground = blocks.some((b) => b.harvestTools);
     const how = auto ? (underground ? 'dig' : 'walk') : args.how;
+    if (how === 'dig') {
+      await ensureHarvestTool(bot, blocks, token, guard);
+      if (token.cancelled) return;
+    }
     const start = bot.entity.position.clone();
     const seen = () => {
       const p = bot.findBlocks({ matching: ids, maxDistance: FIND_NEAR, count: FIND_COUNT }).find((q) => knows(bot, q));
@@ -457,6 +462,8 @@ const SKILL_RUN = {
   async collect(bot, args, token, { guard }) {
     const blocks = blocksFor(bot.registry, args.block);
     if (!blocks.length) throw new Failed('unknown_block');
+    await ensureHarvestTool(bot, blocks, token, guard);
+    if (token.cancelled) return;
     const ids = blocks.map((b) => b.id);
     const names = new Set(blocks.map((b) => b.name));
     // 数えるのは、そのブロックから取れる物だけ（石なら丸石）。道を作るときに掘れた土などは数えない
@@ -476,8 +483,10 @@ const SKILL_RUN = {
       const target = bot.blockAt(pos);
       if (target) {
         try {
-          await guarded(guard, token, () => {
+          await guarded(guard, token, async () => {
             bot.collectBlock.movements = playerMovements(bot);   // 守る係が歩き方を変えたあとでも、掘れるように戻す
+            await ensureHarvestTool(bot, [target], token, guard);   // 途中で道具が壊れた場合も用意し直す
+            if (token.cancelled) return;
             return watched(bot, () => bot.collectBlock.collect(target));
           });
           rememberAround(bot, pos, (n) => names.has(n));   // 木の幹の上のほうも、続けて集められる
@@ -652,7 +661,7 @@ async function digSomewhere(bot, max, token, guard, seen) {
 }
 
 // dir へ、階段状に掘り下げながら探す。1 段ごとに：前の足の高さ・頭の高さ・前の 1 段下を掘り、そこへ降りる。
-// 自然のブロックだけ掘る。水・溶岩に当たりそうなら止める（danger）。素手で掘れない（落ちない）ブロックに当たったら止める（needs_tool）
+// 自然のブロックだけ掘る。水・溶岩に当たりそうなら止める（danger）。必要な道具を用意し、装備してから掘る。
 async function digToFind(bot, max, token, guard, seen, start, dir) {
   let dug = 0;
   for (let i = 0; i < max && !token.cancelled; i++) {
@@ -679,9 +688,8 @@ async function digToFind(bot, max, token, guard, seen, start, dir) {
       if (!NATURAL.test(b.name) || !bot.canDigBlock(b)) {
         throw new Failed('cannot_dig', { how: 'dig', dug, blocked_by: b.name });
       }
-      if (!harvestable(bot, b) && b.harvestTools) {
-        throw new Failed('needs_tool', { how: 'dig', dug, tool: weakestTool(bot, [b]) });
-      }
+      await equipForDig(bot, b, token, guard);
+      if (token.cancelled) return;
       await bot.dig(b, true);
       dug += 1;
     }
@@ -722,7 +730,8 @@ async function descend(bot, depth, token, guard) {
     if (under && DANGER.test(under.name)) {
       throw new Failed('danger', { descended: Math.round(startY - bot.entity.position.y), dug, below: under.name });
     }
-    if (bot.tool?.equipForBlock) await bot.tool.equipForBlock(below, {}).catch(() => {});
+    await equipForDig(bot, below, token, guard);
+    if (token.cancelled) break;
     await bot.dig(below, true);
     dug += 1;
     await bot.waitForTicks(4);
@@ -735,12 +744,13 @@ const SKILL_PREPARE = {
   find(bot, args) {
     return blocksFor(bot.registry, args.block).length ? null : { reason: 'unknown_block' };
   },
-  // 始める前に分かること（取る道具が無い・見て知っている所に無い）は、ここで断る。始めたと返したあとですぐ失敗すると、
+  // 見て知っている所に無い場合は、ここで断る。道具不足は技の中で作成する。始めたと返したあとですぐ失敗すると、
   // 心は「今まさに作っている」と言い違えた（2026-11-07）
   collect(bot, args) {
     const blocks = blocksFor(bot.registry, args.block);
     if (!blocks.length) return { reason: 'unknown_block' };
-    if (!blocks.some((b) => harvestable(bot, b))) return { reason: 'needs_tool', note: { tool: weakestTool(bot, blocks) } };
+    // 道具が足りなければ、技の中で材料を集めて作ってから続ける。
+    if (!blocks.some((b) => harvestable(bot, b))) return null;
     const ids = blocks.map((b) => b.id);
     const seen = bot.findBlocks({ matching: ids, maxDistance: SEARCH_DISTANCE, count: FIND_COUNT }).some((p) => knows(bot, p));
     return seen ? null : { reason: 'not_found', note: { gained: {}, wanted: args.count } };
@@ -756,6 +766,58 @@ const SKILL_PREPARE = {
     return null;
   },
 };
+
+// 探索・採集で必要な道具を、既存の作成計画で用意する。同じ技・停止合図の中で実行し、
+// 別の Runner を始めて元の依頼を取り消さない。見つからない材料や未対応の材料では失敗を返す。
+async function ensureHarvestTool(bot, blocks, token, guard) {
+  if (token.cancelled || blocks.some((b) => harvestable(bot, b))) return;
+  const tool = weakestTool(bot, blocks);
+  if (!tool) throw new Failed('needs_tool');
+  const hasTable = (counts(bot).crafting_table ?? 0) > 0
+    || bot.findBlocks({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: TABLE_SEARCH, count: 8 }).some((p) => knows(bot, p));
+  const plan = planGoal(bot.registry, (id) => bot.recipesAll(id, null, true), tool, 1, counts(bot), hasTable);
+  if (plan.error) throw new Failed('needs_tool', { tool });
+  for (const step of plan.steps) {
+    if (token.cancelled) return;
+    if (step.kind === 'craft') {
+      await SKILL_RUN.craft(bot, { item: step.item, count: step.count }, token, { guard });
+    } else if (step.kind === 'gather') {
+      const wanted = (counts(bot)[step.item] ?? 0) + step.count;
+      // 一度の採集で足りない場合も、残りだけを探して集める。無限には探さない。
+      for (let attempt = 0; attempt < TRIES_PER_ITEM && !token.cancelled; attempt++) {
+        const remaining = wanted - (counts(bot)[step.item] ?? 0);
+        if (remaining <= 0) break;
+        try {
+          await SKILL_RUN.collect(bot, { block: step.item, count: Math.min(64, remaining) }, token, { guard });
+        } catch (err) {
+          if (!(err instanceof Failed) || err.message !== 'not_found') throw err;
+        }
+        if (token.cancelled) return;
+        if ((counts(bot)[step.item] ?? 0) < wanted && attempt < TRIES_PER_ITEM - 1) {
+          await SKILL_RUN.find(bot, { block: step.item, how: 'auto' }, token, { guard });
+        }
+      }
+      if (token.cancelled) return;
+      const missing = wanted - (counts(bot)[step.item] ?? 0);
+      if (missing > 0) throw new Failed('missing_materials', { tool, needs: { [step.item]: missing } });
+    } else {
+      throw new Failed('missing_materials', { tool, needs: { [step.item]: step.count } });
+    }
+  }
+  if (!token.cancelled && !blocks.some((b) => harvestable(bot, b))) throw new Failed('needs_tool', { tool });
+}
+
+async function equipForDig(bot, block, token, guard) {
+  await ensureHarvestTool(bot, [block], token, guard);
+  if (token.cancelled) return;
+  if (bot.tool?.equipForBlock) await bot.tool.equipForBlock(block, {});
+  // 最速の道具がドロップ条件を満たさない場合も、採掘可能な道具を必ず手に持つ。
+  if (block.harvestTools && !block.harvestTools[bot.heldItem?.type]) {
+    const item = bot.inventory.items().find((i) => block.harvestTools[i.type]);
+    if (!item) throw new Failed('needs_tool', { tool: weakestTool(bot, [block]) });
+    await bot.equip(item, 'hand');
+  }
+}
 
 // 素手か、持っている道具で、落ちる物が取れるか
 export function harvestable(bot, block) {

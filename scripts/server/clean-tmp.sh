@@ -22,7 +22,8 @@ DIR=''
 if [ -n "$LOCAL" ]; then
   DIR="$(cd "$LOCAL" 2>/dev/null && pwd)" || DIR=''
   case "$DIR" in
-    */Temp/claude/*/scratchpad) ;;
+    # Git Bash では Windows の一時フォルダ（…/AppData/Local/Temp）が /tmp に見えるので、その形も同じ場所として認める
+    */Temp/claude/*/scratchpad|/tmp/claude/*/scratchpad) ;;
     *) echo "スクラッチパッドではないので消さない：$LOCAL" >&2; exit 2 ;;
   esac
 fi

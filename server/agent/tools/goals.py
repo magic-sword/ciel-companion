@@ -16,7 +16,7 @@ def _result(r: dict) -> str:
 
 @function_tool
 async def start_goal(context: RunContext, title: str, make_item: str | None = None, count: int = 1, why: str = '',
-                     by_myself: bool = False, first: bool = False, game: str = 'minecraft') -> str:
+                     by_myself: bool = False, first: bool = False, game: str = '') -> str:
     """いくつもの段がある目的を始める（目的の係が、計画して 1 つずつ進め、できたかを確かめる）。
     title は見せる言葉（日本語。例「石のつるはしを作る」）。物を作る目的なら make_item に英語の ID（stone_pickaxe など）と count。
     why は目的のわけ（あれば）。by_myself は、頼まれたのではなく自分で決めた目的なら true。

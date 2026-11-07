@@ -1,5 +1,7 @@
 # ゲームの知識の窓口（設計）
 
+> **2026-11-07 から：** 会話サーバーとのつなぎ方を、MCP の「ゲームの環境」に変えた（[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md)）。この文書の `minecraft.py`・`tools/minecraft.py`・`config/prompts/minecraft.md`・WebSocket の決まりは、そのときまでの形。今は、体の MCP の入口（`server/minecraft/src/ciel/`）がシエル向けの言葉・道具・遊び方の指示を持ち、会話サーバーは `game_env.py` でつなぐ。
+
 状態：試作中（2026-11-07）。facts と search の窓口を作り、開発用の会話サーバーにつないだ（6 章の 1・2）。前提は [マインクラフトで遊ぶ設計](minecraft-design-ja.md)（体）と [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)（心）。
 
 ## 1. 何をするか

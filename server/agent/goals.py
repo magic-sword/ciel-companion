@@ -5,7 +5,8 @@
   計画し直し）→ それでもだめなら心に相談 → 同じ段で何度もだめなら止めて持ち主に聞く。
 - 目的は木にできる（6 章）。段が失敗して決まった直し方が無いとき、心が小さな目標（add_subgoal）を作る。小さな目標が
   できたら、親の失敗した段からやり直す。深さは決め打ちしない。ループは「同じ目標が先祖にいる」「進んでいない」「予算」で止める。
-- ゲームを知らない。ゲームごとの係（adapter）が、段の中身・実行・確かめ方・見せる言葉を持つ（マイクラは minecraft.py の Goals）。
+- ゲームを知らない。ゲームごとの係（adapter）が、段の中身・実行・確かめ方・見せる言葉を持つ（ゲームの MCP の道具を使う game_env.py の GoalsAdapter。
+  段の中身はゲームの側が持つ。マイクラは server/minecraft の src/ciel/goals.js）。
 - 「できた」は確かめた結果で決める。心の言葉では決めない（「作り始めました」と言ったあと体が断っても、目的の段は正しい）。
 - 心へは、会話の後ろにいつも短く「[今の目的]」を渡す。口（mouth.py）の知らせは区切りだけ（始めた・直した・相談・できた）。
 - 今の目的と段は、変わるたびにアプリと配信の画面へ goal.state で送る（topic ciel.goal）。
@@ -115,6 +116,8 @@ class GoalRunner:
     # ---- 心の道具から ----
 
     async def start(self, game: str, title: str, spec: dict, *, why: str = '', by: str = 'owner', first: bool = False) -> dict:
+        if not game:   # ゲームを言わなければ、つないでいるゲーム（今は 1 つだけ）
+            game = next(iter(self.adapters), '')
         adapter = self.adapters.get(game)
         if adapter is None or not adapter.available():
             return {'status': 'unavailable'}
@@ -229,6 +232,15 @@ class GoalRunner:
     def status(self) -> dict:
         return self.state()
 
+    def body_step(self) -> str | None:
+        """係が体で進めている段の名前（体を使っていなければ None）。心に任せた段（mind）は、心が体の道具を使うので含めない。
+        係が原木を集めている途中で、心が板を作る道具を呼び、集める技が「ほかの頼み」に替わって目的が黙って止まった（2026-11-07）"""
+        g = self.active
+        if g is None or g.status != 'running':
+            return None
+        step = next((s for s in g.steps if s.status == 'running'), None)
+        return step.label if step is not None and step.kind != 'mind' else None
+
     def pause_for(self, reason: str) -> None:
         """持ち主が「止まって」と言った・体がほかの技を始めた（今の段をやめる。目的は止めて待つ）"""
         g = self.active
@@ -334,7 +346,11 @@ class GoalRunner:
                     step.status = 'todo'
                     g.status = 'paused'
                     g.attention = adapter.why(reason)
+                    debug_log.record('goal', what='paused', id=g.id, step=step.label, reason=reason)
                     self._publish()
+                    if reason == 'replaced':   # 黙って止まると、だれも続けない（2026-11-07）
+                        self._tell(f'[目的「{g.title}」：「{step.label}」の途中で、体がほかの頼みに替わったので止まって待っている。'
+                                   'その頼みが済んだら resume_goal で続ける。やめるなら stop_goal]')
                     return
                 step.fails += 1
                 if step.repairs < MAX_REPAIRS:

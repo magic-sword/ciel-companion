@@ -22,9 +22,9 @@ services:
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
       # （docs/conversation-improvements-2026-10-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=pipeline
-      # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけがつなぐ
-      - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
-      - CIEL_GAME_KNOWLEDGE=minecraft=http://127.0.0.1:8770/mcp   # ゲームの知識の窓口（docs/game-knowledge-design-ja.md）
+      # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口（server/minecraft の src/ciel/mcp.js）。
+      # 会話の始めにつなぎ、アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけが体を受け持つ。知識の道具も同じ入口から出る
+      - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
       # 覚えている人の記録（speaker_store.py）。開発用も同じ DB を使い、印（main・dev）で分ける（docs/shared-memory-ja.md）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=main
@@ -147,7 +147,8 @@ services:
       - ./minecraft/data:/data
     restart: unless-stopped
 
-  # シエルの体（server/minecraft。マイクラにプレイヤーとして入るボット）。会話サーバーは ws://127.0.0.1:8768 へつなぐ
+  # シエルの体（server/minecraft。マイクラにプレイヤーとして入るボット）。会話サーバーは MCP の http://127.0.0.1:8771/mcp へつなぐ。
+  # 以前の ws://127.0.0.1:8768 も、移り終えるまで残す（docs/game-environment-mcp-design-ja.md の 10 章）
   minecraft-body:
     profiles: [minecraft]
     build:
@@ -162,13 +163,18 @@ services:
       - MC_OWNER=${MC_OWNER:-}
       - BODY_HOST=127.0.0.1
       - BODY_PORT=8768
+      - CIEL_PORT=8771                  # MCP の入口（src/ciel/mcp.js）。BODY_HOST（このマシンの中）だけで開く
       - EYE_PORT=3007                   # 目（src/eye.js）の視点のページ。BODY_HOST（このマシンの中）だけで開く
+      - KNOWLEDGE_DATA=/app/knowledge-data   # 知識の道具（minecraft_search）が読む手元の Wiki
+    volumes:
+      - ./minecraft/knowledge/data:/app/knowledge-data
     depends_on:
       - minecraft
     restart: unless-stopped
 
   # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/game-knowledge-design-ja.md）。体と同じイメージで、別のコンテナ。
-  # 会話サーバーは CIEL_GAME_KNOWLEDGE で http://127.0.0.1:8770/mcp へつなぐ。このマシンの中だけで開く
+  # 会話サーバーは今は体の MCP の入口（:8771）から同じ道具を使うので、ここへはつながない。Wiki を取り出す（下の exec）ために残す。
+  # このマシンの中だけで開く
   minecraft-knowledge:
     profiles: [minecraft]
     build:

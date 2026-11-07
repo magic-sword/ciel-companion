@@ -120,6 +120,8 @@ namespace Ciel.Conversation
             BuildSummary(_safe);
             BuildSong(_safe);
             BuildGoal(_safe);   // シエルの今の目的（CielConversationUI.Goal.cs）。札の列（BuildTasks）のあと
+            BuildActivity(_safe);   // いまのシエルの札とパネル（CielConversationUI.Activity.cs）。目的の札のあと
+            BuildCard(_safe);   // シエルが画面に出すカード（CielConversationUI.Card.cs。アプリの道具 app_show_card）
         }
 
         // シエルに触れている点の表示（CielTouchVisual）。暗がりの上、ボタンや文字の下に描く
@@ -484,6 +486,7 @@ namespace Ciel.Conversation
             UpdateSummary();
             _minutesLabel.text = MoreLabel(c, t);
             UpdateSong();
+            UpdateCard(t);
 
             if (on)
             {

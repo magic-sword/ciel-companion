@@ -30,9 +30,8 @@ services:
       # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
-      # マイクラの体（server/minecraft。docs/minecraft-design-ja.md）。本番より先に、開発用だけでつなぐ
-      - CIEL_MINECRAFT_URL=ws://127.0.0.1:8768
-      - CIEL_GAME_KNOWLEDGE=minecraft=http://127.0.0.1:8770/mcp
+      # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
+      - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
       # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。裏で動く役目だけ送る。歌を聴くあいだは CPU の形に切り替える
       - CIEL_LOCAL_LLM_URL=http://127.0.0.1:8094/v1
       - CIEL_LOCAL_LLM_CONTROL=http://127.0.0.1:8095

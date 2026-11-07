@@ -9,7 +9,6 @@ import numpy as np
 
 import router
 from tools.goals import GOAL_TOOLS
-from tools.minecraft import BODY_TOOLS
 
 KEYS = ('渡', '欲し', 'ちょうだい', '作', '集め', 'えらい', 'こんばん', '見え', 'どこ')
 
@@ -53,13 +52,11 @@ def make(store=None, seeds=None):
 
 
 class SeedsTest(unittest.TestCase):
-    def test_every_tool_she_is_asked_for_has_triggers(self):
-        # 道具を足したら、きっかけも書く（スキルのトリガーと同じ。書き忘れると、その頼みは意味では心へ回らない）
-        data = json.loads((router.SEEDS_DIR / 'minecraft.json').read_text(encoding='utf-8'))
-        asked = set(BODY_TOOLS + GOAL_TOOLS) - set(data['internal'])
-        self.assertEqual(asked - set(data['tools']), set())
-        self.assertTrue(all(data['tools'][t] for t in data['tools']))
-        self.assertGreater(len(data['talker']), 10)
+    # 道具ごとのきっかけはゲームの側が持つ（server/minecraft の src/ciel/routes.json。書き忘れは test/ciel.test.js が確かめる）
+
+    def test_seeds_given_by_the_game_are_used(self):
+        r = router.Router('test', client=None, seeds=[('跳んで', 'test_jump'), ('えらいね', None)])
+        self.assertEqual(r._seeds, [('跳んで', 'test_jump'), ('えらいね', None)])
 
     def test_the_name_and_marks_are_dropped_before_comparing(self):
         self.assertEqual(router.norm('シエル、どこにいる？'), 'どこにいる')
@@ -104,11 +101,25 @@ class RouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await r.wants_mind('それちょうだい'))
 
 
+class FakeBody:
+    """ゲームの環境（game_env.GameEnv）のうち、心が見るところ。道具の役目はゲームの決まりから"""
+    ROLES = {'act': {'give_item', 'craft_item'}, 'look': {'look_around'}, 'know': set()}
+
+    def __init__(self):
+        self.linked, self.in_world, self.route_words = True, True, None
+
+    def playing(self):
+        return self.linked and self.in_world
+
+    def tool_ids(self, *roles):
+        return frozenset(n for r in roles for n in self.ROLES.get(r, ()))
+
+
 class AfterReplyTest(unittest.IsolatedAsyncioTestCase):
     def make_mind(self):
         import mind
         m = mind.Mind(None)
-        m.body = SimpleNamespace(linked=True, state={'connected': True})
+        m.body = FakeBody()
         m.router = SimpleNamespace(learn=Mock(side_effect=lambda *a: asyncio.sleep(0)))
         m.on_promise = Mock()
         return m
@@ -142,9 +153,33 @@ class AfterReplyTest(unittest.IsolatedAsyncioTestCase):
         m.after_reply(self.ctx('作り方の話をしてたんだ'), 'mind', 'そうなのですね', [], True)
         m.router.learn.assert_called_once_with('作り方の話をしてたんだ', None, 'no_tool')
 
+    async def test_words_only_after_a_refused_body_tool_get_one_nudge(self):
+        # 「丸石を集めてから作るのです」と言うだけで何も始めなかった件（2026-11-07）
+        from livekit.agents import llm
+        m = self.make_mind()
+        m.on_stalled = Mock()
+        refused = json.dumps({'status': 'error', 'reason': 'missing_materials', 'why': '材料が足りない',
+                              'next': 'start_goal で目的にする'}, ensure_ascii=False)
+
+        def ctx(call_id, output):
+            c = self.ctx('石のツルハシ作って')
+            c.items.append(llm.FunctionCall(call_id=call_id, name='craft_item', arguments='{}'))
+            c.items.append(llm.FunctionCallOutput(call_id=call_id, name='craft_item', output=output, is_error=False))
+            return c
+        m.after_reply(ctx('c1', refused), 'mind', '丸石を集めてから作るのです', [], True)
+        m.on_stalled.assert_called_once()
+        self.assertEqual(m.on_stalled.call_args[0][0], 'craft_item')
+        m.after_reply(ctx('c1', refused), 'mind', '丸石を集めてから作るのです', [], True)   # 同じ呼び出しは 1 度だけ
+        m.after_reply(ctx('c2', refused), 'mind', 'まだなのです', [], True)                # 続けては知らせない
+        self.assertEqual(m.on_stalled.call_count, 1)
+        m._nudged_at -= 60
+        m.after_reply(ctx('c3', refused), 'mind', '', ['collect_blocks'], True)   # 道具を呼んだなら知らせない
+        m.after_reply(ctx('c4', json.dumps({'status': 'started'})), 'mind', '始めたのです', [], True)   # 始めたなら知らせない
+        self.assertEqual(m.on_stalled.call_count, 1)
+
     async def test_not_playing_learns_nothing(self):
         m = self.make_mind()
-        m.body.state = {'connected': False}
+        m.body.in_world = False
         m.after_reply(self.ctx('それくれる？'), 'mind', '', ['give_item'], True)
         m.router.learn.assert_not_called()
 

@@ -7,7 +7,6 @@ from livekit.agents import llm
 import mind
 import tools
 from tools.goals import GOAL_TOOLS
-from tools.minecraft import BODY_TOOLS
 from conversation import Conversation
 
 
@@ -55,8 +54,8 @@ class MindTest(unittest.TestCase):
         self.mind.on_say('comment')
         ctx = ctx_with(None)
         self.assertEqual(self.mind.route(ctx), 'mind')
-        # マイクラの体の道具は、体とつながっていないので渡さない（mind.py の tools_for）
-        comment_tools = {t.id for t in tools.for_comments(tools.TOOLS)} - set(BODY_TOOLS) - set(GOAL_TOOLS)   # 目的の道具も同じ
+        # 目的の道具は、ゲームの体を受け持っていないので渡さない（mind.py の tools_for）
+        comment_tools = {t.id for t in tools.for_comments(tools.TOOLS)} - set(GOAL_TOOLS)
         self.assertEqual(self.ids(ctx), comment_tools)
         # 道具の結果を受けた続きも、コメントへの返事のまま
         ctx.items.append(llm.FunctionCall(call_id='c1', name='research_web', arguments='{}'))

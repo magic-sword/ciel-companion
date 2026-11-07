@@ -28,9 +28,7 @@ import clock
 import debug_log
 import models
 import tools as toolbox
-import game_knowledge
 from tools.goals import GOAL_TOOLS
-from tools.minecraft import BODY_TOOLS
 from jst import JST
 from summaries import live
 
@@ -51,19 +49,16 @@ REQUEST = re.compile(r'録|まとめ|調べ|検索|何時|時間を|名前|覚�
 # 議事録を始める・終える頼みの言葉。今回の発言（付箋になった分を除く）に無ければ、議事録を動かす道具を心に渡さない
 MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
 MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
-# マイクラの体を動かす・見る頼みの言葉（minecraft.py）。体とつながっているときだけ心に回す。「ついてきて」は短いので、
-# 小脳に行くと、道具を持たない小脳が「はーい」と言うだけになる（docs/minecraft-design-ja.md の 4.3）
-# 「きて」「まって」だけでは「できて」「決まって」も当たるので入れない
-# 「ついてくるの止められないかな？」が当たらず、小脳が「『止まって』と言ってくれたら」と返した（2026-11-05）
-GAME_ASK = re.compile(r'つい(て|と)(き|来|く|こ|い)|付いて|こっち|おいで|来て|止ま|止め|とまっ|待って|ストップ|やめて|'
-                      r'見え(る|て)|見て|何がある|なにがある|周り|まわり|大丈夫|体力|マイクラ|集め|取って|とって|掘って|掘る|ちょうだい|渡して|くれる|行って|降り|おり|'
-                      r'作って|つくって|作れる|クラフト|ツルハシ|つるはし')
-# 相手の発言で呼ぶゲームの道具（育つ例文の印）。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を終える）は除く
-GAME_CALLS = frozenset(BODY_TOOLS + GOAL_TOOLS) - {'add_subgoal', 'finish_step'}
-MOVING_CALLS = GAME_CALLS - {'look_around', 'look_at_view', 'goal_status'}
+# 目的の道具のうち、相手の発言で呼ぶもの（育つ例文の印）・体を動かすもの。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を
+# 終える）は除く。ゲームの道具は、ゲームの決まりの役目（act・look・know）で決める（game_env.py）。体を動かす頼みの言葉も
+# ゲームの決まり（route_words）にある。「ついてきて」は短いので、小脳に行くと、道具を持たない小脳が「はーい」と言うだけになる
+GOAL_ASKED = frozenset(GOAL_TOOLS) - {'add_subgoal', 'finish_step'}
+GOAL_MOVING = GOAL_ASKED - {'goal_status'}
+GOAL_ONE = frozenset(GOAL_TOOLS) - {'goal_status'}   # 1 つの返事で 1 つだけ通す目的の道具（見るだけの道具は、いくつでもよい）
 # 小脳が体の動きを約束した言い方（シエル自身の口ぐせなので、相手の言い方よりそろっている）。約束しても小脳は道具を持たないので、
 # 話し終えたら心が続きをする（「すぐに渡しますね」と言うだけで渡さなかった。2026-11-07）
 PROMISE = re.compile(r'(渡し|作り|作って|集め|集めて|取って|取り|掘り|掘って|探し|探して|持って|置き|置いて|拾い|拾って|降り|向かい|ついていき|ついて行き|そっちに行き|行き|あげ|止まり|待ち)(ます|ますね|ますよ|ましょう|きます|おきます|いきます|るのです|ますのです)')
+STALL_GAP = 30.0   # 言葉だけで止まったと心に知らせるのは、この秒数に 1 回まで
 FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
@@ -78,7 +73,7 @@ class Mind:
         self.minutes = minutes        # minutes.Minutes
         self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
-        self.body = body              # minecraft.Body（マイクラの体。つなぐときだけ）
+        self.body = body              # game_env.GameEnv（ゲームの体。つなぐ先があるときだけ）
         self.goals = None             # goals.GoalRunner（長い目的の係。agent.py が置く）
         self.eyes = eyes              # eyes.Eyes（見せてもらった画像）
         # シエル自身の姿の絵（data URL）。指示のすぐ後ろにいつも置き、自分の姿を絵としても知っているようにする。
@@ -106,6 +101,9 @@ class Mind:
         self.semantic_tool: str | None = None   # 意味で心へ回したときの、いちばん近いきっかけの道具
         self._promised: str | None = None # 小脳が体の動きを約束だけした発言（心が道具でやったら、その道具の例文にする）
         self.on_promise = None            # 呼ぶと、心に約束の続きをさせる（agent.py が置く。口の why 'game'）
+        self.on_stalled = None            # 呼ぶと、断られた体の道具の次の手を心にさせる（agent.py が置く。口の why 'game'）
+        self._nudged: set[str] = set()    # 言葉だけで止まったと心に知らせた道具の呼び出し（同じものは 1 度だけ）
+        self._nudged_at = -STALL_GAP      # 最後に知らせた時刻（知らせた返事でまた止まっても、続けて知らせない）
 
     @property
     def client(self):
@@ -153,7 +151,7 @@ class Mind:
         why = ('image' if self.eyes is not None and self.eyes.wants(rest)
                else 'notice' if self._waiting()
                else 'request' if REQUEST.search(rest)
-               else 'game' if self._body_linked() and GAME_ASK.search(rest)
+               else 'game' if self._game_ask(rest)
                else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
                else 'people' if not quiet and self._speakers_since_ciel() >= 2
                else 'named' if quiet and NAME.search(text)
@@ -167,8 +165,27 @@ class Mind:
         return 'mind'
 
     def playing(self) -> bool:
-        """体がつながっていて、マイクラの中にいる"""
-        return self._body_linked() and bool((getattr(self.body, 'state', None) or {}).get('connected'))
+        """体を受け持っていて、ゲームの中にいる"""
+        return self.body is not None and self.body.playing()
+
+    def _game_ask(self, text: str) -> bool:
+        words = getattr(self.body, 'route_words', None) if self._body_linked() else None
+        return bool(words is not None and words.search(text))
+
+    def _ids(self, *roles: str) -> frozenset:
+        return self.body.tool_ids(*roles) if self.body is not None else frozenset()
+
+    def game_calls(self) -> frozenset:
+        """相手の発言で呼ぶゲームの道具（育つ例文の印）"""
+        return self._ids('act', 'look', 'know') | GOAL_ASKED
+
+    def moving_calls(self) -> frozenset:
+        """体を動かす頼みの道具（意味で心へ回したのに使わなければ、回しすぎ）"""
+        return self._ids('act') | GOAL_MOVING
+
+    def one_call_tools(self) -> frozenset:
+        """1 つの返事で 1 つだけ通す道具（one_body_call）"""
+        return self._ids('act') | GOAL_ONE
 
     async def second_look(self, chat_ctx: llm.ChatContext) -> str:
         """1 段目で小脳に決まった発言を、遊んでいるあいだだけ、道具ごとのきっかけとの意味の近さで見直す（router.py）。
@@ -189,15 +206,26 @@ class Mind:
         """返事のあと：振り分けの例文を育て、小脳が体の動きを約束だけしたら心に続きをさせる"""
         if self.router is None or not self.playing() or not done:
             return
+        if who == 'mind' and not calls and self.on_stalled is not None and time.monotonic() - self._nudged_at >= STALL_GAP:
+            stalled = self._stalled(chat_ctx)
+            if stalled is not None:
+                # 体の道具が始めずに断られ（次の手つき）、心が道具を呼ばずに言葉だけで返した。「丸石を集めてから作るのです」と
+                # 言って何も始めず、「始めてる？」に「まだ始めていない」と答えた（2026-11-07）。指示文だけでは止まらないので、
+                # コードで 1 度だけ心に続きをさせる
+                name, result = stalled
+                self._nudged_at = time.monotonic()
+                debug_log.record('mind_route', why='stalled', tool=name, reason=result.get('reason'))
+                self.on_stalled(name, result)
         said = latest_user_text(chat_ctx)
-        game = [c for c in calls if c in GAME_CALLS or game_knowledge.game_of_name(c) is not None]
+        asked = self.game_calls()
+        game = [c for c in calls if c in asked]
         if who == 'mind' and game:
             if self._promised:   # 小脳が約束だけした発言を、心が道具でやった：取りこぼしの例文
                 self._learn(self._promised, game[0], 'promise')
                 self._promised = None
             elif said and self.is_owner():
                 self._learn(said, game[0], 'tool')
-        elif (who == 'mind' and self.last_why == 'semantic' and self.semantic_tool in MOVING_CALLS and said
+        elif (who == 'mind' and self.last_why == 'semantic' and self.semantic_tool in self.moving_calls() and said
               and self.is_owner() and '[silent]' not in text):
             # 体を動かす頼みに近いとして心へ回したのに、道具を使わなかった：回しすぎ。見る・進み具合・知識の頼みは、
             # 心が様子から道具なしで答えることもあるので、小脳の例文にしない
@@ -208,6 +236,25 @@ class Mind:
             debug_log.record('mind_route', why='promise', said=said[:60], text=text[:80])
             if self.on_promise is not None:
                 self.on_promise(said, text)
+
+    def _stalled(self, chat_ctx: llm.ChatContext) -> tuple[str, dict] | None:
+        """この返事の直前の道具の結果のうち、体を動かす道具が始めずに断られ、次の手（next）があるもの。まだ知らせていなければ"""
+        acts = self._ids('act')
+        for item in reversed(list(chat_ctx.items)):
+            if isinstance(item, llm.FunctionCall):
+                continue
+            if not isinstance(item, llm.FunctionCallOutput):
+                return None   # この返事の道具の結果は、ここまで
+            if item.name not in acts or item.call_id in self._nudged:
+                continue
+            try:
+                result = json.loads(item.output)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(result, dict) and result.get('status') == 'error' and result.get('next'):
+                self._nudged.add(item.call_id)
+                return item.name, result
+        return None
 
     def _learn(self, text: str, tool: str | None, source: str) -> None:
         task = asyncio.create_task(self.router.learn(self._strip(text), tool, source))
@@ -220,12 +267,10 @@ class Mind:
         text = _user_text(_tail(list(chat_ctx.items)))
         if text and not MINUTES_ASK.search(self._strip(text)):
             tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
-        # マイクラの体とつながっていなければ、体の道具は渡さない
+        # ゲームの体を受け持っていなければ、ゲームの道具（体・見る・知識）と目的の道具は渡さない
         if not self._body_linked():
-            tools = [t for t in tools if getattr(t, 'id', None) not in BODY_TOOLS + GOAL_TOOLS]
-        # ゲームの知識の窓口の道具（game_knowledge.py）は、そのゲームで遊んでいる間だけ
-        playing = {'minecraft': self._body_linked()}
-        tools = [t for t in tools if (g := game_knowledge.game_of(t)) is None or playing.get(g, False)]
+            hidden = set(self._ids('act', 'look', 'know')) | set(GOAL_TOOLS)
+            tools = [t for t in tools if getattr(t, 'id', None) not in hidden]
         # 配信のコメントへの返事では、コメントから使ってよい道具だけ（tools/ の FROM_COMMENTS）
         return toolbox.for_comments(tools) if self.from_comment else tools
 
@@ -426,14 +471,14 @@ def only_given(chunk, fns: list):
     return chunk.model_copy(update={'delta': delta.model_copy(update={'tool_calls': kept})}), dropped
 
 
-def one_body_call(chunk, taken: list):
+def one_body_call(chunk, taken: list, moving=frozenset()):
     """1 つの返事で、体を動かす道具（体の道具・目的の道具）は 1 つだけ通す。体の技は一度に 1 つなので、同時に呼ぶと
     取り合いになって両方失敗した（集めると作るを同時に呼んだ。2026-11-07）。taken は、この返事ですでに通した呼び出しの名前。
+    moving は 1 つだけ通す道具の名前（Mind.one_call_tools）。
     （通す chunk, 落とした道具の名前）を返し、全部落として何も残らなければ chunk は None"""
     delta = None if isinstance(chunk, str) else getattr(chunk, 'delta', None)
     if delta is None or not delta.tool_calls:
         return chunk, []
-    moving = set(BODY_TOOLS + GOAL_TOOLS) - {'look_around', 'look_at_view', 'goal_status'}   # 見るだけの道具は、いくつでもよい
     kept, dropped = [], []
     for c in delta.tool_calls:
         if c.name in moving and any(n in moving for n in taken):

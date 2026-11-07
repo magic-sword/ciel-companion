@@ -11,7 +11,6 @@
 from dataclasses import dataclass
 
 import errors
-import game_knowledge
 from speakers import SpeakerBook
 
 
@@ -27,7 +26,6 @@ class State:
     song: object | None = None   # singing.SongListener（歌を聴く係）
     preamble: object | None = None   # emotion.PreambleCut（道具を呼んだ返事の前置きを止める）
     mouth: object | None = None   # mouth.Mouth（シエルを話させる入り口）
-    body: object | None = None   # minecraft.Body（マイクラの体。つなぐときだけ）
     goals: object | None = None   # goals.GoalRunner（長い目的の係。ゲームの体があるときだけ）
 
 
@@ -38,16 +36,18 @@ def cut_preamble(context) -> None:
         cut.request(getattr(context, 'speech_handle', None))
 
 
-from . import memory, minutes, people, conversation, research, thoughts, clock, singing, minecraft, goals  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation, research, thoughts, clock, singing, goals  # noqa: E402  State の後に読む
 
-MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, minecraft, goals)
+MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, goals)
 TOOLS = [t for m in MODULES for t in m.TOOLS]
 # 道具の中のエラーは、エラーの係が受け止める（記録・アプリへの知らせ・心には tool_failed。errors.py）
 errors.ERRORS.wrap_tools(TOOLS)
 # 配信のコメント（だれでも書ける）からの返事で使ってよいか。道具を足したら、モジュールの FROM_COMMENTS に必ず書く。
 # 書いていない道具があれば、会話サーバーは起動しない（決めないまま、コメントから動く道具が増えないように）。
-# ここに無い道具は、コメントからは使わない。ただしゲームの知識の窓口（MCP。game_knowledge.py）の道具は、読むだけなので使ってよい
+# ここに無い道具は、コメントからは使わない。ゲームの道具（game_env.py）とアプリの道具（app_env.py）は、それぞれの _meta の
+# ciel/from_comments で足す（ENV_FROM_COMMENTS）
 FROM_COMMENTS = {t.id: ok for m in MODULES for t, ok in m.FROM_COMMENTS.items()}
+ENV_FROM_COMMENTS: dict[str, bool] = {}
 _undecided = [t.id for t in TOOLS if t.id not in FROM_COMMENTS]
 if _undecided:
     raise RuntimeError(f'コメントから使ってよいかが決まっていない道具：{_undecided}（モジュールの FROM_COMMENTS に書く）')
@@ -55,4 +55,5 @@ if _undecided:
 
 def for_comments(tools: list) -> list:
     """コメントからの返事に渡してよい道具だけにする"""
-    return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False) or game_knowledge.game_of(t) is not None]
+    return [t for t in tools if FROM_COMMENTS.get(getattr(t, 'id', None), False)
+            or ENV_FROM_COMMENTS.get(getattr(t, 'id', None), False)]

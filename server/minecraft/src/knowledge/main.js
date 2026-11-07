@@ -7,7 +7,8 @@
 // - MCP の streamable HTTP を、会話を覚えない形（stateless）で開く。呼ばれるたびに窓口を作って答える。
 import { existsSync } from 'node:fs';
 import http from 'node:http';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
@@ -39,6 +40,13 @@ function openWiki() {
 
 export function makeServer() {
   const server = new McpServer({ name: 'minecraft-knowledge', version: '1.0.0' });
+  registerKnowledge(server);
+  return server;
+}
+
+// 知識の道具を窓口に足す。体の MCP（src/ciel/mcp.js）も同じ道具を出す。triggers は振り分けの例文（src/ciel/routes.json）
+export function registerKnowledge(server, triggers = {}) {
+  const meta = (name) => ({ 'ciel/role': 'know', 'ciel/from_comments': true, 'ciel/triggers': triggers[name] ?? [] });
   server.registerTool('minecraft_facts', {
     title: 'マイクラの正確なデータ',
     description: `Minecraft Java ${VERSION} の正確なデータ（シエルの体と同じ版）を引く。`
@@ -50,6 +58,8 @@ export function makeServer() {
       kind: z.enum(KINDS).describe('調べる種類'),
       name: z.string().min(1).max(64).describe('英語の ID（例 stone_pickaxe）'),
     },
+    annotations: { readOnlyHint: true },
+    _meta: meta('minecraft_facts'),
   }, async ({ kind, name }) => {
     const r = facts.lookup(kind, name);
     log('facts', kind, name, r.found ? 'found' : 'not_found');
@@ -62,13 +72,14 @@ export function makeServer() {
       + 'question は英語の短い言葉（例 stone generation height、where to find sand、how to tame a wolf）。'
       + '正確な数・作り方・要る道具は minecraft_facts のほうが確か。',
     inputSchema: { question: z.string().min(2).max(200).describe('英語の短い言葉') },
+    annotations: { readOnlyHint: true },
+    _meta: meta('minecraft_search'),
   }, async ({ question }) => {
     const w = openWiki();
     const r = w ? { status: 'ok', results: w.search(question) } : { status: 'not_ready' };
     log('search', question, r.status, r.results?.length ?? 0);
     return { content: [{ type: 'text', text: JSON.stringify(r) }] };
   });
-  return server;
 }
 
 async function readBody(req) {
@@ -114,7 +125,9 @@ const httpServer = http.createServer(async (req, res) => {
   }
 });
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) {
+// 直接起動したときだけ待ち受ける。体（src/main.js）が道具だけを読み込むときは開かない（ファイルの名前だけで比べると、
+// 体の main.js と取り違えて :8770 を開こうとし、知識の窓口のコンテナとぶつかって体が落ちた。2026-11-07）
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   httpServer.listen(PORT, HOST, () => log(`マイクラの知識の窓口 http://${HOST}:${PORT}/mcp（版 ${VERSION}）`));
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { httpServer.close(); process.exit(0); });
 }

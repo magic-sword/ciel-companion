@@ -47,11 +47,12 @@ import interruptions
 import listener
 import irodori_tts
 import errors
-import game_knowledge
+import activity as activity_
+import app_env
+import game_env
 import goals
 import mind
 import router
-import minecraft
 import minutes
 import mode
 import models
@@ -184,14 +185,15 @@ def make_pipeline(names: list[str]) -> dict:
 
 
 class Ciel(Agent):
-    def __init__(self, grown: str = '') -> None:
+    def __init__(self, grown: str = '', game=None) -> None:
         persona = load_persona()
         self.persona = persona
         self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
+        self.game = game     # game_env.GameEnv（会話の始めにつないだゲームの環境。無ければ None）
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
-        # ゲームの知識の窓口（game_knowledge.py。MCP）の道具は、LiveKit が窓口から受け取って足す。渡すかは心が決める（mind.py）
-        super().__init__(instructions=self.instructions_for('normal', 'solo'), tools=tools.TOOLS,
-                         mcp_servers=game_knowledge.servers() or None)
+        # ゲームの道具（体・見る・知識）は、ゲームの環境が出したものを足す。渡すかは心が決める（mind.py の tools_for）
+        super().__init__(instructions=self.instructions_for('normal', 'solo'),
+                         tools=tools.TOOLS + (list(game.tools) if game is not None else []))
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
@@ -200,6 +202,7 @@ class Ciel(Agent):
         self.ear: listener.Listener | None = None   # pipeline の聞く係（entrypoint がつなぐ）
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
+        self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         """pipeline：相手が話し終えた。長く話したなら相づちを流す。発言（LiveKit の会話）は書き換えない
@@ -222,6 +225,8 @@ class Ciel(Agent):
             who = await self.mind.second_look(chat_ctx)   # 遊んでいるあいだは、意味の近さでもう一度見る（router.py）
         if who == 'skip':
             return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
+        if self.activity is not None:
+            self.activity.thinking(who)   # いま考えているのは心か小脳か（アプリの「いま」）
         if who == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
             ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
@@ -244,7 +249,7 @@ class Ciel(Agent):
                     blocked += dropped
                 if chunk is None:
                     continue
-                chunk, dropped = mind.one_body_call(chunk, taken)
+                chunk, dropped = mind.one_body_call(chunk, taken, self.mind.one_call_tools())
                 if dropped:
                     logger.info('心：体を動かす道具は 1 つだけ通した（止めた：%s）', dropped)
                     blocked += dropped
@@ -256,6 +261,9 @@ class Ciel(Agent):
                 elif delta is not None:
                     text.append(delta.content or '')
                     calls += [c.name for c in delta.tool_calls or []]
+                    if self.activity is not None:   # 結果が返るまで「呼んでいる」（function_tools_executed で消える）
+                        for c in delta.tool_calls or []:
+                            self.activity.call_started(c.call_id, c.name)
                 yield chunk
             done = True
         finally:
@@ -273,9 +281,16 @@ class Ciel(Agent):
         parts = [p.instructions + p.emotion_instructions, p.self_instructions, self.grown, p.touch_instructions,
                  p.talker_instructions,
                  p.tasks_instructions, self._presence_text(presence), self._talk_text(talk),
-                 p.minecraft_instructions if PIPELINE and minecraft.URL else '',
+                 self._game_text(),
                  p.image_voice_instructions if PIPELINE else '']
         return '\n\n'.join(part.strip('\n') for part in parts if part)
+
+    def _game_text(self) -> str:
+        """ゲームで遊ぶときの指示：どのゲームでも同じシエルの振る舞い（game.md）と、ゲームの遊び方（MCP の prompt play）"""
+        game = getattr(self, 'game', None)
+        if not PIPELINE or game is None or not game.profile:
+            return ''
+        return '\n\n'.join(t.strip('\n') for t in (self.persona.game_instructions, game.instructions) if t)
 
     def _presence_text(self, presence: str) -> str:
         """その場にいる人（presence_*.md、覚えていることの出し方）"""
@@ -304,8 +319,9 @@ class Ciel(Agent):
                   p.inner_thoughts_voice_instructions]
         if PIPELINE:
             parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
-            if minecraft.URL:
-                parts.append(p.minecraft_instructions)   # マイクラで一緒に遊ぶ（minecraft.py。体へつなぐときだけ）
+            parts.append(p.app_instructions)     # アプリの道具（app_env.py。アプリが出せる道具だけが渡る）
+            if self._game_text():
+                parts.append(self._game_text())   # ゲームで一緒に遊ぶ（game_env.py。ゲームの環境へつなげたときだけ）
             parts.append(p.image_voice_instructions)     # 見せてもらった画像（eyes.py）
         if VOICE == 'irodori':
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
@@ -372,7 +388,15 @@ async def entrypoint(ctx: JobContext) -> None:
                            # （2026-10-22、bench_latency.py。印は emotion.py が読み取って外す）
                            tts_text_transforms=['filter_emoji'],
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
-    agent = Ciel(growth.context(grown))
+    # ゲームの環境（game_env.py。MCP）。会話の始めにつなぎ、道具と遊び方の指示を読む（指示は会話の中で変えない）。
+    # 体を受け持つのは、アプリの設定でオンにしてから。つなげなければ、ゲームの道具は無しで続ける
+    game = game_env.from_env() if PIPELINE else None
+    if game is not None and not await game.prepare():
+        await game.close()
+        game = None
+    if game is not None:
+        tools.ENV_FROM_COMMENTS.update(game.from_comments())
+    agent = Ciel(growth.context(grown), game=game)
     session.userdata.preamble = agent.preamble
     # シエルを話させる入り口は 1 つ（mouth.py）。返事・話しかけ・議事録・歌・タッチ・声の登録・あいさつが、ここを通る
     voice = session.userdata.mouth = mouth.Mouth(session)
@@ -399,6 +423,10 @@ async def entrypoint(ctx: JobContext) -> None:
     def notify(msg: dict) -> None:
         # アプリへの知らせ（ciel.event）を、待たずに送る
         asyncio.create_task(send('ciel.event', msg))
+    # いまのシエル（activity.py）：心・道具・体の、いまの動き。止まって見えるとき、どこで待っているかをアプリで見る
+    act = agent.activity = activity_.Activity(notify)
+    session.on('agent_state_changed', act.agent_state)
+    session.on('function_tools_executed', act.tools_executed)
     # エラーの係（errors.py）：道具・裏の処理・体のエラーを記録し、アプリの接続の表示に知らせる
     errors.ERRORS.notify = notify
     errors.ERRORS.install(asyncio.get_running_loop())
@@ -458,26 +486,37 @@ async def entrypoint(ctx: JobContext) -> None:
             researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
             agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
             learned=learned)
-        # マイクラの体（minecraft.py）。つなぐ先があり、アプリの設定でオンにしたときだけつなぐ。
+        # ゲームの体（game_env.py）。アプリの設定でオンにしたときだけ受け持つ。
         # 出来事は、話の切れ目に心が知らせる（why 'game'）
-        body = (minecraft.Body(minecraft.URL, voice.say_latest, diary=ciel_diary, board=tasks, notify=notify)
-                if minecraft.URL else None)
-        session.userdata.body = body
+        body = game
+        if body is not None:
+            body.say, body.diary, body.board, body.notify = voice.say_latest, ciel_diary, tasks, notify
+            body.activity = act
+            act.titles.update(body.titles)
+            act.body_doing = lambda: body.state.get('doing') if body.linked else None
         # 長い目的の係（goals.py）。ゲームの体があるときだけ。目的と段はアプリと配信の画面へ goal.state で送る（topic ciel.goal）
         goal_runner = None
         if body is not None:
-            goal_runner = goals.GoalRunner(voice.say_latest, publish=lambda m: asyncio.create_task(send(goals.TOPIC, m)))
-            goal_runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
+            def goal_publish(m: dict) -> None:
+                asyncio.create_task(send(goals.TOPIC, m))
+                act.changed()   # 目的の係が体で進めている段（いま）も変わる
+
+            def goal_say(why: str, **kw) -> None:
+                act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
+                voice.say_latest(why, **kw)
+            goal_runner = goals.GoalRunner(goal_say, publish=goal_publish)
+            act.goal_step = goal_runner.body_step
+            goal_runner.register(body.game, game_env.GoalsAdapter(body), body.label)
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
-            body.goals = goal_runner
+            body.goals = goal_runner   # 係が体を使っているあいだは、心の体の道具を断る
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:
             # 内なる考えに、マイクラの様子と今の目的を渡す（遊んでいるあいだだけ）。体でやりたいこと（act）を考え、
             # 静かでも一定の間で考える（initiative.py の game・PLAY_THINK_SECONDS）
             def game_now() -> str | None:
-                if not body.linked or not (body.state or {}).get('connected'):
+                if not body.playing():
                     return None
                 goal = goal_runner.context() if goal_runner is not None else None
                 return '\n'.join(p for p in (body.context(), goal) if p)
@@ -487,7 +526,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # 目（eyes.py）：アプリから送られた画像を受け取り、話の切れ目に心が見て話す（why 'image'）
         seeing = eyes_.Eyes(voice.say_latest, agent.persona.image_caption_instructions, notify=notify)
         if body is not None:
-            body.eyes = seeing   # マイクラの体の目で撮った景色も、同じ目の係が受ける
+            body.eyes = seeing   # ゲームの体の目で撮った景色も、同じ目の係が受ける
         ctx.room.register_byte_stream_handler(eyes_.TOPIC, seeing.on_stream)
         agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
@@ -495,14 +534,28 @@ async def entrypoint(ctx: JobContext) -> None:
                                eyes=seeing, self_image=agent.persona.self_image)
         agent.mind.goals = goal_runner
         if body is not None:
-            # 遊んでいるあいだの振り分けの 2 段目：道具ごとのきっかけ（config/routes/minecraft.json）と、遊びながら育った例文
+            # 遊んでいるあいだの振り分けの 2 段目：道具ごとのきっかけ（ゲームの決まりの ciel/triggers）と、遊びながら育った例文
             # （DB の route_examples）との意味の近さで、小脳に決まった発言を見直す（router.py）
-            agent.mind.router = router.Router('minecraft', store=store)
+            agent.mind.router = router.Router(body.game, store=store, seeds=body.seeds())
             agent.mind.router.start()
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
+            # 体の道具が始めずに断られたのに、心が言葉だけで返したら、話し終えたあとに次の手を道具でさせる（1 度だけ）
+            def stalled(name: str, r: dict) -> None:
+                act.log(f'心へ：{act.label(name)}が始めなかったのに言葉だけで止まったので、次の手をうながした', 'wait')
+                say_stalled(name, r)
+            agent.mind.on_stalled = stalled
+            say_stalled = lambda name, r: voice.say_latest(   # noqa: E731
+                'game', settle=1.0,
+                instructions=f'[さっきの {name} は始めていない（{r.get("why") or r.get("reason")}）。そのあと道具を呼ばず、'
+                             f'言葉だけで終わっている。次の手：{r.get("next")}。今、その手の道具を呼んで実際に始め、'
+                             '始めたことだけを短く言う。持ち主に聞かないと決められないときだけ、短く聞く]')
             # 小脳が「渡しますね」と約束だけしたら、話し終えたあとに心が体の道具で続きをする（取りこぼしの受け皿）
-            agent.mind.on_promise = lambda said, text: voice.say_latest(
+            def promised(said: str, text: str) -> None:
+                act.log('心へ：小脳が約束だけしたので、体の道具で続きをうながした', 'wait')
+                say_promised(said, text)
+            agent.mind.on_promise = promised
+            say_promised = lambda said, text: voice.say_latest(   # noqa: E731
                 'game', settle=1.0,
                 instructions=f'[さっき相手の「{said[:60]}」に、小脳が「{text[:80]}」と答えたが、体の道具はまだ使っていない。'
                              '小脳は会話の流れを読み違えることがある。まず会話を見て、相手が本当にそれを頼んだかを確かめる。'
@@ -656,14 +709,24 @@ async def entrypoint(ctx: JobContext) -> None:
     # 画像を見られない会話サーバー（pipeline でない）：送られたら、見られないと返す（eyes.py）
     if not PIPELINE:
         ctx.room.register_byte_stream_handler(eyes_.TOPIC, eyes_.refuse(notify))
-    # マイクラの体へつなげない会話サーバー：アプリがオンにしたら、つなげないと返す（minecraft.py）
-    if session.userdata.body is None:
-        ctx.room.on('data_received', minecraft.refuse(notify))
+    # ゲームの環境へつなげない会話サーバー：アプリがオンにしたら、つなげないと返す（game_env.py）
+    if game is None:
+        ctx.room.on('data_received', game_env.refuse(notify))
+    # アプリの道具（app_env.py）。アプリが知らせた道具（カードを出す・体の動き など）を、心が呼べる道具にする（心だけが使う）
+    if PIPELINE:
+        app = app_env.AppEnv(lambda m: send(app_env.TOPIC, m))
+
+        def app_tools_changed() -> None:
+            tools.ENV_FROM_COMMENTS.update(app.from_comments())
+            asyncio.create_task(agent.update_tools(tools.TOOLS + (list(game.tools) if game is not None else []) + app.tools))
+        app.on_tools = app_tools_changed
+        ctx.room.on('data_received', app.on_data)
     # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す
     ctx.room.on('data_received', soundcheck.SoundCheck(agent.aizuchi if AIZUCHI else None, notify).on_data)
     # アプリが部屋に入った直後に送った知らせは、会話サーバーの受け取りの準備ができる前で、届かないことがある
     # （2026-10-24、開発用の試験で 3 回に 2 回、hello か会話のしかたが届かなかった）。準備ができたので、もう一度送ってもらう
-    await send('ciel.event', {'v': 1, 'type': 'device.hello_request'})
+    # つなげるゲームの一覧（game_env.py の env.list）も、送り直してもらう前に送る（アプリは、これでスイッチの名前を出す）
+    await send('ciel.event', game_env.listing(game), {'v': 1, 'type': 'device.hello_request'})
     # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
     # 今の日付・時間帯（clock.py）も添える（「おはよう」「こんばんは」を合わせる）
     await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),

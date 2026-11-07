@@ -7,8 +7,9 @@
   届いた直後に持ち主が「これどう？」と話したときも、その返事で見る（見ていない画像があれば心に回す）。
 - 一度見たら、軽いモデルが短い説明文を書く。あとの返事には説明文だけを「[見せてもらった画像]」で渡し、画像は送り直さない。
   「さっきの絵の…」のように画像を指したときだけ、もう一度添える。
-- 絵の出どころ（source）は 2 つ：持ち主が見せてくれた画像（shown）と、マイクラの体の目で見た景色（minecraft。
-  minecraft.py の look。docs/minecraft-vision-design-ja.md）。受け取ったあとの流れは同じで、添えるときの見出しだけが違う。
+- 絵の出どころ（source）は 2 つ：持ち主が見せてくれた画像（shown）と、ゲームの体の目で見た景色（game。
+  game_env.py が、ゲームの道具の返事の絵を渡す。docs/minecraft-vision-design-ja.md）。受け取ったあとの流れは同じで、
+  添えるときの見出しだけが違う。見出しのゲームの名前（マイクラ）は、ゲームの決まりの label。
   あとで画面共有を足すときも、映像から取った 1 コマを、出どころを足してここへ渡す。
 """
 import asyncio
@@ -37,7 +38,7 @@ CAPTION_TIMEOUT = 20.0
 CAPTION_CHARS = 240
 # 画像を指す言葉（もう一度見る）
 LOOK_AGAIN = re.compile(r'(さっき|その|あの|この|今の|いまの)(画像|絵|写真|スクショ|イラスト|画面|景色)|(画像|絵|写真|スクショ|イラスト|景色)(の|で|に|を|って)')
-SHOWN, MINECRAFT = 'shown', 'minecraft'
+SHOWN, GAME = 'shown', 'game'
 MAGIC = ((b'\xff\xd8\xff', 'image/jpeg'), (b'\x89PNG\r\n\x1a\n', 'image/png'), (b'RIFF', 'image/webp'))
 
 
@@ -60,10 +61,11 @@ class Picture:
     caption: str | None = None
     source: str = SHOWN
     note: str = ''           # 添えるときの見出しに足すこと（景色なら向いている方角）
+    place: str = ''          # 景色なら、どのゲームの中か（マイクラ）
 
     def label(self) -> str:
-        if self.source == MINECRAFT:
-            return f'[わたしの目に見えている景色 #{self.id}（マイクラの中で、今わたしが見ているもの{"。" + self.note if self.note else ""}）]'
+        if self.source == GAME:
+            return f'[わたしの目に見えている景色 #{self.id}（{self.place or "ゲーム"}の中で、今わたしが見ているもの{"。" + self.note if self.note else ""}）]'
         return f'[見せてもらった画像 #{self.id}{"（" + self.name + "）" if self.name else ""}]'
 
 
@@ -73,6 +75,7 @@ class Eyes:
         self.say = say                     # mouth.Mouth.say_latest
         self.caption_instructions = caption_instructions   # config/prompts/image_caption.md
         self.notify = notify               # アプリへの知らせ（image.state）
+        self.place = ''                    # 景色を見たゲームの名前（見出しに使う。マイクラ）
         self.pictures: list[Picture] = []
         self._client = client
         self._clock = clock
@@ -119,17 +122,19 @@ class Eyes:
         self.say('image', settle=SETTLE, instructions=f'[持ち主が画像を見せてくれた（#{pic.id}）]')
         return pic
 
-    def see_minecraft(self, data: bytes, note: str = '') -> Picture | None:
-        """マイクラの体の目で撮った景色（minecraft.py の look）。道具の返事の続きで心が見るので、口には頼まない"""
+    def see_game(self, data: bytes, note: str = '', place: str = '') -> Picture | None:
+        """ゲームの体の目で撮った景色（game_env.py）。道具の返事の続きで心が見るので、口には頼まない"""
         mime = mime_of(data)
         if mime is None:
             return None
         for old in self.pictures:   # 前の景色は、まだ見ていなくても、もう見ない（今の景色だけを見る）
-            if old.source == MINECRAFT:
+            if old.source == GAME:
                 old.seen = True
-        pic = self._keep(data, mime, '', MINECRAFT, note)
-        log.info('マイクラの景色を受け取った（#%d、%d バイト）', pic.id, pic.size)
-        debug_log.record('image', id=pic.id, bytes=pic.size, mime=mime, source=MINECRAFT)
+        pic = self._keep(data, mime, '', GAME, note)
+        pic.place = place
+        self.place = place or self.place
+        log.info('ゲームの景色を受け取った（#%d、%d バイト）', pic.id, pic.size)
+        debug_log.record('image', id=pic.id, bytes=pic.size, mime=mime, source=GAME)
         return pic
 
     def _keep(self, data: bytes, mime: str, name: str, source: str, note: str = '') -> Picture:
@@ -170,7 +175,7 @@ class Eyes:
         """心と小脳へ渡す「[見せてもらった画像]」「[わたしの目で見た景色（マイクラ）]」（説明文のあるものだけ。無ければ None）"""
         now = self._clock()
         parts = []
-        for source, head in ((SHOWN, '[見せてもらった画像]'), (MINECRAFT, '[わたしの目で見た景色（マイクラ）]')):
+        for source, head in ((SHOWN, '[見せてもらった画像]'), (GAME, f'[わたしの目で見た景色（{self.place or "ゲーム"}）]')):
             rows = [p for p in self.pictures if p.caption and p.source == source]
             if not rows:
                 continue

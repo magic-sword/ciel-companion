@@ -29,7 +29,7 @@ namespace Ciel.Conversation
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
         Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob, _gameSwitch, _gameKnob;
-        Text _gameNow, _youtubeNow;
+        Text _gameNow, _youtubeNow, _gameTitle, _gameSwitchLabel;
         readonly List<(Image fill, Image edge, Text label)> _backdropSegs = new List<(Image, Image, Text)>();
         Image _youtubeSwitch, _youtubeKnob;
         InputField _youtubeUrl;
@@ -426,25 +426,32 @@ namespace Ciel.Conversation
             return $"いまは：配信につなげませんでした（{c.YouTubeReason}）";
         }
 
-        // マイクラで一緒に遊ぶ（CielConversation.Game.cs。docs/minecraft-design-ja.md）
+        // ゲームで一緒に遊ぶ（CielConversation.Game.cs。docs/game-environment-mcp-design-ja.md の 6.4）。
+        // ゲームの名前は会話サーバーの一覧（env.list）から出す。届くまで・以前の会話サーバーでは「ゲーム」
         void BuildGameSection(RectTransform content)
         {
             var sec = Section(content);
-            SectionLabel(Row(sec, 20), "マイクラ");
-            (_gameSwitch, _gameKnob) = SwitchRow(sec, "マイクラで一緒に遊ぶ", () => _conversation.SetMinecraft(!_conversation.Minecraft));
+            _gameTitle = SectionLabel(Row(sec, 20), "ゲーム");
+            (_gameSwitch, _gameKnob) = SwitchRow(sec, "ゲームで一緒に遊ぶ", () => _conversation.SetGameWanted(!_conversation.GameWanted));
+            _gameSwitchLabel = _gameSwitch.transform.parent.Find("Text")?.GetComponent<Text>();
             _gameNow = Txt("Now", sec, 12, TextMain, TextAnchor.UpperLeft, true);
-            Note(sec, "自宅サーバーのマイクラの世界にいるシエルの体とつなぎ、声で「ついてきて」「木を集めて」と頼めるようにします。"
+            Note(sec, "自宅サーバーのゲームの世界にいるシエルの体とつなぎ、声で「ついてきて」「木を集めて」と頼めるようにします。"
                 + "体を動かせるのは、一度に 1 つの会話だけです");
         }
 
+        static string GameLabelOf(CielConversation c) => c.GameLabel != "" ? c.GameLabel : "ゲーム";
+
         static string GameNow(CielConversation c)
         {
-            if (!c.Minecraft) return "";
+            var name = GameLabelOf(c);
+            if (c.Status == CielConversation.State.Connected && c.GameListed && c.GameName == "")
+                return "いまは：この会話サーバーは、つなげるゲームがありません";
+            if (!c.GameWanted) return "";
             if (c.Status != CielConversation.State.Connected) return "いまは：つないだら、シエルの体とつなぎます";
-            if (!c.GameKnown) return "いまは：会話サーバーがマイクラに対応していません";
-            if (c.GameLinked) return c.GameInWorld ? "いまは：● シエルはマイクラの中にいます" : "いまは：体とつながりました（マイクラに入るのを待っています）";
+            if (!c.GameKnown) return c.GameListed ? "いまは：シエルの体へつないでいます…" : $"いまは：会話サーバーが{name}に対応していません";
+            if (c.GameLinked) return c.GameInWorld ? $"いまは：● シエルは{name}の中にいます" : $"いまは：体とつながりました（{name}に入るのを待っています）";
             return c.GameReason == "busy" ? "いまは：ほかの会話がシエルの体を使っています"
-                : c.GameReason == "unavailable" ? "いまは：この会話サーバーはマイクラにつなげません"
+                : c.GameReason == "unavailable" ? $"いまは：この会話サーバーは{name}につなげません"
                 : "いまは：シエルの体へつないでいます…";
         }
 
@@ -529,8 +536,10 @@ namespace Ciel.Conversation
             if (_exprPanel != null) _exprPanel.SetActive(expr);
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
-            ShowSwitch(_gameSwitch, _gameKnob, c.Minecraft);
+            ShowSwitch(_gameSwitch, _gameKnob, c.GameWanted);
             _gameNow.text = GameNow(c);
+            if (_gameTitle != null) _gameTitle.text = GameLabelOf(c);
+            if (_gameSwitchLabel != null) _gameSwitchLabel.text = $"{GameLabelOf(c)}で一緒に遊ぶ";
             if (_stream != null)
             {
                 ShowSwitch(_streamSwitch, _streamKnob, _stream.IsOpen);

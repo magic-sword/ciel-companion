@@ -1,12 +1,16 @@
 // シエルの体：マイクラ（Java 版）にプレイヤーとして入り、会話サーバーの命令で動く。docs/minecraft-design-ja.md。
-// - 会話とは別に動き続ける。会話サーバーは ws://BODY_HOST:BODY_PORT へつなぐ（体を動かせる会話は 1 つだけ）。
-// - 会話モデルは使わない。出来事は全部送り、どれを話すかは会話サーバーが選ぶ。
+// - 会話とは別に動き続ける。会話サーバーは MCP（http://BODY_HOST:CIEL_PORT/mcp、src/ciel/mcp.js）でつなぐ。
+//   以前の WebSocket（ws://BODY_HOST:BODY_PORT）も、移り終えるまで残す（docs/game-environment-mcp-design-ja.md の 10 章）。
+//   体を動かせる会話は、どちらの入口でも合わせて 1 つだけ。
+// - 会話モデルは使わない。MCP では、出来事をシエル向けの言葉にして、話すものだけを知らせる（src/ciel/words.js）。
 // - ゲームのチャットの中身はログに出さない（会話と同じ扱い）。
 import mineflayer from 'mineflayer';
 import pathfinderPkg from 'mineflayer-pathfinder';
 import collectBlock from 'mineflayer-collectblock';
 import { WebSocketServer } from 'ws';
 
+import { makeHub } from './ciel/hub.js';
+import { startHttp } from './ciel/mcp.js';
 import { message, parseCommand } from './protocol.js';
 import { Care } from './care.js';
 import { Eye } from './eye.js';
@@ -29,6 +33,8 @@ const MC = {
 const OWNER = env.MC_OWNER || null;
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
+const CIEL_PORT = Number(env.CIEL_PORT ?? 8771);   // MCP の入口（src/ciel/mcp.js）。BODY_HOST だけで開く
+const CIEL_IDLE_MS = Number(env.CIEL_IDLE_MS ?? 60000);
 const EYE_PORT = Number(env.EYE_PORT ?? 3007);   // 目（eye.js）の視点のページ。BODY_HOST だけで開く
 const STATE_EVERY_MS = 2000;
 const BLOCKS_EVERY_MS = 10000;
@@ -39,7 +45,7 @@ const RETRY_MAX_MS = 60000;
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const tenth = (v) => Math.round(v * 10) / 10;
 
-// ---- 会話サーバーとのつながり（1 つだけ） ----
+// ---- 会話サーバーとのつながり（1 つだけ。WebSocket の会話か、MCP の会話の CielLink） ----
 let link = null;
 
 function send(type, fields) {
@@ -63,22 +69,7 @@ wss.on('connection', (ws) => {
   link = ws;
   log('会話とつながった');
   send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
-  ws.on('message', (raw) => {
-    const r = parseCommand(raw.toString());
-    if (r.error) {
-      send('error', { reason: r.error, ...(r.id !== undefined ? { id: r.id } : {}) });
-      return;
-    }
-    const cmd = r.cmd;
-    if (cmd.type === 'do') runner.start(cmd);
-    else if (cmd.type === 'stop') runner.stop('stopped');
-    else if (cmd.type === 'chat') {
-      if (bot?.entity) bot.chat(cmd.text);
-      else send('error', { reason: 'not_spawned' });
-    } else if (cmd.type === 'state') send('state', state());
-    else if (cmd.type === 'look') look(cmd.id);
-    else if (cmd.type === 'plan') plan(cmd);
-  });
+  ws.on('message', (raw) => command(raw.toString()));
   ws.on('close', () => {
     if (link !== ws) return;
     link = null;
@@ -88,6 +79,41 @@ wss.on('connection', (ws) => {
   ws.on('error', () => {});
 });
 wss.on('listening', () => log(`会話を待つ ws://${BODY_HOST}:${BODY_PORT}`));
+
+// 会話から届いた命令（形を確かめてから動かす。protocol.js）
+function command(raw) {
+  const r = parseCommand(raw);
+  if (r.error) {
+    send('error', { reason: r.error, ...(r.id !== undefined ? { id: r.id } : {}) });
+    return;
+  }
+  const cmd = r.cmd;
+  if (cmd.type === 'do') runner.start(cmd);
+  else if (cmd.type === 'stop') runner.stop('stopped');
+  else if (cmd.type === 'chat') {
+    if (bot?.entity) bot.chat(cmd.text);
+    else send('error', { reason: 'not_spawned' });
+  } else if (cmd.type === 'state') send('state', state());
+  else if (cmd.type === 'look') look(cmd.id);
+  else if (cmd.type === 'plan') plan(cmd);
+}
+
+// MCP の会話の受け持ち（src/ciel/hub.js・mcp.js）
+const hub = makeHub({
+  command,
+  owner: OWNER,
+  isBusy: () => link !== null && link !== hub.link,   // WebSocket の会話が使っている
+  onClaim: (l) => {
+    link = l;
+    send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
+  },
+  onRelease: (l) => {
+    runner.stop('unlinked');   // 会話を切ったら、その場で待つ（ログアウトしない）
+    if (link === l) link = null;
+  },
+  log,
+});
+startHttp(hub, { host: BODY_HOST, port: CIEL_PORT, idleMs: CIEL_IDLE_MS, log });
 
 // 景色を 1 枚撮って返す。向いている方角も添える（「北を向いている」）
 async function look(id) {

@@ -1,5 +1,7 @@
 # 目的の係（長い目的をやり遂げる仕組み・設計）
 
+> **2026-11-07 から：** 会話サーバーとのつなぎ方を、MCP の「ゲームの環境」に変えた（[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md)）。この文書の `minecraft.py`・`tools/minecraft.py`・`config/prompts/minecraft.md`・WebSocket の決まりは、そのときまでの形。今は、体の MCP の入口（`server/minecraft/src/ciel/`）がシエル向けの言葉・道具・遊び方の指示を持ち、会話サーバーは `game_env.py` でつなぐ。
+
 状態：6 章の 1 を作った（2026-11-07）。心が分ける目的・会話をまたぐ置き場は、まだ。調べたことは [長い目的をやり遂げる仕組み（調べたこと）](long-horizon-planning-research-ja.md)。前提は [ゲームの知識の窓口](game-knowledge-design-ja.md)・[マインクラフトで遊ぶ設計](minecraft-design-ja.md)・[会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)。
 
 ## 1. 何をするか
