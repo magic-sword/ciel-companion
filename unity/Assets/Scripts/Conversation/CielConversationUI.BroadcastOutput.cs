@@ -54,7 +54,7 @@ namespace Ciel.Conversation
 
         void BuildStreamGoalSwitch(RectTransform sec)
         {
-            (_streamGoalSwitch, _streamGoalKnob) = SwitchRow(sec, "配信用のウィンドウに、目的と処理状態を見せる", () =>
+            (_streamGoalSwitch, _streamGoalKnob) = SwitchRow(sec, "シエルの映像に、目的と処理状態を重ねる", () =>
             {
                 PlayerPrefs.SetInt(StreamGoalPrefKey, StreamGoalOn ? 0 : 1);
                 PlayerPrefs.Save();

@@ -41,6 +41,8 @@ namespace Ciel.Conversation
         public string GameReason { get; private set; } = "";
         /// 会話サーバーから env.state か game.state が届いたか（古い会話サーバーは送らない）
         public bool GameKnown { get; private set; }
+        float _gameWaitFrom = -1f;
+        public float GameWaitingSeconds => _gameWaitFrom < 0 ? 0 : Mathf.Max(0, Time.unscaledTime - _gameWaitFrom);
 
         void LoadGame() => GameWanted = PlayerPrefs.GetInt(LegacyGamePrefKey, 0) == 1;
 
@@ -48,6 +50,7 @@ namespace Ciel.Conversation
         {
             if (on == GameWanted) return;
             GameWanted = on;
+            _gameWaitFrom = -1f;
             if (GameName != "") PlayerPrefs.SetInt(GamePrefPrefix + GameName, on ? 1 : 0);
             PlayerPrefs.SetInt(LegacyGamePrefKey, on ? 1 : 0);
             PlayerPrefs.Save();
@@ -58,6 +61,7 @@ namespace Ciel.Conversation
         void SendGame()
         {
             if (_room == null || Status != State.Connected) return;
+            if (GameWanted && _gameWaitFrom < 0) _gameWaitFrom = Time.unscaledTime;
             string json;
             if (GameListed)
             {
@@ -67,6 +71,16 @@ namespace Ciel.Conversation
             else json = $"{{\"v\":1,\"type\":\"game.link\",\"on\":{(GameWanted ? "true" : "false")}}}";
             try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.game"); }
             catch (Exception e) { Debug.LogWarning($"[CielConversation] ゲームの設定を送れない: {e.Message}"); }
+        }
+
+        // 設定のオン・オフを変えずに再要求する。他の会話の接続を解除しない。
+        public void RetryGameConnection()
+        {
+            if (!GameWanted || Status != State.Connected || GameLinked || (GameListed && GameName == "")) return;
+            (GameKnown, GameLinked, GameInWorld, GameReason) = (false, false, false, "connecting");
+            _gameWaitFrom = Time.unscaledTime;
+            SendGame();
+            Changed?.Invoke();
         }
 
         // つなげるゲームの一覧（会話サーバーが、つないだ直後と device.hello_request の前に送る）
@@ -116,6 +130,8 @@ namespace Ciel.Conversation
 
         void SetGameState(bool linked, bool inWorld, string reason)
         {
+            if (!GameKnown || linked != GameLinked || inWorld != GameInWorld || (reason ?? "") != GameReason)
+                _gameWaitFrom = Time.unscaledTime;
             (GameKnown, GameLinked, GameInWorld, GameReason) = (true, linked, inWorld, reason ?? "");
             Debug.Log($"[CielConversation] ゲーム：{(GameLinked ? (GameInWorld ? "入っている" : "体とつながった") : $"つながっていない（{GameReason}）")}");
             Changed?.Invoke();
@@ -124,6 +140,7 @@ namespace Ciel.Conversation
         // 部屋を出たら、体とのつながりも、つなげるゲームも分からなくなる（つなぎ直した会話サーバーが送り直す）
         void ResetGame()
         {
+            _gameWaitFrom = -1f;
             (GameKnown, GameLinked, GameInWorld, GameReason) = (false, false, false, "");
             (GameListed, GameName, GameLabel) = (false, "", "");
         }

@@ -11,6 +11,7 @@
 // その色で塗ってからシエルを描く。OBS ではウィンドウキャプチャに「クロマキー」のフィルタを付けて色を抜く。
 // ウィンドウキャプチャは透明（アルファ）を取り込めないので、透過はクロマキーで作る。
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -24,6 +25,16 @@ namespace Ciel.Conversation
         const string PrefKey = "ciel.streamWindow";
         const string WidthKey = "ciel.streamWindow.width", HeightKey = "ciel.streamWindow.height";
         const int MaxSide = 2160;   // 絵の長い辺の上限（4K の縦）
+        public const string CardTitle = "CIEL Broadcast 目的カード";
+        Camera _cardSource;
+        bool _isCard;
+        bool CardOutput => _isCard;
+        string OutputClass => CardOutput ? "CielStatusCardWindow" : ClassName;
+        string OutputTitle => CardOutput ? CardTitle : Title;
+        string OpenKey => CardOutput ? "ciel.statusCard.open" : PrefKey;
+        string OutputWidthKey => CardOutput ? "ciel.statusCard.width" : WidthKey;
+        string OutputHeightKey => CardOutput ? "ciel.statusCard.height" : HeightKey;
+        public void ConfigureCard(Camera source) { _cardSource = source; _isCard = true; }
 
         public static bool Supported =>
             Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor;
@@ -51,7 +62,7 @@ namespace Ciel.Conversation
 
         static Color BackdropColor(Backdrop b) => b == Backdrop.Blue ? new Color(0f, 0f, 1f, 1f) : new Color(0f, 1f, 0f, 1f);
 
-        static CielStreamWindow _instance;   // ウィンドウの知らせ（WndProc）から見る
+        static readonly Dictionary<IntPtr, CielStreamWindow> Instances = new Dictionary<IntPtr, CielStreamWindow>();
 
         CielBackground _background;
         Camera _main, _camera;
@@ -63,44 +74,51 @@ namespace Ciel.Conversation
 
         void Start()
         {
-            _background = FindAnyObjectByType<CielBackground>();
+            _background = CardOutput ? null : FindAnyObjectByType<CielBackground>();
             CurrentBackdrop = (Backdrop)Mathf.Clamp(PlayerPrefs.GetInt(BackdropKey, 0), 0, BackdropLabels.Length - 1);
-            var autoOpen = !Application.isEditor && CielAppComposition.Profile != null && CielAppComposition.Profile.openOutputOnStart;
-            if (Supported && PlayerPrefs.GetInt(PrefKey, autoOpen ? 1 : 0) == 1) Open();
+            var autoOpen = !Application.isEditor && CielAppComposition.Profile != null
+                && (CardOutput || CielAppComposition.Profile.openOutputOnStart);
+            if (Supported && PlayerPrefs.GetInt(OpenKey, autoOpen ? 1 : 0) == 1) Open();
         }
 
         void OnDisable() => Close();
 
         public void SetOpen(bool open)
         {
-            PlayerPrefs.SetInt(PrefKey, open ? 1 : 0);
+            PlayerPrefs.SetInt(OpenKey, open ? 1 : 0);
             if (open) Open();
             else Close();
+            PlayerPrefs.Save();
             Changed?.Invoke();
         }
 
         void Open()
         {
             if (!Supported || _hwnd != IntPtr.Zero) return;
-            _main = Camera.main;
+            _main = CardOutput ? _cardSource : Camera.main;
             if (_main == null) return;
-            _hwnd = CreateNativeWindow(PlayerPrefs.GetInt(WidthKey, 540), PlayerPrefs.GetInt(HeightKey, 960));
+            _hwnd = CreateNativeWindow(PlayerPrefs.GetInt(OutputWidthKey, CardOutput ? 900 : 540),
+                PlayerPrefs.GetInt(OutputHeightKey, CardOutput ? 500 : 960), OutputClass, OutputTitle);
             if (_hwnd == IntPtr.Zero)
             {
                 Debug.LogWarning($"[CielStreamWindow] 配信用のウィンドウを開けなかった（エラー {Marshal.GetLastWin32Error()}）");
                 return;
             }
-            _instance = this;
+            Instances[_hwnd] = this;
             // アプリのカメラの子に、同じ設定のカメラを置く（位置・向き・背景の板はアプリのカメラについて動く）
             var go = new GameObject("StreamCamera");
             go.transform.SetParent(_main.transform, false);
             _camera = go.AddComponent<Camera>();
             _camera.CopyFrom(_main);
+            _camera.enabled = true;
             go.tag = "Untagged";   // Camera.main（タッチ・背景が使う）はアプリのカメラのまま
             _camera.depth = _main.depth - 1;
-            _main.cullingMask &= ~(1 << OverlayLayer);     // 配信用の札は、アプリのウィンドウには映さない
-            _camera.cullingMask |= 1 << OverlayLayer;
-            Debug.Log($"[CielStreamWindow] 配信用のウィンドウ「{Title}」を開いた");
+            if (!CardOutput)
+            {
+                _main.cullingMask &= ~(1 << OverlayLayer);
+                _camera.cullingMask |= 1 << OverlayLayer;
+            }
+            Debug.Log($"[CielStreamWindow] 配信用のウィンドウ「{OutputTitle}」を開いた");
         }
 
         void Close()
@@ -108,13 +126,13 @@ namespace Ciel.Conversation
             if (_hwnd == IntPtr.Zero) return;
             if (!IsIconic(_hwnd) && GetClientRect(_hwnd, out var rc) && rc.Right > 0 && rc.Bottom > 0)
             {
-                PlayerPrefs.SetInt(WidthKey, rc.Right);
-                PlayerPrefs.SetInt(HeightKey, rc.Bottom);
+                PlayerPrefs.SetInt(OutputWidthKey, rc.Right);
+                PlayerPrefs.SetInt(OutputHeightKey, rc.Bottom);
             }
+            Instances.Remove(_hwnd);
             DestroyWindow(_hwnd);
-            UnregisterClassW(ClassName, GetModuleHandleW(null));
+            UnregisterClassW(OutputClass, GetModuleHandleW(null));
             _hwnd = IntPtr.Zero;
-            if (_instance == this) _instance = null;
             if (_camera != null) Destroy(_camera.gameObject);
             _camera = null;
             if (_rt != null) { _rt.Release(); Destroy(_rt); }
@@ -147,11 +165,14 @@ namespace Ciel.Conversation
             _camera.orthographicSize = _main.orthographicSize;
             _camera.fieldOfView = _main.fieldOfView;
             // 背景：アプリと同じ絵か、一色（背景の板の層を映さず、その色で塗る）
-            var plain = CurrentBackdrop != Backdrop.App;
+            var plain = !CardOutput && CurrentBackdrop != Backdrop.App;
             _camera.clearFlags = plain ? CameraClearFlags.SolidColor : _main.clearFlags;
             _camera.backgroundColor = plain ? BackdropColor(CurrentBackdrop) : _main.backgroundColor;
-            if (plain) _camera.cullingMask &= ~(1 << CielBackground.Layer);
-            else _camera.cullingMask |= _main.cullingMask & (1 << CielBackground.Layer);
+            if (!CardOutput)
+            {
+                if (plain) _camera.cullingMask &= ~(1 << CielBackground.Layer);
+                else _camera.cullingMask |= _main.cullingMask & (1 << CielBackground.Layer);
+            }
             if (_background != null) _background.CoverAspect = plain ? 0 : (float)w / h;   // 配信用のほうが横長でも、背景が足りるように
 
             // 読み出しは 1 つずつ（前のが終わってから）。ここで頼むと、前のフレームの絵が読める
@@ -207,10 +228,10 @@ namespace Ciel.Conversation
 
         static readonly WndProcDelegate Proc = WndProc;   // 関数の場所を Windows に渡すので、消されないように持っておく
 
-        static IntPtr CreateNativeWindow(int width, int height)
+        static IntPtr CreateNativeWindow(int width, int height, string className, string title)
         {
             var module = GetModuleHandleW(null);
-            UnregisterClassW(ClassName, module);   // エディタでスクリプトを読み込み直す前の登録（古い WndProc を指す）が残っていれば消す
+            UnregisterClassW(className, module);
             var wc = new WNDCLASSEX
             {
                 cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
@@ -219,12 +240,12 @@ namespace Ciel.Conversation
                 hInstance = module,
                 hCursor = LoadCursorW(IntPtr.Zero, (IntPtr)IDC_ARROW),
                 hbrBackground = GetStockObject(BLACK_BRUSH),
-                lpszClassName = ClassName,
+                lpszClassName = className,
             };
             if (RegisterClassExW(ref wc) == 0) return IntPtr.Zero;
             var rect = new RECT { Right = Mathf.Max(width, 160), Bottom = Mathf.Max(height, 160) };
             AdjustWindowRectEx(ref rect, WS_OVERLAPPEDWINDOW, false, 0);
-            var hwnd = CreateWindowExW(0, ClassName, Title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+            var hwnd = CreateWindowExW(0, className, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                 rect.Right - rect.Left, rect.Bottom - rect.Top, IntPtr.Zero, IntPtr.Zero, module, IntPtr.Zero);
             if (hwnd != IntPtr.Zero) ShowWindow(hwnd, SW_SHOWNOACTIVATE);   // アプリのウィンドウから前面を奪わない
             return hwnd;
@@ -236,7 +257,7 @@ namespace Ciel.Conversation
         {
             try
             {
-                var self = _instance != null && _instance._hwnd == hWnd ? _instance : null;
+                Instances.TryGetValue(hWnd, out var self);
                 switch (msg)
                 {
                     case WM_CLOSE:   // 閉じるのは次のフレームで（設定も切る）

@@ -424,6 +424,8 @@ namespace Ciel.Conversation
                 // シエルの中の誤り（server/agent/errors.py）。service に、どの道具・係か
                 _ when problem == "bug" => (Amber, $"シエルの中でエラー・{c.ProblemService}"),
                 _ when problem != "" => (Amber, $"{ServiceLabel(c.ProblemService)}に失敗・{ProblemLabel(problem)}"),
+                _ when Broadcast && c.GameWanted && (!c.GameLinked || !c.GameInWorld) => (Amber, "会話は接続済み・ゲームは未接続"),
+                _ when Broadcast => (Mint, c.GameWanted ? "会話・ゲーム接続済み" : "会話は接続済み"),
                 _ => (Mint, "つながっています"),
             };
             if (_linkText.text == text && _linkDot.color == color) return;

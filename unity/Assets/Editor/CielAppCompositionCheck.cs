@@ -61,6 +61,7 @@ namespace Ciel.EditorTools
             if (!broadcast) Check(!c.YouTube, "companion never enables broadcast comments");
             var ui = UnityEngine.Object.FindAnyObjectByType<CielConversationUI>();
             Check(ui != null, "shared UI shell exists");
+            Check((ui.GetComponent<CielAudienceCard>() != null) == broadcast, "audience output belongs only to broadcast app");
             Invoke(ui, "Awake");
             var canvas = ui.transform.Find("ConversationCanvas");
             // 配信ページの存在は、階層名で確認（非表示の設定ページも含む）。

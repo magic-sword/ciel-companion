@@ -33,6 +33,7 @@ namespace Ciel.Conversation
         readonly List<(Image fill, Image edge, Text label)> _backdropSegs = new List<(Image, Image, Text)>();
         Image _youtubeSwitch, _youtubeKnob;
         InputField _youtubeUrl;
+        Image _cardOutputSwitch, _cardOutputKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -369,8 +370,17 @@ namespace Ciel.Conversation
             if (_stream == null) return;
             var sec = Section(content);
             SectionLabel(Row(sec, 20), "配信");
-            (_streamSwitch, _streamKnob) = SwitchRow(sec, "配信用のウィンドウを開く", () => _stream.SetOpen(!_stream.IsOpen));
+            (_streamSwitch, _streamKnob) = SwitchRow(sec, "シエルの映像ウィンドウを開く", () => _stream.SetOpen(!_stream.IsOpen));
             BuildStreamGoalSwitch(sec);   // いまの目的の札（CielConversationUI.Goal.cs）
+            (_cardOutputSwitch, _cardOutputKnob) = SwitchRow(sec, "視聴者向けの目的カードを開く", () =>
+            {
+                var card = GetComponent<CielAudienceCard>();
+                if (card?.Output == null) return;
+                card.Output.SetOpen(!card.Output.IsOpen);
+                Refresh();
+            });
+            Note(sec, $"「{CielStreamWindow.CardTitle}」をOBSのウィンドウキャプチャで取り込みます。"
+                + "クロマキーで緑を抜くと、目的も作業もない間はカードが消えます。映像とは別に位置と大きさを調整できます");
             Note(sec, $"シエルと背景だけを映すウィンドウ「{CielStreamWindow.Title}」を開きます。"
                 + "OBS では「ゲームキャプチャ」ではなく「ウィンドウキャプチャ」でこちらを選んでください（ゲームキャプチャはアプリの画面を映します）。"
                 + "設定・名前・ボタンは映りません。大きさを変えると、その大きさで描きます");
@@ -552,6 +562,7 @@ namespace Ciel.Conversation
                 if (!_youtubeUrl.isFocused && _youtubeUrl.text != c.YouTubeUrl) _youtubeUrl.SetTextWithoutNotify(c.YouTubeUrl);
             }
             RefreshStreamGoalSwitch();
+            RefreshCardOutputSwitch();
             RefreshMinutesDestinations();
         }
 
@@ -579,6 +590,7 @@ namespace Ciel.Conversation
         void UpdateSheet()
         {
             if (_sheetOpen) UpdateMeetingCheck();
+            if (_sheetOpen) RefreshCardOutputSwitch();
             var target = _sheetOpen ? 1f : 0f;
             if (!Mathf.Approximately(_sheetT, target))
             {
@@ -588,6 +600,13 @@ namespace Ciel.Conversation
                 _sheet.anchoredPosition = new Vector2(0, -(1 - e) * 220);
                 if (_sheetT <= 0) _sheetRoot.SetActive(false);
             }
+        }
+
+        void RefreshCardOutputSwitch()
+        {
+            var card = GetComponent<CielAudienceCard>();
+            if (_cardOutputSwitch != null && card?.Output != null)
+                ShowSwitch(_cardOutputSwitch, _cardOutputKnob, card.Output.IsOpen);
         }
     }
 }

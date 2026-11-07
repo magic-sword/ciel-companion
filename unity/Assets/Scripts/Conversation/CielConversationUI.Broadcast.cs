@@ -8,6 +8,11 @@ namespace Ciel.Conversation
     {
         Text _broadcastGoal, _broadcastActivity;
         float _broadcastFilledAt = -1f;
+        RectTransform _broadcastMonitor, _broadcastNoticeRect;
+        Text _broadcastNoticeTitle, _broadcastNoticeDetail, _broadcastNoticeButtonText;
+        Image _broadcastNoticeFill;
+        Button _broadcastNoticeButton;
+        CielBroadcastNotice _broadcastNotice;
 
         void BuildBroadcastSurface(RectTransform root)
         {
@@ -19,12 +24,73 @@ namespace Ciel.Conversation
         void BuildBroadcastMonitor(RectTransform root)
         {
             var monitor = Rect("BroadcastMonitor", root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            _broadcastMonitor = monitor;
             Stretch(monitor);
             monitor.offsetMin = new Vector2(20, 255);
             monitor.offsetMax = new Vector2(-20, -95);
             monitor.SetAsFirstSibling();   // 調べものなどのパネルは、この上に開く
             _broadcastGoal = BroadcastColumn(monitor, "Goal", "目的と進み具合", 0f, 0.49f);
             _broadcastActivity = BroadcastColumn(monitor, "Activity", "現在の処理", 0.51f, 1f);
+            BuildBroadcastNotice(root);
+        }
+
+        void BuildBroadcastNotice(RectTransform root)
+        {
+            var panel = Rect("ConnectionNotice", root, Vector2.up, Vector2.up, Vector2.zero, Vector2.zero);
+            panel.anchorMin = new Vector2(0, 1);
+            panel.anchorMax = Vector2.one;
+            panel.offsetMin = new Vector2(20, -170);
+            panel.offsetMax = new Vector2(-20, -78);
+            panel.SetAsFirstSibling();
+            _broadcastNoticeRect = panel;
+            _broadcastNoticeFill = Rounded(panel, AmberGlass, 12);
+            _broadcastNoticeTitle = Txt("Title", panel, 16, Amber, TextAnchor.UpperLeft, true);
+            _broadcastNoticeDetail = Txt("Detail", panel, 12, TextMain, TextAnchor.UpperLeft);
+            foreach (var text in new[] { _broadcastNoticeTitle, _broadcastNoticeDetail })
+            {
+                text.supportRichText = false;
+                text.rectTransform.anchorMin = Vector2.zero;
+                text.rectTransform.anchorMax = Vector2.one;
+                text.rectTransform.offsetMin = new Vector2(16, 10);
+                text.rectTransform.offsetMax = new Vector2(-200, -10);
+            }
+            _broadcastNoticeTitle.rectTransform.offsetMin = new Vector2(16, 56);
+            _broadcastNoticeDetail.rectTransform.offsetMax = new Vector2(-200, -36);
+            var action = Rect("Action", panel, new Vector2(1, .5f), new Vector2(1, .5f), new Vector2(-16, 0), new Vector2(162, 40));
+            _broadcastNoticeButton = PanelButton(action, "接続を再試行", TextAnchor.MiddleCenter);
+            _broadcastNoticeButtonText = action.GetComponentInChildren<Text>();
+            _broadcastNoticeButton.onClick.AddListener(() =>
+            {
+                switch (_broadcastNotice?.action)
+                {
+                    case CielBroadcastNotice.Action.RetryGame: _conversation.RetryGameConnection(); break;
+                    case CielBroadcastNotice.Action.Connect: _conversation.StartConversation(); break;
+                    case CielBroadcastNotice.Action.Reconnect: _conversation.Reconnect(); break;
+                    case CielBroadcastNotice.Action.Settings:
+                        OpenSheet(true);
+                        int page = _pages.FindIndex(p => p.name == "Page_そのほか");
+                        if (page >= 0) ShowPage(page);
+                        break;
+                }
+                _broadcastFilledAt = -1;
+                UpdateBroadcastMonitor();
+            });
+            panel.gameObject.SetActive(false);
+        }
+
+        void UpdateBroadcastNotice()
+        {
+            _broadcastNotice = CielBroadcastNotice.From(_conversation);
+            bool show = _broadcastNotice.Visible;
+            _broadcastNoticeRect.gameObject.SetActive(show);
+            _broadcastMonitor.offsetMax = new Vector2(-20, show ? -185 : -95);
+            if (!show) return;
+            _broadcastNoticeTitle.text = _broadcastNotice.title;
+            _broadcastNoticeDetail.text = _broadcastNotice.detail;
+            _broadcastNoticeTitle.color = _broadcastNotice.error ? Alert : Amber;
+            _broadcastNoticeFill.color = _broadcastNotice.error ? new Color(.36f, .07f, .08f, .95f) : AmberGlass;
+            _broadcastNoticeButton.gameObject.SetActive(_broadcastNotice.action != CielBroadcastNotice.Action.None);
+            _broadcastNoticeButtonText.text = _broadcastNotice.button;
         }
 
         Text BroadcastColumn(RectTransform root, string name, string title, float left, float right)
@@ -69,6 +135,7 @@ namespace Ciel.Conversation
         {
             if (_broadcastGoal == null || Time.unscaledTime - _broadcastFilledAt < 0.5f) return;
             _broadcastFilledAt = Time.unscaledTime;
+            UpdateBroadcastNotice();
             var connected = _conversation.Status == CielConversation.State.Connected;
             var goal = connected ? _conversation.Goal : null;
             _broadcastGoal.text = goal != null && goal.HasGoal ? _goalPanelTitle.text + "\n\n" + _goalPanelBody.text
