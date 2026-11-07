@@ -232,6 +232,15 @@ class GoalRunner:
     def status(self) -> dict:
         return self.state()
 
+    def body_step(self) -> str | None:
+        """係が体で進めている段の名前（体を使っていなければ None）。心に任せた段（mind）は、心が体の道具を使うので含めない。
+        係が原木を集めている途中で、心が板を作る道具を呼び、集める技が「ほかの頼み」に替わって目的が黙って止まった（2026-11-07）"""
+        g = self.active
+        if g is None or g.status != 'running':
+            return None
+        step = next((s for s in g.steps if s.status == 'running'), None)
+        return step.label if step is not None and step.kind != 'mind' else None
+
     def pause_for(self, reason: str) -> None:
         """持ち主が「止まって」と言った・体がほかの技を始めた（今の段をやめる。目的は止めて待つ）"""
         g = self.active
@@ -337,7 +346,11 @@ class GoalRunner:
                     step.status = 'todo'
                     g.status = 'paused'
                     g.attention = adapter.why(reason)
+                    debug_log.record('goal', what='paused', id=g.id, step=step.label, reason=reason)
                     self._publish()
+                    if reason == 'replaced':   # 黙って止まると、だれも続けない（2026-11-07）
+                        self._tell(f'[目的「{g.title}」：「{step.label}」の途中で、体がほかの頼みに替わったので止まって待っている。'
+                                   'その頼みが済んだら resume_goal で続ける。やめるなら stop_goal]')
                     return
                 step.fails += 1
                 if step.repairs < MAX_REPAIRS:

@@ -284,6 +284,41 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runner.goal.status, 'done')
 
 
+class BodyBusyTest(unittest.IsolatedAsyncioTestCase):
+    async def test_the_running_body_step_is_known_and_a_replaced_step_is_told(self):
+        # 係が原木を集めている途中で、心が板を作る道具を呼び、集める技が替わって目的が黙って止まった件（2026-11-07）
+        said = Said()
+        runner = goals.GoalRunner(said)
+        gate = asyncio.Event()
+
+        class Slow(FakeAdapter):
+            async def run(self, goal, step):
+                self.ran.append(step.label)
+                await gate.wait()
+                return self.results.pop(0)
+        a = Slow([steps('原木を集める', 'ツルハシを作る')], [{'ok': False, 'reason': 'replaced'}])
+        runner.register('mc', a, 'マイクラ')
+        self.assertIsNone(runner.body_step())
+        await runner.start('mc', '木のツルハシを作る', {})
+        await asyncio.sleep(0)
+        self.assertEqual(runner.body_step(), '原木を集める')   # 係が体を使っている
+        gate.set()
+        await settle(runner)
+        self.assertEqual(runner.goal.status, 'paused')
+        self.assertIsNone(runner.body_step())
+        self.assertIn('ほかの頼みに替わったので止まって待っている', said.lines[-1])
+        self.assertIn('resume_goal', said.lines[-1])
+
+    async def test_a_step_left_to_the_mind_does_not_hold_the_body(self):
+        runner = goals.GoalRunner(Said())
+        a = FakeAdapter([None], [])
+        runner.register('mc', a, 'マイクラ')
+        await runner.start('mc', '広い場所へ移る', {})   # 係では分けられない：心に任せる段
+        await asyncio.sleep(0)
+        self.assertIsNone(runner.body_step())
+        await runner.stop()
+
+
 class OneBodyCallTest(unittest.TestCase):
     def test_only_one_moving_tool_per_reply(self):
         # 集めると作るを同時に呼び、体の技が取り合いになって両方失敗した件（2026-11-07）

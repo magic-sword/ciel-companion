@@ -128,6 +128,7 @@ class GameEnv:
         self.board = None            # board.Board（頼まれた技を付箋にする）
         self.notify: Callable[[dict], None] | None = None   # アプリへの知らせ（game.state）
         self.eyes = None             # eyes.Eyes（撮った景色を渡す先）
+        self.goals = None            # goals.GoalRunner（係が体を使っているあいだは、心の体の道具を断る）
         self.profile: dict = {}
         self.label = game
         self.instructions = ''       # ゲームの遊び方の指示（prompt play）
@@ -351,6 +352,11 @@ class GameEnv:
         role = meta.get('ciel/role')
         if role in ('act', 'look') and not self.linked:
             return {'status': 'unavailable'}
+        busy = self.goals.body_step() if self.goals is not None and role == 'act' and not meta.get('ciel/stops') else None
+        if busy is not None:
+            # 係が体で段を進めている：体は一度に 1 つの技なので、ここで動かすと係の技が替わって目的が止まる（2026-11-07）
+            return {'status': 'goal_running', 'why': f'目的の係が「{busy}」を体で進めている',
+                    'next': '待てば係が続ける。先にこちらをしたいなら stop_goal で目的を止めてから'}
         r = await self._call(name, args)
         images = r.pop('_images', None)
         if images and self.eyes is not None:   # 目：景色の絵は目の係に渡し、道具の返事の続きで心が見る

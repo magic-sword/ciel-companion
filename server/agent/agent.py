@@ -487,6 +487,7 @@ async def entrypoint(ctx: JobContext) -> None:
             goal_runner.register(body.game, game_env.GoalsAdapter(body), body.label)
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
+            body.goals = goal_runner   # 係が体を使っているあいだは、心の体の道具を断る
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:

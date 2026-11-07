@@ -209,6 +209,20 @@ class GoalsAdapterTest(EnvCase):
         await runner.stop()
 
 
+class GoalHoldsBodyTest(EnvCase):
+    async def test_body_tools_wait_while_the_goal_uses_the_body(self):
+        await self.link()
+        self.env.goals = types.SimpleNamespace(body_step=lambda: 'オークの原木を 2 個集める')
+        r = await self.env.use('test_jump', {})
+        self.assertEqual(r['status'], 'goal_running')
+        self.assertIn('オークの原木を 2 個集める', r['why'])
+        self.assertEqual((await self.env.use('test_stop', {}))['status'], 'stopped')   # 止めるのはよい
+        self.assertEqual((await self.env.use('test_look', {}))['status'], 'seen')      # 見るのはよい
+        self.assertNotIn(('test_jump', {}), self.fake.calls)
+        self.env.goals = types.SimpleNamespace(body_step=lambda: None)
+        self.assertEqual((await self.env.use('test_jump', {}))['status'], 'started')
+
+
 class MindGameTest(EnvCase):
     def setUp(self):
         patcher = mock.patch('clock.now_line', return_value='[今：朝]')
