@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { registerKnowledge } from '../knowledge/main.js';
 import { repair, skillFor, stepResult, stepsFrom } from './goals.js';
 import { STEP_TIMEOUT_MS } from './link.js';
-import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText } from './words.js';
+import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText, title } from './words.js';
 
 export const PROFILE_VERSION = 1;
 const GAME = 'minecraft';
@@ -79,47 +79,55 @@ export function makeServer(hub, sessionId) {
   });
 
   // ---- 体の技（以前の tools/minecraft.py） ----
-  server.registerTool('minecraft_follow_me', { description: 'マイクラで、持ち主についていく（止めるまで続く）。', inputSchema: {},
+  server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'マイクラで、持ち主についていく（止めるまで続く）。', inputSchema: {},
     ...ACT('minecraft_follow_me', { 'ciel/long_running': true }) }, () => body((l) => l.do('follow')));
-  server.registerTool('minecraft_come_here', { description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。', inputSchema: {},
+  server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。', inputSchema: {},
     ...ACT('minecraft_come_here', { 'ciel/long_running': true }) }, () => body((l) => l.do('come')));
-  server.registerTool('minecraft_go_to_place', { description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
+  server.registerTool('minecraft_go_to_place', { title: '場所へ行く', description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
     inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true }) },
   ({ x, z: zz }) => body((l) => l.do('go_to', { x, z: zz })));
   server.registerTool('minecraft_collect_blocks', {
+    title: '集める',
     description: 'マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy など）か、'
       + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。',
     inputSchema: { block: z.string(), count: z.number().int() }, ...ACT('minecraft_collect_blocks', { 'ciel/long_running': true }),
   }, ({ block, count }) => body((l) => l.do('collect', { block, count })));
   server.registerTool('minecraft_find_blocks', {
+    title: '探す',
     description: 'マイクラで、見える所に無いブロックを探す（見つけたら止まる。集めるのは minecraft_collect_blocks）。block は英語の ID か呼び名。'
       + 'how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。',
     inputSchema: { block: z.string(), how: z.string().optional() }, ...ACT('minecraft_find_blocks', { 'ciel/long_running': true }),
   }, ({ block, how }) => body((l) => l.do('find', { block, how: ['walk', 'dig', 'auto'].includes(how) ? how : 'auto' })));
   server.registerTool('minecraft_craft_item', {
+    title: '作る',
     description: 'マイクラで、持ち物から物を作る（oak_planks・stick・crafting_table・wooden_pickaxe など）。item は英語の ID、count は作りたい数（1〜64）。'
       + '作業台が要る物は、近くの作業台か、持っている作業台を置いて使う。材料が足りなければ、足りない物が返る。',
     inputSchema: { item: z.string(), count: z.number().int().optional() }, ...ACT('minecraft_craft_item', { 'ciel/long_running': true }),
   }, ({ item, count }) => body((l) => l.do('craft', { item, count: count ?? 1 })));
   server.registerTool('minecraft_give_item', {
+    title: '渡す',
     description: 'マイクラで、持ち物を持ち主に渡す（そばへ行って投げる）。item は英語の ID（oak_log など）。count を省けば持っている分すべて。',
     inputSchema: { item: z.string(), count: z.number().int().optional() }, ...ACT('minecraft_give_item', { 'ciel/long_running': true }),
   }, ({ item, count }) => body((l) => l.do('give', { item, ...(count != null ? { count } : {}) })));
   server.registerTool('minecraft_dig_down', {
+    title: '足元を掘る',
     description: 'マイクラで、足元を depth ブロック（1〜32）掘って降りる。葉・原木・土・石など自然のブロックだけ掘る。',
     inputSchema: { depth: z.number().int() }, ...ACT('minecraft_dig_down', { 'ciel/long_running': true }),
   }, ({ depth }) => body((l) => l.do('dig_down', { depth })));
   server.registerTool('minecraft_stop_moving', {
+    title: '止まる',
     description: 'マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。', inputSchema: {},
     ...ACT('minecraft_stop_moving', { 'ciel/stops': true }),
   }, () => body((l) => l.stop()));
 
   // ---- 見る ----
   server.registerTool('minecraft_look_around', {
+    title: '様子を見る',
     description: 'マイクラで、今の様子（体力・持ち物・時刻・近くの人と敵・していること）を見る。', inputSchema: {},
     annotations: { readOnlyHint: true }, _meta: meta('minecraft_look_around', 'look', { 'ciel/from_comments': true }),
   }, () => body((l) => ({ status: 'ok', state: l.text() })));
   server.registerTool('minecraft_look_at_view', {
+    title: '景色を見る',
     description: 'マイクラで、自分の目で今の景色を見る（向いている方向の 1 枚の絵。呼んだあと、その絵が見える）。', inputSchema: {},
     annotations: { readOnlyHint: true },
     // 景色の絵は 1 枚 0.3 円ほどかかるので、コメントからは見ない
@@ -169,7 +177,10 @@ export function makeServer(hub, sessionId) {
   server.registerResource('state', 'game://state', { mimeType: 'application/json', description: '今の体の様子（シエルが読む文）' },
     async (uri) => {
       const l = mine();
-      const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint() }
+      // doing：体がいましている技の見せる言葉（会話サーバーの「いま」。無ければ空）
+      const d = l?.state?.doing;
+      const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
+        doing: d ? title(d.skill, d.args ?? {}) : '' }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

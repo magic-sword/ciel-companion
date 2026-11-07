@@ -202,6 +202,7 @@ sequenceDiagram
 | `ciel.research` | 会話サーバー → アプリ | `research.result`・`research.text`・`research.source`・`research.complete` | 調査本文と出典を小さいパケットに分けて送る。[Web 調査](decisions/web-research-ja.md) |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"env.list","games":[{"game":"minecraft","label":"マイクラ"}]}`、`{"v":1,"type":"env.state","game":"minecraft","label":"マイクラ","linked":true,"playing":true,"reason":""}` | つなげるゲームの一覧と、体を受け持ったか（`game_env.py`）。アプリはゲームの名前を持たず、ここの名前でスイッチを出す。[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md) |
 | `ciel.game` | アプリ → 会話サーバー | `{"v":1,"type":"env.link","game":"minecraft","on":true}` | そのゲームで一緒に遊ぶか（設定のスイッチ）。以前の形 `game.link`・`game.state` も、移り終えるまで受け付ける |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"activity.state","mind":"thinking","who":"mind","mind_for":1.2,"calls":[{"label":"集める","for_s":4.0}],"tasks":[{"title":"oak_log を 3 個集める","for_s":12.0}],"doing":"…","goal_step":"…","log":[{"id":3,"ago":6.0,"text":"…","kind":"error"}]}` | いまのシエル（`activity.py`）。心が考えている・道具の結果を待っている・体が技をしている・最近のこと。アプリの「いま」の札とパネル。変わったときだけ送り、秒数はアプリが数え足す |
 | `ciel.app` | アプリ ↔ 会話サーバー | `app.hello`（アプリ → 会話サーバー。出せる道具の一覧、MCP の tools/list の形）、`app.call`（会話サーバー → アプリ。id・tool・args）、`app.result`（アプリ → 会話サーバー。id・result） | アプリの道具（`app_env.py`）。心が呼ぶ：`app_gesture`（シエルの体の動き）・`app_show_card`（画面のカード） |
 
 ## 会議に参加するとき（多人数）

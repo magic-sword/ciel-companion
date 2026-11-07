@@ -465,6 +465,7 @@ namespace Ciel.Conversation
             ResetGame();
             ResetYouTube();
             ResetGoal();
+            ResetActivity();
             Card = null;
             Changed?.Invoke();
         }
@@ -1085,6 +1086,7 @@ namespace Ciel.Conversation
             }
             else if (e.type == "voice.test") OnVoiceTest(e);
             else if (e.type == "agent.problem") OnProblem(e);
+            else if (e.type == "activity.state") OnActivity(data);   // いまのシエル（CielConversation.Activity.cs）
             else if (e.type == "env.list") OnEnvList(data);   // つなげるゲームの一覧（CielConversation.Game.cs）
             else if (e.type == "env.state") OnEnvState(e);   // ゲームの体を受け持ったか（CielConversation.Game.cs）
             else if (e.type == "game.state") OnGameState(e);   // 以前の会話サーバーの形
@@ -1412,6 +1414,7 @@ namespace Ciel.Conversation
             ResetGame();
             ResetYouTube();
             ResetGoal();
+            ResetActivity();
             Card = null;
             DisposeVoice();
             DisposeAizuchi();

@@ -134,6 +134,8 @@ class GameEnv:
         self.instructions = ''       # ゲームの遊び方の指示（prompt play）
         self.tools: list = []        # 心に渡す道具（LiveKit の道具に包んだもの）
         self.meta: dict[str, dict] = {}   # 道具の名前 → _meta
+        self.titles: dict[str, str] = {}  # 道具の名前 → 見せる名前（MCP の title。アプリの「いま」）
+        self.activity = None              # activity.Activity（いまのシエル。体の技の始まりと終わり）
         self.route_words: re.Pattern | None = None
         self.state: dict = {}
         self.linked = False          # 体を受け持っている
@@ -197,8 +199,10 @@ class GameEnv:
                     log.info('ゲーム（%s）の体から切れた', self.game)
                 self.linked = False
                 self._stop_ping()
-                for card in list(self._cards.values()):   # 終わりを聞けなくなった技の付箋
+                for key, card in list(self._cards.items()):   # 終わりを聞けなくなった技の付箋
                     self._close_card_of(card, 'failed', '体から切れた')
+                    if self.activity is not None:
+                        self.activity.task_done(f'{self.game}:{key}', '', False, quiet=True)
                 self._cards.clear()
                 if self.reason not in ('busy',):
                     self.reason = 'off' if not self.wanted else 'connecting'
@@ -238,6 +242,8 @@ class GameEnv:
                 continue
             meta = dict(t.meta or {})
             self.meta[t.name] = meta
+            if getattr(t, 'title', None):
+                self.titles[t.name] = t.title
             if meta.get('ciel/role') in SHOWN_ROLES:
                 self.tools.append(self._wrap(t.name, t.description or '', t.inputSchema or {'type': 'object', 'properties': {}}))
         log.info('ゲーム（%s）の道具 %d 個', self.game, len(self.tools))
@@ -371,6 +377,8 @@ class GameEnv:
             r['note'] = f"景色の絵は「[わたしの目に見えている景色 #{pic.id}]」として、この続きで見える"
         if meta.get('ciel/long_running') and r.get('status') == 'started' and self.board is not None and r.get('task') is not None:
             self._cards[r['task']] = self.board.add('game', r.get('title') or name, tasks.RUNNING, 'ciel', ref=str(r['task']))
+        if meta.get('ciel/long_running') and r.get('status') == 'started' and self.activity is not None:
+            self.activity.task_started(f"{self.game}:{r.get('task')}", r.get('title') or name)
         return r
 
     def tool_ids(self, *roles: str) -> frozenset[str]:
@@ -402,6 +410,8 @@ class GameEnv:
             return
         self.state = _json(getattr(r.contents[0], 'text', '') if r.contents else '')
         self.publish()
+        if self.activity is not None:
+            self.activity.changed()   # 体がいましていること（いま）
 
     def context(self) -> str | None:
         """心と小脳へ渡す「[マイクラの様子]」（つなぐ先が無ければ None）"""
@@ -442,12 +452,18 @@ class GameEnv:
         if e.get('memorable'):
             self._remember(e['memorable'])
         urgency = e.get('urgency')
+        if e.get('say') and self.activity is not None:
+            self.activity.log(e['say'].strip('[]'), 'error' if urgency == 'urgent' else 'info')
         if e.get('say') and urgency in ('urgent', 'normal'):
             self._tell(kind, e['say'], URGENT_SETTLE if urgency == 'urgent' else SETTLE, key=e.get('key'))
 
     def _task_done(self, e: dict) -> None:
         """頼まれた技の終わり。付箋を閉じ、うまくいかなかったら同じ頼みの何回目かを添えて心へ知らせる"""
         card = self._cards.pop(e.get('task'), None)
+        if self.activity is not None:
+            # 止めた・替えた・切れたは「できなかった」にしない（その知らせは言わない）
+            self.activity.task_done(f"{self.game}:{e.get('task')}", e.get('title') or '', bool(e.get('ok')),
+                                    e.get('card_note'), quiet=not e.get('ok') and not e.get('failed'))
         if card is not None:
             self._close_card_of(card, e.get('card') or ('done' if e.get('ok') else 'failed'), e.get('card_note'))
         name = e.get('title') or ''

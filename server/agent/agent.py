@@ -47,6 +47,7 @@ import interruptions
 import listener
 import irodori_tts
 import errors
+import activity as activity_
 import app_env
 import game_env
 import goals
@@ -201,6 +202,7 @@ class Ciel(Agent):
         self.ear: listener.Listener | None = None   # pipeline の聞く係（entrypoint がつなぐ）
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
+        self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         """pipeline：相手が話し終えた。長く話したなら相づちを流す。発言（LiveKit の会話）は書き換えない
@@ -223,6 +225,8 @@ class Ciel(Agent):
             who = await self.mind.second_look(chat_ctx)   # 遊んでいるあいだは、意味の近さでもう一度見る（router.py）
         if who == 'skip':
             return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
+        if self.activity is not None:
+            self.activity.thinking(who)   # いま考えているのは心か小脳か（アプリの「いま」）
         if who == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
             ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
@@ -257,6 +261,9 @@ class Ciel(Agent):
                 elif delta is not None:
                     text.append(delta.content or '')
                     calls += [c.name for c in delta.tool_calls or []]
+                    if self.activity is not None:   # 結果が返るまで「呼んでいる」（function_tools_executed で消える）
+                        for c in delta.tool_calls or []:
+                            self.activity.call_started(c.call_id, c.name)
                 yield chunk
             done = True
         finally:
@@ -416,6 +423,10 @@ async def entrypoint(ctx: JobContext) -> None:
     def notify(msg: dict) -> None:
         # アプリへの知らせ（ciel.event）を、待たずに送る
         asyncio.create_task(send('ciel.event', msg))
+    # いまのシエル（activity.py）：心・道具・体の、いまの動き。止まって見えるとき、どこで待っているかをアプリで見る
+    act = agent.activity = activity_.Activity(notify)
+    session.on('agent_state_changed', act.agent_state)
+    session.on('function_tools_executed', act.tools_executed)
     # エラーの係（errors.py）：道具・裏の処理・体のエラーを記録し、アプリの接続の表示に知らせる
     errors.ERRORS.notify = notify
     errors.ERRORS.install(asyncio.get_running_loop())
@@ -480,10 +491,21 @@ async def entrypoint(ctx: JobContext) -> None:
         body = game
         if body is not None:
             body.say, body.diary, body.board, body.notify = voice.say_latest, ciel_diary, tasks, notify
+            body.activity = act
+            act.titles.update(body.titles)
+            act.body_doing = lambda: body.state.get('doing') if body.linked else None
         # 長い目的の係（goals.py）。ゲームの体があるときだけ。目的と段はアプリと配信の画面へ goal.state で送る（topic ciel.goal）
         goal_runner = None
         if body is not None:
-            goal_runner = goals.GoalRunner(voice.say_latest, publish=lambda m: asyncio.create_task(send(goals.TOPIC, m)))
+            def goal_publish(m: dict) -> None:
+                asyncio.create_task(send(goals.TOPIC, m))
+                act.changed()   # 目的の係が体で進めている段（いま）も変わる
+
+            def goal_say(why: str, **kw) -> None:
+                act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
+                voice.say_latest(why, **kw)
+            goal_runner = goals.GoalRunner(goal_say, publish=goal_publish)
+            act.goal_step = goal_runner.body_step
             goal_runner.register(body.game, game_env.GoalsAdapter(body), body.label)
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
@@ -519,13 +541,21 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
             # 体の道具が始めずに断られたのに、心が言葉だけで返したら、話し終えたあとに次の手を道具でさせる（1 度だけ）
-            agent.mind.on_stalled = lambda name, r: voice.say_latest(
+            def stalled(name: str, r: dict) -> None:
+                act.log(f'心へ：{act.label(name)}が始めなかったのに言葉だけで止まったので、次の手をうながした', 'wait')
+                say_stalled(name, r)
+            agent.mind.on_stalled = stalled
+            say_stalled = lambda name, r: voice.say_latest(   # noqa: E731
                 'game', settle=1.0,
                 instructions=f'[さっきの {name} は始めていない（{r.get("why") or r.get("reason")}）。そのあと道具を呼ばず、'
                              f'言葉だけで終わっている。次の手：{r.get("next")}。今、その手の道具を呼んで実際に始め、'
                              '始めたことだけを短く言う。持ち主に聞かないと決められないときだけ、短く聞く]')
             # 小脳が「渡しますね」と約束だけしたら、話し終えたあとに心が体の道具で続きをする（取りこぼしの受け皿）
-            agent.mind.on_promise = lambda said, text: voice.say_latest(
+            def promised(said: str, text: str) -> None:
+                act.log('心へ：小脳が約束だけしたので、体の道具で続きをうながした', 'wait')
+                say_promised(said, text)
+            agent.mind.on_promise = promised
+            say_promised = lambda said, text: voice.say_latest(   # noqa: E731
                 'game', settle=1.0,
                 instructions=f'[さっき相手の「{said[:60]}」に、小脳が「{text[:80]}」と答えたが、体の道具はまだ使っていない。'
                              '小脳は会話の流れを読み違えることがある。まず会話を見て、相手が本当にそれを頼んだかを確かめる。'
