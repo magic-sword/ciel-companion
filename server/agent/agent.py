@@ -518,6 +518,12 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.mind.router.start()
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
+            # 体の道具が始めずに断られたのに、心が言葉だけで返したら、話し終えたあとに次の手を道具でさせる（1 度だけ）
+            agent.mind.on_stalled = lambda name, r: voice.say_latest(
+                'game', settle=1.0,
+                instructions=f'[さっきの {name} は始めていない（{r.get("why") or r.get("reason")}）。そのあと道具を呼ばず、'
+                             f'言葉だけで終わっている。次の手：{r.get("next")}。今、その手の道具を呼んで実際に始め、'
+                             '始めたことだけを短く言う。持ち主に聞かないと決められないときだけ、短く聞く]')
             # 小脳が「渡しますね」と約束だけしたら、話し終えたあとに心が体の道具で続きをする（取りこぼしの受け皿）
             agent.mind.on_promise = lambda said, text: voice.say_latest(
                 'game', settle=1.0,

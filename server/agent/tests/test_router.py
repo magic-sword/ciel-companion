@@ -153,6 +153,30 @@ class AfterReplyTest(unittest.IsolatedAsyncioTestCase):
         m.after_reply(self.ctx('作り方の話をしてたんだ'), 'mind', 'そうなのですね', [], True)
         m.router.learn.assert_called_once_with('作り方の話をしてたんだ', None, 'no_tool')
 
+    async def test_words_only_after_a_refused_body_tool_get_one_nudge(self):
+        # 「丸石を集めてから作るのです」と言うだけで何も始めなかった件（2026-11-07）
+        from livekit.agents import llm
+        m = self.make_mind()
+        m.on_stalled = Mock()
+        refused = json.dumps({'status': 'error', 'reason': 'missing_materials', 'why': '材料が足りない',
+                              'next': 'start_goal で目的にする'}, ensure_ascii=False)
+
+        def ctx(call_id, output):
+            c = self.ctx('石のツルハシ作って')
+            c.items.append(llm.FunctionCall(call_id=call_id, name='craft_item', arguments='{}'))
+            c.items.append(llm.FunctionCallOutput(call_id=call_id, name='craft_item', output=output, is_error=False))
+            return c
+        m.after_reply(ctx('c1', refused), 'mind', '丸石を集めてから作るのです', [], True)
+        m.on_stalled.assert_called_once()
+        self.assertEqual(m.on_stalled.call_args[0][0], 'craft_item')
+        m.after_reply(ctx('c1', refused), 'mind', '丸石を集めてから作るのです', [], True)   # 同じ呼び出しは 1 度だけ
+        m.after_reply(ctx('c2', refused), 'mind', 'まだなのです', [], True)                # 続けては知らせない
+        self.assertEqual(m.on_stalled.call_count, 1)
+        m._nudged_at -= 60
+        m.after_reply(ctx('c3', refused), 'mind', '', ['collect_blocks'], True)   # 道具を呼んだなら知らせない
+        m.after_reply(ctx('c4', json.dumps({'status': 'started'})), 'mind', '始めたのです', [], True)   # 始めたなら知らせない
+        self.assertEqual(m.on_stalled.call_count, 1)
+
     async def test_not_playing_learns_nothing(self):
         m = self.make_mind()
         m.body.in_world = False

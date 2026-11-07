@@ -58,6 +58,7 @@ GOAL_ONE = frozenset(GOAL_TOOLS) - {'goal_status'}   # 1 つの返事で 1 つ�
 # 小脳が体の動きを約束した言い方（シエル自身の口ぐせなので、相手の言い方よりそろっている）。約束しても小脳は道具を持たないので、
 # 話し終えたら心が続きをする（「すぐに渡しますね」と言うだけで渡さなかった。2026-11-07）
 PROMISE = re.compile(r'(渡し|作り|作って|集め|集めて|取って|取り|掘り|掘って|探し|探して|持って|置き|置いて|拾い|拾って|降り|向かい|ついていき|ついて行き|そっちに行き|行き|あげ|止まり|待ち)(ます|ますね|ますよ|ましょう|きます|おきます|いきます|るのです|ますのです)')
+STALL_GAP = 30.0   # 言葉だけで止まったと心に知らせるのは、この秒数に 1 回まで
 FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
@@ -100,6 +101,9 @@ class Mind:
         self.semantic_tool: str | None = None   # 意味で心へ回したときの、いちばん近いきっかけの道具
         self._promised: str | None = None # 小脳が体の動きを約束だけした発言（心が道具でやったら、その道具の例文にする）
         self.on_promise = None            # 呼ぶと、心に約束の続きをさせる（agent.py が置く。口の why 'game'）
+        self.on_stalled = None            # 呼ぶと、断られた体の道具の次の手を心にさせる（agent.py が置く。口の why 'game'）
+        self._nudged: set[str] = set()    # 言葉だけで止まったと心に知らせた道具の呼び出し（同じものは 1 度だけ）
+        self._nudged_at = -STALL_GAP      # 最後に知らせた時刻（知らせた返事でまた止まっても、続けて知らせない）
 
     @property
     def client(self):
@@ -202,6 +206,16 @@ class Mind:
         """返事のあと：振り分けの例文を育て、小脳が体の動きを約束だけしたら心に続きをさせる"""
         if self.router is None or not self.playing() or not done:
             return
+        if who == 'mind' and not calls and self.on_stalled is not None and time.monotonic() - self._nudged_at >= STALL_GAP:
+            stalled = self._stalled(chat_ctx)
+            if stalled is not None:
+                # 体の道具が始めずに断られ（次の手つき）、心が道具を呼ばずに言葉だけで返した。「丸石を集めてから作るのです」と
+                # 言って何も始めず、「始めてる？」に「まだ始めていない」と答えた（2026-11-07）。指示文だけでは止まらないので、
+                # コードで 1 度だけ心に続きをさせる
+                name, result = stalled
+                self._nudged_at = time.monotonic()
+                debug_log.record('mind_route', why='stalled', tool=name, reason=result.get('reason'))
+                self.on_stalled(name, result)
         said = latest_user_text(chat_ctx)
         asked = self.game_calls()
         game = [c for c in calls if c in asked]
@@ -222,6 +236,25 @@ class Mind:
             debug_log.record('mind_route', why='promise', said=said[:60], text=text[:80])
             if self.on_promise is not None:
                 self.on_promise(said, text)
+
+    def _stalled(self, chat_ctx: llm.ChatContext) -> tuple[str, dict] | None:
+        """この返事の直前の道具の結果のうち、体を動かす道具が始めずに断られ、次の手（next）があるもの。まだ知らせていなければ"""
+        acts = self._ids('act')
+        for item in reversed(list(chat_ctx.items)):
+            if isinstance(item, llm.FunctionCall):
+                continue
+            if not isinstance(item, llm.FunctionCallOutput):
+                return None   # この返事の道具の結果は、ここまで
+            if item.name not in acts or item.call_id in self._nudged:
+                continue
+            try:
+                result = json.loads(item.output)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(result, dict) and result.get('status') == 'error' and result.get('next'):
+                self._nudged.add(item.call_id)
+                return item.name, result
+        return None
 
     def _learn(self, text: str, tool: str | None, source: str) -> None:
         task = asyncio.create_task(self.router.learn(self._strip(text), tool, source))
