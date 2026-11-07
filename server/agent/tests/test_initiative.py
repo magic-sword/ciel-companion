@@ -571,3 +571,49 @@ class BoardFormTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PlayTests(unittest.IsolatedAsyncioTestCase):
+    """遊んでいるあいだの自発（2026-11-07）：ゲームの様子を考える係に渡し、体でやりたいこと（act）で話す番を開く"""
+
+    async def test_the_game_goes_to_the_thinker_and_act_thoughts_are_kept(self):
+        i = make('normal', history=Conversation())
+        i.game = lambda: '[マイクラの様子]\n時刻：夜（敵が出る）'
+        reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(
+            {'thoughts': [{'text': 'たいまつを作りたい', 'kind': 'act', 'motivation': 4, 'stimulus': '夜で暗い'}]})))])
+        i._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(return_value=reply))))
+        await i._think(0.0)
+        request = json.loads(i._client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
+        self.assertIn('夜', request['game'])
+        self.assertEqual([(t.kind, t.text) for t in i.thoughts], [('act', 'たいまつを作りたい')])
+
+    def test_not_playing_sends_no_game(self):
+        i = make('normal')
+        i.game = lambda: None
+        self.assertIsNone(i._game())
+        i.game = lambda: (_ for _ in ()).throw(RuntimeError('broken'))
+        self.assertIsNone(i._game())   # 様子が読めなくても考えは続ける
+
+    def test_while_playing_she_thinks_in_the_quiet_even_in_normal_talk_without_doubling(self):
+        i = make('normal', history=Conversation())
+        i._last = i._thought_at = 0.0
+        i.unanswered = 3
+        self.assertFalse(i._should_think(initiative.PLAY_THINK_SECONDS))   # 遊んでいなければ、ふだんは静かなあいだ考えない
+        i.game = lambda: '[マイクラの様子]'
+        self.assertFalse(i._should_think(initiative.PLAY_THINK_SECONDS - 1))
+        self.assertTrue(i._should_think(initiative.PLAY_THINK_SECONDS))
+
+    def test_an_act_card_opens_a_turn_in_normal_talk_after_a_short_quiet(self):
+        i = make_board('normal')
+        i.game = lambda: '[マイクラの様子]'
+        i._last = 100.0
+        i.thoughts = [Thought('夜が来る前に、たいまつを作りたい', 'act', 4.0, created=100.0)]
+        i.sync_board(100.0)
+        self.assertIn('体でやりたいこと', i.board.cards[0].title)
+        self.assertIsNone(i.pick(100.0 + initiative.ACT_PAUSE - 1))
+        self.assertEqual(i.pick(100.0 + initiative.ACT_PAUSE).kind, 'act')
+        i._spoke_at = i._last = 110.0                      # 話す番を開いた。持ち主は黙ったまま
+        self.assertIsNone(i.pick(110.0 + initiative.ACT_PAUSE))
+        self.assertIsNotNone(i.pick(110.0 + initiative.ACT_GAP))
+        i.game = lambda: None                               # 遊んでいなければ act で開かない
+        self.assertIsNone(i.pick(110.0 + initiative.ACT_GAP))

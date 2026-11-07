@@ -39,9 +39,16 @@ const FIND_NEAR = 32;        // 探しているあいだ、見回す距離
 const WALK_RINGS = [16, 32, 48];   // 歩いて探すとき、始めた所から広げる距離（8 方向ずつ）
 const WAYPOINT_MS = 30000;   // 歩いて探すとき、1 か所へ向かう上限（水辺を回り込み続けて 90 秒かかった。2026-11-07）
 const DIG_MAX = 24;          // 掘って探すとき、掘り下げる段の上限
+const AUTO_WALK_RINGS = [16];   // auto で地中の物を探すとき、掘る前に歩いて見回す輪（山肌・崖に出ていることが多い）
+const DIG_SPOTS = 3;           // 掘って探すとき、場所を変えてやり直す上限
+const DIG_SPOT_RANGE = 16;     // 掘り始める場所を探す距離
+const DIG_SPOT_CANDIDATES = 256;
+const DIG_SPOT_GAP = 6;        // やり直すとき、前に試した場所からあける距離
+const DIG_RETRY = new Set(['danger', 'not_found', 'cannot_dig']);   // 別の場所で掘り直す失敗（needs_tool は心に返す）
 const FLUIDS = /^(lava|water|bubble_column)$/;
 const TABLE_SEARCH = 32;    // 作業台を探す距離
 const TABLE_RANGE = 2;
+const TABLE_SPOTS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [-2, 0], [0, 2], [0, -2]];   // 作業台を置く場所（足元からのずれ）
 const CRAFT_SETTLE_TICKS = 4;      // 作業台を使うときに近づく距離
 // 掘る道具の段（弱い順）。要る道具を言うとき、いちばん弱いものを言う
 const TOOL_TIERS = ['wooden', 'golden', 'stone', 'copper', 'iron', 'diamond', 'netherite'];
@@ -145,6 +152,19 @@ function counts(bot) {
   return c;
 }
 
+// ブロックを掘って取れる物の名前（石 → 丸石、草ブロック → 土、石炭の鉱石 → 石炭）と、ブロックそのものの名前
+function dropsOf(registry, blocks) {
+  const out = new Set(blocks.map((b) => b.name));
+  for (const b of blocks) {
+    for (const d of b.drops ?? []) {
+      const id = typeof d === 'object' ? (d.drop?.id ?? d.drop) : d;
+      const name = registry.items[id]?.name;
+      if (name) out.add(name);
+    }
+  }
+  return out;
+}
+
 function gained(before, after) {
   const g = {};
   for (const [name, n] of Object.entries(after)) {
@@ -154,7 +174,6 @@ function gained(before, after) {
   return g;
 }
 
-const total = (g) => Object.values(g).reduce((a, b) => a + b, 0);
 
 // 掘る前に、足が地面に着くのを待つ（GROUND_WAIT_MS まで）。mineflayer は掘り始めた瞬間に掘る時間を決め、足が浮いていると
 // 5 倍にする（地面に降りても戻さない）。着いた直後の跳ねている瞬間に掘り始め、原木 1 本に 15 秒、腕を振り続けて
@@ -354,14 +373,17 @@ const SKILL_RUN = {
   // 足元を depth ブロック掘って降りる。自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
   // 見える所に無いブロックを探す（docs/minecraft-design-ja.md の 25 章）。how：
   //   walk：始めた所から 8 方向へ、少しずつ遠くまで歩いて見回す（木・花・砂・水辺など、地面の上の物）
-  //   dig：向いている方へ階段状に掘り下げながら見る（石・鉱石など、地中の物。上り道が残る）
-  //   auto：ツルハシが要るブロック（石・鉱石）なら dig、ほかは walk（どちらで探すかは、ふつう心が知識を見て決める）
+  //   dig：固い地面から、階段状に掘り下げながら見る（石・鉱石など、地中の物。上り道が残る）
+  //   auto：ツルハシが要るブロック（石・鉱石）なら、まず近くを歩いて見回し（山肌・崖に出ていることが多い）、無ければ dig。
+  //         ほかは walk（どちらで探すかは、ふつう心が知識を見て決める）
   // 見つけたら止める（集めるのは collect）。見つけたブロックは覚えるので、続けて collect すれば掘れる
   async find(bot, args, token, { guard }) {
     const blocks = blocksFor(bot.registry, args.block);
     if (!blocks.length) throw new Failed('unknown_block');
     const ids = blocks.map((b) => b.id);
-    const how = args.how === 'auto' || !args.how ? (blocks.some((b) => b.harvestTools) ? 'dig' : 'walk') : args.how;
+    const auto = args.how === 'auto' || !args.how;
+    const underground = blocks.some((b) => b.harvestTools);
+    const how = auto ? (underground ? 'dig' : 'walk') : args.how;
     const start = bot.entity.position.clone();
     const seen = () => {
       const p = bot.findBlocks({ matching: ids, maxDistance: FIND_NEAR, count: FIND_COUNT }).find((q) => knows(bot, q));
@@ -369,32 +391,18 @@ const SKILL_RUN = {
     };
     const first = seen();
     if (first) return { ...first, how, already: true };
-    if (how === 'dig') return digToFind(bot, args.max ?? DIG_MAX, token, guard, seen, start);
-    // walk：8 方向・3 つの輪
-    let visited = 0;
-    for (const r of WALK_RINGS) {
-      for (let k = 0; k < 8 && !token.cancelled; k++) {
-        const a = (k / 8) * 2 * Math.PI;
-        const x = Math.round(start.x + r * Math.cos(a)), z = Math.round(start.z + r * Math.sin(a));
-        const limit = setTimeout(() => bot.pathfinder.setGoal(null), WAYPOINT_MS);   // 長くかかる方は、あきらめて次の方へ
-        try {
-          // 1 回だけ向かう（walk のやり直し・足場集めはしない。行けない方は飛ばして次の方へ）
-          await guarded(guard, token, () => {
-            bot.pathfinder.setMovements(playerMovements(bot));
-            return watched(bot, () => bot.pathfinder.goto(new goals.GoalNear(x, bot.entity.position.y, z, 4)));
-          });
-        } catch (err) {
-          if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;   // 行けない方は飛ばす
-        } finally {
-          clearTimeout(limit);
-        }
-        visited += 1;
-        const hit = seen();
-        if (hit) return { ...hit, how, visited };
+    if (how === 'dig') {
+      if (auto) {   // 先に近くを歩いて見回す（1 つめの輪だけ）
+        const hit = await walkToFind(bot, AUTO_WALK_RINGS, token, guard, seen, start);
+        if (token.cancelled) return undefined;
+        if (hit) return { ...hit, how: 'walk' };
       }
+      return digSomewhere(bot, args.max ?? DIG_MAX, token, guard, seen);
     }
+    const hit = await walkToFind(bot, WALK_RINGS, token, guard, seen, start);
     if (token.cancelled) return undefined;
-    throw new Failed('not_found', { how, visited });
+    if (hit) return { ...hit, how };
+    throw new Failed('not_found', { how, visited: WALK_RINGS.length * 8 });
   },
 
   async dig_down(bot, args, token, { guard }) {
@@ -423,6 +431,10 @@ const SKILL_RUN = {
     if (!blocks.length) throw new Failed('unknown_block');
     const ids = blocks.map((b) => b.id);
     const names = new Set(blocks.map((b) => b.name));
+    // 数えるのは、そのブロックから取れる物だけ（石なら丸石）。道を作るときに掘れた土などは数えない
+    // （丸石 2 個と土 1 個で「3 個集めた」と終わり、目的の係が丸石 2/3 で止まった。2026-11-07）
+    const wanted = dropsOf(bot.registry, blocks);
+    const total = (g) => Object.entries(g).reduce((n, [k, v]) => n + (wanted.has(k) ? v : 0), 0);
     const before = counts(bot);
     let got = {};
     // 掘れない（道具が無い・掘ると危ない）ブロックは、collectblock が黙って飛ばす。同じ場所を何度も選ばないよう、試した場所を覚える
@@ -494,13 +506,126 @@ const SKILL_RUN = {
 };
 
 
-// 向いている方へ、階段状に掘り下げながら探す（find の dig）。1 段ごとに：前の足の高さ・頭の高さ・前の 1 段下を掘り、そこへ降りる。
+// 始めた所から輪を広げ、8 方向へ歩いて見回す（find の walk）。見つけたら { found, at, visited }、無ければ null
+async function walkToFind(bot, rings, token, guard, seen, start) {
+  let visited = 0;
+  for (const r of rings) {
+    for (let k = 0; k < 8 && !token.cancelled; k++) {
+      const a = (k / 8) * 2 * Math.PI;
+      const x = Math.round(start.x + r * Math.cos(a)), z = Math.round(start.z + r * Math.sin(a));
+      const limit = setTimeout(() => bot.pathfinder.setGoal(null), WAYPOINT_MS);   // 長くかかる方は、あきらめて次の方へ
+      try {
+        // 1 回だけ向かう（walk のやり直し・足場集めはしない。行けない方は飛ばして次の方へ）
+        await guarded(guard, token, () => {
+          bot.pathfinder.setMovements(playerMovements(bot));
+          return watched(bot, () => bot.pathfinder.goto(new goals.GoalNear(x, bot.entity.position.y, z, 4)));
+        });
+      } catch (err) {
+        if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;   // 行けない方は飛ばす
+      } finally {
+        clearTimeout(limit);
+      }
+      visited += 1;
+      const hit = seen();
+      if (hit) return { ...hit, visited };
+    }
+  }
+  return null;
+}
+
+// マイクラの yaw：0 が北（-z）、π/2 が西（-x）
+const DIRS = [new Vec3(0, 0, -1), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(1, 0, 0)];
+const NOT_GROUND = /_leaves$|_log$|_wood$|^(snow|vine|short_grass|tall_grass|fern|large_fern|moss_carpet|azalea|flowering_azalea|mangrove_roots)$/;
+
+// feet に立って dir へ 1 段目を掘り始められるか：水・溶岩に触れない・降りた先に足場がある・自然のブロックだけ
+// （湖の上に張り出した薄い地面では、どの向きも降りた先が空っぽ。2026-11-07）
+function canStartDig(bot, feet, dir) {
+  const front = feet.plus(dir);
+  const step = front.offset(0, -1, 0);
+  const targets = [front.offset(0, 1, 0), front, step];
+  for (const p of targets) {
+    const around = [p, p.offset(1, 0, 0), p.offset(-1, 0, 0), p.offset(0, 0, 1), p.offset(0, 0, -1), p.offset(0, 1, 0)];
+    if (around.some((q) => FLUIDS.test(bot.blockAt(q)?.name ?? ''))) return false;
+  }
+  const floor = bot.blockAt(step.offset(0, -1, 0));
+  if (!floor || floor.boundingBox !== 'block') return false;
+  return targets.every((p) => {
+    const b = bot.blockAt(p);
+    return !b || b.boundingBox === 'empty' || (NATURAL.test(b.name) && bot.canDigBlock(b));
+  });
+}
+
+// feet から掘り始められる向き（向いている方から順に 4 方向）。どれも駄目なら null
+function digDirection(bot, feet) {
+  const yaw = ((bot.entity.yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const first = Math.round(yaw / (Math.PI / 2)) % 4;
+  for (let k = 0; k < 4; k++) {
+    const dir = DIRS[(first + k) % 4];
+    if (canStartDig(bot, feet, dir)) return dir;
+  }
+  return null;
+}
+
+// 近くで、掘り始められる立ち場所（見えている自然の地面で、上 2 つが空き、どこかの向きへ掘り始められる所）。近い順
+function digSpots(bot, tried) {
+  const ids = Object.values(bot.registry.blocksByName)
+    .filter((b) => b.boundingBox === 'block' && NATURAL.test(b.name) && !NOT_GROUND.test(b.name)).map((b) => b.id);
+  const here = bot.entity.position;
+  return bot.findBlocks({ matching: ids, maxDistance: DIG_SPOT_RANGE, count: DIG_SPOT_CANDIDATES })
+    .map((p) => p.offset(0, 1, 0))
+    .filter((feet) => [feet, feet.offset(0, 1, 0)].every((q) => (bot.blockAt(q)?.boundingBox ?? 'block') === 'empty'))
+    .filter((feet) => knows(bot, feet.offset(0, -1, 0)) && !tried.some((t) => t.distanceTo(feet) < DIG_SPOT_GAP))
+    .filter((feet) => digDirection(bot, feet))
+    .sort((a, b) => a.distanceTo(here) - b.distanceTo(here));
+}
+
+// 掘って探す（find の dig）。足元から掘り始められなければ、近くの固い地面へ移ってから掘る。
+// 水に当たる・洞窟に抜けるなど、その場所で続けられなければ、別の場所でやり直す（DIG_SPOTS か所まで）
+async function digSomewhere(bot, max, token, guard, seen) {
+  const tried = [];
+  let last = null;
+  for (let n = 0; n < DIG_SPOTS && !token.cancelled; n++) {
+    let feet = bot.entity.position.floored();
+    let dir = bot.entity.onGround && !tried.some((t) => t.distanceTo(feet) < DIG_SPOT_GAP) ? digDirection(bot, feet) : null;
+    if (!dir) {
+      const spot = digSpots(bot, tried)[0];
+      if (!spot) break;
+      tried.push(spot);
+      const limit = setTimeout(() => bot.pathfinder.setGoal(null), WAYPOINT_MS);
+      try {
+        await guarded(guard, token, () => {
+          bot.pathfinder.setMovements(playerMovements(bot));
+          return watched(bot, () => bot.pathfinder.goto(new goals.GoalBlock(spot.x, spot.y, spot.z)));
+        });
+      } catch (err) {
+        if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+        continue;   // 行けない：次の場所へ
+      } finally {
+        clearTimeout(limit);
+      }
+      if (token.cancelled) break;
+      feet = bot.entity.position.floored();
+      dir = digDirection(bot, feet);
+      if (!dir) continue;
+    }
+    tried.push(feet.clone());
+    try {
+      return await digToFind(bot, max, token, guard, seen, bot.entity.position.clone(), dir);
+    } catch (err) {
+      // 道具が要る（needs_tool）は、場所を変えても同じなので心に返す。ほかは別の場所で掘り直す
+      if (!(err instanceof Failed) || !DIG_RETRY.has(err.message)) throw err;
+      if (err.message === 'not_found' && err.note?.stopped_at !== 'cave') throw err;   // 深くまで掘って無かった：やり直さない
+      last = err;
+    }
+  }
+  if (token.cancelled) return undefined;
+  if (last) throw last;
+  throw new Failed('not_found', { how: 'dig', dug: 0, stopped_at: 'no_ground' });
+}
+
+// dir へ、階段状に掘り下げながら探す。1 段ごとに：前の足の高さ・頭の高さ・前の 1 段下を掘り、そこへ降りる。
 // 自然のブロックだけ掘る。水・溶岩に当たりそうなら止める（danger）。素手で掘れない（落ちない）ブロックに当たったら止める（needs_tool）
-async function digToFind(bot, max, token, guard, seen, start) {
-  const yaw = bot.entity.yaw;
-  // マイクラの yaw：0 が北（-z）、π/2 が西（-x）。いちばん近い 4 方向にする
-  const dirs = [new Vec3(0, 0, -1), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(1, 0, 0)];
-  const dir = dirs[Math.round(((yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 2)) % 4];
+async function digToFind(bot, max, token, guard, seen, start, dir) {
   let dug = 0;
   for (let i = 0; i < max && !token.cancelled; i++) {
     if (guard?.active) await guard.idle();
@@ -634,16 +759,43 @@ async function placeTable(bot) {
   }
   if (!item) return null;
   const feet = bot.entity.position.floored();
-  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
-    const at = feet.offset(dx, 0, dz);
-    const here = bot.blockAt(at);
+  const open = (p) => {
+    const b = bot.blockAt(p);
+    return b && b.boundingBox === 'empty' && !FLUIDS.test(b.name);
+  };
+  const tryPlace = async (at) => {
     const below = bot.blockAt(at.offset(0, -1, 0));
-    if (here?.name !== 'air' || below?.boundingBox !== 'block') continue;
-    await bot.equip(item, 'hand');
-    await bot.lookAt(at.offset(0.5, 0.5, 0.5), true);
-    await bot.placeBlock(below, new Vec3(0, 1, 0));
+    if (!open(at) || below?.boundingBox !== 'block') return null;
+    try {
+      await bot.equip(item, 'hand');
+      await bot.lookAt(at.offset(0.5, 0.5, 0.5), true);
+      await bot.placeBlock(below, new Vec3(0, 1, 0));
+    } catch {
+      return null;   // 置けなかった（面が見えない・届かない）：次の場所へ
+    }
     const placed = bot.blockAt(at);
-    if (placed?.name === 'crafting_table') return placed;
+    return placed?.name === 'crafting_table' ? placed : null;
+  };
+  // 足と同じ高さ、1 段上、1 段下の順に、近くの空いた所（下が地面）を探す
+  for (const dy of [0, 1, -1]) {
+    for (const [dx, dz] of TABLE_SPOTS) {
+      const placed = await tryPlace(feet.offset(dx, dy, dz));
+      if (placed) return placed;
+    }
+  }
+  // 空きが無い（1 マスの穴の中など）：プレイヤーと同じく、横の自然のブロックを 1 つ掘って場所を空けてから置く（2026-11-07）
+  for (const dir of DIRS) {
+    const at = feet.plus(dir);
+    const wall = bot.blockAt(at);
+    const below = bot.blockAt(at.offset(0, -1, 0));
+    if (!wall || wall.boundingBox !== 'block' || below?.boundingBox !== 'block') continue;
+    if (!NATURAL.test(wall.name) || !bot.canDigBlock(wall)) continue;
+    const near = [at.offset(1, 0, 0), at.offset(-1, 0, 0), at.offset(0, 0, 1), at.offset(0, 0, -1), at.offset(0, 1, 0)];
+    if (near.some((q) => FLUIDS.test(bot.blockAt(q)?.name ?? ''))) continue;   // 掘ると水・溶岩が流れ込む
+    if (bot.tool?.equipForBlock) await bot.tool.equipForBlock(wall, {}).catch(() => {});
+    await bot.dig(wall, true);
+    const placed = await tryPlace(at);
+    if (placed) return placed;
   }
   throw new Failed('no_room');
 }

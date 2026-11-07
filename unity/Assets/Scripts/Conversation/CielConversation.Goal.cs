@@ -30,10 +30,13 @@ namespace Ciel.Conversation
         {
             public string type;
             public GoalInfo goal;
-            public GoalStep[] steps;
+            public string[] path;          // いちばん上の目的から、今いる小さな目標までの名前（小さな目標が無ければ 1 つ）
+            public GoalStep[] steps;       // 今いる目標（小さな目標があれば、いちばん下）の段
             public string[] changes, next;
             public string attention;
 
+            /// 今いる小さな目標までの道筋（「作業台を置く場所を空ける」。いちばん上の目的だけなら null）
+            public string SubPath => path != null && path.Length > 1 ? string.Join(" › ", path, 1, path.Length - 1) : null;
             /// 目的があるか（goal が null のときも、JsonUtility は空の GoalInfo を作る）
             public bool HasGoal => goal != null && goal.id > 0 && !string.IsNullOrEmpty(goal.title);
             /// 動いている・止まって待っている（planning・running・paused）

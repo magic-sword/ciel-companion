@@ -592,7 +592,17 @@ class Goals:
         note = r.get('note') or {}
         if r.get('ok') and note.get('short'):   # 頼んだ数に届かなかった
             r = {**r, 'ok': False, 'reason': note['short']}
+        elif r.get('ok') and step.kind == 'gather' and int((note.get('gained') or {}).get(a['item'], 0)) < max(1, a['count'] - got):
+            # 体は数え終えたが、この物は足りない（体が別の物も数えた）：近くにもう無い扱いで、探す段から続ける
+            r = {**r, 'ok': False, 'reason': 'not_found'}
         return r
+
+    def snapshot(self):
+        """小さな目標の前後で何か変わったかを見るための、体の様子（持ち物と、ブロック単位の場所）"""
+        s = self.body.state or {}
+        pos = s.get('pos') or {}
+        return (tuple(round(pos.get(k, 0)) for k in ('x', 'y', 'z')),
+                tuple(sorted((s.get('inventory') or {}).items())))
 
     def _find_step(self, item: str) -> dict:
         return {'kind': 'find', 'args': {'item': item, 'how': 'auto'}, 'label': f'{ja(item)}を探す', 'progress': None}
@@ -617,7 +627,11 @@ class Goals:
         r = await self.body.plan(goal.spec['make'], int(goal.spec.get('count') or 1))
         if r.get('status') != 'planned' or not r['steps']:
             return None
-        return self._steps(r['steps']), f'{self.why(reason, result)}ので、計画を直した'
+        steps = self._steps(r['steps'])
+        rest = [s.label for s in goal.steps if s.status != 'done']
+        if [s['label'] for s in steps] == rest:   # 計画し直しても同じ：直ったことにしない（同じ計画を 3 回くり返した。2026-11-07）
+            return None
+        return steps, f'{self.why(reason, result)}ので、計画を直した'
 
     def why(self, reason: str, result: dict | None = None) -> str:
         note = (result or {}).get('note') or {}

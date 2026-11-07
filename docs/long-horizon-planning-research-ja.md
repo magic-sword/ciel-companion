@@ -75,6 +75,24 @@
 3. 「探す」の技（掘り下げる・探し歩く）を体に足す（Plan4MC の Finding-skill。丸石が見えないときに止まった件）。
 4. うまくいけば、作り方の木で決まらない目的（建てる・探検する）を、心と知識の窓口で分ける形へ広げる。
 
+## 5. 小さな目標を重ねる（2026-11-07 に追加で調べた）
+
+石のつるはしの途中で「作業台を置く場所が無い」と止まり、心は分かっていても次の手に進めなかった。失敗から小さな目標を作り、終わったら元の目標へ戻る仕組みを考えるため、深さの決め方とループの防ぎ方を調べた。
+
+| 名前 | 中身 | シエルに使えるところ |
+|---|---|---|
+| **ADaPT（2023、NAACL 2024）** | まず実行し、**失敗したときだけ**その仕事を分ける（as-needed）。分けた子も失敗したら、さらに分ける。深さの上限 1〜3 で試し、**深いほど成功が上がった**（最大の伸びは 1 → 2、2 → 3 でも伸びる）。作り物のマイクラ（TextCraft）では上限 4 を与え、使った深さはレシピの深さに合わせて 1.9 → 2.8 に増えた | 失敗したときだけ小さな目標を作る。深さはレシピや状況に合わせて伸びてよい |
+| **GITM（2023）** | 目的を知識で**部分目標の木**に分ける。Overworld の技術の木の物を全部取れた | 作り方で決まる部分（体の `planGoal`）は、深さに関係なく木として前もって分けられる |
+| **BAR（ACL 2025 Findings）** | 目的の状態から**逆向きに**、再帰的に分ける（動的計画法のように）。状態の食い違いを確かめる部分と、段ごとの記憶を持つ | 作り方の木を逆向きに辿る今の `planGoal` と同じ考え方。深い物（ダイヤ）でも静的に計画できる |
+| **Goal-Driven Autonomy（GDA、2010〜）** | 予想との**食い違いに気づく → なぜかを説明する → 新しい目標を作る → 目標を並べ替えて選ぶ（goal management）** の 4 つで回す。ゲーム（StarCraft）で使われた | 「作業台を置けない（食い違い）→ 穴の中で周りに空きが無い（説明）→ 場所を空ける・移る（新しい目標）」。目標の管理を係が持つ |
+| **Infinite Agentic Loops（2026-07）** | 6,549 のエージェントの作りを調べ、止まる上限の無い繰り返しで実際に 68 件失敗していた。いちばん多いのは、失敗をそのままやり直す `while True` | 深さだけでは止まらない。**同じ物のやり直し・進まない状態**を見て止める上限が要る |
+
+分かったこと：
+
+- **深さを小さく決め打ちすると、複雑な目的ほど届かない**（ADaPT は深いほど成功が上がった）。ループは深さではなく、別の上限で止めるのがよい。
+- 研究でよく使う止め方：**同じ目標が先祖にいたら作らない（輪の検出）**・**進んでいない（持ち物や場所が変わらない）なら止める**・**手数や時間の予算**・**同じ理由の失敗が続いたら人に聞く**。
+- 分け方は 2 種類ある。**知識で決まる分け方**（作り方の木。LLM を使わず、深くても有限）と、**失敗から作る分け方**（ADaPT・GDA。心が状況を見て作る）。
+
 ## 出典
 
 - [Building effective agents（Anthropic）](https://www.anthropic.com/research/building-effective-agents)
@@ -87,3 +105,7 @@
 - [Mindcraft / MineCollab（arXiv 2504.17950）](https://arxiv.org/html/2504.17950v1)
 - [HTN と BT の組み合わせ（AIIDE 2018）](https://ojs.aaai.org/index.php/AIIDE/article/view/13044)・[Real Agents（LLM＋GOAP）](https://redirect.github.com/AkiKurisu/Real-Agents)
 - [LLM ゲームエージェントの論文一覧（ACM CSUR の調査）](https://github.com/git-disl/awesome-LLM-game-agent-papers)
+- [ADaPT（arXiv 2311.05772）](https://arxiv.org/pdf/2311.05772)
+- [BAR（ACL 2025 Findings）](https://aitopics.org/doc/arxivorg:7E9C5C7E)
+- [Goal-Driven Autonomy（AIIDE）](https://ojs.aaai.org/index.php/AIIDE/article/download/12605/12453)
+- [When Agents Do Not Stop: Infinite Agentic Loops（arXiv 2607.01641）](https://arxiv.org/abs/2607.01641)

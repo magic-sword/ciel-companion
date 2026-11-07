@@ -36,7 +36,9 @@ export function planCraft(registry, recipes, name, count, inv, hasTable) {
   };
 
   const ensure = (n, k, depth, top) => {
-    const owned = have[n] ?? 0;
+    // 作りたい物そのものは、持っていても「もう k 個」作る（途中の物だけ、持っている分を使う）。
+    // 石のつるはしを 1 本持っていて「もう一本」を頼まれ、作る段だけの計画になって、丸石が足りずに止まった（2026-11-07）
+    const owned = top ? 0 : (have[n] ?? 0);
     if (owned >= k) {
       have[n] = owned - k;
       return;

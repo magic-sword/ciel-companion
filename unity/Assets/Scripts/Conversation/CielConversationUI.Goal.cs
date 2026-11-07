@@ -83,7 +83,8 @@ namespace Ciel.Conversation
             var root = (RectTransform)go.transform;
             _streamGoalCard = Rect("GoalCard", root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -18), new Vector2(320, 100));
             Rounded(_streamGoalCard, new Color(0.03f, 0.10f, 0.17f, 0.78f), 14);
-            Edge(_streamGoalCard, WithAlpha(Cyan, 0.55f));
+            // 縁は板と同じ角の半径にする（Edge はカプセル形なので、背の高いカードだと大きな丸になる）
+            SetRadius(Img(_streamGoalCard, "circle_outline", WithAlpha(Cyan, 0.55f), child: true), 14);
             var layout = _streamGoalCard.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(14, 14, 10, 12);
             layout.childControlWidth = layout.childControlHeight = true;
@@ -194,7 +195,9 @@ namespace Ciel.Conversation
             var b = new StringBuilder();
             b.Append($"<b>{Esc(g.goal.title)}</b>\n<color=#8FB3C3>{Esc(g.goal.by_label)}");
             if (!string.IsNullOrEmpty(g.goal.why)) b.Append($"・{Esc(g.goal.why)}");
-            b.Append("</color>\n\n");
+            b.Append("</color>\n");
+            if (g.SubPath != null) b.Append($"<color=#9FDDF0>› 先に：{Esc(g.SubPath)}</color>\n");
+            b.Append("\n");
             foreach (var s in g.steps ?? new CielConversation.GoalStep[0]) b.Append($"{Mark(s.status)} {Esc(s.label)}{Progress(s)}\n");
             if (!string.IsNullOrEmpty(g.attention)) b.Append($"\n<color=#FFC46B>止まっている：{Esc(g.attention)}</color>\n");
             if (g.changes != null && g.changes.Length > 0)
@@ -216,6 +219,7 @@ namespace Ciel.Conversation
             var st = g.goal.status;
             var tail = st == "done" ? "  <color=#5BF0C8>できた！</color>" : st == "stopped" ? "  <color=#8FB3C3>やめた</color>" : "";
             b.Append($"<b>{Esc(g.goal.title)}</b>{tail}\n<size=12><color=#8FB3C3>{Esc(g.goal.by_label)}</color></size>\n");
+            if (g.SubPath != null) b.Append($"<size=13><color=#9FDDF0>› 先に：{Esc(g.SubPath)}</color></size>\n");
             var steps = g.steps ?? new CielConversation.GoalStep[0];
             var (done, _, _) = Count(g);
             var skip = Mathf.Max(0, Mathf.Min(done, steps.Length - StreamStepsShown));

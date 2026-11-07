@@ -2,6 +2,7 @@
 import asyncio
 import json
 import unittest
+import unittest.mock
 
 import goals
 import minecraft
@@ -165,6 +166,110 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.runner.stop())['status'], 'no_goal')
 
 
+    async def test_subgoal_runs_then_the_parent_step_is_retried(self):
+        # 作業台を置く場所が無くて止まった件（2026-11-07）：小さな目標を作り、できたら止まった段からやり直す
+        a = FakeAdapter([steps('丸石を集める', '石のツルハシを作る'), None],
+                        [{'ok': True}, {'ok': False, 'reason': 'no_room'}, {'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '石のツルハシを作る', {'make': 'stone_pickaxe'})
+        await settle(self.runner)
+        self.assertIn('add_subgoal', self.said.lines[-1])
+        r = await self.runner.add_subgoal('広い場所へ移る', {})
+        self.assertEqual(r['path'], ['石のツルハシを作る', '広い場所へ移る'])
+        self.assertEqual(r['for'], '石のツルハシを作る')
+        await settle(self.runner)
+        st = self.runner.state()
+        self.assertEqual(st['path'], ['石のツルハシを作る', '広い場所へ移る'])
+        self.assertEqual(st['goal']['title'], '石のツルハシを作る')
+        self.assertIn('› 広い場所へ移る', self.runner.context())
+        self.assertEqual(self.runner.finish_step(True)['status'], 'ok')   # 小さな目標は心が進める段
+        await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'done')
+        self.assertEqual(a.ran, ['丸石を集める', '石のツルハシを作る', '石のツルハシを作る'])
+        self.assertIn('「広い場所へ移る」ができた', self.said.lines[-2])
+
+    async def test_subgoals_nest_without_a_fixed_depth(self):
+        a = FakeAdapter([steps('A'), steps('B'), steps('C'), steps('D')],
+                        [{'ok': False, 'reason': 'x'}, {'ok': False, 'reason': 'x'}, {'ok': False, 'reason': 'x'},
+                         {'ok': True}, {'ok': True}, {'ok': True}, {'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '吊り橋', {'make': 'bridge'})
+        await settle(self.runner)
+        for title, item in (('板', 'planks'), ('原木', 'log'), ('斧', 'axe')):
+            r = await self.runner.add_subgoal(title, {'make': item})
+            self.assertEqual(r['status'], 'started')
+            await settle(self.runner)
+        await settle(self.runner)
+        await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'done')
+        self.assertEqual(a.ran, ['A', 'B', 'C', 'D', 'C', 'B', 'A'])
+
+    async def test_a_subgoal_equal_to_an_ancestor_is_refused(self):
+        a = FakeAdapter([steps('作業台を置く'), steps('場所を空ける')],
+                        [{'ok': False, 'reason': 'x'}, {'ok': False, 'reason': 'x'}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '作業台を置く', {'make': 'crafting_table'})
+        await settle(self.runner)
+        await self.runner.add_subgoal('場所を空ける', {})
+        await settle(self.runner)
+        r = await self.runner.add_subgoal('作業台を 置く', {'make': 'crafting_table'})
+        self.assertEqual(r['reason'], 'loop')
+        r = await self.runner.add_subgoal('場所を空ける', {})
+        self.assertEqual(r['reason'], 'loop')
+
+    async def test_subgoal_budget_asks_the_owner(self):
+        a = FakeAdapter([steps('A')] + [steps('S')] * 3, [{'ok': False, 'reason': 'x'}] * 4)
+        self.runner.register('mc', a, 'マイクラ')
+        with unittest.mock.patch.object(goals, 'MAX_SUBGOALS', 2):
+            await self.runner.start('mc', '目的', {'make': 'x'})
+            await settle(self.runner)
+            for i in range(2):
+                self.assertEqual((await self.runner.add_subgoal(f'小{i}', {'make': f'y{i}'}))['status'], 'started')
+                await settle(self.runner)
+            r = await self.runner.add_subgoal('小2', {'make': 'y2'})
+        self.assertEqual(r['reason'], 'budget')
+        self.assertIn('持ち主に聞く', self.said.lines[-1])
+
+    async def test_subgoals_that_change_nothing_stop_the_goal(self):
+        a = FakeAdapter([steps('A')] + [steps('S')] * 2,
+                        [{'ok': False, 'reason': 'x'}, {'ok': True}, {'ok': False, 'reason': 'x'}, {'ok': True},
+                         {'ok': False, 'reason': 'x'}])
+        a.snapshot = lambda: 'same'
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '目的', {'make': 'x'})
+        await settle(self.runner)
+        for i in range(2):
+            await self.runner.add_subgoal(f'小{i}', {'make': f'y{i}'})
+            await settle(self.runner)
+            await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'paused')
+        self.assertIn('変わらない', self.said.lines[-1])
+
+    async def test_asking_the_same_paused_goal_again_replans(self):
+        # 止まっている目的と同じ物の start_goal が「あとで」に並ぶだけで、止まったままだった（2026-11-07）
+        a = FakeAdapter([steps('作る'), steps('集める', '作る')], [{'ok': False, 'reason': 'x'}, {'ok': True}, {'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '石のつるはしを作る', {'make': 'stone_pickaxe'})
+        await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'paused')
+        r = await self.runner.start('mc', '石のつるはしを作る', {'make': 'stone_pickaxe'})
+        self.assertEqual(r['status'], 'started')
+        await settle(self.runner)
+        self.assertEqual(self.runner.goal.status, 'done')
+        self.assertEqual(self.runner.next, [])
+
+    async def test_stop_only_the_subgoal(self):
+        a = FakeAdapter([steps('A'), None], [{'ok': False, 'reason': 'x'}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '目的', {'make': 'x'})
+        await settle(self.runner)
+        await self.runner.add_subgoal('移る', {})
+        await settle(self.runner)
+        r = await self.runner.stop(only_current=True)
+        self.assertEqual(r['back_to'], '目的')
+        self.assertEqual(self.runner.active.title, '目的')
+        self.assertEqual(self.runner.goal.status, 'paused')
+
     async def test_app_buttons_stop_and_resume(self):
         import types
         a = FakeAdapter([steps('A', 'B')], [{'ok': False, 'reason': 'not_found'}, {'ok': True}, {'ok': True}])
@@ -234,6 +339,34 @@ class MinecraftGoalsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body.asked[1][1], {'block': 'cobblestone', 'how': 'auto'})
         self.assertEqual(runner.goal.status, 'done')
         self.assertEqual(runner.state()['changes'], ['丸石が見える所に無いので、探す段を足した'])
+
+    async def test_the_same_plan_again_is_not_a_repair(self):
+        # 計画し直しても同じ「作る」だけの計画で、「計画を直した」を 3 回くり返した件（2026-11-07）
+        same = [{'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]
+        body = FakeBody([same, same], [{'ok': False, 'reason': 'missing_materials', 'note': {'needs': {'cobblestone': 2}}}])
+        runner = goals.GoalRunner(Said())
+        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
+        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
+        await settle(runner)
+        self.assertEqual(runner.goal.status, 'paused')
+        self.assertEqual(runner.state()['changes'], [])
+        self.assertIn('材料が足りない', runner.goal.attention)
+
+    async def test_gather_done_but_short_of_the_item_goes_on(self):
+        # 体が丸石 2 個と土 1 個で「3 個集めた」と終え、理由なしで止まった件（2026-11-07）：足りない分を探して続ける
+        body = FakeBody([[{'kind': 'gather', 'item': 'cobblestone', 'count': 3},
+                          {'kind': 'craft', 'item': 'stone_pickaxe', 'count': 1}]],
+                        [{'ok': True, 'note': {'gained': {'cobblestone': 2, 'dirt': 1}}},
+                         {'ok': True, 'note': {'found': 'stone'}},
+                         {'ok': True, 'note': {'gained': {'cobblestone': 1}}},
+                         {'ok': True, 'note': {'gained': {'stone_pickaxe': 1}}}])
+        runner = goals.GoalRunner(Said())
+        runner.register('minecraft', minecraft.Goals(body), 'マイクラ')
+        await runner.start('minecraft', '石のツルハシを作る', {'make': 'stone_pickaxe'})
+        await settle(runner)
+        self.assertEqual([a[0] for a in body.asked], ['collect', 'find', 'collect', 'craft'])
+        self.assertEqual(body.asked[2][1], {'block': 'cobblestone', 'count': 1})
+        self.assertEqual(runner.goal.status, 'done')
 
 
 

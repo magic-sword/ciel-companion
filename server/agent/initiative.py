@@ -70,6 +70,11 @@ THINK_SETTLE_SECONDS = 3.0    # 新しい発言のあと、続きを待ってか
 THINK_MIN_SECONDS = 20.0      # 考えるのは、この秒数に 1 回まで
 IDLE_THINK_SECONDS = 60.0     # 静かなあいだに考える間隔（返事が無ければ倍にしていく）
 IDLE_THINK_MAX = 600.0
+# ゲームで遊んでいるあいだ（game がある）：静かでも、返事が無くても倍にせず、この間隔で考える。ゲームの様子は話さなくても
+# 変わるので（夜が近い・材料がそろった）、自分から動くきっかけを逃さない。ローカル LLM の 1 回は 13〜49 秒（2026-11-07）
+PLAY_THINK_SECONDS = float(os.environ.get('CIEL_THOUGHT_PLAY_SECONDS', '60'))
+ACT_PAUSE = 6.0               # 体でやりたいこと（act）は、誰もこれだけ話していなければ話す番を開く
+ACT_GAP = 90.0                # act で話す番を開いたあと、相手が話さなくても、次に開くまでの間
 THINK_TIMEOUT = 20.0
 CONTINUE_AFTER = 1.5          # シエルが話し終えて、相手がこれだけ話し始めなければ、続けて話してよい
 CONTINUE_WINDOW = 4.0         # 続けて話すのは、話し終えてからこの秒数まで（過ぎたら、長い沈黙を待つ）
@@ -104,10 +109,11 @@ LEARNED_CHARS = 400
 BOARD_THOUGHTS = 2            # 付箋にする、気になっていることの数
 PER_TOPIC_KIND = 2             # 同じ話題・同じ種類の考えを持つ数
 CONVERSATION_TURNS = 20
-KINDS = ('comment', 'question', 'recall', 'research', 'correction', 'share')
+KINDS = ('comment', 'question', 'recall', 'research', 'correction', 'share', 'act')
 # 話しかけるときに添える、考えの種類（シエルが考えと違う話をしないように）
 KIND_LABELS = {'comment': '感想', 'question': '相手に聞きたいこと', 'recall': '前の話に戻りたい',
-               'research': '調べてみたいこと', 'correction': '言い直したいこと', 'share': '自分のことで話したいこと'}
+               'research': '調べてみたいこと', 'correction': '言い直したいこと', 'share': '自分のことで話したいこと',
+               'act': '体でやりたいこと'}
 
 
 @dataclass
@@ -168,6 +174,9 @@ class Initiative:
         self._cards: dict[str, board.Card] = {}   # 考えの id → 気になっている付箋
         self.curious = None                # curiosity.Curiosity（調べてみたいことを自分で調べる。agent.py がつなぐ）
         self.diary = None                  # diary.Diary（シエル自身に本当にあった出来事。agent.py がつなぐ）
+        # 呼ぶと、遊んでいるゲームの様子と今の目的（文字列）。遊んでいなければ None（agent.py がつなぐ）。
+        # 考える係に渡し、体でやりたいこと（act）を考えさせる。遊んでいるあいだは静かでも考える（PLAY_THINK_SECONDS）
+        self.game = None
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -272,10 +281,27 @@ class Initiative:
         if (self._new_at is not None and not self._user_busy
                 and now - max(self._new_at, self._last) >= THINK_SETTLE_SECONDS):
             return True
+        if self._busy_quiet():
+            return False
+        # ゲームで遊んでいるあいだは、ふだん・おしゃべりのどちらでも、静かでも一定の間で考える（返事が無くても倍にしない）
+        if self._game() is not None:
+            return now - self._last >= PLAY_THINK_SECONDS and now - self._thought_at >= PLAY_THINK_SECONDS
         # 静かなあいだにも考える（おしゃべりのときだけ。返事が無いほど間をあける）
         idle = min(IDLE_THINK_SECONDS * 2 ** self.unanswered, IDLE_THINK_MAX)
         return (self.style.talk == 'chatty' and not self._user_busy and not self._agent_busy
                 and now - self._last >= idle and now - self._thought_at >= idle)
+
+    def _busy_quiet(self) -> bool:
+        return self._user_busy or self._agent_busy
+
+    def _game(self) -> str | None:
+        """遊んでいるゲームの様子と今の目的（遊んでいなければ None）"""
+        if self.game is None:
+            return None
+        try:
+            return self.game() or None
+        except Exception:   # ゲームの様子が読めなくても、考えは続ける
+            return None
 
     def _user_spoke(self) -> bool:
         """まだ考えに使っていない確定した発言に、相手の発言があるか"""
@@ -357,6 +383,12 @@ class Initiative:
         if self.reviewing(now):
             return None   # 調べて分かったことで答えが出た考えを、見直す前に話さない
         shown = [t for t in self.thoughts if t.id in self._cards]
+        # 体でやりたいこと：ふだんでも、少し静かなら話す番を開き、心にやるかを決めさせる（遊んでいるあいだの自発。2026-11-07）。
+        # 返事が無くても ACT_GAP あければ、次のやりたいことで開いてよい（遊んでいるあいだ、持ち主は黙っていることが多い）
+        acts = [t for t in shown if t.kind == 'act']
+        if (acts and self._game() is not None and now - self._last >= ACT_PAUSE
+                and (self._spoke_at is None or now - self._spoke_at >= ACT_GAP)):
+            return max(acts, key=lambda t: self.score(t, now))
         if self.continuing(now):
             return max(shown, key=lambda t: self.score(t, now), default=None)
         if talk == 'chatty' and self._spoke_at is None:
@@ -580,6 +612,7 @@ class Initiative:
         memories = self._memories()
         wall = datetime.now(JST)
         events = self.diary.lines(wall) if self.diary is not None else []
+        game = self._game()
         request = {
             'now': f'{wall:%Y-%m-%d %H:%M}（{"月火水木金土日"[wall.weekday()]}）',
             'talk': self.style.talk,
@@ -593,6 +626,7 @@ class Initiative:
             **({'topic': self.topic} if self.topic else {}),
             **({'memories': memories} if memories else {}),
             **({'ciel_events': events} if events else {}),
+            **({'game': game} if game else {}),
             **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
                if any(t.offered for t in sent) else {}),
         }

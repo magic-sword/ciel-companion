@@ -29,10 +29,23 @@ async def start_goal(context: RunContext, title: str, make_item: str | None = No
 
 
 @function_tool
-async def stop_goal(context: RunContext) -> str:
-    """今の目的をやめる（あとでやる目的も消す）。"""
+async def add_subgoal(context: RunContext, title: str, make_item: str | None = None, count: int = 1, why: str = '') -> str:
+    """目的の段が止まったとき、その原因を片づける小さな目標を作る。できたら自動で、止まった段からやり直す。
+    小さな目標の中でまた止まれば、さらに小さな目標を作れる。title は見せる言葉（例「作業台を置ける広い場所へ移る」）。
+    物を作る・集めるなら make_item に英語の ID と count（係が段に分ける）。無ければ自分で体の道具を使って進め、finish_step で終える。
+    上の目標と同じものは作れない（輪になる）。"""
     runner = _runner(context)
-    return _result(await runner.stop() if runner else {'status': 'unavailable'})
+    if runner is None:
+        return _result({'status': 'unavailable'})
+    spec = {'make': make_item, 'count': max(1, min(64, count))} if make_item else {}
+    return _result(await runner.add_subgoal(title, spec, why=why))
+
+
+@function_tool
+async def stop_goal(context: RunContext, only_subgoal: bool = False) -> str:
+    """今の目的をやめる（あとでやる目的も消す）。only_subgoal=true なら、今の小さな目標だけやめて、上の目標で止まって待つ。"""
+    runner = _runner(context)
+    return _result(await runner.stop(only_current=only_subgoal) if runner else {'status': 'unavailable'})
 
 
 @function_tool
@@ -56,7 +69,8 @@ async def goal_status(context: RunContext) -> str:
     return _result(runner.status() if runner else {'status': 'unavailable'})
 
 
-TOOLS = [start_goal, stop_goal, resume_goal, finish_step, goal_status]
+TOOLS = [start_goal, add_subgoal, stop_goal, resume_goal, finish_step, goal_status]
 GOAL_TOOLS = tuple(t.id for t in TOOLS)
 # 配信のコメントからは目的を動かさない（体を動かすのは持ち主とシエルだけ）。見るだけはよい
-FROM_COMMENTS = {start_goal: False, stop_goal: False, resume_goal: False, finish_step: False, goal_status: True}
+FROM_COMMENTS = {start_goal: False, add_subgoal: False, stop_goal: False, resume_goal: False, finish_step: False,
+                 goal_status: True}

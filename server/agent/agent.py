@@ -466,6 +466,14 @@ async def entrypoint(ctx: JobContext) -> None:
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:
+            # 内なる考えに、マイクラの様子と今の目的を渡す（遊んでいるあいだだけ）。体でやりたいこと（act）を考え、
+            # 静かでも一定の間で考える（initiative.py の game・PLAY_THINK_SECONDS）
+            def game_now() -> str | None:
+                if not body.linked or not (body.state or {}).get('connected'):
+                    return None
+                goal = goal_runner.context() if goal_runner is not None else None
+                return '\n'.join(p for p in (body.context(), goal) if p)
+            talker.game = game_now
             ctx.room.on('data_received', body.on_data)
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
         # 目（eyes.py）：アプリから送られた画像を受け取り、話の切れ目に心が見て話す（why 'image'）
