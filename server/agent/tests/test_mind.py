@@ -121,6 +121,9 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         # 話す番（自分から話す）も、心が話すか黙るかを決める
         m.on_say('initiative')
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
+        self.assertEqual(m.reply_origin, 'initiative')
+        m.route(self.ctx_with('こんにちは'), {})
+        self.assertEqual(m.reply_origin, 'reply')
 
     async def test_several_people_since_ciel_go_to_the_mind(self):
         h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))

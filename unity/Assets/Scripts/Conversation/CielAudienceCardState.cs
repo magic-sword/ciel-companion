@@ -1,28 +1,106 @@
-// 視聴者向けの要約。受信済みの目的・状態だけを使い、内部ログや頼んだ人の名前は出さない。
+// 受信した事実から表示する。待機・思考・道具の返答待ち・体の実行を区別する。
 using System;
 
 namespace Ciel.Conversation
 {
     public sealed class CielAudienceCardState
     {
-        public bool visible, attention;
-        public string heading = "シエルの目的", title = "", current = "", progress = "";
+        public bool visible = true, attention;
+        public string heading = "シエル｜待機中", title = "今は作業していません", current = "次の呼びかけ・依頼を待っています";
+        public string progress = "", elapsed = "", phase = "idle";
         public float fraction = -1;
 
+        static string Seconds(float value, float age) => $"{Math.Max(0, (int)(value + age))}秒経過";
+
         public static CielAudienceCardState From(CielConversation.GoalState goal,
-            CielConversation.ActivityState activity, bool connected, bool recent)
+            CielConversation.ActivityState activity, bool connected, bool recent, float age = 0, bool userSpeaking = false)
         {
             var result = new CielAudienceCardState();
-            if (!connected) return result;
-            string work = null;
-            if (activity?.tasks?.Length > 0) work = activity.tasks[0].title;
+            if (!connected)
+            {
+                result.phase = "disconnected";
+                result.heading = "シエル｜未接続";
+                result.title = "会話に接続していません";
+                result.current = "操作画面で接続を確認してください";
+                result.attention = true;
+                return result;
+            }
+            string work = activity?.tasks?.Length > 0 ? activity.tasks[0].title : null;
             if (string.IsNullOrEmpty(work)) work = activity?.doing;
             if (string.IsNullOrEmpty(work)) work = activity?.goal_step;
-            if (string.IsNullOrEmpty(work) && activity?.calls?.Length > 0) work = activity.calls[0].label + "の結果を待っている";
+            string summary = "";
+            if (activity?.calls?.Length > 0)
+            {
+                var call = activity.calls[0];
+                result.phase = "calling";
+                result.heading = "シエル｜道具の返答待ち";
+                result.title = call.label;
+                result.current = "道具を呼び出し、返答を待っています";
+                summary = call.label + "の実行開始・結果待ち";
+                result.progress = string.IsNullOrEmpty(work) ? "実行開始はまだ確認できていません" : "体の作業：" + work;
+                result.elapsed = Seconds(call.for_s, age);
+                result.attention = call.for_s + age >= 30;
+                if (result.attention) result.current = "道具の返答待ちが続いています";
+            }
+            else if (!string.IsNullOrEmpty(work))
+            {
+                result.phase = "working";
+                result.heading = "シエル｜作業中";
+                result.title = work;
+                result.current = "作業の終了通知を待っています";
+                summary = "実行中：" + work;
+                if (activity.tasks?.Length > 0) result.elapsed = Seconds(activity.tasks[0].for_s, age);
+            }
+            else if (userSpeaking)
+            {
+                result.phase = "listening";
+                result.heading = "シエル｜聞き取り中";
+                result.title = "話を聞いています";
+                result.current = "声を受け取っています";
+            }
+            else if (activity?.mind == "thinking")
+            {
+                result.phase = "thinking";
+                bool initiative = activity.thinking_origin == "initiative";
+                result.heading = initiative ? "シエル｜自発的に考え中" : "シエル｜考え中";
+                result.title = initiative ? "自分から話すことを考えています"
+                    : activity.thinking_origin == "tool_result" ? "道具の結果を確認しています"
+                    : activity.thinking_origin == "comment" ? "コメントへの返事を考えています" : "返事・次の行動を考えています";
+                result.current = "道具の呼び出しはまだありません";
+                result.elapsed = Seconds(activity.mind_for, age);
+                summary = result.title;
+            }
+            else if (activity?.mind == "speaking")
+            {
+                result.phase = "speaking";
+                result.heading = "シエル｜発話中";
+                result.title = "話しています";
+                result.current = "声で返事をしています";
+            }
+            else if (activity?.background_thinking == true)
+            {
+                result.phase = "background";
+                result.heading = "シエル｜自発的に考え中";
+                result.title = "裏で考えを整理しています";
+                result.current = "体の作業・道具の呼び出しはありません";
+                result.elapsed = Seconds(activity.background_for, age);
+                summary = result.title;
+            }
+            else if (activity == null)
+            {
+                result.phase = "unknown";
+                result.heading = "シエル｜状態の確認中";
+                result.title = "状態の通知を待っています";
+                result.current = "まだ待機中かどうかは分かりません";
+            }
+            else if (activity.detail_version < 1)
+            {
+                result.current = "実行中の作業はありません";
+                result.progress = "詳しい思考状態はまだ確認できていません";
+            }
 
             if (goal != null && goal.Active)
             {
-                result.visible = true;
                 result.title = goal.goal.title;
                 CielConversation.GoalStep now = null;
                 int done = 0, all = 0;
@@ -33,11 +111,19 @@ namespace Ciel.Conversation
                     if (step.status == "done") done++;
                     else if (now == null) now = step;
                 }
-                result.current = !string.IsNullOrEmpty(work) ? work : now?.label ?? "準備している";
+                if (!string.IsNullOrEmpty(summary)) result.current = summary;
+                else if (result.phase == "idle")
+                {
+                    result.heading = "シエル｜手順の開始待ち";
+                    result.current = now != null ? "次の手順：" + now.label : "実行開始の通知を待っています";
+                }
                 if (goal.goal.status == "paused")
                 {
+                    result.phase = "paused";
+                    result.heading = "シエル｜停止中";
                     result.attention = true;
-                    result.current = string.IsNullOrEmpty(goal.attention) ? "いったん止まっている" : goal.attention;
+                    result.elapsed = "";
+                    result.current = string.IsNullOrEmpty(goal.attention) ? "いったん止まっています" : goal.attention;
                 }
                 if (now?.progress?.Length == 2 && now.progress[1] > 0)
                 {
@@ -52,29 +138,13 @@ namespace Ciel.Conversation
                 }
                 return result;
             }
-
-            if (!string.IsNullOrEmpty(work))
+            if (result.phase == "idle" && goal != null && goal.HasGoal && recent)
             {
-                result.visible = true;
-                result.heading = "いまのシエル";
-                result.title = work;
-                result.current = "作業を進めている";
-                return result;
-            }
-            if (goal != null && goal.HasGoal && recent)
-            {
-                result.visible = true;
                 result.title = goal.goal.title;
+                result.heading = "シエル｜直前の目的";
                 result.current = goal.goal.status == "done" ? "できた！" : goal.goal.status == "stopped" ? "やめた"
                     : string.IsNullOrEmpty(goal.attention) ? "うまくいかなかった" : goal.attention;
                 result.attention = goal.goal.status == "failed";
-                return result;
-            }
-            if (activity?.mind == "thinking" || activity?.mind == "speaking")
-            {
-                result.visible = true;
-                result.heading = "いまのシエル";
-                result.title = activity.mind == "thinking" ? "考えている" : "話している";
             }
             return result;
         }

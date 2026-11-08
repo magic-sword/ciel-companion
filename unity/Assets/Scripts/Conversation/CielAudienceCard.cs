@@ -11,7 +11,7 @@ namespace Ciel.Conversation
         CielConversation _conversation;
         Canvas _canvas;
         GameObject _panel;
-        Text _heading, _title, _current, _progress;
+        Text _heading, _title, _current, _progress, _elapsed;
         Image _bar, _accent;
 
         void Awake()
@@ -53,19 +53,28 @@ namespace Ciel.Conversation
             _accent.color = new Color(0.5f, 0.91f, 1);
             var font = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP" }, 64);
             _heading = Label("Heading", panel, font, 42, 38, 30, 50);
+            _heading.rectTransform.offsetMax = new Vector2(-250, -30);
+            _elapsed = Label("Elapsed", panel, font, 28, 650, 38, 42);
+            _elapsed.alignment = TextAnchor.UpperRight;
             _title = Label("Title", panel, font, 64, 38, 100, 140);
             _title.fontStyle = FontStyle.Bold;
             _title.resizeTextForBestFit = true;
             _title.resizeTextMinSize = 36;
             _title.resizeTextMaxSize = 64;
             _current = Label("Current", panel, font, 46, 38, 258, 98);
+            _current.resizeTextForBestFit = true;
+            _current.resizeTextMinSize = 32;
+            _current.resizeTextMaxSize = 46;
             _progress = Label("Progress", panel, font, 38, 38, 385, 55);
+            _progress.resizeTextForBestFit = true;
+            _progress.resizeTextMinSize = 28;
+            _progress.resizeTextMaxSize = 38;
             var track = Box("ProgressTrack", panel, new Vector2(0, 0), new Vector2(1, 0), new Vector2(38, 24), new Vector2(-38, 34));
             track.gameObject.AddComponent<Image>().color = new Color(0.14f, 0.25f, 0.3f);
             _bar = Box("ProgressFill", track, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
             _bar.color = new Color(0.5f, 0.91f, 1);
             SetLayer(go);
-            _panel.SetActive(false);
+            Show(new CielAudienceCardState { heading = "シエル｜状態の確認中", title = "状態の通知を待っています", current = "" });
         }
 
         // offsetMin/Maxを明示し、カメラの比率が変わっても画面の内側へ収める。
@@ -106,6 +115,7 @@ namespace Ciel.Conversation
             _title.text = state.title;
             _current.text = string.IsNullOrEmpty(state.current) ? "" : "いま：" + state.current;
             _progress.text = state.progress;
+            _elapsed.text = state.elapsed;
             var color = state.attention ? new Color(1, 0.77f, 0.42f) : new Color(0.5f, 0.91f, 1);
             _accent.color = _bar.color = color;
             _bar.transform.parent.gameObject.SetActive(state.fraction >= 0);
@@ -117,7 +127,9 @@ namespace Ciel.Conversation
             if (_conversation == null) return;
             var recent = Time.unscaledTime - _conversation.GoalSince < 8;
             Show(CielAudienceCardState.From(_conversation.Goal, _conversation.Activity,
-                _conversation.Status == CielConversation.State.Connected, recent));
+                _conversation.Status == CielConversation.State.Connected, recent,
+                _conversation.Activity == null ? 0 : Time.unscaledTime - _conversation.ActivityAt,
+                _conversation.MicEnabled && _conversation.UserSpeaking));
             if (Output.StreamCamera != null) _canvas.worldCamera = Output.StreamCamera;
         }
     }

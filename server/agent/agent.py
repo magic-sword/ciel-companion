@@ -226,7 +226,7 @@ class Ciel(Agent):
         if who == 'skip':
             return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
         if self.activity is not None:
-            self.activity.thinking(who)   # いま考えているのは心か小脳か（アプリの「いま」）
+            self.activity.thinking(who, self.mind.reply_origin)
         if who == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
             ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
@@ -468,6 +468,7 @@ async def entrypoint(ctx: JobContext) -> None:
                                    memories=lambda: book.last.notes() if book is not None and book.last is not None
                                    and book.last_sure and style.presence in ('solo', 'close') else [])
     replies.initiative = talker   # 相手への返事に、話したかった考えを添える
+    talker.on_thinking = act.background
     talker.diary = ciel_diary
     if PIPELINE:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める

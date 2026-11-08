@@ -26,6 +26,18 @@ def agent_finished(i, at):
     i._agent_done_at = at
 
 
+class ThinkingStatusTests(unittest.IsolatedAsyncioTestCase):
+    async def test_status_clears_on_failure_and_cancellation(self):
+        for error in (RuntimeError('test'), asyncio.CancelledError()):
+            i = make()
+            states = []
+            i.on_thinking = states.append
+            i._think_once = AsyncMock(side_effect=error)
+            with self.assertRaises(type(error)):
+                await i._think(100)
+            self.assertEqual(states, [True, False])
+
+
 class DecisionTests(unittest.TestCase):
     def test_continues_right_after_her_reply_when_nobody_speaks(self):
         i = make()

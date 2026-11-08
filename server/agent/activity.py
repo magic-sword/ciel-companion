@@ -36,6 +36,11 @@ class Activity:
         self._clock = clock
         self.mind = 'idle'                # idle・listening・thinking・speaking
         self.who: str | None = None       # 考えている係（mind：心・talker：小脳）
+        self.thinking_origin = ''
+        self._mind_epoch = 0
+        self.background_thinking = False
+        self._background_at = clock()
+        self._background_epoch = 0
         self._mind_at = clock()
         self._calls: dict[str, dict] = {}     # call_id → {name, label, at}
         self._tasks: dict[str, dict] = {}     # 技の鍵 → {title, at}（体でしている技）
@@ -56,16 +61,27 @@ class Activity:
             return
         self._set_mind(state if state in ('listening', 'thinking', 'speaking') else 'idle')
 
-    def thinking(self, who: str) -> None:
+    def thinking(self, who: str, origin: str = '') -> None:
         """返事を作り始めた（心か小脳か）"""
-        self.who = who
+        self.who, self.thinking_origin = who, origin
+        self._mind_epoch += 1
+        self._mind_at = self._clock()
         self._set_mind('thinking')
+        self.changed()
+
+    def background(self, active: bool) -> None:
+        """内なる考えを生成している間だけ。考えの本文は送らない。"""
+        if self.background_thinking != active:
+            self.background_thinking, self._background_at = active, self._clock()
+            self._background_epoch += 1
+            self.changed()
 
     def _set_mind(self, state: str) -> None:
         if state != self.mind:
             self.mind, self._mind_at = state, self._clock()
             if state != 'thinking':
                 self.who = None
+                self.thinking_origin = ''
             self.changed()
 
     # ---- 道具 ----
@@ -142,6 +158,10 @@ class Activity:
         return {
             'v': VERSION, 'type': 'activity.state',
             'mind': self.mind, 'who': self.who or '', 'mind_for': round(now - self._mind_at, 1),
+            'detail_version': 1, 'thinking_origin': self.thinking_origin,
+            'mind_epoch': self._mind_epoch, 'background_epoch': self._background_epoch,
+            'background_thinking': self.background_thinking,
+            'background_for': round(now - self._background_at, 1) if self.background_thinking else 0,
             'calls': [{'label': c['label'], 'for_s': round(now - c['at'], 1)} for c in self._calls.values()],
             'tasks': [{'title': t['title'], 'for_s': round(now - t['at'], 1)} for t in self._tasks.values()],
             'doing': doing or '', 'goal_step': step or '',
@@ -166,7 +186,7 @@ class Activity:
             return
         s = self.state()
         # 経った秒数だけが違うなら送らない（アプリが数え足す）
-        shown = json.dumps({k: v for k, v in s.items() if k != 'mind_for'} | {
+        shown = json.dumps({k: v for k, v in s.items() if k not in ('mind_for', 'background_for')} | {
             'calls': [c['label'] for c in s['calls']], 'tasks': [t['title'] for t in s['tasks']],
             'log': [e['id'] for e in s['log']]}, ensure_ascii=False, sort_keys=True)
         if shown == self._shown:

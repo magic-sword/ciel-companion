@@ -36,6 +36,10 @@ namespace Ciel.Conversation
         {
             public string type, mind, who, doing, goal_step;   // mind：idle・listening・thinking・speaking。who：mind・talker
             public float mind_for;
+            public int detail_version;
+            public string thinking_origin;
+            public bool background_thinking;
+            public float background_for;
             public ActivityCall[] calls;
             public ActivityTask[] tasks;
             public ActivityLog[] log;

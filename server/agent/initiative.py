@@ -162,6 +162,7 @@ class Initiative:
         self._new_at: float | None = None   # まだ考えに使っていない発言が確定した時刻
         self._thought_at = -1e9          # 最後に考えた時刻
         self._thinking: asyncio.Task | None = None
+        self.on_thinking = None          # 状態だけをアプリへ知らせる（考えの本文は渡さない）
         self._thought_done_at = -1e9     # 最後に考え終わった時刻（話す番を、考え終わるまで開けておくかを見る）
         self._spoke_at: float | None = None   # 自分から話しかけた時刻（そのあと人が話したかで、返事を見る）
         self._task: asyncio.Task | None = None
@@ -603,6 +604,15 @@ class Initiative:
         return lines
 
     async def _think(self, now: float) -> None:
+        if self.on_thinking is not None:
+            self.on_thinking(True)
+        try:
+            await self._think_once(now)
+        finally:
+            if self.on_thinking is not None:
+                self.on_thinking(False)
+
+    async def _think_once(self, now: float) -> None:
         started = time.monotonic()
         if self.history is not None:
             self._seen_id = self.history.settled_through()

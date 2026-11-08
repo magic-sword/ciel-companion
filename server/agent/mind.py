@@ -89,6 +89,8 @@ class Mind:
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
         self._deep = False               # 次の返事は心が作る
+        self.reply_origin = ''
+        self._next_origin = ''
         self.from_comment = False        # 今の返事（と、その道具の結果の続き）は配信のコメントへの返事
         self.waiting = None              # まだ言っていない知らせ（why → 指示）を返す（mouth.Mouth.waiting）
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
@@ -116,6 +118,7 @@ class Mind:
     def on_say(self, why: str) -> None:
         """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
         self.from_comment = why == 'comment'
+        self._next_origin = why
         if why in DEEP_WHY:
             self._deep = True
 
@@ -124,7 +127,10 @@ class Mind:
         tail = _tail(list(chat_ctx.items))
         self.last_why = self.semantic_tool = None
         if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
+            self.reply_origin = 'tool_result'
             return 'mind'   # 道具の結果を受けた続き
+        self.reply_origin = self._next_origin or 'reply'
+        self._next_origin = ''
         if self._deep:
             self._deep = False
             return 'mind'

@@ -78,6 +78,37 @@ class ActivityTest(unittest.TestCase):
         self.assertEqual(self.sent[-1]['type'], 'activity.state')
 
 
+class DetailTest(unittest.TestCase):
+    def test_background_timer_and_cleanup(self):
+        clock, sent = Clock(), []
+        a = activity.Activity(sent.append, clock=clock)
+        a.background(True)
+        clock.now += 4
+        self.assertTrue(a.state()['background_thinking'])
+        self.assertEqual(a.state()['background_for'], 4)
+        self.assertEqual(a.state()['detail_version'], 1)
+        a.publish()
+        before = len(sent)
+        clock.now += 3
+        a.publish()
+        self.assertEqual(len(sent), before)
+        a.background(False)
+        self.assertFalse(a.state()['background_thinking'])
+
+    def test_repeated_thinking_resets_the_timer_and_is_published(self):
+        clock, sent = Clock(), []
+        a = activity.Activity(sent.append, clock=clock)
+        a.thinking('mind', 'initiative')
+        clock.now += 5
+        before = len(sent)
+        a.thinking('mind', 'initiative')
+        self.assertEqual(a.state()['mind_for'], 0)
+        self.assertEqual(a.state()['thinking_origin'], 'initiative')
+        self.assertGreater(len(sent), before)
+        a.agent_state(types.SimpleNamespace(new_state='listening'))
+        self.assertEqual(a.state()['thinking_origin'], '')
+
+
 class BatchTest(unittest.IsolatedAsyncioTestCase):
     async def test_changes_close_together_are_sent_once(self):
         sent = []

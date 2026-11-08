@@ -89,9 +89,11 @@ namespace Ciel.Conversation
                 return ($"いま：体が{a.tasks[0].title} {Sec(c.ActivitySeconds(a.tasks[0].for_s))}", Cyan, true);
             if (!string.IsNullOrEmpty(a.goal_step)) return ($"いま：目的の段「{a.goal_step}」", Cyan, true);
             if (a.mind == "thinking")
-                return ($"いま：{(WhoName(a.who) != "" ? WhoName(a.who) + "が" : "")}考えている {Sec(c.ActivitySeconds(a.mind_for))}", Mint, true);
+                return ($"いま：{(a.thinking_origin == "initiative" ? "自発的に" : "")}考えている {Sec(c.ActivitySeconds(a.mind_for))}", Mint, true);
             if (a.mind == "speaking") return ("いま：話している", Mint, true);
             if (!string.IsNullOrEmpty(a.doing)) return ($"いま：体が{a.doing}", Cyan, true);
+            if (a.background_thinking)
+                return ($"いま：裏で自発的に考えている {Sec(c.ActivitySeconds(a.background_for))}", Mint, true);
             if (!activeOnly && a.log != null && a.log.Length > 0 && c.ActivitySeconds(a.log[0].ago) < ActivityRecent)
                 return ($"いま：{a.log[0].text}", KindColor(a.log[0].kind), true);
             if (!activeOnly && c.GameLinked) return ("いま：待っている", Idle, true);
@@ -111,6 +113,9 @@ namespace Ciel.Conversation
             var mind = a.mind == "thinking" ? $"考えている（{(WhoName(a.who) != "" ? WhoName(a.who) : "返事")}）{Sec(c.ActivitySeconds(a.mind_for))}"
                 : a.mind == "speaking" ? "話している" : a.mind == "listening" ? "聞いている" : "待っている";
             b.Append(Head("心")).Append("　").Append(Esc(mind)).Append('\n');
+            b.Append(Head("裏の思考")).Append(a.background_thinking
+                ? $"　自発的に考えを整理している {Sec(c.ActivitySeconds(a.background_for))}\n"
+                : a.detail_version >= 1 ? "　いまは考えを生成していない\n" : "　詳しい状態はまだ確認できていない\n");
             // 呼んでいる道具
             b.Append(Head("呼んでいる道具")).Append('\n');
             if (a.calls == null || a.calls.Length == 0) b.Append("　なし\n");
