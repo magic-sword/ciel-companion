@@ -1,6 +1,78 @@
 # システムの構成
 
-更新：2026-10-19（日本時間）。リポジトリの既定構成と、既存の運用記録をまとめる。本番未反映の追加実装は個別に示す。**2026-10-31 から、会話の組み立ては pipeline（`CIEL_MODEL=pipeline`）。この文書の Realtime API の記述は、戻すときのための以前の形で、今の作りは [会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md) を参照。** 目標の仕様は [仕様書](specification-ja.md)、決めた理由は [音声会話の構成の決定記録](decisions/voice-pipeline-ja.md) を参照。
+更新：2026-11-08。リポジトリのCompose・Unityシーン・会話サーバーに基づく構成。稼働先への反映や全機能の実機検証は、各機能の確認記録を参照する。[資料一覧](README.md)／[開発環境構築](development-setup-ja.md)
+
+## 現在の全体像
+
+日常版のCIEL CompanionとWindows配信版のCIEL Broadcastは、同じUnityプロジェクトとRuntime Prefabを使う。声と状態はLiveKitで中継し、会話サーバーが音声認識・応答・記憶・道具を管理する。Composeの通常経路は **`CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori`**。RealtimeやSeed-VCを使う経路は、初期構成・比較用として区別する。
+
+```mermaid
+flowchart LR
+    U["Unity＋Live2D<br>Companion / Broadcast"] <-->|"音声・状態・アプリの道具"| L["LiveKit"]
+    L <--> A["会話サーバー<br>聞く・考える・話す / 目的の管理"]
+    A <--> O["OpenAI<br>文字起こし・返事・調査など"]
+    A --> T["Irodori-TTS<br>シエルの声"]
+    T --> A
+    A <--> D["PostgreSQL＋pgvector<br>同意した人の記憶など"]
+    A <-->|"MCP"| G["Minecraftの環境<br>Mineflayer / 行動・視覚・知識"]
+    A -.-> S["任意の機能<br>歌の分析・ローカルLLMなど"]
+```
+
+## 部品と変更の入口
+
+| 部品 | 場所 | 役割・詳細 |
+|---|---|---|
+| 日常版・配信版 | `unity/` | 共通の`CielRuntime.prefab`、`Conversation.unity`と`Broadcast.unity`。[アプリ構成](app-composition-ja.md) |
+| 会話サーバー | `server/agent/` | 会話履歴、返事の振り分け、発話、記憶、道具。[pipelineの仕組み](conversation-pipeline-ja.md) |
+| 音声認識・返事 | `server/agent/agent.py`・`models.py` | VAD・文字起こし・発話区切り・文字の応答生成を分担。役目ごとのモデルと環境変数は`models.py`を参照 |
+| キャラクター設定 | `server/agent/config/` | 指示本文はMarkdown、参照は`persona.toml`。会話開始時に読み込む。[編集手順](../server/agent/README.md) |
+| シエルの声 | `server/tts-irodori/` | GPUで音声合成。参照音声とモデルキャッシュは別途準備 |
+| 記憶 | PostgreSQL＋pgvector | 人物・声の特徴・メモなど。[人物記憶](people-memory-ja.md)・[共有記憶](shared-memory-ja.md) |
+| Minecraft | `server/minecraft/` | Mineflayerの体、行動・視覚・知識をMCPで提供。[Minecraft](minecraft-design-ja.md)・[環境の設計](game-environment-mcp-design-ja.md) |
+| 目的と作業状態 | 会話サーバーとUnity | [目的の管理](goal-runner-design-ja.md)・[体の作業の状態](body-command-lifecycle-ja.md) |
+| 歌を聴く | `server/singing/` | 歌声を分析し、感想の手がかりを返す。[仕組み](singing-scoring-ja.md) |
+| ローカルLLM | `server/local-llm/` | 選んだ役目をローカル推論へ送る任意の構成。[設定](local-llm-ja.md) |
+| 配置・起動 | `server/compose.yaml`・`compose.dev.yaml` | 本番用・開発用のサービス構成。[反映手順](build-ja.md) |
+
+## 会話とゲームの流れ
+
+1. UnityがLiveKitへ接続し、マイクの音声を送る。シエルの音声と表情・状態を受け取り、表示と再生を行う。
+2. pipelineが音声を文字にし、会話履歴と現在の状態から返事を組み立てる。通常の会話と道具を使う依頼を振り分け、発話の入口をまとめる。
+3. 返事の文字をIrodori-TTSで音声にし、LiveKitを通してUnityへ返す。
+4. ゲームが有効な会話は、MCP経由で環境の道具を使う。Minecraftの移動・採集などはMineflayer側が実行する。
+5. 結果・進捗は会話とアプリへ返す。配信版では目的と処理を操作画面・視聴者向けカードへ表示する。
+
+ゲームのMCP統合は段階的に実装している。実装済み範囲と実ゲームでの未確認項目は[環境設計の冒頭と検証章](game-environment-mcp-design-ja.md)を参照する。
+
+## 現在の設定と動作場所
+
+| 設定 | 入口 | 扱い |
+|---|---|---|
+| Unityとパッケージの版 | `unity/ProjectSettings/ProjectVersion.txt`・`unity/Packages/manifest.json`・lock | リポジトリで固定。各製品の最新版という意味ではない |
+| OpenAI・LiveKitの資格情報 | `server/agent/.env` | Git管理外。UnityへAPIキーを入れない |
+| 会話の構成・ゲームの入口 | `server/compose.yaml` | pipelineとIrodoriを指定。`CIEL_GAMES`でMinecraftの`http://127.0.0.1:8771/mcp`へ接続 |
+| モデルの役目と既定値 | `server/agent/models.py` | 環境変数で上書き可能。`.env.example`や単体起動の既定値とComposeの指定を区別する |
+| DBの資格情報 | `server/.env` | Git管理外。例は`server/.env.example` |
+| Unityの接続先 | `unity/Assets/Settings/LiveKitTokenSource.asset` | SDK設定時にローカル生成。Git管理外 |
+| 会話モード・音声機器・配信設定 | 端末のPlayerPrefs | 日常版と配信版は別の保存先 |
+
+ComposeはGPUを利用するLinuxサーバーを想定する。TTSは8766、歌の分析は8767、DBは5433、Minecraftの会話用MCPは8771。旧WebSocketの8768や知識用MCPの8770は移行・補助用途として残るため、現在の会話経路と混同しない。
+
+複数端末はそれぞれ別の会話になる。長期記憶の共有と、同じゲームの体を同時に使えるかは別の制約。[独立した会話](decisions/independent-conversations-ja.md)・[共有記憶](shared-memory-ja.md)・[アプリ構成](app-composition-ja.md)
+
+## 確認と公開の範囲
+
+- 通常テストはAPIキー・GPUなしで実行できる。DB結合テストや実際の音声・ゲームの検証は別に行う。[回帰テスト](regression-tests-ja.md)・[料金のかかる試験](paid-checks-ja.md)
+- Android・Windowsの会話の確認記録がある。配信版やゲーム連携の追加機能は各資料の確認範囲を参照する。iOSは未検証。
+- Live2D SDK、参照音声、接続設定はクローンに含まれない。[初期仕様書](specification-ja.md)にある一般公開向け認証などは、実装済みと解釈しない。
+- 開発用接続設定を含むビルドの配布条件は[ビルド手順](build-ja.md)、利用許諾は[README](../README.md#公開とライセンス)を参照する。
+
+## 過去の構成・運用記録
+
+以下は従来のRealtime構成を中心にした記録。モデル名・既定経路・本番未反映という記述は当時の状態であり、現在の構成には上記と各機能の検証記録を使う。[旧SVG構成図](system-overview-ja.svg)もこの記録に対応する。
+
+<details>
+<summary>以前の構成・設定・運用記録を開く（Realtime経路）</summary>
 
 ## 新しく参加する人へ
 
@@ -262,3 +334,5 @@ GPU（RTX A2000 12GB）は、別の vLLM のコンテナとも分け合う。会
 - ビルドしたアプリには接続の設定が入るので、ほかの人に配らない。
 - 話者は声だけで判定する。会議では全員の声が 1 本に混ざって届くので、1 つの発言に 2 人の声が混ざると主な話者しか付けられない。ほとんど同じ声の 2 人は区別しきれない（「たぶん」として扱う）。
 - Android：会話・話者の識別・メモ・スピーカーの切り替えを実機で確認済み（2026-10-16）。マイクの選択は OS に任せる。iOS は未確認。
+
+</details>

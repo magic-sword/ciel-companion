@@ -1,6 +1,10 @@
-# 会話サーバーのキャラクター設定
+# 会話サーバーとキャラクター設定
 
-GPT-Live と Realtime のプロンプト本文は、UTF-8 の Markdown として編集します。[管理方針・引き継ぎ手順](../../docs/decisions/prompt-management-ja.md) に、構成の理由、検証・公開・履歴管理の方法をまとめています。
+現在のComposeは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` です。会話の処理を変更する前に[pipelineの仕組み](../../docs/conversation-pipeline-ja.md)を参照してください。起動・反映は[コマンド集](../../docs/build-ja.md)、テストは[回帰テスト](../../docs/regression-tests-ja.md)が入口です。
+
+## キャラクター設定を編集する
+
+pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownとして編集します。[管理方針・引き継ぎ手順](../../docs/decisions/prompt-management-ja.md)に、構成の理由、検証・公開・履歴管理の方法をまとめています。
 
 | 編集するファイル | 内容 |
 |---|---|

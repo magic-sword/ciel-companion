@@ -1,9 +1,11 @@
-# CIEL Companion アプリケーション仕様書
+# CIEL Companion 初期仕様書（2026-10-05）
 
 - 作成日：2026-10-05（日本時間）
 - バージョン：0.1
-- 状態：初期仕様。採用方針と実装提案を整理したもので、実装・性能検証は未実施。
+- 状態：初期の提案を残した履歴資料。以下の実装・検証の記述は作成当時のもの。
 - リポジトリ：https://github.com/magic-sword/ciel-companion
+
+> 現在の実装は[トップREADME](../README.md)と[システム構成](architecture-ja.md)を参照してください。現在のComposeはpipeline＋Irodori-TTS、対象はAndroid・Windows（日常版と配信版）です。以下のSeed-VC中心の方針・iOS対応・将来拡張の一覧は、現状を表していません。初期の判断を追えるよう本文は保存しています。
 
 ## 1. 目的と採用方針
 

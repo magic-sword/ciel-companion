@@ -1,6 +1,6 @@
 # ビルド・サーバーデプロイのコマンド集
 
-更新：2026-10-18（日本時間）。コマンドは **Git Bash** 用。
+更新：2026-11-08（日本時間）。コマンドは **Git Bash** 用。
 
 ## まずここから
 
@@ -11,6 +11,7 @@
 | Windows / Android をビルドする | 手元の `unity/` | [ビルドのコマンド](#コマンドからエディタを閉じて) |
 | Unity を開いたままビルドする | 手元の `unity/` | [メニューをコマンドで実行](#コマンドからエディタを開いたまま) |
 | Windows アプリを起動する | 手元のリポジトリルート | `"./unity/Builds/Windows/CIEL Companion.exe"` |
+| 配信版を起動する | 手元のリポジトリルート | `"./unity/Builds/Broadcast/CIEL Broadcast.exe"` |
 | Android 端末に APK を入れる | 手元の `unity/` | [Android](#android) |
 | サーバーへデプロイする | 手元のリポジトリルート | `bash scripts/server/deploy-server.sh`（[前提と確認方法](#サーバーへのデプロイ)） |
 | サーバーの状態・ログを見る | SSH 接続先の `~/work/ciel-companion/server` | [デプロイ後の確認・再起動](#デプロイ後の確認再起動) |
@@ -22,7 +23,7 @@ Unity 側の変更はアプリをビルドし直し、`server/` 側の変更は�
 ビルドそのものは Unity の標準の仕組み（`BuildPipeline.BuildPlayer`）で行う。File ＞ Build Profiles から手でビルドしてもよい。
 このプロジェクトでは、それを決まった設定で呼ぶエディタ拡張 [`Assets/Editor/CielBuild.cs`](../unity/Assets/Editor/CielBuild.cs) を用意している。理由：
 
-- ビルドに入れるシーン（`Assets/Scenes/Conversation.unity`）、出力先、プレイヤー設定を、誰がいつビルドしても同じにする。
+- ビルドに入れるシーン（日常版は`Conversation.unity`、配信版は`Broadcast.unity`）、出力先、プレイヤー設定を、誰がいつビルドしても同じにする。
 - エディタを開かずに、コマンドからもビルドできるようにする。
 - Android の権限（マイクなど）を自動で足す（下の「Android の権限」）。
 
@@ -31,6 +32,7 @@ Unity 側の変更はアプリをビルドし直し、`server/` 側の変更は�
 | メニュー | 出力（Git 管理外） | 用途 |
 |---|---|---|
 | **CIEL ＞ Build ＞ Windows** | `unity/Builds/Windows/CIEL Companion.exe` | PC で使う。会議に OBS で取り込む（[会議への参加](meeting-bridge-ja.md)） |
+| **CIEL ＞ Build ＞ Windows Broadcast** | `unity/Builds/Broadcast/CIEL Broadcast.exe` | 配信用の操作画面、シエル映像・目的カードを使う |
 | **CIEL ＞ Build ＞ Android** | `unity/Builds/Android/CIEL Companion.apk` | スマホで使う（開発用） |
 
 **ビルドしたものはほかの人に配らない。** LiveKit の接続の設定（`Assets/Settings/LiveKitTokenSource.asset`、開発用トークンサーバーの ID）が入っている。
@@ -44,7 +46,7 @@ Unity 側の変更はアプリをビルドし直し、`server/` 側の変更は�
 
 ### エディタから
 
-メニューの **CIEL ＞ Build ＞ Windows** か **CIEL ＞ Build ＞ Android** を選ぶ。終わると Console に `CIEL_BUILD_OK: <出力先>` と出る。
+メニューの **CIEL ＞ Build ＞ Windows**、**Windows Broadcast**、**Android** から選ぶ。終わると Console に `CIEL_BUILD_OK: <出力先>` と出る。
 
 - 選んだ側へ、ビルドの対象（Build Profile の有効なもの）が切り替わる。**対象を切り替えた最初のビルドは、素材の読み込み直しで時間がかかる**（数分〜十数分）。Windows と Android を交互にビルドすると毎回切り替わる。
 - ビルドの間、エディタは操作できない。
@@ -61,6 +63,8 @@ cd unity
 
 # Windows
 "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 1800 --log-file ./Logs/build-windows.log -- -executeMethod Ciel.Companion.Editor.CielBuild.Windows
+# Windows配信版
+"/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 1800 --log-file ./Logs/build-broadcast.log -- -executeMethod Ciel.Companion.Editor.CielBuild.WindowsBroadcast
 # Android
 "/c/Program Files/Unity Hub/resources/unity.exe" --no-banner run . --timeout 3000 --log-file ./Logs/build-android.log -- -executeMethod Ciel.Companion.Editor.CielBuild.Android
 ```

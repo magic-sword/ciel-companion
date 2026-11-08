@@ -1,6 +1,6 @@
 # 開発環境の構築
 
-更新：2026-10-19（日本時間）。Windows PC と VS Code を使い、クローンから Unity の表示確認・最初の修正まで進める手順。コーディング AI は VS Code 拡張の Codex・Claude Code を使う。サーバーの通常テストは、GPU や API キーを用意せずに始められる。
+更新：2026-11-08（日本時間）。Windows PC と VS Code を使い、クローンから Unity の表示確認・最初の修正まで進める手順。コーディング AI は VS Code 拡張の Codex・Claude Code を使う。サーバーの通常テストは、GPU や API キーを用意せずに始められる。
 
 [セットアップ図を開く・拡大する](development-setup-ja.svg) ／ [システム全体の構成](architecture-ja.md)
 
@@ -94,7 +94,11 @@ C# の補完が出なければ、Unity から C# スクリプトをダブルク�
 2. Play を押し、サンプルの **Koharu** が表示されることを確認する。ここでは接続・マイクを使わない。
 3. Play を止めて **`Assets/Scenes/Conversation.unity`** を開き、Game ビューでシエルと UI の配置を確認する。
 
-`Conversation.unity` は再生時に接続を試みる設定。接続設定のない状態でシエルの表示・タッチだけを Play で確認したい場合は、Hierarchy の **Conversation** を選び、**Ciel Conversation** コンポーネントの **Connect On Start** をオフにしてから再生する。この切り替えはローカルの確認用とし、保存・コミットするシーン差分に混ぜない。サンプル表示まで通れば、Unity 開発を始めるための基本環境は揃っている。
+`Conversation.unity` は再生時に接続を試みる設定。接続設定のない状態でシエルの表示・タッチだけを Play で確認したい場合は、Hierarchyで共通Runtime内の **Ciel Conversation** コンポーネントを探し、**Connect On Start** をオフにしてから再生する。この切り替えはローカルの確認用とし、保存・コミットするシーン差分に混ぜない。サンプル表示まで通れば、Unity 開発を始めるための基本環境は揃っている。
+
+### 配信版を確認する場合
+
+Windows配信版は **`Assets/Scenes/Broadcast.unity`** を開く。日常版と同じ **`Assets/Prefabs/CielRuntime.prefab`** を使い、操作画面と別ウィンドウの映像・目的カードを持つ。通常のモデル・接続の編集は共通Prefab、製品差は設定アセットと画面構築コードで行う。[アプリ構成](app-composition-ja.md)
 
 ## 7 音声会話を試す場合
 
@@ -102,7 +106,7 @@ C# の補完が出なければ、Unity から C# スクリプトをダブルク�
 
 1. Unity の **`Assets/Settings/LiveKitTokenSource.asset`** を選択する。5 のメニューで生成される、Git 管理外のファイル。
 2. Inspector の **Token Source Type** を **Development Token Server** にし、**Token Server Id** に共有された ID を入力する。独自の発行 API を使う場合は、管理者の案内に従い **Endpoint** を選ぶ。
-3. `Conversation.unity` の Hierarchy の **Conversation** を選択し、**Ciel Conversation → Token Config** に今のアセットをドラッグする。クローン直後は、元の参照先アセットが Git に含まれないため、参照の再設定が必要になる場合がある。
+3. `Conversation.unity` の共通Runtime内で **Ciel Conversation → Token Config** に今のアセットをドラッグする。クローン直後は、元の参照先アセットが Git に含まれないため、参照の再設定が必要になる場合がある。
 4. **Connect On Start** がオンであることを確認して Play。接続後に UI でマイク・スピーカーを確認し、マイクをオンにして話しかける。
 5. シエルの声、口パク、表情が返ることを確認する。終わったら Play を止める。
 
