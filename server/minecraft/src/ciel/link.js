@@ -3,7 +3,10 @@
 //   シエル向けの言葉（words.js）にして MCP の側へ渡す。体へは、WebSocket と同じ JSON の命令を command で送る
 //   （形の確かめは protocol.js のまま。任意のコードは実行しない）。
 // - 以前は会話サーバーの minecraft.py の Body がしていたことを、ここでする。
-import { doneFor, eventFor, fingerprint, refused, stateText, title } from './words.js';
+import { doneFor, eventFor, fingerprint, reasons, refused, stateText, title } from './words.js';
+import { randomUUID } from 'node:crypto';
+
+let nextCommandId = 1;   // 受け持つ会話が替わっても、遅い終了とIDを衝突させない
 
 const START_TIMEOUT_MS = 3000;    // 技を頼んでから「始めた」が返るまでの上限
 const LOOK_TIMEOUT_MS = 25000;    // 景色を頼んでから絵が返るまでの上限（初めはブラウザを開いて描き終えるまで 10 秒ほど）
@@ -26,11 +29,14 @@ export class CielLink {
     this.changed = changed;
     this.readyState = 1;
     this.state = null;
-    this._ids = 1;
+    this.session = randomUUID();
+    this.body = null;
     this._pending = new Map();   // id → 返事を待つ resolve（started・error・seen・planned）
     this._waiting = new Map();   // id → 目的の係が終わりを待つ resolve（知らせ・付箋は会話サーバーの目的の係が持つ）
     this._tasks = new Map();     // id → {title, skill}（頼まれた技。付箋の題）
     this._shown = '';
+    this._cancelledRequests = new Set();
+    this._requests = new Map();
   }
 
   // ---- 体から（main.js の send） ----
@@ -45,9 +51,13 @@ export class CielLink {
     const kind = m.type;
     if (kind === 'hello' || kind === 'state') {
       this.state = kind === 'hello' ? m.state : m;
+      if (this.state?.body) this._body(this.state.body);
       if (kind === 'hello' && m.owner) this.owner = m.owner;
       this._maybeChanged();
-    } else if (['started', 'error', 'seen', 'planned'].includes(kind)) {
+    } else if (kind === 'body') {
+      this._body(m);
+      this._maybeChanged();
+    } else if (['accepted', 'started', 'error', 'seen', 'planned'].includes(kind)) {
       const r = this._pending.get(m.id);
       if (r) {
         this._pending.delete(m.id);
@@ -63,11 +73,22 @@ export class CielLink {
   }
 
   _maybeChanged() {
-    const shown = JSON.stringify([this.playing(), this.text(), fingerprint(this.state)]);
+    const shown = JSON.stringify([this.playing(), this.text(), fingerprint(this.state), this.body]);
     if (shown !== this._shown) {
       this._shown = shown;
       this.changed();
     }
+  }
+
+  _body(snapshot) {
+    if (this.body?.epoch === snapshot.session && snapshot.revision <= this.body.revision) return;
+    const command = c => c ? { ...c, title: title(c.skill, c.args ?? {}) } : null;
+    this.body = { ...snapshot, session: this.session, epoch: snapshot.session,
+      current: command(snapshot.current), pending: command(snapshot.pending), last: command(snapshot.last) };
+    if (this.body.last) this.body.last.why = this.body.last.result?.ok ? ''
+      : reasons(this.body.last.result?.reason, this.body.last.result?.note ?? {});
+    if (this.state) this.state.doing = snapshot.current
+      ? { id: snapshot.current.id, skill: snapshot.current.skill, args: snapshot.current.args } : null;
   }
 
   _done(m) {
@@ -81,7 +102,7 @@ export class CielLink {
     }
     if (!task) return;
     const r = doneFor(m, task.title);
-    const e = { kind: 'task_done', urgency: 'normal', key: null, task: m.id, ...r };
+    const e = { kind: 'task_done', urgency: 'normal', key: null, task: m.id, session: this.session, ...r };
     if (!m.ok && m.reason === 'error') e.error = { where: `body.${task.skill}`, detail: String(m.detail ?? '') };
     this.notice(e);
   }
@@ -93,13 +114,25 @@ export class CielLink {
   }
 
   text() {
-    return stateText(this.state, this.owner, true);
+    const base = stateText(this.state, this.owner, true), b = this.body;
+    if (!b) return base;
+    const c = b.current;
+    const status = b.blocked ? '前の作業の停止を確認できない。次の作業は未開始'
+      : b.owner === 'defending' ? '身を守っている（通常の作業は待っている）'
+      : b.owner === 'eating' ? '食事をしている'
+      : c?.phase === 'stopping' ? `「${c.title}」を停止している`
+      : c?.phase === 'preparing' ? `「${c.title}」の条件を確認している`
+      : c?.phase === 'waiting' ? `「${c.title}」の再開を待っている`
+      : c ? `「${c.title}」を実行している` : 'いまは作業していない';
+    return `${base}\n体の作業：${status}`
+      + (b.pending ? `。次の依頼：「${b.pending.title}」（未開始）` : '')
+      + (b.last?.phase === 'failed' ? `\n直前の作業「${b.last.title}」：${b.last.why}` : '');
   }
 
   // ---- 頼む（mcp.js の道具から） ----
 
   _ask(msg, ms, onTimeout) {
-    const id = this._ids++;
+    const id = nextCommandId++;
     const p = new Promise((resolve) => this._pending.set(id, resolve));
     this.command(JSON.stringify({ v: 1, id, ...msg }));
     return { id, answer: timeout(p, ms, () => { this._pending.delete(id); return onTimeout(); }) };
@@ -108,33 +141,46 @@ export class CielLink {
   // 技を頼む。始めたか（started）を返す。終わったら task_done の知らせが届く
   async do(skill, args = {}) {
     const name = title(skill, args);
-    if ([...this._tasks.values()].some((t) => t.title === name)) return { status: 'already_doing' };   // 同じ頼みは、もうしている
-    const { id, answer } = this._ask({ type: 'do', skill, args }, START_TIMEOUT_MS, () => ({ type: 'timeout' }));
+    const id = nextCommandId++;
+    const response = new Promise(resolve => this._pending.set(id, resolve));
     this._tasks.set(id, { title: name, skill });
-    const m = await answer;
-    if (m.type === 'started') return { status: 'started', task: id, title: name };
+    this.command(JSON.stringify({ v: 1, type: 'do', id, skill, args }));
+    const m = await timeout(response, START_TIMEOUT_MS, () => { this._pending.delete(id); return { type: 'timeout' }; });
+    if (m.type === 'started' || m.type === 'accepted') return { status: m.type, task: id, title: name, session: this.session };
     this._tasks.delete(id);
+    if (m.type === 'timeout') this.stop(id);
     return m.type === 'timeout' ? { status: 'no_answer' } : refused(m);
   }
 
   // 目的の係が頼む技：始めて、終わりまで待って、体の done（ok・reason・note）を返す。付箋も知らせも作らない
-  async runSkill(skill, args) {
-    const id = this._ids++;
+  runSkill(skill, args, requestId) {
+    if (requestId && this._requests.has(requestId)) return this._requests.get(requestId);
+    const result = this._runSkill(skill, args, requestId);
+    if (requestId) {
+      this._requests.set(requestId, result);
+      if (this._requests.size > 512) this._requests.delete(this._requests.keys().next().value);
+    }
+    return result;
+  }
+
+  async _runSkill(skill, args, requestId) {
+    if (requestId && this._cancelledRequests.has(requestId)) return { ok: false, reason: 'stopped' };
+    const id = nextCommandId++;
     const done = new Promise((resolve) => this._waiting.set(id, resolve));
     const started = new Promise((resolve) => this._pending.set(id, resolve));
-    this._tasks.set(id, { title: title(skill, args), skill });
-    this.command(JSON.stringify({ v: 1, type: 'do', id, skill, args }));
+    this._tasks.set(id, { title: title(skill, args), skill, requestId });
+    this.command(JSON.stringify({ v: 1, type: 'do', id, skill, args, ...(requestId ? { request_id: requestId } : {}) }));
     const s = await timeout(started, START_TIMEOUT_MS, () => { this._pending.delete(id); return { type: 'timeout' }; });
-    if (s.type !== 'started') {
+    if (s.type !== 'started' && s.type !== 'accepted') {
       this._waiting.delete(id);
       this._tasks.delete(id);
-      if (s.type === 'timeout') return { ok: false, reason: 'no_answer' };
+      if (s.type === 'timeout') { this.stop(id); return { ok: false, reason: 'no_answer' }; }
       const r = refused(s);
       return { ok: false, reason: r.reason, note: s.note ?? {}, why: r.why };
     }
     return timeout(done, STEP_TIMEOUT_MS, () => {
       this._waiting.delete(id);
-      this.stop();
+      this.stop(id);
       return { ok: false, reason: 'error', detail: 'timeout' };
     });
   }
@@ -155,9 +201,19 @@ export class CielLink {
     return m.type === 'timeout' ? { status: 'no_answer' } : refused(m);
   }
 
-  stop() {
-    this.command(JSON.stringify({ v: 1, type: 'stop' }));
-    return { status: 'stopped' };
+  stop(task, requestId) {
+    if (requestId) {
+      this._cancelledRequests.add(requestId);
+      if (this._cancelledRequests.size > 512) this._cancelledRequests.delete(this._cancelledRequests.values().next().value);
+      const match = [...this._tasks].find(([, value]) => value.requestId === requestId);
+      if (!match) return { status: 'stopped' };
+      task = match[0];
+    }
+    const target = task ?? this.body?.pending?.id ?? this.body?.current?.id;
+    // スナップショットがあるときは対象を固定。遅い停止が次の作業を止めない。
+    if (this.body && target == null) return { status: 'stopped' };
+    this.command(JSON.stringify({ v: 1, type: 'stop', ...(target != null ? { task: target } : {}) }));
+    return { status: 'stopping', task: target, session: this.session };
   }
 
   // 会話が離れた：待っているものを、切れた扱いで終える
@@ -168,6 +224,7 @@ export class CielLink {
     for (const r of this._waiting.values()) r({ ok: false, reason: 'unlinked' });
     this._waiting.clear();
     for (const id of this._tasks.keys()) this.notice({ kind: 'task_done', urgency: 'normal', key: null, task: id,
+      session: this.session,
       ...doneFor({ id, ok: false, reason: 'unlinked' }, this._tasks.get(id).title) });
     this._tasks.clear();
   }

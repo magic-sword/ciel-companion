@@ -25,11 +25,24 @@ namespace Ciel.Conversation
                 result.attention = true;
                 return result;
             }
-            string work = activity?.tasks?.Length > 0 ? activity.tasks[0].title : null;
-            if (string.IsNullOrEmpty(work)) work = activity?.doing;
-            if (string.IsNullOrEmpty(work)) work = activity?.goal_step;
+            var body = activity?.body;
+            string work = body != null ? (body.Active ? body.title : null)
+                : activity?.tasks?.Length > 0 ? activity.tasks[0].title : null;
+            if (body == null && string.IsNullOrEmpty(work)) work = activity?.doing;
+            if (body == null && string.IsNullOrEmpty(work)) work = activity?.goal_step;
             string summary = "";
-            if (activity?.calls?.Length > 0)
+            if (body != null && body.phase != "idle" && body.phase != "running")
+            {
+                result.phase = body.phase;
+                result.heading = body.phase == "stopping" ? "シエル｜作業の切り替え中"
+                    : body.phase == "unknown" ? "シエル｜体の状態不明" : "シエル｜作業の開始・再開待ち";
+                result.title = !string.IsNullOrEmpty(body.next_title) ? body.next_title
+                    : !string.IsNullOrEmpty(body.title) ? body.title : "体の状態を確認しています";
+                result.current = summary = body.Description;
+                result.elapsed = Seconds(body.for_s, age);
+                result.attention = body.reason == "stop_timeout" || body.phase == "unknown";
+            }
+            else if (activity?.calls?.Length > 0)
             {
                 var call = activity.calls[0];
                 result.phase = "calling";
@@ -47,9 +60,10 @@ namespace Ciel.Conversation
                 result.phase = "working";
                 result.heading = "シエル｜作業中";
                 result.title = work;
-                result.current = "作業の終了通知を待っています";
+                result.current = body != null ? body.Description : "作業の終了通知を待っています";
                 summary = "実行中：" + work;
-                if (activity.tasks?.Length > 0) result.elapsed = Seconds(activity.tasks[0].for_s, age);
+                if (body != null) result.elapsed = Seconds(body.for_s, age);
+                else if (activity.tasks?.Length > 0) result.elapsed = Seconds(activity.tasks[0].for_s, age);
             }
             else if (userSpeaking)
             {
@@ -99,6 +113,14 @@ namespace Ciel.Conversation
                 result.progress = "詳しい思考状態はまだ確認できていません";
             }
 
+            if (body?.phase == "idle" && body.last_phase == "failed" && result.phase == "idle")
+            {
+                result.phase = "failed";
+                result.heading = "シエル｜作業できませんでした";
+                result.title = string.IsNullOrEmpty(body.last_title) ? "直前の作業" : body.last_title;
+                result.current = string.IsNullOrEmpty(body.last_note) ? "操作画面で理由を確認してください" : body.last_note;
+                result.attention = true;
+            }
             if (goal != null && goal.Active)
             {
                 result.title = goal.goal.title;

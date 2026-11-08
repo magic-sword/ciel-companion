@@ -1,3 +1,4 @@
+import { BodyCommands, commandBot } from './body-command.js';
 // 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/minecraft-design-ja.md の 4.2。
 // 技は一度に 1 つ。新しい技を受けたら、今の技を止めてから始める。終わったら（止めたときも）必ず done を 1 回送る。
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
@@ -62,20 +63,30 @@ class Failed extends Error {
   }
 }
 
-export class Runner {
-  // report(type, fields)：会話サーバーへ送る。owner：持ち主のプレイヤー名（player を省いたときの相手）
-  // guard：身を守る係（guard.Guard）
+export class Runner extends BodyCommands {
   constructor(report, owner, guard = null) {
-    this.report = report;
+    super({
+      report,
+      available: () => Boolean(this.bot?.entity),
+      prepare: c => SKILL_PREPARE[c.skill]?.(this.bot, c.args),
+      run: c => this._runSkill(c),
+      halt: async c => {
+        if (this.guard?.active) return;
+        const bot = c.bot ?? this.bot;
+        bot?.pathfinder?.stop();
+        bot?.pathfinder?.setGoal(null);
+        bot?.stopDigging?.();
+        await bot?.collectBlock?.cancelTask();
+      },
+    });
     this.owner = owner;
     this.guard = guard;
     this.bot = null;
-    this.current = null;   // {id, skill, args, token}
   }
 
   attach(bot) {
     this.bot = bot;
-    if (bot) groundedDig(bot);
+    if (bot) { groundedDig(bot); this.blocked = false; }
   }
 
   doing() {
@@ -83,57 +94,23 @@ export class Runner {
     return c ? { id: c.id, skill: c.skill, args: c.args } : null;
   }
 
-  // 今の技を止める。reason は done の note に入る（stopped・replaced・died・disconnected・unlinked）
-  stop(reason) {
-    const c = this.current;
-    if (!c) return;
-    c.token.cancelled = true;
-    c.token.reason = reason;
-    const bot = this.bot;
-    if (this.guard?.active) return;   // 守っている最中の経路探索は止めない（技は待っているので、そのまま終わる）
-    if (bot?.pathfinder) {
-      bot.pathfinder.stop();
-      bot.pathfinder.setGoal(null);
-    }
-    bot?.collectBlock?.cancelTask().catch(() => {});
-  }
-
-  async start({ id, skill, args }) {
-    if (!this.bot?.entity) {
-      this.report('done', { id, ok: false, reason: 'not_spawned' });
-      return;
-    }
-    // 始める前に分かるだめな理由（知らない名前・道具が無い）は、started の代わりに error で返す。
-    // 心は道具の返事でそれを知り、その場で正直に言える（「flower」で頼み、始めたと言ったあとで断られた。2026-11-06）
-    const refused = SKILL_PREPARE[skill]?.(this.bot, args);
-    if (refused) {
-      this.report('error', { id, ...refused });
-      return;
-    }
-    this.stop('replaced');
-    const token = { cancelled: false, reason: null };
-    const c = { id, skill, args, token };
-    this.current = c;
-    this.report('started', { id, skill });
-    let result;
+  async _runSkill(c) {
+    const { skill, args, token } = c;
+    c.bot = this.bot;
+    const bot = commandBot(this.bot, c, this);
     try {
-      const note = await SKILL_RUN[skill](this.bot, args, token, { owner: this.owner, guard: this.guard });
-      result = token.cancelled ? cancelled(skill, token, note) : { ok: true, note };
+      const note = await SKILL_RUN[skill](bot, args, token, { owner: this.owner, guard: this.guard });
+      return token.cancelled ? cancelled(skill, token, note) : { ok: true, note };
     } catch (err) {
-      if (token.cancelled) result = cancelled(skill, token);
-      else if (err instanceof Failed) result = { ok: false, reason: err.message, ...(err.note ? { note: err.note } : {}) };
-      else if (PATH_ERRORS.test(`${err?.name} ${err?.message}`)) result = { ok: false, reason: 'no_path' };
-      else {
-        console.warn(`技が失敗した skill=${skill} error=${err?.name ?? err}`, err?.stack?.split('\n').slice(0, 4).join(' | ') ?? '');
-        result = { ok: false, reason: 'error', detail: String(err?.message ?? err?.name ?? '').slice(0, 120) };
-      }
+      if (token.cancelled) return cancelled(skill, token);
+      if (err instanceof Failed) return { ok: false, reason: err.message, ...(err.note ? { note: err.note } : {}) };
+      if (PATH_ERRORS.test(`${err?.name} ${err?.message}`)) return { ok: false, reason: 'no_path' };
+      console.warn(`skill failed: skill=${skill} error=${err?.name ?? 'error'}`);
+      return { ok: false, reason: 'error', detail: String(err?.message ?? err?.name ?? '').slice(0, 120) };
     }
-    if (this.current === c) this.current = null;
-    this.report('done', { id, ...result });
   }
 }
 
-// 止めたとき。ついていくのは止めるまで続く技なので、止めるのがふつうの終わり
 function cancelled(skill, token, note) {
   if (skill === 'follow' && token.reason === 'stopped') return { ok: true, note: { stopped: true } };
   return { ok: false, reason: token.reason ?? 'stopped', ...(note ? { note } : {}) };
@@ -312,7 +289,7 @@ const SKILL_RUN = {
       bot.pathfinder.setMovements(movements(bot));
       bot.pathfinder.setGoal(new goals.GoalFollow(target, FOLLOW_RANGE), true);
     };
-    await guard?.idle();   // 守っている最中なら、終わってからついていく（守りの行き先を上書きしない）
+    await guard?.idle(token);   // 守っている最中なら、終わってからついていく（守りの行き先を上書きしない）
     if (token.cancelled) return;
     follow();
     // 止めるまで続く。相手が見えなくなったら終える。守り終えたら、またついていく。
@@ -665,7 +642,7 @@ async function digSomewhere(bot, max, token, guard, seen) {
 async function digToFind(bot, max, token, guard, seen, start, dir) {
   let dug = 0;
   for (let i = 0; i < max && !token.cancelled; i++) {
-    if (guard?.active) await guard.idle();
+    if (guard?.active) await guard.idle(token);
     const feet = bot.entity.position.floored();
     const front = feet.plus(dir);
     const step = front.offset(0, -1, 0);
@@ -714,7 +691,7 @@ async function descend(bot, depth, token, guard) {
   const startY = bot.entity.position.y;
   let dug = 0;
   for (let i = 0; i < Math.min(depth, DIG_LIMIT) && !token.cancelled; i++) {
-    if (guard?.active) await guard.idle();
+    if (guard?.active) await guard.idle(token);
     if (token.cancelled) break;
     const feet = bot.entity.position.floored();
     const below = bot.blockAt(feet.offset(0, -1, 0));

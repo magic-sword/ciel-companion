@@ -92,7 +92,7 @@
 
 | 道具 | 中身 |
 |---|---|
-| `start_goal(text, why?)` | 目的を始める。動いている目的があれば `next` に足す（「先にこっち」なら `first=true` で替える） |
+| `start_goal(text, why?, queue?)` | 利用者の新しい目的は既定で切り替える。「終わったら」は `queue=true` で `next` に足す。自発的な目的は利用者の目的の後ろへ並べる。詳細は[体の作業と切り替え](body-command-lifecycle-ja.md) |
 | `stop_goal()` | 今の目的をやめる |
 | `finish_step(result)` | `mind` の段（係では決められない段）を終える |
 | `goal_status()` | 今の目的と段（会話の後ろの「[今の目的]」で足りないとき） |

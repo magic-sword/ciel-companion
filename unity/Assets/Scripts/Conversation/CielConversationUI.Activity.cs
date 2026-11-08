@@ -85,13 +85,15 @@ namespace Ciel.Conversation
         {
             if (a.calls != null && a.calls.Length > 0)
                 return ($"いま：{a.calls[0].label}の結果を待っている {Sec(c.ActivitySeconds(a.calls[0].for_s))}", Amber, true);
-            if (a.tasks != null && a.tasks.Length > 0)
+            if (a.body != null && a.body.phase != "idle")
+                return ($"いま：{a.body.Description} {Sec(c.ActivitySeconds(a.body.for_s))}", a.body.phase == "running" ? Cyan : Amber, true);
+            if (a.body == null && a.tasks != null && a.tasks.Length > 0)
                 return ($"いま：体が{a.tasks[0].title} {Sec(c.ActivitySeconds(a.tasks[0].for_s))}", Cyan, true);
-            if (!string.IsNullOrEmpty(a.goal_step)) return ($"いま：目的の段「{a.goal_step}」", Cyan, true);
+            if (a.body == null && !string.IsNullOrEmpty(a.goal_step)) return ($"いま：目的の段「{a.goal_step}」", Cyan, true);
             if (a.mind == "thinking")
                 return ($"いま：{(a.thinking_origin == "initiative" ? "自発的に" : "")}考えている {Sec(c.ActivitySeconds(a.mind_for))}", Mint, true);
             if (a.mind == "speaking") return ("いま：話している", Mint, true);
-            if (!string.IsNullOrEmpty(a.doing)) return ($"いま：体が{a.doing}", Cyan, true);
+            if (a.body == null && !string.IsNullOrEmpty(a.doing)) return ($"いま：体が{a.doing}", Cyan, true);
             if (a.background_thinking)
                 return ($"いま：裏で自発的に考えている {Sec(c.ActivitySeconds(a.background_for))}", Mint, true);
             if (!activeOnly && a.log != null && a.log.Length > 0 && c.ActivitySeconds(a.log[0].ago) < ActivityRecent)
@@ -124,12 +126,18 @@ namespace Ciel.Conversation
             // 体
             b.Append(Head("体")).Append('\n');
             var any = false;
-            if (a.tasks != null)
+            if (a.body != null)
+            {
+                b.Append($"　{Esc(a.body.Description)}（{Sec(c.ActivitySeconds(a.body.for_s))}）\n");
+                if (!string.IsNullOrEmpty(a.body.next_title)) b.Append($"　次：{Esc(a.body.next_title)}\n");
+                any = true;
+            }
+            if (a.body == null && a.tasks != null)
                 foreach (var t in a.tasks) { b.Append($"　{Esc(t.title)}（{Sec(c.ActivitySeconds(t.for_s))}）\n"); any = true; }
-            if (!string.IsNullOrEmpty(a.goal_step)) { b.Append($"　目的の段：{Esc(a.goal_step)}\n"); any = true; }
+            if (a.body == null && !string.IsNullOrEmpty(a.goal_step)) { b.Append($"　目的の段：{Esc(a.goal_step)}\n"); any = true; }
             var listed = false;   // 体の技と同じなら、二度は書かない
             if (a.tasks != null) foreach (var t in a.tasks) listed |= t.title == a.doing;
-            if (!string.IsNullOrEmpty(a.doing) && !listed) { b.Append($"　いましていること：{Esc(a.doing)}\n"); any = true; }
+            if (a.body == null && !string.IsNullOrEmpty(a.doing) && !listed) { b.Append($"　いましていること：{Esc(a.doing)}\n"); any = true; }
             if (!any) b.Append(c.GameLinked ? "　なにもしていない\n" : "　体とつながっていない\n");
             // 目的
             var g = c.Goal;

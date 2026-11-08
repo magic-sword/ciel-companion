@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from datetime import timedelta
 from typing import Callable
 
@@ -147,6 +148,11 @@ class GameEnv:
         self._closed = False
         self._shown: tuple | None = None
         self._cards: dict = {}       # 技の id → 付箋
+        self._completed: dict = {}   # 終了の先着・重複を記録。接続の世代もキーに含める
+        self._body: dict = {}
+        self._observed: set = set()
+        self._connection_epoch = 0
+        self._act_lock = asyncio.Lock()
         self._fails: dict[str, int] = {}
         self._said: dict[str, float] = {}
         self._remembered: set[str] = set()
@@ -182,6 +188,7 @@ class GameEnv:
                         await self._read_setup(session)
                         first = False
                     self._session = session
+                    self._connection_epoch += 1
                     retry = RETRY_MIN
                     log.info('ゲーム（%s）の環境とつながった', self.game)
                     if self._ready is not None:
@@ -194,6 +201,7 @@ class GameEnv:
             except Exception as e:
                 log.info('ゲーム（%s）の環境につなげない：%s', self.game, type(e).__name__)
             finally:
+                self._connection_epoch += 1
                 self._session = None
                 if self.linked:
                     log.info('ゲーム（%s）の体から切れた', self.game)
@@ -204,6 +212,10 @@ class GameEnv:
                     if self.activity is not None:
                         self.activity.task_done(f'{self.game}:{key}', '', False, quiet=True)
                 self._cards.clear()
+                self._body = {}
+                self._observed.clear()
+                if self.activity is not None:
+                    self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': 'disconnected'})
                 if self.reason not in ('busy',):
                     self.reason = 'off' if not self.wanted else 'connecting'
                 self.publish()
@@ -280,6 +292,8 @@ class GameEnv:
             if status == 'busy':
                 log.info('ゲーム（%s）の体は、ほかの会話が使っている', self.game)
             self._stop_ping()
+            if self.activity is not None:
+                self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': self.reason})
         self.publish()
 
     def _start_ping(self) -> None:
@@ -353,17 +367,32 @@ class GameEnv:
         return function_tool(impl, raw_schema={'name': name, 'description': description, 'parameters': schema})
 
     async def use(self, name: str, args: dict) -> dict:
+        # 目的の停止と新しい命令の投入を、ほかの直接命令が追い越さない。
+        if self.meta.get(name, {}).get('ciel/role') == 'act':
+            async with self._act_lock:
+                return await self._use(name, args)
+        return await self._use(name, args)
+
+    async def _use(self, name: str, args: dict) -> dict:
         """心が呼んだゲームの道具"""
         meta = self.meta.get(name, {})
         role = meta.get('ciel/role')
         if role in ('act', 'look') and not self.linked:
             return {'status': 'unavailable'}
         busy = self.goals.body_step() if self.goals is not None and role == 'act' and not meta.get('ciel/stops') else None
-        if busy is not None:
-            # 係が体で段を進めている：体は一度に 1 つの技なので、ここで動かすと係の技が替わって目的が止まる（2026-11-07）
-            return {'status': 'goal_running', 'why': f'目的の係が「{busy}」を体で進めている',
-                    'next': '待てば係が続ける。先にこちらをしたいなら stop_goal で目的を止めてから'}
+        active_goal = getattr(self.goals, 'active', None)
+        planning = active_goal is not None and active_goal.status == 'planning'
+        spontaneous = self.activity is not None and self.activity.thinking_origin == 'initiative'
+        if role == 'act' and spontaneous and (busy is not None or planning or self._body.get('current') or self._body.get('pending')):
+            return {'status': 'goal_running', 'why': '依頼された体の作業を進めている'}
+        if role == 'act' and (busy is not None or planning or (meta.get('ciel/stops') and active_goal is not None)):
+            if spontaneous:
+                return {'status': 'goal_running', 'why': '持ち主の目的を進めている'}
+            await self.goals.stop(reason='stopped' if meta.get('ciel/stops') else 'replaced')
+        epoch = self._connection_epoch
         r = await self._call(name, args)
+        if epoch != self._connection_epoch:
+            return {'status': 'unavailable'}
         images = r.pop('_images', None)
         if images and self.eyes is not None:   # 目：景色の絵は目の係に渡し、道具の返事の続きで心が見る
             try:
@@ -375,10 +404,19 @@ class GameEnv:
                 return {'status': 'error', 'reason': 'bad_image'}
             r['view'] = pic.id
             r['note'] = f"景色の絵は「[わたしの目に見えている景色 #{pic.id}]」として、この続きで見える"
-        if meta.get('ciel/long_running') and r.get('status') == 'started' and self.board is not None and r.get('task') is not None:
-            self._cards[r['task']] = self.board.add('game', r.get('title') or name, tasks.RUNNING, 'ciel', ref=str(r['task']))
-        if meta.get('ciel/long_running') and r.get('status') == 'started' and self.activity is not None:
-            self.activity.task_started(f"{self.game}:{r.get('task')}", r.get('title') or name)
+        key = self._task_key(r)
+        if meta.get('ciel/long_running') and r.get('status') in ('started', 'accepted') and r.get('task') is not None:
+            if key not in self._completed:
+                if self.board is not None and key not in self._cards:
+                    self._cards[key] = self.board.add('game', r.get('title') or name, tasks.RUNNING, 'ciel', ref=str(key))
+                if self.activity is not None:
+                    self.activity.task_started(f'{self.game}:{key}', r.get('title') or name)
+            else:
+                # 「受付／開始」が終了より遅く返ってきた。終了を正として返す。
+                r = {**r, 'status': 'completed', 'ok': bool(self._completed[key].get('ok')),
+                     'reason': self._completed[key].get('reason')}
+        if self._body:
+            self._reconcile_body()
         return r
 
     def tool_ids(self, *roles: str) -> frozenset[str]:
@@ -403,12 +441,22 @@ class GameEnv:
     async def _refresh(self) -> None:
         if self._session is None:
             return
+        session, epoch = self._session, self._connection_epoch
         try:
             r = await self._session.read_resource('game://state')
         except Exception as e:
             log.info('ゲーム（%s）の様子を読めない：%s', self.game, type(e).__name__)
             return
-        self.state = _json(getattr(r.contents[0], 'text', '') if r.contents else '')
+        if session is not self._session or epoch != self._connection_epoch:
+            return
+        state = _json(getattr(r.contents[0], 'text', '') if r.contents else '')
+        body = state.get('body')
+        if isinstance(body, dict):
+            if (self._body.get('session'), self._body.get('epoch')) == (body.get('session'), body.get('epoch')) and body.get('revision', 0) < self._body.get('revision', -1):
+                return
+            self._body = body
+        self.state = state
+        self._reconcile_body()
         self.publish()
         if self.activity is not None:
             self.activity.changed()   # 体がいましていること（いま）
@@ -459,10 +507,18 @@ class GameEnv:
 
     def _task_done(self, e: dict) -> None:
         """頼まれた技の終わり。付箋を閉じ、うまくいかなかったら同じ頼みの何回目かを添えて心へ知らせる"""
-        card = self._cards.pop(e.get('task'), None)
+        key = self._task_key(e)
+        previous = self._completed.get(key)
+        if previous is not None and (not previous.get('_snapshot') or e.get('_snapshot')):
+            return
+        self._completed[key] = e
+        if len(self._completed) > 512:
+            self._completed.pop(next(iter(self._completed)))
+        self._observed.discard(key)
+        card = self._cards.pop(key, None)
         if self.activity is not None:
             # 止めた・替えた・切れたは「できなかった」にしない（その知らせは言わない）
-            self.activity.task_done(f"{self.game}:{e.get('task')}", e.get('title') or '', bool(e.get('ok')),
+            self.activity.task_done(f'{self.game}:{key}', e.get('title') or '', bool(e.get('ok')),
                                     e.get('card_note'), quiet=not e.get('ok') and not e.get('failed'))
         if card is not None:
             self._close_card_of(card, e.get('card') or ('done' if e.get('ok') else 'failed'), e.get('card_note'))
@@ -476,6 +532,47 @@ class GameEnv:
             self._fails.pop(name, None)
         if say:
             self._tell('task_done', say, SETTLE, key=None)
+
+    @staticmethod
+    def _task_key(event: dict):
+        task = event.get('task')
+        return f"{event['session']}:{task}" if event.get('session') else task
+
+    def _reconcile_body(self) -> None:
+        b = self._body
+        if not b:
+            return
+        active = {self._task_key({'session': b.get('session'), 'task': c['id']})
+                  for c in (b.get('current'), b.get('pending')) if c}
+        self._observed.update(active)
+        last = b.get('last') or {}
+        last_key = self._task_key({'session': b.get('session'), 'task': last.get('id')})
+        if last.get('id') is not None:
+            result = last.get('result') or {}
+            self._task_done({'session': b.get('session'), 'task': last['id'], 'title': last.get('title', ''),
+                             'ok': bool(result.get('ok')), 'reason': result.get('reason'), 'failed': False, '_snapshot': True})
+        for key in list(self._cards):
+            if key not in active and (key in self._observed or key == last_key):
+                self._task_done({'task': key, 'ok': False, 'failed': False, '_snapshot': True, 'card_note': '終了を状態から確認した'})
+        if self.activity is not None:
+            current, pending = b.get('current') or {}, b.get('pending') or {}
+            phase = current.get('phase') or ('accepted' if pending else 'idle')
+            reason = current.get('reason') or ''
+            if b.get('owner'):
+                phase, reason = 'waiting', b['owner']
+            if b.get('blocked'):
+                phase, reason = 'stopping', 'stop_timeout'
+            if self.state.get('playing') is False or self.state.get('linked') is False:
+                phase, reason = 'unknown', 'disconnected'
+            # 完了／失敗は履歴。現在の体とは区別して送る。
+            self.activity.set_body({'version': 1, 'session': b.get('session', ''), 'revision': b.get('revision', 0),
+                'phase': phase, 'title': current.get('title') or pending.get('title') or '',
+                'next_title': pending.get('title') or '', 'reason': reason,
+                'for_s': max(0, time.time() - ((b.get('owner_since') if b.get('owner') else None)
+                    or current.get('since') or pending.get('since') or time.time() * 1000) / 1000),
+                'last_title': last.get('title') or '', 'last_phase': last.get('phase') or '',
+                'last_note': last.get('why') or '',
+                'last_reason': (last.get('result') or {}).get('reason') or ''})
 
     def _close_card_of(self, card, how: str, note: str | None) -> None:
         if self.board is None:
@@ -508,12 +605,24 @@ class GoalsAdapter:
 
     def __init__(self, env: GameEnv) -> None:
         self.env = env
+        self._running: str | None = None
 
     def _tool(self, key: str) -> str | None:
         return (self.env.profile.get('goals') or {}).get(key)
 
     def available(self) -> bool:
         return bool(self.env.linked and self._tool('plan'))
+
+    def body_busy(self) -> bool:
+        b = self.env._body
+        return bool(b.get('current') or b.get('pending') or b.get('owner') or b.get('blocked') or self.env.state.get('doing'))
+
+    async def begin(self) -> None:
+        # 計画を待つあいだも古い追従を続けない。体側は停止完了後に次を始める。
+        self._running = None
+        tool = self.env.profile.get('stop_tool')
+        if tool:
+            await self.env._call(tool, {})
 
     @staticmethod
     def _step_dict(s) -> dict:
@@ -526,7 +635,10 @@ class GoalsAdapter:
         return r.get('steps')   # None：係では分けられない目的（心が進める）
 
     async def run(self, goal, step) -> dict:
-        return await self.env._call(self._tool('step'), {'step': self._step_dict(step)}, timeout=STEP_TIMEOUT)
+        request = str(uuid.uuid4())
+        # stop()はキャンセル後にも呼ばれるため、対象は次のrunまで保持する。
+        self._running = request
+        return await self.env._call(self._tool('step'), {'step': self._step_dict(step), 'request_id': request}, timeout=STEP_TIMEOUT)
 
     def check(self, goal, step, result) -> tuple[bool, list | None]:
         result = result or {}
@@ -551,4 +663,5 @@ class GoalsAdapter:
     async def stop(self) -> None:
         tool = self.env.profile.get('stop_tool')
         if tool:
-            await self.env._call(tool, {})
+            request = self._running
+            await self.env._call(tool, {'request_id': request} if request else {})

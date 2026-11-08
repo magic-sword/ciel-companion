@@ -48,6 +48,30 @@ namespace Ciel.EditorTools
             state = CielAudienceCardState.From(null, idle, true, false);
             Check(state.visible && state.phase == "idle" && !state.current.Contains("内部ログ"), "idle remains visible without internal logs");
             Render(state, "audience-card-idle", false);
+            var bodyActivity = new CielConversation.ActivityState {
+                detail_version = 1, tasks = activity.tasks, doing = "古い追従", goal_step = "古い段",
+                body = new CielConversation.ActivityBody { version = 1, phase = "idle" }
+            };
+            Check(CielAudienceCardState.From(null, bodyActivity, true, false).phase == "idle", "body snapshot overrides stale task rows");
+            bodyActivity.body.phase = "stopping";
+            bodyActivity.body.title = "持ち主についていく";
+            bodyActivity.body.next_title = "石のツルハシを作る";
+            bodyActivity.body.for_s = 2;
+            state = CielAudienceCardState.From(null, bodyActivity, true, false);
+            Check(state.phase == "stopping" && state.title == bodyActivity.body.next_title && state.current.Contains("停止"), "handoff shows pending request and stopping");
+            Render(state, "audience-card-stopping", false);
+            bodyActivity.body.reason = "stop_timeout";
+            Check(CielAudienceCardState.From(null, bodyActivity, true, false).attention, "stop timeout visible");
+            bodyActivity.body.phase = "waiting";
+            bodyActivity.body.reason = "defending";
+            Check(CielAudienceCardState.From(null, bodyActivity, true, false).current.Contains("身を守"), "defense wait has reason");
+            bodyActivity.body.phase = "idle";
+            bodyActivity.body.reason = "";
+            bodyActivity.body.last_phase = "failed";
+            bodyActivity.body.last_title = "石のツルハシを作る";
+            bodyActivity.body.last_note = "材料が足りない";
+            state = CielAudienceCardState.From(null, bodyActivity, true, false);
+            Check(state.phase == "failed" && state.current == "材料が足りない", "failed preparation stays visible");
             state = CielAudienceCardState.From(goal, activity, false, true);
             Check(state.visible && state.phase == "disconnected" && !state.title.Contains("鉄"), "disconnect is explicit without stale work");
             Check(CielAudienceCardState.From(goal, idle, true, true).current == "できた！", "brief completion");

@@ -116,9 +116,10 @@ export function makeServer(hub, sessionId) {
   }, ({ depth }) => body((l) => l.do('dig_down', { depth })));
   server.registerTool('minecraft_stop_moving', {
     title: '止まる',
-    description: 'マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。', inputSchema: {},
+    description: 'マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。',
+    inputSchema: { request_id: z.string().max(160).optional() },
     ...ACT('minecraft_stop_moving', { 'ciel/stops': true }),
-  }, () => body((l) => l.stop()));
+  }, ({ request_id }) => body((l) => l.stop(undefined, request_id)));
 
   // ---- 見る ----
   server.registerTool('minecraft_look_around', {
@@ -155,13 +156,14 @@ export function makeServer(hub, sessionId) {
     const r = await hub.link.plan(spec.make, Number(spec.count ?? 1) || 1);
     return json(r.error ? { error: r.error, why: r.why } : { steps: stepsFrom(r.steps) });
   });
-  server.registerTool('minecraft_goal_step', { description: '目的の段を 1 つ、終わるまで動かす', inputSchema: { step }, ...GOAL },
-    async ({ step: s }) => {
+  server.registerTool('minecraft_goal_step', { description: '目的の段を 1 つ、終わるまで動かす',
+    inputSchema: { step, request_id: z.string().max(160).optional() }, ...GOAL },
+    async ({ step: s, request_id }) => {
       const l = mine();
       if (!l) return json({ ok: false, reason: 'unlinked', complete: false });
       const sk = skillFor(s);
       if (!sk) return json({ ok: false, reason: 'error', complete: false });
-      return json(stepResult(s, await l.runSkill(sk[0], sk[1])));
+      return json(stepResult(s, await l.runSkill(sk[0], sk[1], request_id)));
     });
   server.registerTool('minecraft_goal_repair', { description: 'うまくいかなかった段を、決まった直し方で直す',
     inputSchema: { spec: z.record(z.string(), z.any()), step, result: z.record(z.string(), z.any()), remaining: z.array(step) }, ...GOAL },
@@ -180,7 +182,7 @@ export function makeServer(hub, sessionId) {
       // doing：体がいましている技の見せる言葉（会話サーバーの「いま」。無ければ空）
       const d = l?.state?.doing;
       const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
-        doing: d ? title(d.skill, d.args ?? {}) : '' }
+        doing: d ? title(d.skill, d.args ?? {}) : '', ...(l.body ? { body: l.body } : {}) }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

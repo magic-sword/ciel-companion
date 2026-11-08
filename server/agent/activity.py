@@ -43,6 +43,9 @@ class Activity:
         self._background_epoch = 0
         self._mind_at = clock()
         self._calls: dict[str, dict] = {}     # call_id → {name, label, at}
+        self._body: dict = {}
+        self._body_at = clock()
+        self._finished: dict[str, bool] = {}
         self._tasks: dict[str, dict] = {}     # 技の鍵 → {title, at}（体でしている技）
         self._log: deque = deque(maxlen=LOG_KEEP)
         self.titles: dict[str, str] = {}      # 道具の名前 → 見せる名前（ゲーム・アプリの道具の title）
@@ -120,20 +123,36 @@ class Activity:
             self.log(f'{label}：{why}', 'wait')
         elif status == 'started':
             self.log(f'{label}：始めた（{r.get("title") or r.get("goal") or ""}）'.replace('（）', ''), 'ok')
+        elif status == 'accepted':
+            self.log(f'{label}：依頼を受け付けた（体の開始待ち）', 'info')
         elif status == 'already_doing':
             self.log(f'{label}：もうしている', 'info')
 
     # ---- 体の技 ----
 
     def task_started(self, key: str, title: str) -> None:
+        if key in self._finished:
+            return
+        if key in self._tasks:
+            return
         self._tasks[key] = {'title': title, 'at': self._clock()}
         self.changed()
 
     def task_done(self, key: str, title: str, ok: bool, note: str | None = None, quiet: bool = False) -> None:
+        if key in self._finished:
+            return
+        self._finished[key] = True
+        if len(self._finished) > 512:
+            self._finished.pop(next(iter(self._finished)))
         self._tasks.pop(key, None)
         if not quiet:
             self.log(f'体：{title}' + ('（できた）' if ok else f'（できなかった：{note}）' if note else '（できなかった）'),
                      'ok' if ok else 'error')
+        self.changed()
+
+    def set_body(self, state: dict) -> None:
+        self._body = dict(state)
+        self._body_at = self._clock()
         self.changed()
 
     # ---- 最近のこと ----
@@ -163,7 +182,8 @@ class Activity:
             'background_thinking': self.background_thinking,
             'background_for': round(now - self._background_at, 1) if self.background_thinking else 0,
             'calls': [{'label': c['label'], 'for_s': round(now - c['at'], 1)} for c in self._calls.values()],
-            'tasks': [{'title': t['title'], 'for_s': round(now - t['at'], 1)} for t in self._tasks.values()],
+            'tasks': [] if self._body else [{'title': t['title'], 'for_s': round(now - t['at'], 1)} for t in self._tasks.values()],
+            'body': {**self._body, 'for_s': round(self._body.get('for_s', 0) + now - self._body_at, 1)} if self._body else None,
             'doing': doing or '', 'goal_step': step or '',
             'log': [{'id': e['id'], 'ago': round(now - e['at'], 1), 'text': e['text'], 'kind': e['kind']} for e in self._log],
         }
@@ -187,6 +207,7 @@ class Activity:
         s = self.state()
         # 経った秒数だけが違うなら送らない（アプリが数え足す）
         shown = json.dumps({k: v for k, v in s.items() if k not in ('mind_for', 'background_for')} | {
+            'body': {k: v for k, v in (s.get('body') or {}).items() if k != 'for_s'},
             'calls': [c['label'] for c in s['calls']], 'tasks': [t['title'] for t in s['tasks']],
             'log': [e['id'] for e in s['log']]}, ensure_ascii=False, sort_keys=True)
         if shown == self._shown:

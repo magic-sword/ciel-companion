@@ -106,6 +106,8 @@ class GoalRunner:
         self._step_ids = itertools.count(1)
         self._task: asyncio.Task | None = None
         self._mind_step: asyncio.Future | None = None
+        self._generation = 0
+        self._control = asyncio.Lock()
         self.presence: Callable[[], str] = lambda: 'solo'   # 人前なら、頼んだ人の名前を出さない
         self.owner_name: Callable[[], str | None] = lambda: None   # 持ち主の呼び名（speakers.py）
 
@@ -115,7 +117,22 @@ class GoalRunner:
 
     # ---- 心の道具から ----
 
-    async def start(self, game: str, title: str, spec: dict, *, why: str = '', by: str = 'owner', first: bool = False) -> dict:
+    async def start(self, game: str, title: str, spec: dict, *, why: str = '', by: str = 'owner', first: bool = False,
+                    queue: bool = False) -> dict:
+        async with self._control:
+            accepted = await self._start(game, title, spec, why=why, by=by, first=first, queue=queue)
+        if isinstance(accepted, dict):
+            return accepted
+        goal = accepted
+        r = await self._plan(goal)
+        if r is not None:
+            return r
+        debug_log.record('goal', what='start', id=goal.id, title=title, steps=[s.label for s in goal.steps])
+        self._publish()
+        self._run()
+        return {'status': 'started', 'goal': title, 'steps': [s.label for s in goal.steps]}
+
+    async def _start(self, game: str, title: str, spec: dict, *, why: str, by: str, first: bool, queue: bool) -> dict | Goal:
         if not game:   # ゲームを言わなければ、つないでいるゲーム（今は 1 つだけ）
             game = next(iter(self.adapters), '')
         adapter = self.adapters.get(game)
@@ -125,22 +142,21 @@ class GoalRunner:
         # （心が計画し直そうとして start_goal を呼び、「あとで」に並んだだけで止まったままだった。2026-11-07）
         again = (self.active is not None and self.active.status == 'paused'
                  and _key(title, spec) == _key(self.goal.title, self.goal.spec))
-        if self.goal is not None and self.goal.status in ACTIVE and not first and not again:
+        if self.goal is not None and self.goal.status in ACTIVE and (by == 'ciel' or (queue and not first and not again)):
             self.next.append({'game': game, 'title': title, 'spec': spec, 'why': why, 'by': by})
             self._publish()
             return {'status': 'queued', 'after': self.goal.title}
+        if by == 'ciel' and getattr(adapter, 'body_busy', lambda: False)():
+            return {'status': 'busy'}
         if self.goal is not None and self.goal.status in ACTIVE:
-            await self.stop(keep_next=True, reason='replaced')
+            await self._stop(keep_next=queue, reason='replaced')
         goal = Goal(next(self._ids), game, title, by, spec, why, started_at=self._clock())
         self.goal = self.active = goal
         self._publish()
-        r = await self._plan(goal)
-        if r is not None:
-            return r
-        debug_log.record('goal', what='start', id=goal.id, title=title, steps=[s.label for s in goal.steps])
-        self._publish()
-        self._run()
-        return {'status': 'started', 'goal': title, 'steps': [s.label for s in goal.steps]}
+        begin = getattr(adapter, 'begin', None)
+        if begin is not None:
+            await begin()
+        return goal
 
     async def add_subgoal(self, title: str, spec: dict, *, why: str = '') -> dict:
         """今の目標の止まっている段のために、小さな目標を作る（できたら、その段からやり直す）"""
@@ -159,6 +175,8 @@ class GoalRunner:
             return refused
         if self._task is not None and not self._task.done() and step.kind != 'mind':
             await self.adapters[cur.game].stop()   # 体の技の途中なら止める
+            if self.active is not cur or cur.status not in ('paused', 'running'):
+                return {'status': 'cancelled'}
         self._cancel()
         root.subgoals += 1
         if step.status == 'running':
@@ -169,6 +187,8 @@ class GoalRunner:
                    started_at=self._clock(), before=self._snapshot(cur.game))
         self.active = sub
         r = await self._plan(sub)
+        if self.active is not sub:
+            return {'status': 'cancelled'}
         if r is not None:   # 計画できない：親に戻して止める
             self.active = cur
             cur.status = 'paused'
@@ -184,6 +204,10 @@ class GoalRunner:
                 'steps': [s.label for s in sub.steps]}
 
     async def stop(self, *, keep_next: bool = False, reason: str = 'stopped', only_current: bool = False) -> dict:
+        async with self._control:
+            return await self._stop(keep_next=keep_next, reason=reason, only_current=only_current)
+
+    async def _stop(self, *, keep_next: bool = False, reason: str = 'stopped', only_current: bool = False) -> dict:
         g = self.active
         if g is None or g.status not in ACTIVE:
             return {'status': 'no_goal'}
@@ -270,6 +294,8 @@ class GoalRunner:
     async def _plan(self, goal: Goal) -> dict | None:
         """段を決める。決められなければ、目的を failed にして道具の返事を返す"""
         steps = await self.adapters[goal.game].plan(goal)
+        if self.active is not goal or goal.status != 'planning':
+            return {'status': 'cancelled'}
         if steps is None:   # ゲームの係では分けられない目的：心が進める段 1 つにする
             steps = [{'kind': 'mind', 'args': {'text': goal.title}, 'label': goal.title}]
         if isinstance(steps, dict):   # 計画できない（{'error': …}）
@@ -312,6 +338,7 @@ class GoalRunner:
         self._task = ERRORS.spawn(self._loop(), 'goals')
 
     def _cancel(self) -> None:
+        self._generation += 1
         if self._task is not None and not self._task.done() and self._task is not asyncio.current_task():
             self._task.cancel()
         self._task = None
@@ -321,8 +348,9 @@ class GoalRunner:
 
     async def _loop(self) -> None:
         g = self.active
+        generation = self._generation
         try:
-            while g is not None and g.status == 'running':
+            while g is not None and g.status == 'running' and generation == self._generation:
                 adapter = self.adapters[g.game]
                 step = next((s for s in g.steps if s.status in ('todo', 'running')), None)
                 if step is None:
@@ -334,7 +362,7 @@ class GoalRunner:
                     result = await self._ask_mind(g, step)
                 else:
                     result = await adapter.run(g, step)
-                if g.status != 'running' or self.active is not g:
+                if g.status != 'running' or self.active is not g or generation != self._generation:
                     return
                 ok, progress = adapter.check(g, step, result)
                 step.progress = progress
@@ -355,6 +383,8 @@ class GoalRunner:
                 step.fails += 1
                 if step.repairs < MAX_REPAIRS:
                     repaired = await adapter.repair(g, step, result)
+                    if self.active is not g or g.status != 'running' or generation != self._generation:
+                        return
                     if repaired is not None:
                         steps, text = repaired
                         step.repairs += 1
@@ -370,6 +400,8 @@ class GoalRunner:
             raise
         except Exception as e:
             ERRORS.report('goals', e, kind='task')   # 記録とアプリへの知らせ（errors.py）
+            if generation != self._generation:
+                return
             g = self.active
             if g is not None:
                 g.status = 'paused'
@@ -408,13 +440,15 @@ class GoalRunner:
 
     async def _ask_mind(self, g: Goal, step: Step) -> dict:
         self._mind_step = asyncio.get_running_loop().create_future()
+        waiting = self._mind_step
         self._tell(f'[目的「{g.title}」：次の段「{step.label}」は、自分で考えて進める。体の道具で進め、'
                    'できたら finish_step(ok=true)、できなければ finish_step(ok=false)。'
                    '途中で手が足りなければ add_subgoal で小さな目標を作れる]')
         try:
-            r = await self._mind_step
+            r = await waiting
         finally:
-            self._mind_step = None
+            if self._mind_step is waiting:
+                self._mind_step = None
         return {'ok': r['ok'], 'reason': None if r['ok'] else 'mind_failed', 'note': {'text': r.get('note', '')}}
 
     def _pause(self, g: Goal, step: Step, why: str, *, ask_owner: bool, count: bool = True) -> None:

@@ -16,16 +16,17 @@ def _result(r: dict) -> str:
 
 @function_tool
 async def start_goal(context: RunContext, title: str, make_item: str | None = None, count: int = 1, why: str = '',
-                     by_myself: bool = False, first: bool = False, game: str = '') -> str:
+                     by_myself: bool = False, first: bool = False, game: str = '', queue: bool = False) -> str:
     """いくつもの段がある目的を始める（目的の係が、計画して 1 つずつ進め、できたかを確かめる）。
     title は見せる言葉（日本語。例「石のつるはしを作る」）。物を作る目的なら make_item に英語の ID（stone_pickaxe など）と count。
     why は目的のわけ（あれば）。by_myself は、頼まれたのではなく自分で決めた目的なら true。
-    動いている目的があれば、あとでやる目的に足す。先にこちらをするなら first=true。"""
+    新しいお願いは今の目的から切り替える。「終わったら・その後で」と頼まれた場合は queue=true。
+    自分で決めた目的は、持ち主の作業のあとに並べる。first は以前の呼び出しとの互換用。"""
     runner = _runner(context)
     if runner is None:
         return _result({'status': 'unavailable'})
     spec = {'make': make_item, 'count': max(1, min(64, count))} if make_item else {}
-    return _result(await runner.start(game, title, spec, why=why, by='ciel' if by_myself else 'owner', first=first))
+    return _result(await runner.start(game, title, spec, why=why, by='ciel' if by_myself else 'owner', first=first, queue=queue))
 
 
 @function_tool

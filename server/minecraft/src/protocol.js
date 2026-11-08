@@ -90,10 +90,13 @@ export function parseCommand(raw) {
       const args = m.args === undefined ? {} : m.args;
       if (args === null || typeof args !== 'object' || Array.isArray(args)) return { error: 'bad_args', id };
       const r = check(args);
-      return r.error ? { error: r.error, id } : { cmd: { type: 'do', id, skill: m.skill, args: r.args } };
+      if (m.request_id !== undefined && (typeof m.request_id !== 'string' || m.request_id.length > 160)) return { error: 'bad_args', id };
+      return r.error ? { error: r.error, id } : { cmd: { type: 'do', id, skill: m.skill, args: r.args,
+        ...(m.request_id ? { request_id: m.request_id } : {}) } };
     }
     case 'stop':
-      return { cmd: { type: 'stop' } };
+      if (m.task !== undefined && !Number.isInteger(m.task)) return { error: 'bad_id' };
+      return { cmd: { type: 'stop', ...(m.task !== undefined ? { task: m.task } : {}) } };
     case 'chat': {
       if (typeof m.text !== 'string' || !m.text.trim()) return { error: 'bad_args' };
       // 改行や制御文字はコマンドの区切りにならないよう、空白にする。先頭の / はコマンドになるので送らない

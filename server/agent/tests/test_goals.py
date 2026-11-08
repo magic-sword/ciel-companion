@@ -135,6 +135,67 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runner.goal.title, '二つ目')
         self.assertEqual(self.runner.state()['goal']['by_label'], 'シエルが決めた')
 
+    async def test_owner_request_replaces_infinite_mind_step_by_default(self):
+        a = FakeAdapter([None, steps('B')], [{'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', 'ついてきて', {})
+        await settle(self.runner)
+        old = self.runner.goal
+        result = await self.runner.start('mc', 'ツルハシを作る', {'make': 'stone_pickaxe'})
+        await settle(self.runner)
+        self.assertEqual(result['status'], 'started')
+        self.assertEqual(old.status, 'stopped')
+        self.assertEqual(self.runner.goal.status, 'done')
+        self.assertEqual(self.runner.next, [])
+
+    async def test_explicit_queue_waits_for_current_goal(self):
+        a = FakeAdapter([None, steps('B')], [{'ok': True}])
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', '追従', {})
+        await settle(self.runner)
+        result = await self.runner.start('mc', '工作', {}, queue=True)
+        self.assertEqual(result['status'], 'queued')
+        await self.runner.stop()
+
+    async def test_slow_old_plan_cannot_restart_after_new_goal(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        a = FakeAdapter([], [{'ok': True}])
+        async def plan(goal):
+            if goal.title == 'old':
+                entered.set()
+                await release.wait()
+            return steps(goal.title)
+        a.plan = plan
+        self.runner.register('mc', a, 'マイクラ')
+        old = asyncio.create_task(self.runner.start('mc', 'old', {}))
+        await entered.wait()
+        await asyncio.wait_for(self.runner.start('mc', 'new', {}), .5)
+        await settle(self.runner)
+        release.set()
+        self.assertEqual((await old)['status'], 'cancelled')
+        self.assertEqual(a.ran, ['new'])
+        self.assertEqual(self.runner.goal.title, 'new')
+
+    async def test_cancelled_repair_cannot_submit_another_old_step(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        a = FakeAdapter([steps('old'), steps('new')], [{'ok': False}, {'ok': True}])
+        async def repair(goal, step, result):
+            entered.set()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                # 遅い外部処理がキャンセルを飲んでも、世代の確認で止める。
+                pass
+            return steps('stale'), 'repair'
+        a.repair = repair
+        self.runner.register('mc', a, 'マイクラ')
+        await self.runner.start('mc', 'old', {})
+        await entered.wait()
+        await self.runner.start('mc', 'new', {})
+        release.set()
+        await settle(self.runner)
+        self.assertEqual(a.ran, ['old', 'new'])
+
     async def test_mind_step_waits_for_finish_step(self):
         a = FakeAdapter([None], [])
         self.runner.register('mc', a, 'マイクラ')

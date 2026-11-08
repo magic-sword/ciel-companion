@@ -5,6 +5,7 @@
 // - 会話モデルは使わない。MCP では、出来事をシエル向けの言葉にして、話すものだけを知らせる（src/ciel/words.js）。
 // - ゲームのチャットの中身はログに出さない（会話と同じ扱い）。
 import mineflayer from 'mineflayer';
+import { randomUUID } from 'node:crypto';
 import pathfinderPkg from 'mineflayer-pathfinder';
 import collectBlock from 'mineflayer-collectblock';
 import { WebSocketServer } from 'ws';
@@ -49,12 +50,15 @@ const tenth = (v) => Math.round(v * 10) / 10;
 let link = null;
 
 function send(type, fields) {
+  if (fields?.command_scope && fields.command_scope !== link?.bodyScope) return;
   if (link?.readyState === 1) link.send(message(type, fields));
 }
 
 const guard = new Guard(send, OWNER);
 const runner = new Runner(send, OWNER, guard);
 const care = new Care(send, guard);
+guard.body = runner;
+care.body = runner;
 const eye = new Eye({ host: BODY_HOST, port: EYE_PORT, log });
 let bot = null;
 
@@ -67,9 +71,10 @@ wss.on('connection', (ws) => {
     return;
   }
   link = ws;
+  ws.bodyScope = randomUUID();
   log('会話とつながった');
   send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
-  ws.on('message', (raw) => command(raw.toString()));
+  ws.on('message', (raw) => { if (link === ws) command(raw.toString()); });
   ws.on('close', () => {
     if (link !== ws) return;
     link = null;
@@ -88,8 +93,8 @@ function command(raw) {
     return;
   }
   const cmd = r.cmd;
-  if (cmd.type === 'do') runner.start(cmd);
-  else if (cmd.type === 'stop') runner.stop('stopped');
+  if (cmd.type === 'do') void runner.start({ ...cmd, scope: link?.bodyScope });
+  else if (cmd.type === 'stop') void runner.stop('stopped', cmd.task, link?.bodyScope);
   else if (cmd.type === 'chat') {
     if (bot?.entity) bot.chat(cmd.text);
     else send('error', { reason: 'not_spawned' });
@@ -105,6 +110,7 @@ const hub = makeHub({
   isBusy: () => link !== null && link !== hub.link,   // WebSocket の会話が使っている
   onClaim: (l) => {
     link = l;
+    l.bodyScope = randomUUID();
     send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
   },
   onRelease: (l) => {
@@ -143,7 +149,7 @@ function plan({ id, item, count }) {
 }
 
 let blocks = {};
-const state = () => summarize(bot, runner.doing(), blocks);
+const state = () => ({ ...summarize(bot, runner.doing(), blocks), body: runner.snapshot() });
 setInterval(() => {
   if (link) send('state', state());
 }, STATE_EVERY_MS);

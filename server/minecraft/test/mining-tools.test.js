@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { Vec3 } from 'vec3';
 import { Runner } from '../src/skills.js';
+import { Guard } from '../src/guard.js';
 
 const require = createRequire(import.meta.url);
 const registry = require('prismarine-registry')('1.21.11');
@@ -65,7 +66,7 @@ function fixture(inventory = {}) {
     const item = bot.inventory.items().reverse().find(i => block.harvestTools?.[i.type]);
     if (item) await bot.equip(item, 'hand');
   } };
-  const runner = new Runner((type, fields) => events.push({ type, ...fields }));
+  const runner = new Runner((type, fields) => { if (type !== 'body') events.push({ type, ...fields }); });
   runner.bot = bot;
   const add = (x, y, z, name) => { const p = new Vec3(x, y, z); set(p, name); resources.push(p); };
   const run = (skill = 'find', args = { block: 'iron', how: 'dig', max: 1 }) => runner.start({ id: 1, skill, args });
@@ -138,4 +139,20 @@ test('足元を掘る場合も道具の装備失敗を無視しない', async ()
   await f.run('dig_down', { depth: 1 });
   assert.equal(f.actions.length, 0);
   assert.equal(f.events.at(-1).ok, false);
+});
+
+test('防御待ちの追従から材料不足の工作へ切り替えても、追従と待ち手を残さない', async () => {
+  const f = fixture();
+  const guard = new Guard(() => {}, 'owner');
+  guard.active = true;
+  f.runner.guard = guard;
+  f.runner.owner = 'owner';
+  f.bot.players = { owner: { entity: { id: 1, position: new Vec3(1, 64, 0) } } };
+  const following = f.runner.start({ id: 1, skill: 'follow', args: {} });
+  const crafting = f.runner.start({ id: 2, skill: 'craft', args: { item: 'wooden_pickaxe', count: 1 } });
+  await Promise.all([following, crafting]);
+  assert.equal(f.runner.current, null);
+  assert.equal(guard._waiters.length, 0);
+  assert.equal(f.events.find(e => e.type === 'done' && e.id === 2).reason, 'missing_materials');
+  assert.deepEqual(f.actions, []);
 });

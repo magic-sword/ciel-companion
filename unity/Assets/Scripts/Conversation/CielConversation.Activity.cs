@@ -32,6 +32,24 @@ namespace Ciel.Conversation
         }
 
         [Serializable]
+        public class ActivityBody
+        {
+            public int version, revision;
+            public string session, phase, title, next_title, reason, last_title, last_phase, last_reason, last_note;
+            public float for_s;
+            public bool Active => phase != "idle" && phase != "unknown";
+            public string Description => reason == "stop_timeout" ? "停止の確認に時間がかかっています"
+                : reason == "defending" ? "身を守っています（作業を一時中断）"
+                : reason == "eating" ? "食事をしています"
+                : phase == "stopping" ? "前の作業を停止しています"
+                : phase == "accepted" ? "依頼を受け付け、開始を待っています"
+                : phase == "preparing" ? "材料・作業の条件を確認しています"
+                : phase == "waiting" ? "作業の再開を待っています"
+                : phase == "unknown" ? "体の状態を確認できていません"
+                : phase == "running" ? "実行中：" + title : "今は作業していません";
+        }
+
+        [Serializable]
         public class ActivityState
         {
             public string type, mind, who, doing, goal_step;   // mind：idle・listening・thinking・speaking。who：mind・talker
@@ -43,6 +61,7 @@ namespace Ciel.Conversation
             public ActivityCall[] calls;
             public ActivityTask[] tasks;
             public ActivityLog[] log;
+            public ActivityBody body;
         }
 
         /// いまのシエル（届いていなければ null）
@@ -58,6 +77,8 @@ namespace Ciel.Conversation
             try { s = JsonUtility.FromJson<ActivityState>(System.Text.Encoding.UTF8.GetString(data)); }
             catch (Exception ex) { Debug.LogWarning($"[CielConversation] いまのシエルを読めない: {ex.Message}"); return; }
             if (s == null || s.type != "activity.state") return;
+            // JsonUtilityは古い通知に無い入れ子も空のインスタンスにすることがある。
+            if (s.body != null && s.body.version < 1) s.body = null;
             Activity = s;
             ActivityAt = Time.unscaledTime;
             ActivityRevision++;

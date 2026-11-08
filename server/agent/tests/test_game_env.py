@@ -9,6 +9,7 @@ from unittest import mock
 from livekit.agents import llm
 
 import board
+import activity
 import game_env
 import goals
 import mind
@@ -157,7 +158,7 @@ class EventTest(EnvCase):
         await until(lambda: self.said.calls)
         self.assertIn('3 だけ跳ぶ：失敗', self.board.context())
         self.assertEqual(self.said.lines()[-1], '[テスト：「3 だけ跳ぶ」ができなかった。理由：鍵が無い。同じ頼みでうまくいかなかったのは 1 回目]')
-        await self.fake.emit(failed)
+        await self.fake.emit({**failed, 'task': 8})
         await until(lambda: len(self.said.calls) == 2)
         self.assertIn('2 回目', self.said.lines()[-1])   # 同じ頼みの何回目かは、会話サーバーが題で数える
 
@@ -210,17 +211,105 @@ class GoalsAdapterTest(EnvCase):
 
 
 class GoalHoldsBodyTest(EnvCase):
-    async def test_body_tools_wait_while_the_goal_uses_the_body(self):
+    async def test_new_body_command_stops_goal_before_submission(self):
         await self.link()
-        self.env.goals = types.SimpleNamespace(body_step=lambda: 'オークの原木を 2 個集める')
+        stop = mock.AsyncMock()
+        self.env.goals = types.SimpleNamespace(body_step=lambda: 'オークの原木を 2 個集める', stop=stop)
         r = await self.env.use('test_jump', {})
-        self.assertEqual(r['status'], 'goal_running')
-        self.assertIn('オークの原木を 2 個集める', r['why'])
+        self.assertEqual(r['status'], 'started')
+        stop.assert_awaited_once_with(reason='replaced')
         self.assertEqual((await self.env.use('test_stop', {}))['status'], 'stopped')   # 止めるのはよい
         self.assertEqual((await self.env.use('test_look', {}))['status'], 'seen')      # 見るのはよい
-        self.assertNotIn(('test_jump', {}), self.fake.calls)
+        self.assertIn(('test_jump', {}), self.fake.calls)
         self.env.goals = types.SimpleNamespace(body_step=lambda: None)
         self.assertEqual((await self.env.use('test_jump', {}))['status'], 'started')
+
+
+class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.env = game_env.GameEnv('test', 'http://unused')
+        self.env.linked = True
+        self.env.board = board.Board()
+        self.env.activity = activity.Activity(None)
+        self.env.meta = {'test_jump': {'ciel/role': 'act', 'ciel/long_running': True}}
+
+    async def test_done_before_response_cannot_resurrect_two_finished_tasks(self):
+        for task in (7, 8):
+            async def call(name, args):
+                self.env.on_event({'kind': 'task_done', 'task': task, 'title': 'follow', 'ok': False})
+                return {'status': 'started', 'task': task, 'title': 'follow'}
+            self.env._call = call
+            result = await self.env.use('test_jump', {})
+            self.assertEqual(result['status'], 'completed')
+        self.assertEqual(self.env.activity.state()['tasks'], [])
+        self.assertEqual(self.env._cards, {})
+
+    async def test_duplicate_done_notifies_once_but_new_session_can_reuse_id(self):
+        said = Said()
+        self.env.say = said
+        event = {'kind': 'task_done', 'session': 'one', 'task': 1, 'title': 'follow', 'ok': True, 'say': '[done]'}
+        self.env.on_event(event)
+        self.env.on_event(event)
+        self.env.on_event({**event, 'session': 'two'})
+        self.assertEqual(len(said.calls), 2)
+
+    async def test_snapshot_repairs_missed_done_and_real_notice_still_reaches_mind(self):
+        said = Said()
+        self.env.say = said
+        self.env._call = mock.AsyncMock(return_value={'status': 'accepted', 'session': 'one', 'task': 1, 'title': 'follow'})
+        await self.env.use('test_jump', {})
+        self.env._body = {'session': 'one', 'revision': 1, 'current': {'id': 1, 'title': 'follow', 'phase': 'running'}}
+        self.env._reconcile_body()
+        self.env._body = {'session': 'one', 'revision': 2, 'current': None,
+                          'last': {'id': 1, 'title': 'follow', 'phase': 'failed', 'result': {'ok': False, 'reason': 'no_path'}}}
+        self.env._reconcile_body()
+        self.assertEqual(self.env._cards, {})
+        self.assertEqual(self.env.activity.state()['body']['phase'], 'idle')
+        self.env.on_event({'kind': 'task_done', 'session': 'one', 'task': 1, 'ok': False, 'failed': True, 'say': '[failed]'})
+        self.assertEqual(len(said.calls), 1)
+
+    async def test_old_refresh_cannot_overwrite_newer_revision(self):
+        self.env._body = {'session': 'one', 'epoch': 'boot', 'revision': 5}
+        self.env.state = {'doing': 'new'}
+        self.env._session = types.SimpleNamespace(read_resource=mock.AsyncMock(return_value=types.SimpleNamespace(contents=[
+            types.SimpleNamespace(text=json.dumps({'doing': 'old', 'body': {'session': 'one', 'epoch': 'boot', 'revision': 4}}))])))
+        await self.env._refresh()
+        self.assertEqual(self.env.state['doing'], 'new')
+
+    async def test_search_is_not_blocked_by_body_submission(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        self.env.meta['test_search'] = {'ciel/role': 'know'}
+        async def call(name, args):
+            if name == 'test_jump':
+                entered.set()
+                await release.wait()
+            return {'status': 'ok'}
+        self.env._call = call
+        task = asyncio.create_task(self.env.use('test_jump', {}))
+        await entered.wait()
+        result = await asyncio.wait_for(self.env.use('test_search', {}), .5)
+        self.assertEqual(result['status'], 'ok')
+        release.set()
+        await task
+
+    async def test_direct_command_cancels_goal_that_is_still_planning(self):
+        stop = mock.AsyncMock()
+        self.env.goals = types.SimpleNamespace(body_step=lambda: None,
+            active=types.SimpleNamespace(status='planning'), stop=stop)
+        async def call(name, args):
+            self.assertEqual(stop.await_count, 1)
+            return {'status': 'accepted', 'task': 1}
+        self.env._call = call
+        await self.env.use('test_jump', {})
+        stop.assert_awaited_once_with(reason='replaced')
+
+    async def test_spontaneous_action_cannot_replace_current_body_command(self):
+        self.env.activity.thinking_origin = 'initiative'
+        self.env._body = {'current': {'id': 1}}
+        self.env._call = mock.AsyncMock()
+        result = await self.env.use('test_jump', {})
+        self.assertEqual(result['status'], 'goal_running')
+        self.env._call.assert_not_awaited()
 
 
 class MindGameTest(EnvCase):

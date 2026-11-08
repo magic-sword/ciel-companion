@@ -1,5 +1,5 @@
 // 体の手入れ：おなかが減ったら、持っている食べ物を自分で食べる。docs/minecraft-design-ja.md の 4.2。
-// 守っているあいだ（guard.js）は食べない。食べているあいだ（約 1.6 秒）も、技はそのまま続ける。
+// 体の空き時間だけ食べる。命令や防御と装備を奪い合わない。
 
 const EVERY_MS = 2000;
 const HUNGRY = 14;        // 空腹（0〜20）がこれ以下なら食べる
@@ -23,6 +23,7 @@ export class Care {
     this.bot = null;
     this._eating = false;
     this._timer = null;
+    this.body = null;
   }
 
   attach(bot) {
@@ -44,9 +45,14 @@ export class Care {
     if (!item) return;
     this._eating = true;
     try {
-      await bot.equip(item, 'hand');
-      await bot.consume();
-      this.report('event', { kind: 'ate', name: item.name, food: bot.food });
+      const eat = async () => {
+        await bot.equip(item, 'hand');
+        if (this.bot !== bot || this.guard?.active) return;
+        await bot.consume();
+        this.report('event', { kind: 'ate', name: item.name, food: bot.food });
+      };
+      if (this.body) await this.body.maintain(eat);
+      else await eat();
     } catch {
       // 食べている途中で叩かれた・持ち替えた。次の見回りでまた試す
     } finally {

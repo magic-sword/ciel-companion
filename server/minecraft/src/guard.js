@@ -5,6 +5,7 @@
 import pathfinderPkg from 'mineflayer-pathfinder';
 
 import { carefulMovements } from './movements.js';
+import { cancelledWait } from './body-command.js';
 
 const { goals } = pathfinderPkg;
 const TICK_MS = 250;
@@ -61,6 +62,9 @@ export class Guard {
     this._kills = 0;
     this._waiters = [];
     this._timer = null;
+    this.body = null;
+    this._taking = false;
+    this._operations = new Set();
   }
 
   attach(bot) {
@@ -77,11 +81,17 @@ export class Guard {
   }
 
   // 守り終えるのを待つ
-  idle() {
-    return this.active ? new Promise((r) => this._waiters.push(r)) : Promise.resolve();
+  idle(token) {
+    if (!this.active) return Promise.resolve();
+    let resolve;
+    const wait = new Promise(r => { resolve = r; this._waiters.push(r); });
+    return cancelledWait(token, wait).finally(() => {
+      this._waiters = this._waiters.filter(r => r !== resolve);
+    });
   }
 
   _tick() {
+    if (this._taking || this._ending) return;
     const bot = this.bot;
     if (!bot?.entity || bot.health <= 0) return this._end(false);
     const was = this._plan;
@@ -101,6 +111,20 @@ export class Guard {
       this._hits = 0;
       this._kills = 0;
       bot.collectBlock?.cancelTask().catch(() => {});
+      bot.pathfinder.setGoal(null);
+      bot.stopDigging?.();
+      if (this.body) {
+        this._taking = true;
+        const attached = bot;
+        void this.body.defense(true).finally(() => {
+          this._taking = false;
+          if (this.bot === attached && this.active) {
+            bot.pathfinder.setMovements(carefulMovements(bot));
+            this._tick();
+          }
+        });
+        return;
+      }
       bot.pathfinder.setMovements(carefulMovements(bot));
     }
     const same = this._plan && this._plan.action === plan.action && this._plan.target === plan.target;
@@ -128,9 +152,8 @@ export class Guard {
     if (target.position.distanceTo(bot.entity.position) > REACH) return;
     this._lastHit = now;
     this._hits += 1;
-    bot.lookAt(target.position.offset(0, (target.height ?? 1.6) * 0.8, 0), true)
-      .then(() => bot.attack(target))
-      .catch(() => {});
+    this._track(bot.lookAt(target.position.offset(0, (target.height ?? 1.6) * 0.8, 0), true)
+      .then(() => { if (this.active && !this._ending && this.bot === bot) bot.attack(target); }));
   }
 
   _equipWeapon() {
@@ -138,24 +161,36 @@ export class Guard {
     if (WEAPONS.includes(bot.heldItem?.name)) return;
     const items = bot.inventory.items();
     const best = WEAPONS.map((n) => items.find((i) => i.name === n)).find(Boolean);
-    if (best) bot.equip(best, 'hand').catch(() => {});
+    if (best) this._track(bot.equip(best, 'hand'));
+  }
+
+  _track(promise) {
+    const p = Promise.resolve(promise).catch(() => {});
+    this._operations.add(p);
+    void p.finally(() => this._operations.delete(p));
   }
 
   _end(safe) {
-    if (!this.active) return;
+    if (!this.active || this._ending) return;
+    if (this._operations.size) {
+      this._ending = true;
+      void Promise.allSettled([...this._operations]).then(() => { this._ending = false; this._end(safe); });
+      return;
+    }
     this.active = false;
     this._plan = null;
     console.log(new Date().toISOString(), `守り終えた hits=${this._hits} kills=${this._kills} health=${Math.round(this.bot?.health ?? 0)}`);
     if (this.bot?.pathfinder) this.bot.pathfinder.setGoal(null);
     if (safe) this.report('event', { kind: 'safe' });
     for (const r of this._waiters.splice(0)) r();
+    void this.body?.defense(false);
   }
 }
 
 // 技の動き（経路探索・ブロック集め）を、守りに割り込まれても続ける。止められたら（token.cancelled）やめる
 export async function guarded(guard, token, fn) {
   for (;;) {
-    if (guard?.active) await guard.idle();
+    if (guard?.active) await guard.idle(token);
     if (token.cancelled) return undefined;
     const generation = guard?.generation;
     try {
