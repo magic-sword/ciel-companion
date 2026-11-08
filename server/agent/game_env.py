@@ -43,7 +43,8 @@ PROFILE_VERSION = 1
 PREPARE_TIMEOUT = 4.0      # 会話の始めに、ゲームのサーバーの決まり・道具・指示を読むのを待つ上限
 CALL_TIMEOUT = 40.0        # 道具 1 回の答えを待つ上限（景色を撮るのに 25 秒かかることがある）
 STEP_TIMEOUT = 960.0       # 目的の段（技 1 つ）が終わるまで待つ上限（体の側は 900 秒で止める）
-PING_SECONDS = 20.0        # 体を受け持っているあいだ、離れていないことを知らせる間（体の側は 60 秒で離れたことにする）
+PING_SECONDS = 20.0        # 受け持ち前・待機中も通信を保つ（体の側は 60 秒無通信でセッションを閉じる）
+LINK_RETRY_SECONDS = 3.0   # 使用中・接続待ちからの再試行。ほかの会話の所有権は奪わない
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
 SAME_KIND_SECONDS = 30.0   # 同じ種類の知らせは、この秒数に 1 回まで
 URGENT_SETTLE = 0.3        # 危ない知らせは、すぐの切れ目で言う
@@ -153,10 +154,11 @@ class GameEnv:
         self._observed: set = set()
         self._connection_epoch = 0
         self._act_lock = asyncio.Lock()
+        self._link_lock = asyncio.Lock()
         self._fails: dict[str, int] = {}
         self._said: dict[str, float] = {}
         self._remembered: set[str] = set()
-        self._ping: asyncio.Task | None = None
+        self._stop_event: asyncio.Event | None = None
 
     # ---- つなぐ ----
 
@@ -188,6 +190,7 @@ class GameEnv:
                         await self._read_setup(session)
                         first = False
                     self._session = session
+                    self._stop_event = asyncio.Event()
                     self._connection_epoch += 1
                     retry = RETRY_MIN
                     log.info('ゲーム（%s）の環境とつながった', self.game)
@@ -206,7 +209,6 @@ class GameEnv:
                 if self.linked:
                     log.info('ゲーム（%s）の体から切れた', self.game)
                 self.linked = False
-                self._stop_ping()
                 for key, card in list(self._cards.items()):   # 終わりを聞けなくなった技の付箋
                     self._close_card_of(card, 'failed', '体から切れた')
                     if self.activity is not None:
@@ -225,8 +227,38 @@ class GameEnv:
             retry = min(retry * 2, RETRY_MAX)
 
     async def _closing(self) -> None:
-        self._stop_event = asyncio.Event()
-        await self._stop_event.wait()
+        """受け持ちの有無にかかわらず通信を保ち、切れた通信は作り直す。"""
+        session = self._session
+        loop = asyncio.get_running_loop()
+        next_ping = loop.time() + PING_SECONDS
+        while not self._closed and not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), LINK_RETRY_SECONDS)
+                return
+            except asyncio.TimeoutError:
+                pass
+            if loop.time() >= next_ping:
+                try:
+                    await asyncio.wait_for(session.send_ping(), 10)
+                except Exception as e:
+                    log.info('ゲーム（%s）の通信をつなぎ直す：%s', self.game, type(e).__name__)
+                    self._reconnect(session)
+                    return
+                next_ping = loop.time() + PING_SECONDS
+            if self.wanted and not self.linked:
+                await self._link(True)
+
+    def _reconnect(self, session) -> None:
+        if session is not self._session or self._closed:
+            return
+        self.linked = False
+        self.reason = 'connecting' if self.wanted else 'off'
+        self._connection_epoch += 1
+        if self._stop_event is not None:
+            self._stop_event.set()
+        if self.activity is not None:
+            self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': self.reason})
+        self.publish()
 
     async def _read_setup(self, session) -> None:
         r = await session.read_resource('game://profile')
@@ -275,41 +307,43 @@ class GameEnv:
         asyncio.create_task(self._link(on))
 
     async def _link(self, on: bool) -> None:
-        if on:
+        async with self._link_lock:
+            if self._closed or on != self.wanted or self._session is None:
+                return
+            await self._link_once(on)
+
+    async def _link_once(self, on: bool) -> None:
+        session = self._session
+        was_busy = self.reason == 'busy'
+        if on and self.reason != 'busy':
             self.reason = 'connecting'
             self.publish()
         r = await self._call(self.profile.get('link_tool') or f'{self.game}_link', {'on': on})
+        if session is not self._session or (self._stop_event is not None and self._stop_event.is_set()):
+            return
+        if on and (not self.wanted or self._closed):
+            # 接続要求の返事を待つ間にオフになった。取れた体を残さない。
+            await self._call(self.profile.get('link_tool') or f'{self.game}_link', {'on': False})
+            r = {'status': 'off'}
         status = r.get('status')
+        if status in ('no_answer', 'unavailable', 'error'):
+            self._reconnect(session)
+            return
         if status == 'linked':
             await self._refresh()   # 様子を読んでから、受け持ったことにする
+            if session is not self._session or (self._stop_event is not None and self._stop_event.is_set()):
+                return
         self.linked = status == 'linked'
         self.reason = '' if self.linked else ('busy' if status == 'busy' else 'off' if not on else 'connecting')
         if self.linked:
             log.info('ゲーム（%s）の体を受け持った', self.game)
             debug_log.record('game', game=self.game, what='linked')
-            self._start_ping()
         else:
-            if status == 'busy':
+            if status == 'busy' and not was_busy:
                 log.info('ゲーム（%s）の体は、ほかの会話が使っている', self.game)
-            self._stop_ping()
             if self.activity is not None:
                 self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': self.reason})
         self.publish()
-
-    def _start_ping(self) -> None:
-        self._stop_ping()
-
-        async def ping():
-            while self._session is not None and self.linked:
-                await asyncio.sleep(PING_SECONDS)
-                with contextlib.suppress(Exception):
-                    await self._session.send_ping()
-        self._ping = asyncio.create_task(ping())
-
-    def _stop_ping(self) -> None:
-        if self._ping is not None:
-            self._ping.cancel()
-            self._ping = None
 
     async def close(self) -> None:
         self._closed = True
@@ -346,10 +380,16 @@ class GameEnv:
         """道具を呼んで、返事の JSON（dict）を返す。絵があれば '_images' に入れる"""
         if self._session is None:
             return {'status': 'unavailable'}
+        session = self._session
         try:
             r = await self._session.call_tool(name, args, read_timeout_seconds=timedelta(seconds=timeout))
         except Exception as e:
             log.info('ゲーム（%s）の道具 %s が答えない：%s', self.game, name, type(e).__name__)
+            if (name == (self.profile.get('link_tool') or f'{self.game}_link')
+                    or getattr(getattr(e, 'error', None), 'message', '') == 'Session terminated'
+                    or isinstance(e, (ConnectionError, OSError))
+                    or type(e).__name__ in ('ClosedResourceError', 'BrokenResourceError')):
+                self._reconnect(session)
             return {'status': 'no_answer'}
         out = _json(_text(r))
         images = [c for c in r.content or [] if getattr(c, 'type', '') == 'image']
@@ -446,6 +486,8 @@ class GameEnv:
             r = await self._session.read_resource('game://state')
         except Exception as e:
             log.info('ゲーム（%s）の様子を読めない：%s', self.game, type(e).__name__)
+            if getattr(getattr(e, 'error', None), 'message', '') == 'Session terminated':
+                self._reconnect(session)
             return
         if session is not self._session or epoch != self._connection_epoch:
             return

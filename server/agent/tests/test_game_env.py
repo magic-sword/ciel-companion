@@ -99,6 +99,87 @@ class PrepareTest(EnvCase):
 
 
 class LinkTest(EnvCase):
+    async def asyncSetUp(self):
+        timers = mock.patch.multiple(game_env, LINK_RETRY_SECONDS=.03, PING_SECONDS=.05, RETRY_MIN=.01)
+        timers.start()
+        self.addCleanup(timers.stop)
+        await super().asyncSetUp()
+
+    async def test_busy_retries_automatically_when_previous_owner_leaves(self):
+        self.fake.busy = True
+        with mock.patch.object(game_env, 'LINK_RETRY_SECONDS', .03):
+            self.env.on_data(packet(True))
+            await until(lambda: self.env.reason == 'busy')
+            self.fake.busy = False
+            await until(lambda: self.env.linked)
+        self.assertTrue(self.env.playing())
+
+    async def test_busy_wait_does_not_flicker_or_retry_after_off(self):
+        self.fake.busy = True
+        with mock.patch.object(game_env, 'LINK_RETRY_SECONDS', .02):
+            self.env.on_data(packet(True))
+            await until(lambda: self.env.reason == 'busy')
+            self.shown.clear()
+            await asyncio.sleep(.10)
+            self.assertEqual(self.env.reason, 'busy')
+            self.assertEqual(self.shown, [])
+            self.env.on_data(packet(False))
+            await until(lambda: self.env.reason == 'off')
+            count = len(self.fake.calls)
+            await asyncio.sleep(.08)
+            self.assertEqual(len(self.fake.calls), count)
+
+    async def test_unclaimed_transport_is_kept_alive_without_claiming_body(self):
+        with mock.patch.object(game_env, 'LINK_RETRY_SECONDS', .01), mock.patch.object(game_env, 'PING_SECONDS', .02):
+            # Recreate the monitor to set its initial ping deadline with the short interval.
+            self.env._reconnect(self.env._session)
+            previous = self.env._session
+            with mock.patch.object(game_env, 'RETRY_MIN', .01):
+                await until(lambda: self.env._session is not None and self.env._session is not previous)
+                session = self.env._session
+                session.send_ping = mock.AsyncMock()
+                await until(lambda: session.send_ping.await_count > 0)
+        self.assertFalse(self.env.linked)
+        self.assertNotIn(('test_link', {'on': True}), self.fake.calls)
+
+    async def test_failed_ping_recreates_transport_and_reclaims_if_wanted(self):
+        await self.link()
+        session = self.env._session
+        with mock.patch.object(game_env, 'LINK_RETRY_SECONDS', .01), mock.patch.object(game_env, 'PING_SECONDS', .02), mock.patch.object(game_env, 'RETRY_MIN', .01):
+            self.env._reconnect(session)
+            await until(lambda: self.env._session is not None and self.env._session is not session and self.env.linked)
+            second = self.env._session
+            second.send_ping = mock.AsyncMock(side_effect=ConnectionError('lost'))
+            await until(lambda: self.env._session is not None and self.env._session is not second and self.env.linked)
+
+    async def test_expired_session_on_manual_retry_is_replaced(self):
+        from mcp.shared.exceptions import McpError
+        from mcp.types import ErrorData
+        await self.link()
+        expired = self.env._session
+        expired.call_tool = mock.AsyncMock(side_effect=McpError(ErrorData(code=32600, message='Session terminated')))
+        with mock.patch.object(game_env, 'RETRY_MIN', .01):
+            self.env.on_data(packet(True))
+            await until(lambda: self.env._session is not None and self.env._session is not expired and self.env.linked)
+        self.assertEqual(self.env.reason, '')
+
+    async def test_off_during_slow_link_does_not_leave_body_claimed(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        original = self.env._call
+        async def slow(name, args):
+            if name == 'test_link' and args.get('on'):
+                entered.set()
+                await release.wait()
+            return await original(name, args)
+        self.env._call = slow
+        self.env.on_data(packet(True))
+        await entered.wait()
+        self.env.on_data(packet(False))
+        release.set()
+        await until(lambda: self.env.reason == 'off')
+        self.assertFalse(self.fake.linked)
+        self.assertFalse(self.env.linked)
+
     async def test_app_switch_links_shows_state_and_unlinks(self):
         env = self.env
         self.assertEqual(await env.use('test_jump', {}), {'status': 'unavailable'})   # 受け持つ前は動かさない
