@@ -1,4 +1,4 @@
-// シエルの体の MCP の入口。docs/game-environment-mcp-design-ja.md の 4 章（シエルのゲームの決まり、版 1）。
+﻿// シエルの体の MCP の入口。docs/game-environment-mcp-design-ja.md の 4 章（シエルのゲームの決まり、版 1）。
 // - 会話サーバーは会話の始めに MCP でつなぎ、道具・遊び方の指示（prompt play）・決まり（resource game://profile）を読む。
 //   つないだだけでは体を動かさない。アプリの設定でオンにしたら minecraft_link(on=true) で体を受け持つ（体を動かせる会話は 1 つだけ）。
 // - 様子は resource game://state。変わったら、受け持っている会話へ notifications/resources/updated を送る。
@@ -88,8 +88,8 @@ export function makeServer(hub, sessionId) {
   ({ x, z: zz }) => body((l) => l.do('go_to', { x, z: zz })));
   server.registerTool('minecraft_collect_blocks', {
     title: '集める',
-    description: 'マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy など）か、'
-      + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。必要な道具がなければ材料を集めて作ってから続ける。',
+    description: 'マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy・crafting_table など）か、'
+      + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。必要な道具がなければ材料を集めて作ってから続ける。作業台の回収は block=crafting_table。明示した対象以外の建築ブロックは壊さない。',
     inputSchema: { block: z.string(), count: z.number().int() }, ...ACT('minecraft_collect_blocks', { 'ciel/long_running': true }),
   }, ({ block, count }) => body((l) => l.do('collect', { block, count })));
   server.registerTool('minecraft_find_blocks', {

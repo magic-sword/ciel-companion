@@ -55,3 +55,15 @@ export function escapeDrop(health) {
   const h = Number.isFinite(health) ? Math.floor(health) : 20;
   return Math.max(PLAYER_DROP, Math.min(ESCAPE_DROP_MAX, h - KEEP_HEALTH + 3));
 }
+
+// Explicit collection permits only this protected block, never every block of its type.
+export function collectMovements(bot, target) {
+  const movements = playerMovements(bot);
+  if (target.diggable && movements.blocksCantBreak.has(target.type)) {
+    movements.blocksCantBreak.delete(target.type);
+    const position = target.position.clone();
+    movements.exclusionAreasBreak.push(block => block.type === target.type
+      && !block.position.equals(position) ? 100 : 0);
+  }
+  return movements;
+}

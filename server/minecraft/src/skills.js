@@ -10,7 +10,7 @@ import { planCraft } from './craft-plan.js';
 import { planGoal } from './goal-plan.js';
 import { blocksFor } from './names.js';
 import { knows, rememberAround } from './sight.js';
-import { escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
+import { collectMovements, escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
 
 const { goals } = pathfinderPkg;
 const FOLLOW_RANGE = 2;     // ついていくときに空ける距離
@@ -461,10 +461,15 @@ const SKILL_RUN = {
       if (target) {
         try {
           await guarded(guard, token, async () => {
-            bot.collectBlock.movements = playerMovements(bot);   // 守る係が歩き方を変えたあとでも、掘れるように戻す
-            await ensureHarvestTool(bot, [target], token, guard);   // 途中で道具が壊れた場合も用意し直す
+            await ensureHarvestTool(bot, [target], token, guard);
             if (token.cancelled) return;
-            return watched(bot, () => bot.collectBlock.collect(target));
+            bot.collectBlock.movements = collectMovements(bot, target);
+            try {
+              return await watched(bot, () => bot.collectBlock.collect(target));
+            } finally {
+              bot.collectBlock.movements = playerMovements(bot);
+              if (!guard?.active) bot.pathfinder.setMovements(bot.collectBlock.movements);
+            }
           });
           rememberAround(bot, pos, (n) => names.has(n));   // 木の幹の上のほうも、続けて集められる
           await pickUpNear(bot, pos, guard, token);

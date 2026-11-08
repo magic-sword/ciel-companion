@@ -50,7 +50,6 @@ const FACING = {
 };
 const BIG_HURT = 4;     // 一度にこれだけ減ったら言う（体力は 20 まで）
 const LOW_HEALTH = 6;
-const INVENTORY_SHOWN = 6;
 const BLOCKS_SHOWN = 8;
 
 // よく使う物の日本語の呼び名（見せる言葉。無ければ英語の ID を読みやすくする）
@@ -112,7 +111,7 @@ const counts = (o) => Object.entries(o ?? {}).sort((a, b) => b[1] - a[1]);
 export function stateText(s, owner, linked = true) {
   if (!linked) return 'シエルの体とつながっていない（マイクラの中のことは分からない）';
   if (!s || !s.connected) return 'シエルはマイクラに入っていない（入り直しているところ）';
-  const inv = counts(s.inventory).slice(0, INVENTORY_SHOWN);
+  const inv = counts(s.inventory);
   const doing = s.doing;
   const me = [`体力 ${Math.round(s.health ?? 0)}/20`, `空腹 ${s.food}/20`,
     '持ち物 ' + (inv.length ? inv.map(([k, n]) => `${k}×${n}`).join('、') : 'なし'),

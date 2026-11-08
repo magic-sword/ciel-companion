@@ -4,7 +4,6 @@ import { FLOWER_NAMES } from './names.js';
 import { canSee, notices, remember } from './sight.js';
 
 const NEAR = 16;          // 近くとみなす距離（ブロック）
-const INVENTORY_ITEMS = 12;
 const NIGHT_START = 13000;   // timeOfDay（0〜23999）。13000〜23000 は敵が湧く暗さ
 const NIGHT_END = 23000;
 
@@ -56,7 +55,7 @@ export function summarize(bot, doing, blocks = {}) {
     .sort((a, b) => a.distance - b.distance);
   const inventory = {};
   for (const item of bot.inventory.items()) inventory[item.name] = (inventory[item.name] ?? 0) + item.count;
-  const top = Object.entries(inventory).sort((a, b) => b[1] - a[1]).slice(0, INVENTORY_ITEMS);
+  const top = Object.entries(inventory).sort((a, b) => b[1] - a[1]);
   return {
     connected: true,
     pos: { x: round(me.x), y: round(me.y), z: round(me.z) },
