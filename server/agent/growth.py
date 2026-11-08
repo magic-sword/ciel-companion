@@ -90,7 +90,7 @@ class Grower:
     @property
     def client(self):
         if self._client is None:
-            self._client = openai.AsyncOpenAI()
+            self._client = models.create_client('growth')
         return self._client
 
     async def flush(self, now: datetime | None = None) -> str:

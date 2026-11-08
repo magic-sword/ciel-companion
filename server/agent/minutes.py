@@ -166,7 +166,7 @@ class Minutes:
         self.destination: str | None = None      # 選んでいる送り先の名前（登録が無ければ None）
         self.on_destination: Callable[[str], None] | None = None   # 声で切り替えたとき（アプリの端末に覚えさせる）
         self.board: tasks.Board | None = None   # 付箋の一覧（pipeline のとき agent.py がつなぐ）
-        self._client = openai.AsyncOpenAI()
+        self._client = models.create_client('minutes') if models.LOCAL_TEST else openai.AsyncOpenAI()
 
     @property
     def recording(self) -> bool:
@@ -540,11 +540,11 @@ class Minutes:
                    'state': m.state.for_model(), 'conversation': conversation(lines),
                    **({'research': research} if research else {})}
         try:
-            r = await self._client.chat.completions.create(
+            r = await models.client_for('minutes_live', self._client).chat.completions.create(**models.options('minutes_live',
                 model=live.LIVE_MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=LIVE_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.live_instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-            models.record('minutes_live', live.LIVE_MODEL, getattr(r, 'usage', None))
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+            models.record('minutes_live', models.model('minutes_live'), getattr(r, 'usage', None))
             return json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 作れなくても、会話は続ける（次の機会か、終わりの清書に回す）
             log.warning('議事録：ライブの差分を作れない：%s', type(e).__name__)
@@ -622,11 +622,11 @@ class Minutes:
                    'conversation': conversation(lines),
                    **({'research': research} if research else {})}
         try:
-            r = await self._client.chat.completions.create(
+            r = await models.client_for('minutes', self._client).chat.completions.create(**models.options('minutes',
                 model=MODEL, reasoning_effort='medium', response_format={'type': 'json_object'}, timeout=timeout,
                 messages=[{'role': 'system', 'content': self.instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
-            models.record('minutes', MODEL, getattr(r, 'usage', None))
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+            models.record('minutes', models.model('minutes'), getattr(r, 'usage', None))
             return json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 要約できなくても、会話は続ける
             log.warning('議事録を要約できない：%s', type(e).__name__)

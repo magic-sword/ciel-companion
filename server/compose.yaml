@@ -71,6 +71,8 @@ services:
       - LOCAL_LLM_MODEL=/models/${LOCAL_LLM_FILE:-Qwen3.5-35B-A3B-Q4_K_M.gguf}
       - LOCAL_LLM_PORT=8094
       - LOCAL_LLM_CONTROL_PORT=8095
+      - LOCAL_LLM_CTX=${LOCAL_LLM_CTX:-12288}
+      - LOCAL_LLM_MODE=${LOCAL_LLM_MODE:-gpu}
     volumes:
       - ${LOCAL_LLM_DIR:-${HOME}/models/llm}:/models:ro
     deploy:

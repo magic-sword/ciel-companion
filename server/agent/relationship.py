@@ -60,7 +60,7 @@ class RelationKeeper:
         self.note_taker = note_taker   # notes.NoteTaker（本人からの「忘れて」の依頼）
         self.history = history
         self.instructions = instructions
-        self._client = openai.AsyncOpenAI()
+        self._client = models.create_client('relationship')
 
     async def flush(self) -> None:
         """会話が終わるとき：この会話で話した、同意している人ごとに関係を書き直す"""

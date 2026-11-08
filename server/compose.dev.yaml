@@ -24,6 +24,9 @@ services:
       - CIEL_AGENT_NAME=ciel-dev
       # 会話の組み立て（realtime・pipeline）。本番と同じ pipeline が既定。比べるときは、起動し直すシェルで CIEL_DEV_MODEL=realtime を付ける
       - CIEL_MODEL=${CIEL_DEV_MODEL:-pipeline}
+      # local で文字の推論をすべてローカルへ。既定は文字入力で、音声の API を呼ばない。
+      - CIEL_LLM_BACKEND=${CIEL_DEV_LLM_BACKEND:-openai}
+      - CIEL_INPUT=${CIEL_DEV_INPUT:-}
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
@@ -33,9 +36,11 @@ services:
       # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
       # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。裏で動く役目だけ送る。歌を聴くあいだは CPU の形に切り替える
-      - CIEL_LOCAL_LLM_URL=http://127.0.0.1:8094/v1
+      - CIEL_LOCAL_LLM_URL=${CIEL_DEV_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
+      - CIEL_LOCAL_LLM_MODEL=${CIEL_DEV_LOCAL_LLM_MODEL:-local}
+      - CIEL_LOCAL_TIMEOUT=${CIEL_DEV_LOCAL_TIMEOUT:-90}
       - CIEL_LOCAL_LLM_CONTROL=http://127.0.0.1:8095
-      - CIEL_LOCAL_ROLES=thought,brief,notes,relationship,growth
+      - CIEL_LOCAL_ROLES=${CIEL_DEV_LOCAL_ROLES-thought,brief,notes,relationship,growth}
       # 本番の Webhook を使わないように、必ずここで上書きする
       - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
     volumes:

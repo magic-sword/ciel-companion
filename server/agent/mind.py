@@ -110,7 +110,7 @@ class Mind:
     @property
     def client(self):
         if self._client is None:
-            self._client = openai.AsyncOpenAI()
+            self._client = models.create_client('brief')
         return self._client
 
     # ---- 小脳と心の振り分け ----
@@ -197,6 +197,9 @@ class Mind:
         """1 段目で小脳に決まった発言を、遊んでいるあいだだけ、道具ごとのきっかけとの意味の近さで見直す（router.py）。
         決まった言葉に「欲しい」「ピッケル」が無く、「石のピッケルが欲しいな」が道具の無い小脳へ回り、
         「渡しますね」と言うだけだった（2026-11-07）"""
+        if models.LOCAL_TEST and self.playing() and latest_user_text(chat_ctx):
+            self.last_why = 'local_game'
+            return 'mind'  # 埋め込み API を使わず、ゲームの頼みを道具のある心へ渡す
         if self.router is None or not self.playing():
             return 'talker'
         text = latest_user_text(chat_ctx)

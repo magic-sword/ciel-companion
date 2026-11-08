@@ -48,7 +48,7 @@ class NoteTaker:
         self._locks: dict[int, asyncio.Lock] = {}
         self._timer: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
-        self._client = openai.AsyncOpenAI()
+        self._client = models.create_client('notes')
 
     def on_turn(self, turn: Turn) -> None:
         """相手の発言の文字起こし（確定したもの）と、その発言の話者の判定（シエルへの [発言者：…] と同じもの）"""

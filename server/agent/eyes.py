@@ -85,7 +85,7 @@ class Eyes:
     @property
     def client(self):
         if self._client is None:
-            self._client = openai.AsyncOpenAI()
+            self._client = models.create_client('eyes')
         return self._client
 
     # ---- 受け取る ----
@@ -111,6 +111,9 @@ class Eyes:
         self.receive(b''.join(chunks), name)
 
     def receive(self, data: bytes, name: str = '') -> Picture | None:
+        if models.LOCAL_TEST:
+            self._state('failed', reason='unavailable')
+            return None
         mime = mime_of(data)
         if mime is None:
             self._state('failed', reason='not_image')
@@ -124,6 +127,8 @@ class Eyes:
 
     def see_game(self, data: bytes, note: str = '', place: str = '') -> Picture | None:
         """ゲームの体の目で撮った景色（game_env.py）。道具の返事の続きで心が見るので、口には頼まない"""
+        if models.LOCAL_TEST:
+            return None
         mime = mime_of(data)
         if mime is None:
             return None
@@ -190,13 +195,15 @@ class Eyes:
     # ---- 説明文 ----
 
     async def _caption(self, pic: Picture) -> None:
+        if models.LOCAL_TEST:
+            return
         model = models.model('eyes')
         try:
-            r = await self.client.chat.completions.create(
+            r = await models.client_for('eyes', self.client).chat.completions.create(**models.options('eyes',
                 model=model, timeout=CAPTION_TIMEOUT,
                 messages=[{'role': 'system', 'content': self.caption_instructions},
                           {'role': 'user', 'content': [{'type': 'image_url',
-                                                        'image_url': {'url': pic.data_url, 'detail': 'low'}}]}])
+                                                        'image_url': {'url': pic.data_url, 'detail': 'low'}}]}]))
             models.record('eyes', model, getattr(r, 'usage', None))
             text = ' '.join((r.choices[0].message.content or '').split())
         except Exception as e:   # 書けなくても会話は続ける（画像を指した話では、画像そのものをもう一度見る）

@@ -13,6 +13,12 @@ import debug_log
 
 log = logging.getLogger('ciel-agent.models')
 
+# local は試験用。通常の役目別切り替えとは別に、文字の推論をまとめて手元へ送る。
+BACKEND = os.environ.get('CIEL_LLM_BACKEND', 'openai').strip().lower()
+if BACKEND not in ('openai', 'local'):
+    raise ValueError('CIEL_LLM_BACKEND must be openai or local')
+LOCAL_TEST = BACKEND == 'local'
+
 # 役目 → (環境変数, 既定のモデル)
 ROLES = {
     'talk': ('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini'),     # 返事の文を作る（Realtime。使用量は usage.py）
@@ -44,15 +50,36 @@ PER_MINUTE = {'gpt-realtime-whisper': 0.017, 'gpt-live-transcribe': 0.017}
 
 # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。CIEL_LOCAL_ROLES に書いた役目だけ、OpenAI ではなくここへ送る。
 # 裏で動く役目（内なる考え・まとめ・メモ・関係・育つ好み）向け：少し遅れても会話は止まらない（1 回 13〜50 秒）
-LOCAL_URL = os.environ.get('CIEL_LOCAL_LLM_URL', '')                    # 例 http://127.0.0.1:8094/v1
+LOCAL_URL = os.environ.get('CIEL_LOCAL_LLM_URL', 'http://127.0.0.1:8094/v1' if LOCAL_TEST else '').strip()
 LOCAL_ROLES = {r.strip() for r in os.environ.get('CIEL_LOCAL_ROLES', '').split(',') if r.strip()}
 LOCAL_MODEL = os.environ.get('CIEL_LOCAL_LLM_MODEL', 'local')             # llama-server の --alias
 LOCAL_TIMEOUT = float(os.environ.get('CIEL_LOCAL_TIMEOUT', '90'))           # 1 回の上限（秒）。歌を聴くあいだは CPU の形で遅い
 _local_client = None
+CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt', 'research'}
+if LOCAL_TEST and not LOCAL_URL:
+    raise ValueError('CIEL_LOCAL_LLM_URL is required for local backend')
 
 
 def is_local(role: str) -> bool:
-    return bool(LOCAL_URL) and role in LOCAL_ROLES
+    return bool(LOCAL_URL) and (role in LOCAL_ROLES or (LOCAL_TEST and role in CHAT_ROLES))
+
+
+def create_client(role: str):
+    """役目ごとの所有クライアント。ローカルなら OpenAI のキーも不要。"""
+    import openai
+    if is_local(role):
+        return openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0)
+    return openai.AsyncOpenAI()
+
+
+def reply_options(reasoning_effort: str) -> dict:
+    """LiveKit の LLM コンストラクター用（道具・ストリーミングも同じ接続先）。"""
+    if not is_local('mind'):
+        return {'model': model('mind'), 'reasoning_effort': reasoning_effort}
+    import httpx
+    return {'model': LOCAL_MODEL, 'base_url': LOCAL_URL, 'api_key': 'local',
+            'timeout': httpx.Timeout(LOCAL_TIMEOUT), 'max_retries': 0,
+            'extra_body': {'chat_template_kwargs': {'enable_thinking': False}}}
 
 
 def model(role: str) -> str:

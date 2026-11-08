@@ -1,6 +1,48 @@
-# ローカル LLM（裏で動く役目を自宅サーバーで）
+# ローカル LLM（裏処理・Minecraft の動作試験）
 
 状態：作った（2026-11-07）。開発用の会話サーバーだけで使っている。処理は `server/local-llm/`（動かす係）と `server/agent/models.py`（振り分け）。
+
+## 返答と道具呼び出しもローカルへ切り替える（2026-11-09）
+
+`CIEL_LLM_BACKEND=local` で、心・小脳の返答、道具の呼び出しと結果を受けた続き、聞く係、議事録のライブと清書、既存の裏処理をすべてローカル LLM へ送れる。既定は `openai` で、従来の `CIEL_LOCAL_ROLES` による役目別の振り分けも維持する。OpenAI への自動フォールバックはない。設定の変更には会話サーバーの再作成が必要。
+
+一括切り替えは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` でだけ使える。ローカル側は `/v1/chat/completions` のストリーミング・道具呼び出し・JSON 出力に対応していること（現在の Qwen と llama-server を想定）。返答にも `CIEL_LOCAL_TIMEOUT`（既定 90 秒）を適用し、Qwen の thinking は無効にする。遅さや、ローカルモデルが正しい道具を選べるかは別途実機で確認する。
+
+OpenAI のクレジットなしで試すため、一括切り替えでは文字入力が既定になる。音声認識・画像認識・Web 検索は今回のローカル LLM には接続していない。マイクは購読せず、画像と Web 検索には利用不可を返す。ゲーム中の発言は道具のある心へ回し、振り分け用の OpenAI 埋め込みと例文の学習を止める。Minecraft の状態取得・行動・手元の Wiki 検索は使える。音声や画像を使った試験、通常の意味による振り分け、会話のリアルタイム性の比較はこのモードの対象外。
+
+### 開発用で起動する
+
+先にコードを開発用のサーバーへ反映し、本番側の `~/work/ciel-companion/server` でローカル LLM を起動する。会話と道具の指示は裏処理より長いため、コンテキストを広げる設定を渡せる。以下は GPU メモリーに余裕を持たせる CPU の例（遅い）。GPU を使う場合は `LOCAL_LLM_MODE=gpu` にし、読み上げとの同時動作とメモリーを確認する。
+
+```sh
+LOCAL_LLM_CTX=32768 LOCAL_LLM_MODE=cpu docker compose --profile local-llm up -d --build local-llm
+curl -f http://127.0.0.1:8094/health
+```
+
+開発用の `~/work/ciel-companion-dev/server` で（通常の開発用起動と同じ DB 設定を渡す）：
+
+```sh
+CIEL_DEV_LLM_BACKEND=local CIEL_DEV_LOCAL_TIMEOUT=180 \
+  docker compose --env-file ../../ciel-companion/server/.env -f compose.dev.yaml up -d --build agent-dev
+```
+
+`CIEL_DEV_INPUT` は空のままにすると local では text、openai では voice になる。既存の `CIEL_DEV_MODEL=realtime` を設定している場合は外すか pipeline に戻す。`CIEL_DEV_LOCAL_LLM_URL`・`CIEL_DEV_LOCAL_LLM_MODEL` で接続先とモデルの別名も変えられる。通常の起動へ戻すには、上のコマンドの `CIEL_DEV_LLM_BACKEND=local` を `openai` に替えて agent-dev を再作成する。
+
+### 文字で Minecraft に指示する
+
+LiveKit のキーを設定済みの `server/agent/` で、追加した文字入力端末を動かす。Minecraft と体の MCP が起動しており、ほかの会話が体を受け持っていないことが必要。
+
+```sh
+python local_chat.py --agent ciel-dev --game minecraft
+```
+
+端末は一時的な試験用の部屋を作って ciel-dev を呼び、ゲームの接続状態を待ってから入力を受け付ける。「近くの木を調べて」「原木を3個集めて」などを入力し、返答と行動の完了を待って次を送る。返答の文字とゲーム・目的の状態を端末に表示する。`/quit` で部屋を閉じる。Unity を使う場合も文字入力モードではマイクからの指示は届かないため、この端末を試験の入口にする。
+
+この端末自体は接続先の LLM 設定を変更しない。先に agent-dev を local で起動すること。LiveKit と、設定済みの保存・通知先（DB・Discord）は従来どおり使うため、完全なオフライン実行ではない。開発用で記憶を更新する点も従来どおり。
+
+音声入力も併用したい場合だけ `CIEL_DEV_INPUT=voice` を明示する。この場合、文字の推論はローカルでも、文字起こしは OpenAI API を使い料金がかかる。
+
+確認済み：外部 API を使わない回帰テストと、SDK の要求を模擬 HTTP 接続で検証する道具呼び出し・結果を受けた続きのテスト。ローカル LLM と Minecraft をつないだ実機試験は未実施。
 
 ## なぜ
 

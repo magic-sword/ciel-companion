@@ -67,6 +67,8 @@ class WebResearcher:
                 log.warning('調査結果を画面に送れない：%s', type(exc).__name__)
 
     async def search(self, question: str, call_id: str, speech):
+        if models.LOCAL_TEST:
+            return {'status': 'unavailable', 'reason': 'local_backend'}
         question = question.strip()
         if not question or len(question) > 600:
             return {'status': 'invalid_question'}

@@ -28,6 +28,7 @@ import numpy as np
 import openai
 
 import debug_log
+import models
 
 log = logging.getLogger('ciel-agent.router')
 
@@ -88,7 +89,7 @@ class Router:
 
     def start(self) -> None:
         """例文を読み込み始める（会話の始め。待たない）"""
-        if self._ready is None:
+        if not models.LOCAL_TEST and self._ready is None:
             self._ready = asyncio.create_task(self._load())
 
     async def _load(self) -> None:
@@ -119,7 +120,7 @@ class Router:
 
     async def wants_mind(self, text: str) -> str | None:
         """この発言を心へ回すなら、いちばん近いきっかけの道具の名前。回さない・読み込み中・時間切れ・失敗なら None"""
-        if not text.strip():
+        if models.LOCAL_TEST or not text.strip():
             return None
         try:
             self.start()
@@ -139,6 +140,8 @@ class Router:
 
     async def learn(self, text: str, tool: str | None, source: str) -> str:
         """遊びながら例文を育てる。何をしたかを返す（added・same・replaced・skip）"""
+        if models.LOCAL_TEST:
+            return 'skip'
         text = text.strip()
         if not LEARN_MIN <= len(norm(text).replace(' ', '')) <= LEARN_MAX:
             return 'skip'

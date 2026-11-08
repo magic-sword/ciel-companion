@@ -216,7 +216,7 @@ class Initiative:
     @property
     def client(self):
         if self._client is None:
-            self._client = openai.AsyncOpenAI()
+            self._client = models.create_client('thought')
         return self._client
 
     async def _run(self) -> None:

@@ -25,8 +25,10 @@ import logging
 import os
 
 from dotenv import load_dotenv
+load_dotenv()  # models.py を含む各モジュールが環境変数を読む前に設定する
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, inference
+from livekit.agents.voice.agent_session import SessionConnectOptions
 from livekit.plugins import openai
 from openai.types.realtime.audio_transcription import AudioTranscription
 from openai.types.realtime.realtime_reasoning import RealtimeReasoning
@@ -75,7 +77,6 @@ from conversation_recording import ConversationRecorder
 from web_research import WebResearcher
 from persona import load_persona
 
-load_dotenv()
 logger = logging.getLogger('ciel-agent')
 
 # 待機させておく子プロセスの数（既定は CPU の数 = 24 で多すぎる。会話は 1 人ずつなので 2 で足りる）
@@ -93,6 +94,12 @@ REALTIME_MODEL = os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
 REALTIME = MODEL == 'realtime'
 # 文字起こし → 心 → 読み上げの組み立て。声は Irodori で作るので、irodori のときだけ
 PIPELINE = MODEL == 'pipeline' and VOICE == 'irodori'
+INPUT = os.environ.get('CIEL_INPUT') or ('text' if models.LOCAL_TEST else 'voice')
+if INPUT not in ('text', 'voice'):
+    raise ValueError('CIEL_INPUT must be text or voice')
+TEXT_ONLY = INPUT == 'text'
+if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY) and not PIPELINE:
+    raise ValueError('Local LLM / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
 # 心の考える量（pipeline。none・minimal・low…）
 MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
 # 話し終えたと決めるまでの最短・最長の待ち（pipeline。秒）
@@ -134,7 +141,7 @@ def transcription(names: list[str]) -> AudioTranscription:
 def make_model(names: list[str] | None = None):
     voice = os.environ.get('CIEL_OPENAI_VOICE', 'marin')
     if PIPELINE:
-        return openai.LLM(model=models.model('mind'), reasoning_effort=MIND_REASONING)
+        return openai.LLM(**models.reply_options(MIND_REASONING))
     if not REALTIME:
         return openai.realtime.GPTLiveModel(voice=voice)
     return openai.realtime.RealtimeModel(
@@ -159,6 +166,8 @@ def make_model(names: list[str] | None = None):
 
 def make_pipeline(names: list[str]) -> dict:
     """pipeline の部品（AgentSession に渡す）。音声検出は 1 つにして、文字起こしの区切りにも同じ設定を使う"""
+    if TEXT_ONLY:
+        return {'turn_detection': 'manual'}
     vad = inference.VAD()
     hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
     model = models.model('stt')
@@ -359,7 +368,7 @@ class Ciel(Agent):
 # 名前を付けると、その名前で呼んだ部屋にだけ入る（試験用の会話サーバー。bench_latency.py）。本番は空のまま
 @server.rtc_session(agent_name=os.environ.get('CIEL_AGENT_NAME', ''))
 async def entrypoint(ctx: JobContext) -> None:
-    logger.info('room=%s に入ります（声：%s）', ctx.room.name, VOICE)
+    logger.info('room=%s に入ります（声：%s、LLM：%s、入力：%s）', ctx.room.name, VOICE, models.BACKEND, INPUT)
     # デバッグ用の会話ログ（debug_log.py）。ふだんは残さない。入れているときだけ、この会話のファイルを作る
     debug_log.start(ctx.room.name, model=MODEL, realtime_model=REALTIME_MODEL if REALTIME else None, voice=VOICE,
                     **({'mind_model': models.model('mind'), 'stt_model': models.model('stt')} if PIPELINE else {}))
@@ -381,6 +390,9 @@ async def entrypoint(ctx: JobContext) -> None:
             logger.warning('育った好みを読めない: %s', type(e).__name__)
     names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
     session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
+                           **({'conn_options': SessionConnectOptions(
+                               llm_conn_options=agents.APIConnectOptions(timeout=models.LOCAL_TIMEOUT, max_retry=0))}
+                              if models.is_local('mind') else {}),
                            **(make_pipeline(names) if PIPELINE else
                               {'turn_detection': 'manual' if REALTIME else agents.NOT_GIVEN}),
                            # 読み上げる前の文字の変換は、絵文字を外すだけにする。既定の filter_markdown は、返事の頭の
@@ -672,7 +684,8 @@ async def entrypoint(ctx: JobContext) -> None:
     if book is not None:
         ctx.room.on('data_received', book.on_data)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
-    await session.start(room=ctx.room, agent=agent, record=False)
+    await session.start(room=ctx.room, agent=agent, record=False,
+                        **({'room_options': agents.room_io.RoomOptions(audio_input=False)} if TEXT_ONLY else {}))
     # アプリの「まとめをとる」で選べるテンプレート（minutes.py）
     await send('ciel.event', minute_taker.templates_event())
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る

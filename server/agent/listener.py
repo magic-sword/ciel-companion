@@ -46,7 +46,7 @@ class Listener:
     @property
     def client(self):
         if self._client is None:
-            self._client = openai.AsyncOpenAI()
+            self._client = models.create_client('listener')
         return self._client
 
     async def settled(self, timeout: float) -> None:
@@ -84,10 +84,10 @@ class Listener:
         request = {'latest': text[:400], 'recent': recent, 'recording': bool(getattr(self.minutes, 'recording', False))}
         model = models.model('listener')
         try:
-            r = await self.client.chat.completions.create(
+            r = await models.client_for('listener', self.client).chat.completions.create(**models.options('listener',
                 model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=TIMEOUT,
                 messages=[{'role': 'system', 'content': self.instructions},
-                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}])
+                          {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
             models.record('listener', model, getattr(r, 'usage', None))
             result = json.loads(r.choices[0].message.content or '{}')
         except Exception as e:   # 確かめられなくても、会話は続ける（会話モデルが道具で受けることもできる）
