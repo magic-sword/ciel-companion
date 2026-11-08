@@ -151,6 +151,7 @@ class GameEnv:
         self._cards: dict = {}       # 技の id → 付箋
         self._completed: dict = {}   # 終了の先着・重複を記録。接続の世代もキーに含める
         self._body: dict = {}
+        self._body_protocol_valid = False
         self._observed: set = set()
         self._connection_epoch = 0
         self._act_lock = asyncio.Lock()
@@ -215,6 +216,7 @@ class GameEnv:
                         self.activity.task_done(f'{self.game}:{key}', '', False, quiet=True)
                 self._cards.clear()
                 self._body = {}
+                self._body_protocol_valid = False
                 self._observed.clear()
                 if self.activity is not None:
                     self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': 'disconnected'})
@@ -419,6 +421,8 @@ class GameEnv:
         role = meta.get('ciel/role')
         if role in ('act', 'look') and not self.linked:
             return {'status': 'unavailable'}
+        if role == 'act' and not meta.get('ciel/stops') and not self._body_protocol_valid:
+            return {'status': 'error', 'reason': 'body_protocol_mismatch'}
         busy = self.goals.body_step() if self.goals is not None and role == 'act' and not meta.get('ciel/stops') else None
         active_goal = getattr(self.goals, 'active', None)
         planning = active_goal is not None and active_goal.status == 'planning'
@@ -493,10 +497,15 @@ class GameEnv:
             return
         state = _json(getattr(r.contents[0], 'text', '') if r.contents else '')
         body = state.get('body')
-        if isinstance(body, dict):
+        self._body_protocol_valid = isinstance(body, dict) and body.get('version') == 1
+        if self._body_protocol_valid:
             if (self._body.get('session'), self._body.get('epoch')) == (body.get('session'), body.get('epoch')) and body.get('revision', 0) < self._body.get('revision', -1):
                 return
             self._body = body
+        else:
+            self._body = {}
+            if self.activity is not None:
+                self.activity.set_body({'version': 1, 'phase': 'unknown', 'reason': 'body_protocol_mismatch'})
         self.state = state
         self._reconcile_body()
         self.publish()
@@ -653,11 +662,11 @@ class GoalsAdapter:
         return (self.env.profile.get('goals') or {}).get(key)
 
     def available(self) -> bool:
-        return bool(self.env.linked and self._tool('plan'))
+        return bool(self.env.linked and self.env._body_protocol_valid and self._tool('plan'))
 
     def body_busy(self) -> bool:
         b = self.env._body
-        return bool(b.get('current') or b.get('pending') or b.get('owner') or b.get('blocked') or self.env.state.get('doing'))
+        return bool(b.get('current') or b.get('pending') or b.get('owner') or b.get('blocked'))
 
     async def begin(self) -> None:
         # 計画を待つあいだも古い追従を続けない。体側は停止完了後に次を始める。

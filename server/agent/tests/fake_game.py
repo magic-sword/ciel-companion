@@ -52,6 +52,7 @@ class FakeGame:
         self.repairs: list[dict] = []      # 直し方（goal_repair が順に返す）
         self.plan = {'steps': [{'kind': 'make', 'args': {'item': 'chest'}, 'label': '宝箱を作る', 'progress': None}]}
         self.state = {'label': 'テスト', 'linked': True, 'playing': True, 'reason': '', 'text': 'シエル：元気', 'fingerprint': 'a'}
+        self.state['body'] = {'version': 1, 'session': 'test', 'epoch': 'test', 'revision': 0, 'current': None, 'pending': None, 'last': None}
         self.session = None
         self._register()
 

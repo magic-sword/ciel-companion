@@ -1,4 +1,4 @@
-// 会話（CielConversation）のうち、いまのシエル（会話サーバーの activity.py が送る activity.state）。
+﻿// 会話（CielConversation）のうち、いまのシエル（会話サーバーの activity.py が送る activity.state）。
 // 心が考えている・道具の結果を待っている・体が技をしている、を外から見えるようにする（止まって見えたとき、どこで待っているかが
 // 分からなかった。2026-11-07）。ゲームを問わない形なので、ここもゲームのことは知らない（見せる言葉と秒数だけで描く）。
 // 経った秒数は、届いたときの値に、届いてからの時間を足して数える。読むのは CielConversationUI.Activity.cs。
@@ -17,13 +17,6 @@ namespace Ciel.Conversation
         }
 
         [Serializable]
-        public class ActivityTask
-        {
-            public string title;
-            public float for_s;
-        }
-
-        [Serializable]
         public class ActivityLog
         {
             public int id;
@@ -38,7 +31,7 @@ namespace Ciel.Conversation
             public string session, phase, title, next_title, reason, last_title, last_phase, last_reason, last_note;
             public float for_s;
             public bool Active => phase != "idle" && phase != "unknown";
-            public string Description => reason == "stop_timeout" ? "停止の確認に時間がかかっています"
+            public string Description => reason == "body_protocol_mismatch" ? "体のサービスの更新が必要です" : reason == "stop_timeout" ? "停止の確認に時間がかかっています"
                 : reason == "defending" ? "身を守っています（作業を一時中断）"
                 : reason == "eating" ? "食事をしています"
                 : phase == "stopping" ? "前の作業を停止しています"
@@ -52,14 +45,13 @@ namespace Ciel.Conversation
         [Serializable]
         public class ActivityState
         {
-            public string type, mind, who, doing, goal_step;   // mind：idle・listening・thinking・speaking。who：mind・talker
+            public string type, mind, who;   // mind：idle・listening・thinking・speaking。who：mind・talker
             public float mind_for;
             public int detail_version;
             public string thinking_origin;
             public bool background_thinking;
             public float background_for;
             public ActivityCall[] calls;
-            public ActivityTask[] tasks;
             public ActivityLog[] log;
             public ActivityBody body;
         }
@@ -77,8 +69,8 @@ namespace Ciel.Conversation
             try { s = JsonUtility.FromJson<ActivityState>(System.Text.Encoding.UTF8.GetString(data)); }
             catch (Exception ex) { Debug.LogWarning($"[CielConversation] いまのシエルを読めない: {ex.Message}"); return; }
             if (s == null || s.type != "activity.state") return;
-            // JsonUtilityは古い通知に無い入れ子も空のインスタンスにすることがある。
-            if (s.body != null && s.body.version < 1) s.body = null;
+            // bodyの版1だけを受理する。欠落・不一致を別の表示形式で補わない。
+            if (s.body == null || s.body.version != 1) s.body = new ActivityBody { version = 1, phase = "unknown", reason = "body_protocol_mismatch" };
             Activity = s;
             ActivityAt = Time.unscaledTime;
             ActivityRevision++;

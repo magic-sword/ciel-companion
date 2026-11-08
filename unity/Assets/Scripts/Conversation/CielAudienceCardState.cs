@@ -26,10 +26,7 @@ namespace Ciel.Conversation
                 return result;
             }
             var body = activity?.body;
-            string work = body != null ? (body.Active ? body.title : null)
-                : activity?.tasks?.Length > 0 ? activity.tasks[0].title : null;
-            if (body == null && string.IsNullOrEmpty(work)) work = activity?.doing;
-            if (body == null && string.IsNullOrEmpty(work)) work = activity?.goal_step;
+            string work = body != null && body.Active ? body.title : null;
             string summary = "";
             if (body != null && body.phase != "idle" && body.phase != "running")
             {
@@ -60,10 +57,9 @@ namespace Ciel.Conversation
                 result.phase = "working";
                 result.heading = "シエル｜作業中";
                 result.title = work;
-                result.current = body != null ? body.Description : "作業の終了通知を待っています";
+                result.current = body.Description;
                 summary = "実行中：" + work;
-                if (body != null) result.elapsed = Seconds(body.for_s, age);
-                else if (activity.tasks?.Length > 0) result.elapsed = Seconds(activity.tasks[0].for_s, age);
+                result.elapsed = Seconds(body.for_s, age);
             }
             else if (userSpeaking)
             {

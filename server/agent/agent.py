@@ -494,7 +494,6 @@ async def entrypoint(ctx: JobContext) -> None:
             body.say, body.diary, body.board, body.notify = voice.say_latest, ciel_diary, tasks, notify
             body.activity = act
             act.titles.update(body.titles)
-            act.body_doing = lambda: body.state.get('doing') if body.linked else None
         # 長い目的の係（goals.py）。ゲームの体があるときだけ。目的と段はアプリと配信の画面へ goal.state で送る（topic ciel.goal）
         goal_runner = None
         if body is not None:
@@ -506,7 +505,6 @@ async def entrypoint(ctx: JobContext) -> None:
                 act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
                 voice.say_latest(why, **kw)
             goal_runner = goals.GoalRunner(goal_say, publish=goal_publish)
-            act.goal_step = goal_runner.body_step
             goal_runner.register(body.game, game_env.GoalsAdapter(body), body.label)
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）

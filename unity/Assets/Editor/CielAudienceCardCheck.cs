@@ -26,9 +26,9 @@ namespace Ciel.EditorTools
                 goal = new CielConversation.GoalInfo { id = 1, title = "鉄を10個集める", status = "running", by_label = "非公開の名前" },
                 steps = new[] { new CielConversation.GoalStep { label = "鉄を集める", status = "running", progress = new[] { 3, 10 } } }
             };
-            var activity = new CielConversation.ActivityState { tasks = new[] { new CielConversation.ActivityTask { title = "鉄鉱石を探している" } } };
+            var activity = new CielConversation.ActivityState { body = new CielConversation.ActivityBody { version = 1, phase = "running", title = "鉄鉱石を探している" } };
             var state = CielAudienceCardState.From(goal, activity, true, false);
-            Check(state.visible && state.title == goal.goal.title && state.current.Contains(activity.tasks[0].title), "objective and current work");
+            Check(state.visible && state.title == goal.goal.title && state.current.Contains(activity.body.title), "objective and current work");
             Check(state.progress == "現在の手順：3 / 10" && Math.Abs(state.fraction - .3f) < .001, "received progress");
             Check(!(state.heading + state.title + state.current + state.progress).Contains("非公開"), "owner name excluded");
             Render(state, "audience-card-progress", true);
@@ -42,14 +42,13 @@ namespace Ciel.EditorTools
             Check(state.attention && state.current == goal.attention, "pause reason");
             Render(state, "audience-card-paused", false);
             goal.goal.status = "done";
-            Check(CielAudienceCardState.From(goal, activity, true, true).title == activity.tasks[0].title, "next direct task replaces completed goal");
+            Check(CielAudienceCardState.From(goal, activity, true, true).title == activity.body.title, "next direct task replaces completed goal");
             Check(CielAudienceCardState.From(null, activity, true, false).visible, "task without goal");
             var idle = new CielConversation.ActivityState { detail_version = 1, mind = "listening", log = new[] { new CielConversation.ActivityLog { text = "内部ログ" } } };
             state = CielAudienceCardState.From(null, idle, true, false);
             Check(state.visible && state.phase == "idle" && !state.current.Contains("内部ログ"), "idle remains visible without internal logs");
             Render(state, "audience-card-idle", false);
             var bodyActivity = new CielConversation.ActivityState {
-                detail_version = 1, tasks = activity.tasks, doing = "古い追従", goal_step = "古い段",
                 body = new CielConversation.ActivityBody { version = 1, phase = "idle" }
             };
             Check(CielAudienceCardState.From(null, bodyActivity, true, false).phase == "idle", "body snapshot overrides stale task rows");
@@ -90,7 +89,7 @@ namespace Ciel.EditorTools
             state = CielAudienceCardState.From(null, calling, true, false);
             Check(state.phase == "calling" && state.elapsed == "8秒経過" && state.current.Contains("返答"), "tool acknowledgement wait is visible");
             Render(state, "audience-card-calling", false);
-            calling.tasks = activity.tasks;
+            calling.body = activity.body;
             Check(CielAudienceCardState.From(null, calling, true, false).phase == "calling", "pending tool is not masked by another running task");
             calling.calls[0].for_s = 45;
             Check(CielAudienceCardState.From(null, calling, true, false).attention, "long tool wait is distinguished from failure");

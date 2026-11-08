@@ -310,9 +310,27 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.env = game_env.GameEnv('test', 'http://unused')
         self.env.linked = True
+        self.env._body_protocol_valid = True
         self.env.board = board.Board()
         self.env.activity = activity.Activity(None)
         self.env.meta = {'test_jump': {'ciel/role': 'act', 'ciel/long_running': True}}
+
+    async def test_old_body_format_is_rejected_without_reusing_old_snapshot(self):
+        self.env._body = {'version': 1, 'session': 'old', 'revision': 9}
+        for body in (None, {'version': 0}, {'version': 2}):
+            state = {'linked': True, 'playing': True, 'doing': 'obsolete', 'body': body}
+            self.env._session = types.SimpleNamespace(read_resource=mock.AsyncMock(return_value=types.SimpleNamespace(
+                contents=[types.SimpleNamespace(text=json.dumps(state))])))
+            await self.env._refresh()
+            self.assertEqual(self.env._body, {})
+            shown = self.env.activity.state()
+            self.assertEqual(shown['body']['reason'], 'body_protocol_mismatch')
+            self.assertNotIn('doing', shown)
+            self.assertNotIn('tasks', shown)
+            self.env._call = mock.AsyncMock()
+            result = await self.env.use('test_jump', {})
+            self.assertEqual(result['reason'], 'body_protocol_mismatch')
+            self.env._call.assert_not_awaited()
 
     async def test_done_before_response_cannot_resurrect_two_finished_tasks(self):
         for task in (7, 8):
@@ -322,7 +340,7 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
             self.env._call = call
             result = await self.env.use('test_jump', {})
             self.assertEqual(result['status'], 'completed')
-        self.assertEqual(self.env.activity.state()['tasks'], [])
+        self.assertEqual(self.env.activity._tasks, {})
         self.assertEqual(self.env._cards, {})
 
     async def test_duplicate_done_notifies_once_but_new_session_can_reuse_id(self):
@@ -350,10 +368,10 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(said.calls), 1)
 
     async def test_old_refresh_cannot_overwrite_newer_revision(self):
-        self.env._body = {'session': 'one', 'epoch': 'boot', 'revision': 5}
+        self.env._body = {'version': 1, 'session': 'one', 'epoch': 'boot', 'revision': 5}
         self.env.state = {'doing': 'new'}
         self.env._session = types.SimpleNamespace(read_resource=mock.AsyncMock(return_value=types.SimpleNamespace(contents=[
-            types.SimpleNamespace(text=json.dumps({'doing': 'old', 'body': {'session': 'one', 'epoch': 'boot', 'revision': 4}}))])))
+            types.SimpleNamespace(text=json.dumps({'doing': 'old', 'body': {'version': 1, 'session': 'one', 'epoch': 'boot', 'revision': 4}}))])))
         await self.env._refresh()
         self.assertEqual(self.env.state['doing'], 'new')
 

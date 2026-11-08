@@ -43,11 +43,11 @@ namespace Ciel.EditorTools
                 Check(Render(goal, true, "").Contains("できた！"), "completed goal remains briefly");
                 Check(Render(goal, false, "") == "", "completed goal expires");
 
-                var first = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"tasks\":[{\"title\":\"鉄を探す\",\"for_s\":2}]}");
+                var first = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"running\",\"title\":\"鉄を探す\",\"for_s\":2}}");
                 Check(Render(goal, false, first).Contains("鉄を探す"), "next task appears after goal expires");
                 Check(!Render(goal, true, first).Contains("ツルハシを作る"), "new task replaces recently completed goal");
 
-                var next = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"tasks\":[{\"title\":\"鉄を集める\",\"for_s\":1}]}");
+                var next = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"running\",\"title\":\"鉄を集める\",\"for_s\":1}}");
                 Check(Render(goal, false, next).Contains("鉄を集める") && !Render(goal, false, next).Contains("鉄を探す"),
                     "subsequent task updates with the same goal object");
 
@@ -57,7 +57,7 @@ namespace Ciel.EditorTools
                 Check(Render(null, false, next).Contains("鉄を集める"), "task without any goal appears");
                 Check(Render(null, false, "いま：<鉄>").Contains("＜鉄＞"), "task title escapes rich text");
 
-                var idle = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"log\":[{\"text\":\"内部の知らせ\",\"ago\":0}]}");
+                var idle = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"idle\"},\"log\":[{\"text\":\"内部の知らせ\",\"ago\":0}]}");
                 Check(Render(null, false, idle) == "", "idle state and internal log do not leave a stale card");
                 Debug.Log("STREAM_STATUS_CHECK_OK (9 checks)");
             }

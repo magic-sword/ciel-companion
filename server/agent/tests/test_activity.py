@@ -44,22 +44,21 @@ class ActivityTest(unittest.TestCase):
     def test_body_tasks_last_until_the_end_notice(self):
         self.a.task_started('mc:6', 'oak_log を 3 個集める')
         self.clock.now += 12
-        self.assertEqual(self.a.state()['tasks'], [{'title': 'oak_log を 3 個集める', 'for_s': 12.0}])
+        self.assertEqual(len(self.a._tasks), 1)
         self.a.task_done('mc:6', 'oak_log を 3 個集める', False, '見える所に無い')
         s = self.a.state()
-        self.assertEqual(s['tasks'], [])
+        self.assertEqual(self.a._tasks, {})
         self.assertEqual(s['log'][0]['text'], '体：oak_log を 3 個集める（できなかった：見える所に無い）')
         self.a.task_started('mc:7', '持ち主についていく')
         self.a.task_done('mc:7', '持ち主についていく', False, 'やめた', quiet=True)   # 止めたことは「できなかった」にしない
         self.assertEqual(len(self.a.state()['log']), 1)
 
-    def test_body_doing_goal_step_and_states(self):
-        self.a.body_doing = lambda: '持ち主についていく'
-        self.a.goal_step = lambda: 'オークの原木を 2 個集める'
-        self.a.agent_state(types.SimpleNamespace(new_state='speaking'))
+    def test_body_snapshot_is_the_only_current_body_representation(self):
+        self.a.set_body({'version': 1, 'phase': 'running', 'title': 'follow'})
         s = self.a.state()
-        self.assertEqual((s['doing'], s['goal_step'], s['mind'], s['who']),
-                         ('持ち主についていく', 'オークの原木を 2 個集める', 'speaking', ''))
+        self.assertEqual(s['body']['title'], 'follow')
+        for key in ('doing', 'tasks', 'goal_step'):
+            self.assertNotIn(key, s)
 
     def test_waiting_results_are_logged_as_waiting(self):
         self.a.tools_executed(executed(('c2', 'minecraft_collect_blocks', {'status': 'goal_running', 'why': '目的の係が「原木」を体で進めている'})))

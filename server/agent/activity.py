@@ -43,14 +43,12 @@ class Activity:
         self._background_epoch = 0
         self._mind_at = clock()
         self._calls: dict[str, dict] = {}     # call_id → {name, label, at}
-        self._body: dict = {}
+        self._body: dict = {'version': 1, 'phase': 'idle'}
         self._body_at = clock()
         self._finished: dict[str, bool] = {}
         self._tasks: dict[str, dict] = {}     # 技の鍵 → {title, at}（体でしている技）
         self._log: deque = deque(maxlen=LOG_KEEP)
         self.titles: dict[str, str] = {}      # 道具の名前 → 見せる名前（ゲーム・アプリの道具の title）
-        self.body_doing: Callable[[], str | None] = lambda: None   # 体がいましていること（ゲームの様子の doing）
-        self.goal_step: Callable[[], str | None] = lambda: None    # 目的の係が体で進めている段（goals.py の body_step）
         self._ids = itertools.count(1)
         self._pending: asyncio.Handle | None = None
         self._shown = ''
@@ -166,14 +164,6 @@ class Activity:
 
     def state(self) -> dict:
         now = self._clock()
-        try:
-            doing = self.body_doing()
-        except Exception:
-            doing = None
-        try:
-            step = self.goal_step()
-        except Exception:
-            step = None
         return {
             'v': VERSION, 'type': 'activity.state',
             'mind': self.mind, 'who': self.who or '', 'mind_for': round(now - self._mind_at, 1),
@@ -182,9 +172,7 @@ class Activity:
             'background_thinking': self.background_thinking,
             'background_for': round(now - self._background_at, 1) if self.background_thinking else 0,
             'calls': [{'label': c['label'], 'for_s': round(now - c['at'], 1)} for c in self._calls.values()],
-            'tasks': [] if self._body else [{'title': t['title'], 'for_s': round(now - t['at'], 1)} for t in self._tasks.values()],
             'body': {**self._body, 'for_s': round(self._body.get('for_s', 0) + now - self._body_at, 1)} if self._body else None,
-            'doing': doing or '', 'goal_step': step or '',
             'log': [{'id': e['id'], 'ago': round(now - e['at'], 1), 'text': e['text'], 'kind': e['kind']} for e in self._log],
         }
 
@@ -208,7 +196,7 @@ class Activity:
         # 経った秒数だけが違うなら送らない（アプリが数え足す）
         shown = json.dumps({k: v for k, v in s.items() if k not in ('mind_for', 'background_for')} | {
             'body': {k: v for k, v in (s.get('body') or {}).items() if k != 'for_s'},
-            'calls': [c['label'] for c in s['calls']], 'tasks': [t['title'] for t in s['tasks']],
+            'calls': [c['label'] for c in s['calls']],
             'log': [e['id'] for e in s['log']]}, ensure_ascii=False, sort_keys=True)
         if shown == self._shown:
             return
