@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { registerKnowledge } from '../knowledge/main.js';
 import { repair, skillFor, stepResult, stepsFrom } from './goals.js';
 import { STEP_TIMEOUT_MS } from './link.js';
-import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText, title } from './words.js';
+import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText } from './words.js';
 
 export const PROFILE_VERSION = 1;
 const GAME = 'minecraft';
@@ -179,10 +179,8 @@ export function makeServer(hub, sessionId) {
   server.registerResource('state', 'game://state', { mimeType: 'application/json', description: '今の体の様子（シエルが読む文）' },
     async (uri) => {
       const l = mine();
-      // doing：体がいましている技の見せる言葉（会話サーバーの「いま」。無ければ空）
-      const d = l?.state?.doing;
       const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
-        doing: d ? title(d.skill, d.args ?? {}) : '', ...(l.body ? { body: l.body } : {}) }
+        body: l.body }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

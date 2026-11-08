@@ -12,7 +12,7 @@ import { repair, skillFor, stepResult, stepsFrom } from '../src/ciel/goals.js';
 
 const STATE = { type: 'state', connected: true, pos: { x: 1, y: 64, z: 2 }, health: 20, food: 20, night: true, raining: false,
   inventory: { oak_log: 3 }, players: [{ name: 'Hakase', distance: 2.1 }], hostiles: [{ name: 'zombie', distance: 6 }],
-  doing: null, blocks: { oak_log: 12 } };
+  doing: null, blocks: { oak_log: 12 }, body: { version: 1, session: 'body-test', revision: 1, current: null, pending: null, last: null } };
 
 // にせものの体：do には started を返し、少しして done を返す。collect cobblestone は needs_tool で断る
 function fakeBody() {
@@ -86,6 +86,9 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
     // 様子
     const st = JSON.parse((await a.readResource({ uri: 'game://state' })).contents[0].text);
     assert.equal(st.playing, true);
+    assert.equal(st.body.version, 1);
+    assert.equal(Object.hasOwn(st, 'doing'), false);
+    assert.equal(st.body.current, null);
     assert.match(st.text, /Hakase（持ち主）/);
 
     // 技を始めて、終わりは知らせで届く。同じ頼みは二重に受けない
