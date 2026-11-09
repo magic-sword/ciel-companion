@@ -113,7 +113,7 @@ GPT-Liveでは専用のセッション制御へ対応付ける。Realtimeのイ�
 | イベント | 主な値 | 用途 |
 |---|---|---|
 | session.state | session_id、state、reason | 接続状態通知 |
-| character.expression | generation_id、expression、intensity、ttl_ms | 一時的な表情 |
+| character.expression | v=2、expression、intensity、ttl_ms、priority、expires_unix_ms、event_id（反応時） | 優先度と絶対期限付きの表情。[入力・反応の仕様](service-events-and-reactions-ja.md) |
 | speech.started | generation_id、utterance_id | 応答開始通知 |
 | speech.cancelled | generation_id、utterance_id | 古い音声の破棄 |
 | playback.progress | utterance_id、played_samples、sample_rate | 実再生位置の報告 |

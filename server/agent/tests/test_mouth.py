@@ -101,6 +101,19 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(s.calls, [])
         self.assertEqual(m.waiting(), {})
 
+    async def test_reply_consumes_only_the_notice_ids_given_to_that_reply(self):
+        s = FakeSession()
+        s.user_state = 'speaking'
+        m = mouth.Mouth(s)
+        old = m.say_latest('minutes', instructions='old')
+        self.assertEqual(m.waiting(), {'minutes': 'old'})
+        new = m.say_latest('minutes', instructions='new')
+        m.drop('minutes')
+        self.assertEqual(old.status, 'superseded')
+        self.assertEqual(new.status, 'queued')
+        self.assertEqual(m.waiting(), {'minutes': 'new'})
+        await m.reactions.close()
+
     async def test_gives_up_or_speaks_anyway(self):
         s = FakeSession()
         s.agent_state = 'speaking'

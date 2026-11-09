@@ -16,9 +16,9 @@
 - シエルが話している・考えている間は割り込まない（終わるまで待つ）。短い間に何度も返さないよう、間隔をあける。
 - 撫でている途中（phase start）で知らせたら、撫で終わり（phase end）では知らせない。
 """
-import asyncio
 import json
 import logging
+import math
 import time
 
 from livekit import rtc
@@ -62,12 +62,12 @@ class TouchReactions:
         self.session = session
         self.book = book      # speakers.SpeakerBook（最後に話した人。無ければ名前を添えない）
         self.style = style    # mode.ConversationStyle（会議につないでいるか）
+        self._source_epoch = None
+        self._source_seq = -1
         self.last_reply = 0.0
         self.stroke_answered = False
         self.pending: str | None = None   # まだ返事にしていない知らせ
         self._pending_at = 0.0
-        self._user_spoke_at = -1.0        # 最後に人が話し始めた時刻
-        self._timer: asyncio.TimerHandle | None = None
         self.diary = None                 # diary.Diary（なでてもらったことを残す。agent.py がつなぐ）
         self._noted: set[tuple[str, str]] = set()   # この会話で日記に残した（部位、しぐさ）
 
@@ -78,7 +78,25 @@ class TouchReactions:
             return
         try:
             e = json.loads(packet.data.decode('utf-8'))
+            if type(e.get('v')) is not int or e.get('v') != 2 or e.get('type') != 'user.touch':
+                mouth.of(self.session).reactions.reject('touch', 'unsupported_touch_contract')
+                return
+            if not isinstance(e.get('event_id'), str) or not isinstance(e.get('source_epoch'), str) or type(e.get('seq')) is not int:
+                return
+            if not 1 <= len(e['event_id']) <= 160 or not 1 <= len(e['source_epoch']) <= 160:
+                return
+            if type(e.get('occurred_at')) not in (int, float) or not math.isfinite(e['occurred_at']):
+                return
+            now = mouth.of(self.session).reactions.wall()
+            if now - e['occurred_at'] > 5 or e['occurred_at'] > now + 1:
+                return
+            if self._source_epoch is not None and self._source_epoch != e['source_epoch']:
+                return
+            if e['seq'] <= self._source_seq:
+                return
             part, gesture, phase = e['part'], e['gesture'], e['phase']
+            if not all(isinstance(value, str) for value in (part, gesture, phase)):
+                return
             duration_ms = int(e.get('duration_ms', 0))
             strength, expression = str(e.get('strength', '')), str(e.get('expression', ''))
         except (ValueError, KeyError, TypeError) as ex:
@@ -88,6 +106,8 @@ class TouchReactions:
             log.warning('知らないタッチ: %s %s %s', part, gesture, phase)
             return
 
+        self._source_epoch, self._source_seq = e['source_epoch'], e['seq']
+        self._incoming = e
         line = describe(part, gesture, phase, duration_ms, strength, expression)
         if self.diary is not None and phase != 'end' and (part, gesture) not in self._noted:
             self._noted.add((part, gesture))   # だれが触ったかは書かない（diary.py）
@@ -102,47 +122,25 @@ class TouchReactions:
         else:
             self._hold(line)
 
-    def on_user_state(self, ev) -> None:
-        if ev.new_state == 'speaking':
-            self._user_spoke_at = time.monotonic()
-
-    # ---- 返事にする ----
-
     def _hold(self, line: str) -> None:
-        """知らせを持っておき、返せるときに返す。続けて触れたら、新しい知らせに置き換える"""
         if time.monotonic() - self.last_reply < COOLDOWN and self.pending is None:
-            log.debug('タッチに返事をしない（前の返事から間もない）')
             return
         self.pending = line
         self._pending_at = time.monotonic()
-        self._schedule(WAIT_SECONDS)
+        hub = mouth.of(self.session).reactions
+        kind = 'touch.pull' if self._incoming.get('gesture') == 'pull' and self._incoming.get('strength') == 'hard' else 'touch.contact'
+        envelope = hub.envelope('touch', kind, {'fact': line}, event_id=self._incoming['event_id'])
+        envelope['occurred_at'] = self._incoming['occurred_at']
+        self._reaction = hub.receive('touch', envelope, why='touch',
+            kwargs={'user_input': line + self._who()}, settle=WAIT_SECONDS,
+            expression=self._incoming.get('expression') if self._incoming.get('expression') in EXPRESSIONS else None,
+            local_expression=True)
 
-    def _schedule(self, seconds: float) -> None:
-        if self._timer is not None:
-            self._timer.cancel()
-        self._timer = asyncio.get_running_loop().call_later(seconds, self._fire)
-
-    def _fire(self) -> None:
-        self._timer = None
-        if self.pending is None:
-            return
-        s = self.session
-        now = time.monotonic()
-        waited = now - self._pending_at
-        spoke = self._user_spoke_at >= self._pending_at - 0.5 or s.user_state == 'speaking'
-        if spoke and waited < GIVE_UP_SECONDS:
-            # 触れた前後に人が話した。その発言への返事に添える（turns.py が take で受け取る）
-            self._schedule(1.0)
-            return
-        if s.agent_state in ('speaking', 'thinking') and waited < GIVE_UP_SECONDS:
-            self._schedule(0.5)   # シエルが話し終わるのを待つ
-            return
-        line = self.pending + self._who()
+    def reset(self):
+        self._source_epoch, self._source_seq = None, -1
         self.pending = None
-        self.last_reply = now
-        log.info('タッチに返事をする%s', '（触った人を添えた）' if '触ったのは' in line else '')
-        # 知らせを会話の履歴に残し、あとの会話でも触れられたことを覚えておけるようにする
-        mouth.of(s).say('touch', user_input=line)
+        mouth.of(self.session).reactions.reset('touch')
+
 
     def _who(self) -> str:
         """最後に話した人を「たぶん触った人」として添える 1 文（添えないときは空）"""
@@ -158,13 +156,12 @@ class TouchReactions:
 
     def take(self) -> str | None:
         """話しながら触れたときに、その発言への返事に添える 1 行（turns.py が呼ぶ）。無ければ None"""
-        if self.pending is None:
+        event = mouth.of(self.session).reactions.take('touch')
+        if self.pending is None or event is None:
+            self.pending = None
             return None
         line = self.pending + '（いま話した人が、話しながら触れた）'
         self.pending = None
         self.last_reply = time.monotonic()
-        if self._timer is not None:
-            self._timer.cancel()
-            self._timer = None
         log.info('タッチを、話した人の発言への返事に添えた')
         return line

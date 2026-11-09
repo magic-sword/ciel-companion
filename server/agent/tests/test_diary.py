@@ -64,17 +64,21 @@ class TouchDiaryTests(unittest.IsolatedAsyncioTestCase):
         t = touch.TouchReactions(session)
         t.diary = Mock()
 
+        sequence = 0
         def send(gesture, phase):
+            nonlocal sequence
+            sequence += 1
             t.on_data(SimpleNamespace(topic=touch.TOPIC, data=json.dumps(
-                {'part': 'head', 'gesture': gesture, 'phase': phase, 'duration_ms': 1200}).encode()))
+                {'v': 2, 'type': 'user.touch', 'event_id': str(sequence), 'source_epoch': 'test',
+                 'seq': sequence, 'occurred_at': __import__('time').time(),
+                 'part': 'head', 'gesture': gesture, 'phase': phase, 'duration_ms': 1200}).encode()))
         send('stroke', 'start')
         send('stroke', 'end')
         send('stroke', 'start')
         send('tap', 'once')
         self.assertEqual([c.args for c in t.diary.add.call_args_list],
                          [('touch', '頭をなでてもらった'), ('touch', '頭をちょんとつつかれた')])
-        if t._timer is not None:
-            t._timer.cancel()
+        await __import__('mouth').of(session).reactions.close()
 
 
 class ThinkerGetsEventsTests(unittest.IsolatedAsyncioTestCase):

@@ -43,6 +43,10 @@ namespace Ciel.Conversation
 
         public string Current { get; private set; } = "neutral";
         float _until = float.PositiveInfinity;
+        int _priority;
+        string _deferred;
+        float _deferredUntil;
+        int _deferredPriority;
         readonly Dictionary<string, int> _indices = new Dictionary<string, int>();
         readonly Dictionary<string, CubismParameter> _params = new Dictionary<string, CubismParameter>();
         readonly Dictionary<string, float> _weights = new Dictionary<string, float>();   // 重ねる値 → 今の加算量
@@ -83,9 +87,18 @@ namespace Ciel.Conversation
             _indices.ContainsKey(name) || (Composed.TryGetValue(name, out var c) && _indices.ContainsKey(c.baseName));
 
         /// 表情を切り替える。ttlSeconds が過ぎたら通常へ戻る（0 以下なら戻らない）
-        public void Set(string name, float ttlSeconds = 0f)
+        public void Set(string name, float ttlSeconds = 0f, int priority = 0)
         {
             if (string.IsNullOrEmpty(name) || !Has(name)) { Debug.LogWarning($"[CielExpression] 知らない表情: {name}"); return; }
+            priority = Mathf.Clamp(priority, 0, 100);
+            if (Time.time < _until && priority < _priority)
+            {
+                _deferred = name;
+                _deferredUntil = ttlSeconds > 0 ? Time.time + ttlSeconds : float.PositiveInfinity;
+                _deferredPriority = priority;
+                return;
+            }
+            _priority = priority;
             Current = name;
             _until = ttlSeconds > 0 ? Time.time + ttlSeconds : float.PositiveInfinity;
             Apply();
@@ -107,7 +120,16 @@ namespace Ciel.Conversation
         public void OnLateUpdate()
         {
             if (!enabled) return;
-            if (Current != "neutral" && Time.time > _until) Set("neutral");
+            if (Time.time > _until)
+            {
+                if (_deferred != null && Time.time < _deferredUntil)
+                {
+                    var next = _deferred;
+                    _deferred = null;
+                    Set(next, float.IsPositiveInfinity(_deferredUntil) ? 0f : _deferredUntil - Time.time, _deferredPriority);
+                }
+                else { _deferred = null; Set("neutral"); }
+            }
             // 組み合わせの表情の重ねる値を、なめらかに出し入れする
             var target = new Dictionary<string, float>();
             if (Composed.TryGetValue(Current, out var c))

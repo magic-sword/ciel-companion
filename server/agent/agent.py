@@ -252,7 +252,13 @@ class Ciel(Agent):
             await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
         who = self.mind.route(chat_ctx, turn)
         work = self.mind.goals
-        if work is not None and work.notice is not None and self.mind.reply_origin in ('game', 'initiative'):
+        speech_id = getattr(self.session.current_speech, 'id', None)
+        voice = getattr(self.session.userdata, 'mouth', None)
+        reactions = getattr(voice, 'reactions', None)
+        reaction = reactions.current() if reactions else None
+        if reactions and not reactions.allowed(speech_id):
+            return
+        if work is not None and work.notice is not None and self.mind.reply_origin in ('game', 'initiative') and reaction is not None and reaction.kind == 'work.result':
             self.mind.handed = 'game'
             yield work.report()
             return
@@ -317,9 +323,14 @@ class Ciel(Agent):
         text, calls, blocked, done = [], [], [], False
         taken: list[str] = []   # この返事で通した道具（体を動かす道具は 1 つだけ。mind.one_body_call）
         request_id, generation_started = uuid.uuid4().hex, time.monotonic()
-        debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'))
+        expired = False
+        debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'),
+                         reaction_id=reaction.key[-1] if reaction else None, speech_id=speech)
         try:
             async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
+                if reactions and not reactions.allowed(speech_id):
+                    expired = True
+                    break
                 # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
                 chunk, dropped = mind.only_given(chunk, fns)
                 if dropped:
@@ -343,7 +354,7 @@ class Ciel(Agent):
                         for c in delta.tool_calls or []:
                             self.activity.call_started(c.call_id, c.name)
                 yield chunk
-            done = True
+            done = not expired
         except agents.APIError as exc:
             debug_log.record('model_error', id=request_id, error=type(exc).__name__,
                              status_code=getattr(exc, 'status_code', None))
@@ -432,9 +443,22 @@ class Ciel(Agent):
         if VOICE == 'irodori':
             speech = self.session.current_speech
             speech_id = speech.id if speech is not None else None
-            return self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi,
-                                                      stop=lambda spoken: self.preamble.stop(speech_id, spoken)))
+            return self._reaction_audio(self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi,
+                                                      stop=lambda spoken: self.preamble.stop(speech_id, spoken))), speech_id)
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
+
+    async def _reaction_audio(self, stream, speech_id):
+        voice = getattr(self.session.userdata, 'mouth', None)
+        reactions = getattr(voice, 'reactions', None)
+        try:
+            async for frame in stream:
+                if reactions and not reactions.allowed(speech_id):
+                    return
+                yield frame
+        finally:
+            close = getattr(stream, 'aclose', None)
+            if close is not None:
+                await close()
 
     def transcription_node(self, text, model_settings):
         if VOICE == 'irodori':
@@ -510,6 +534,8 @@ async def entrypoint(ctx: JobContext) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO and publication.source == rtc.TrackSource.SOURCE_MICROPHONE:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
+    ctx.add_shutdown_callback(voice.reactions.close)
+    session.on('conversation_item_added', voice.reactions.on_said)
 
     async def send(topic: str, *messages: dict) -> None:
         # アプリへの知らせ。会話が終わって部屋が閉じたあと（議事録の清書の結果など）は送れないので、捨てる
@@ -520,9 +546,22 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception as e:
             logger.info('アプリへ送れない（%s）: %s', topic, type(e).__name__)
 
-    def notify(msg: dict) -> None:
-        # アプリへの知らせ（ciel.event）を、待たずに送る
+    def publish_reaction(msg):
         asyncio.create_task(send('ciel.event', msg))
+
+    voice.reactions.publish = publish_reaction
+    agent.events.dispatch = lambda expression, ttl: voice.reactions.expression(expression, seconds=ttl / 1000)
+
+    def notify(msg: dict) -> None:
+        if msg.get('type') == 'youtube.state' and msg.get('state') in ('off', 'error', 'connecting'):
+            voice.reactions.reset('comment')
+        if msg.get('type') == 'env.state' and not msg.get('linked'):
+            voice.reactions.reset('game')
+            voice.reactions.reset('work')
+        if msg.get('type') == 'character.expression':
+            voice.reactions.expression(msg['expression'], seconds=msg.get('ttl_ms', 3000) / 1000)
+            return
+        publish_reaction(msg)
     # いまのシエル（activity.py）：心・道具・体の、いまの動き。止まって見えるとき、どこで待っているかをアプリで見る
     act = agent.activity = activity_.Activity(notify)
     session.on('agent_state_changed', act.agent_state)
@@ -591,7 +630,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # 出来事は、話の切れ目に心が知らせる（why 'game'）
         body = game
         if body is not None:
-            body.say, body.diary, body.board, body.notify = voice.say_latest, ciel_diary, tasks, notify
+            body.say, body.diary, body.board, body.notify = voice.react_latest, ciel_diary, tasks, notify
             body.activity = act
             act.titles.update(body.titles)
         # 長い目的の係（goals.py）。ゲームの体があるときだけ。目的と段はアプリと配信の画面へ goal.state で送る（topic ciel.goal）
@@ -603,7 +642,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
             def goal_say(why: str, **kw) -> None:
                 act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
-                voice.say_latest(why, **kw)
+                voice.react_latest(why, reaction_kind='work.result', **kw)
             goal_runner = goals.GoalRunner(goal_say, publish=goal_publish, env=body)
             ctx.add_shutdown_callback(goal_runner.close)
             goal_runner.presence = lambda: style.presence
@@ -663,7 +702,16 @@ async def entrypoint(ctx: JobContext) -> None:
     session.userdata.song = song
     if song is not None:
         song.diary = ciel_diary
-        song.publish = notify
+        voice.reactions.singing = lambda: song.active
+        voice.reactions.emergency = song.emergency_stop
+        def song_event(msg):
+            if msg.get('type') == 'song.live':
+                envelope = voice.reactions.envelope('song', 'song.change',
+                    {k: v for k, v in msg.items() if k != 'type'}, event_id=msg['event_id'])
+                envelope['occurred_at'] = msg['occurred_at']
+                voice.reactions.receive('song', envelope, why='song', expression=msg.get('expression') or None)
+            notify(msg)
+        song.publish = song_event
         talker.paused = lambda: song.active
         song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
         song.preamble = agent.preamble   # 「どうぞ」を 2 文までにする
@@ -766,8 +814,8 @@ async def entrypoint(ctx: JobContext) -> None:
             replies.overlap = gate
         else:   # LiveKit の中が想定と違う。LiveKit が今までどおり話し始めた瞬間に止める
             logger.warning('中断の差し替えができなかった（今までどおり、話し始めた瞬間に止める）')
-    session.on('user_state_changed', toucher.on_user_state)
     ctx.room.on('data_received', toucher.on_data)
+    ctx.room.on('participant_disconnected', lambda _: toucher.reset())
     # 議事録の始めと終わり（minutes.py。アプリのボタンと minutes_admin.py が送る）
     ctx.room.on('data_received', minute_taker.on_data)
     # 歌を聴く（singing.py。アプリの札が「歌い終わった」を送る）
@@ -780,7 +828,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on('data_received', agent.volume.on_data)
     # YouTube の配信のコメント（youtube_chat.py）。アプリの設定で配信の URL を選ぶとつなぎ、話の切れ目に返す（口の why comment）。
     # 心の無い組み立てでは、コメントから道具を使わせない（心ではコメントから使ってよい道具だけになる。tools/ の FROM_COMMENTS）
-    comments = youtube_chat.YouTubeChat(voice.say_when_free, history=history, notify=notify,
+    comments = youtube_chat.YouTubeChat(voice.react_comment, history=history, notify=notify,
                                         head=agent.persona.comment_instructions,
                                         tool_choice=None if PIPELINE else 'none')
     ctx.room.on('data_received', comments.on_data)

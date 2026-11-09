@@ -22,7 +22,7 @@ class Said:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, why, *, settle, instructions, merge=False):
+    def __call__(self, why, *, settle, instructions, merge=False, reaction_kind=None, reaction_event=None):
         self.calls.append((why, settle, instructions))
 
     def lines(self):
@@ -244,7 +244,7 @@ class EventTest(EnvCase):
 
     async def test_urgency_limits_and_the_diary(self):
         await self.link()
-        hurt = {'kind': 'hurt', 'urgency': 'urgent', 'key': 'hurt', 'say': '[テスト：痛い]'}
+        hurt = {'event_id': 'same-hurt', 'kind': 'hurt', 'urgency': 'urgent', 'key': 'hurt', 'say': '[テスト：痛い]'}
         await self.fake.emit(hurt)
         await self.fake.emit(hurt)   # 同じ種類は、しばらく 1 回まで
         await self.fake.emit({'kind': 'won', 'urgency': 'normal', 'key': 'won', 'say': '[テスト：勝った]', 'memorable': 'テストで勝った'})
@@ -254,6 +254,10 @@ class EventTest(EnvCase):
         self.assertEqual([(c[1], c[2]) for c in self.said.calls],
                          [(game_env.URGENT_SETTLE, '[テスト：痛い]'), (game_env.SETTLE, '[テスト：勝った]')])
         self.assertEqual(self.diary.added, [('test', 'テストで勝った')])   # 同じことは 1 度だけ
+        self.env.linked = False
+        self.env.on_event({'kind': 'died', 'memorable': '未所有の体の記憶', 'say': '[old]', 'urgency': 'urgent'})
+        self.assertEqual(self.diary.added, [('test', 'テストで勝った')])
+        self.assertEqual(len(self.said.calls), 2)
 
     async def test_the_view_goes_to_the_eyes(self):
         await self.link()
@@ -347,10 +351,12 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
     async def test_duplicate_done_notifies_once_but_new_session_can_reuse_id(self):
         said = Said()
         self.env.say = said
-        event = {'kind': 'task_done', 'session': 'one', 'task': 1, 'title': 'follow', 'ok': True, 'say': '[done]'}
+        event = {'input_v': 1, 'event_id': 'done1', 'source_epoch': 'source', 'seq': 1,
+                 'occurred_at': __import__('time').time(),
+                 'kind': 'task_done', 'session': 'one', 'task': 1, 'title': 'follow', 'ok': True, 'say': '[done]'}
         self.env.on_event(event)
         self.env.on_event(event)
-        self.env.on_event({**event, 'session': 'two'})
+        self.env.on_event({**event, 'session': 'two', 'event_id': 'done2', 'seq': 2})
         self.assertEqual(len(said.calls), 2)
 
     async def test_unowned_last_snapshot_is_not_a_new_task_result(self):
@@ -371,7 +377,9 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
         self.env._reconcile_body()
         self.assertEqual(self.env._cards, {})
         self.assertEqual(self.env.activity.state()['body']['phase'], 'idle')
-        self.env.on_event({'kind': 'task_done', 'session': 'one', 'task': 1, 'ok': False, 'failed': True, 'say': '[failed]'})
+        self.env.on_event({'input_v': 1, 'event_id': 'failed1', 'source_epoch': 'source', 'seq': 1,
+                           'occurred_at': __import__('time').time(),
+                           'kind': 'task_done', 'session': 'one', 'task': 1, 'ok': False, 'failed': True, 'say': '[failed]'})
         self.assertEqual(len(said.calls), 1)
 
     async def test_old_refresh_cannot_overwrite_newer_revision(self):

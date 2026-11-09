@@ -13,6 +13,7 @@
 歌い終わって分析したら、ときめき度（シエルの主観の点数）と内わけを song.result でアプリへ送り、結果のカードを出す。
 """
 import asyncio
+import uuid
 import json
 import logging
 import os
@@ -234,6 +235,9 @@ class SongListener:
         self._live: asyncio.Task | None = None
         self._llm_task: asyncio.Task | None = None   # ローカル LLM を GPU の形に戻す（_llm_back）
         self._cues = LiveCues()
+        self._live_epoch = uuid.uuid4().hex
+        self._speech = None
+        self._emergency = False
         self._telling = False         # 感想・結果を話している途中（アプリには idle を見せるが、シエルから話しかけない）
         self.on_end = None            # 歌が終わって感想を話し終えたとき（agent.py が内なる考えの interlude をつなぐ）
         self.preamble = None          # emotion.PreambleCut（「どうぞ」を DOUZO_SENTENCES 文までにする。agent.py がつなぐ）
@@ -251,10 +255,12 @@ class SongListener:
         if self.state == ANALYZING:
             self._say(BUSY)
             return BUSY
+        self._emergency = False
         self.state = LISTENING
         self._chunks = []
         self._ready_at = None
         self._cues = LiveCues()
+        self._live_epoch = uuid.uuid4().hex
         # ここから会話モデルへ声を送らない（歌声を外へ出さない。歌っているあいだに返事もしない）
         self.session.input.set_audio_enabled(False)
         self.tap.listeners.append(self._on_chunk)
@@ -282,6 +288,23 @@ class SongListener:
             self._notify()
             self._llm_back(LLM_BACK_AFTER_CANCEL)
             self._task = asyncio.create_task(self._tell(LINES[CANCELLED], note=LINES[CANCELLED]))
+
+    def emergency_stop(self) -> None:
+        if not self.active:
+            return
+        self._emergency = True
+        self._live_epoch = uuid.uuid4().hex
+        for task in (self._task, self._live, self._llm_task):
+            if task is not None:
+                task.cancel()
+        if self._speech is not None and hasattr(self._speech, 'interrupt'):
+            self._speech.interrupt(force=True)
+        self._stop(resume=True)
+        self._chunks = []
+        self._telling = False
+        self.state = IDLE
+        self._notify()
+        self._llm_back()
 
     def on_data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != TOPIC:
@@ -314,7 +337,7 @@ class SongListener:
         try:
             # 「どうぞ」を言い終えてから聴く（言っているあいだの声は、シエルの声が混ざるので使わない）
             asked = time.monotonic()
-            speech = mouth.of(self.session).say('song', instructions=LINES[STARTED], tool_choice='none')
+            speech = self._speech = mouth.of(self.session).say('song', instructions=LINES[STARTED], tool_choice='none')
             if self.preamble is not None:
                 self.preamble.request(speech, keep=DOUZO_SENTENCES)
             await speech
@@ -360,6 +383,7 @@ class SongListener:
 
     async def _live_step(self, at: float) -> None:
         """直近 LIVE_WINDOW 秒を /live に渡し、アプリへ知らせる。失敗しても歌は聴き続ける"""
+        epoch, observed_at = self._live_epoch, time.time()
         need, parts = int(LIVE_WINDOW * SR), []
         for _, pcm in reversed(self._chunks):
             parts.append(pcm)
@@ -377,17 +401,16 @@ class SongListener:
         except Exception as e:
             log.info('歌の途中の分析ができない error=%s', type(e).__name__)
             return
-        if self.state != LISTENING:
+        if self.state != LISTENING or epoch != self._live_epoch:
             return
         event = self._cues.update(data, at)
         if event is None or self.publish is None:
             return
+        event.update(event_id=f'{epoch}:{at:.3f}', occurred_at=observed_at)
         self.publish(event)
-        if event['expression']:
-            self.publish({'v': 1, 'type': 'character.expression', 'expression': event['expression'],
-                          'intensity': 1.0, 'ttl_ms': 3000})
 
     async def _analyze(self) -> None:
+        epoch = self._live_epoch
         log.info(self._cues.summary())
         chunks, self._chunks = self._chunks, []
         audio = np.concatenate([c for _, c in chunks]) if chunks else np.zeros(0, np.int16)
@@ -408,6 +431,8 @@ class SongListener:
                 r.raise_for_status()
                 result = await r.json()
             del audio
+            if epoch != self._live_epoch:
+                return
             log.info('歌を聴いた：%.0f 秒の歌、分析 %.1f 秒', result.get('duration', 0), time.monotonic() - started)
             if result.get('empty') or result.get('sung_seconds', 0) < MIN_SUNG:
                 what = EMPTY
@@ -426,30 +451,36 @@ class SongListener:
             log.warning('歌を聴くサービスにつなげない error=%s', type(e).__name__)
             what = FAILED
         finally:
-            if self.state != IDLE:
-                self.state = IDLE
-                self._notify()
-            self._llm_back()   # 分析が終わった（分析のモデルは外れた）ので、ローカル LLM を GPU の形に戻す
-            if what is not None:
-                await self._tell(LINES[what], note=LINES[what])
+            if epoch == self._live_epoch:
+                if self.state != IDLE:
+                    self.state = IDLE
+                    self._notify()
+                self._llm_back()   # 分析が終わった（分析のモデルは外れた）ので、ローカル LLM を GPU の形に戻す
+                if what is not None:
+                    await self._tell(LINES[what], note=LINES[what])
 
     async def _tell(self, instructions: str, note: str | None = None) -> None:
         """歌のあとのひとこと・感想を話し終えるまで待ち、歌の前の考えを捨てさせる。
         note は、先に会話の後ろへ置く出来事（歌い終えた・手がかり）。返事を頼むときの指示（instructions）はその返事のときだけ
         ふだんの指示の末尾に足され、会話には残らない。会話の最後が「どうぞ」のままだと、会話モデルは歌がこれから始まると
         受け取り、結果が出たあとに「歌い始めた」ような返事をした（2026-10-29）"""
+        epoch = self._live_epoch
         self._telling = True
         self.session.input.set_audio_enabled(True)
         if note is not None:
             await self._note(note)
         try:
-            await mouth.of(self.session).say('song', instructions=instructions, tool_choice='none')
+            if epoch != self._live_epoch:
+                return
+            self._speech = mouth.of(self.session).say('song', instructions=instructions, tool_choice='none')
+            await self._speech
         except Exception:
             log.exception('歌のあとのひとことを話せない')
         finally:
-            self._telling = False
-            if self.on_end is not None:
-                self.on_end()
+            if epoch == self._live_epoch:
+                self._telling = False
+                if self.on_end is not None and not self._emergency:
+                    self.on_end()
 
     async def _note(self, text: str) -> bool:
         """会話の後ろに、出来事を system の項目として置く（turns.py の _add_context と同じやり方）。置けなければ False"""

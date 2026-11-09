@@ -44,6 +44,7 @@ class FakeGame:
         self.server = Server('fake-game')
         self.busy = False          # ほかの会話が体を使っている
         self.linked = False
+        self.event_seq = 0
         self.calls: list[tuple[str, dict]] = []
         self.work = None
         self.state = {'label': 'テスト', 'linked': True, 'playing': True, 'reason': '', 'text': 'シエル：元気', 'fingerprint': 'a'}
@@ -113,6 +114,10 @@ class FakeGame:
 
     async def emit(self, event: dict):
         """出来事の知らせ（notifications/message、logger ciel.event）"""
+        self.event_seq += 1
+        import time
+        event = {'input_v': 1, 'event_id': f'fake:{self.event_seq}', 'source_epoch': 'fake',
+                 'seq': self.event_seq, 'occurred_at': time.time(), **event}
         await self.session.send_log_message(level='info', data=event, logger='ciel.event')
 
     async def changed(self, **state):

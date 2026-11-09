@@ -1,5 +1,7 @@
 # シエルに触れる（タッチの反応）
 
+2026-11-10：タッチはv2（イベントID・世代・順序・UTC発生時刻付き）、表情はv2（優先度・絶対期限付き）。受信・発話は[共通反応基盤](service-events-and-reactions-ja.md)へ接続した。Unityとagentを同じ一式で更新する。
+
 2026-10-15 作成。会話アプリ（Realtime API ＋ Irodori-TTS）で、画面のシエルに触れると、体がその場で反応し、シエルが声で反応を返す。
 
 ## 流れ
@@ -7,7 +9,7 @@
 1. Unity の `CielTouch`（シエルのモデルに付ける）が、タップ・なぞりを Cubism の当たり判定で調べる。触れた点で絵が描かれている（不透明な）部品のうち、いちばん手前のもので部位を決める。
 2. その場で体を動かす（下表）。表情は会話サーバーの表情が無いときだけ短く切り替える。
 3. `CielConversation.SendTouch` が LiveKit のデータのメッセージ（topic `ciel.touch`）で会話サーバーへ知らせる。
-   例：`{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":0}`
+   例：`{"v":2,"type":"user.touch","event_id":"touch-1","source_epoch":"app-session","seq":1,"occurred_at":1794268800.0,"part":"head","gesture":"stroke","phase":"start","duration_ms":0}`（`occurred_at`は送信時点のUnix秒を入れる。この例の時刻は固定の例示値）
 4. 会話サーバーの `touch.py` が「[タッチ] 頭を撫でる（撫で始めた）」の 1 行を会話モデルへ渡し、返事を作らせる（`generate_reply(user_input=…)`。会話の履歴に残る）。返事は通常どおり感情の印つきで Irodori-TTS が読み上げ、表情も切り替わる。受け取り方は `config/prompts/touch.md` で教える。
 
 しぐさは tap（短く触れる）・stroke（なぞる。画面の高さの 5% 以上動かす）・hold（0.4 秒以上動かさずに触れる）。

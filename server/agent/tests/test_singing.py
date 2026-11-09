@@ -249,6 +249,40 @@ class ListenerTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
         self.fail('「どうぞ」が終わらない')
 
+    async def test_emergency_stops_capture_without_adding_a_song_announcement(self):
+        self.song.start()
+        await self.ready()
+        running = self.song._task
+        self.song.emergency_stop()
+        await asyncio.gather(running, return_exceptions=True)
+        self.assertFalse(self.song.active)
+        self.assertEqual(self.tap.listeners, [])
+        self.assertTrue(self.session.audio[-1])
+        self.assertEqual(self.session.replies, [singing.LINES[singing.STARTED]])
+
+    async def test_cancelled_old_analysis_cannot_reset_a_new_song(self):
+        entered = asyncio.Event()
+        previous = self.song._http.post
+        class SlowAnalysis(FakeResponse):
+            async def json(self):
+                entered.set()
+                await asyncio.Event().wait()
+        def post(url, **kwargs):
+            return SlowAnalysis({}) if url == singing.URL else previous(url, **kwargs)
+        self.song._http.post = post
+        self.song.start()
+        await self.ready()
+        await self.feed(4.0)
+        self.song.finish()
+        old = self.song._task
+        await asyncio.wait_for(entered.wait(), 2)
+        self.song.emergency_stop()
+        self.song.start()
+        epoch = self.song._live_epoch
+        await asyncio.gather(old, return_exceptions=True)
+        self.assertEqual(self.song.state, singing.LISTENING)
+        self.assertEqual(self.song._live_epoch, epoch)
+
     async def test_song_is_kept_local_and_feedback_gets_only_text(self):
         self.assertEqual(self.song.start(), singing.STARTED)
         self.assertEqual(self.session.audio, [False])   # 会話モデルへの声を止めた

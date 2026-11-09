@@ -16,6 +16,7 @@ import logging
 import time
 
 import debug_log
+from reactions import Reactions
 
 log = logging.getLogger('ciel-agent.mouth')
 
@@ -28,9 +29,10 @@ FREE_POLL = 0.25
 class Mouth:
     def __init__(self, session) -> None:
         self.session = session
+        self.reactions = Reactions(self)
         self.counts: collections.Counter[str] = collections.Counter()
         self.before_say = None   # 話させる直前に why を知らせる先（pipeline の心が、考える番の返事かを知る。mind.py）
-        self._latest: dict[str, dict] = {}   # say_latest で、まだ言っていない最新の知らせ（why ごと）
+        self._handed = collections.OrderedDict()   # 発話ごとに、文脈へ渡した通知IDを保持する
 
     def busy(self) -> bool:
         s = self.session
@@ -69,36 +71,67 @@ class Mouth:
             await asyncio.sleep(FREE_POLL)
         return not self.busy()
 
-    def say_latest(self, why: str, *, settle: float = 0.0, wait: float = 30.0, merge: bool = False, **kwargs) -> None:
-        """知らせを、切れ目を待ってから言う（待ったあとは言う）。待っているあいだに同じ why の知らせが来たら、最新の 1 つだけを言う。
-        長い話の途中で議事録を始めて終えたとき、「とり始めた」「まとめて送る」「送った」を話し終わりにまとめて言い、
-        返事より後ろに古い知らせが続いた（2026-10-30）"""
-        waiting = why in self._latest
-        if merge and waiting and kwargs.get('instructions'):
-            # 待っているあいだに届いた知らせを、1 つにまとめて 1 回で言う（マイクラの「降りられた」と「スケルトンを倒した」を
-            # 別々の知らせにすると、2 回続けて話し、2 回目は古いことを言った。1 つだけ残すと、前の知らせが消えた。2026-11-05）
-            old = self._latest[why].get('instructions', '')
-            kwargs = {**kwargs, 'instructions': '\n'.join(x for x in (old, kwargs['instructions']) if x)}
-        self._latest[why] = kwargs
-        if not waiting:
-            asyncio.create_task(self._say_latest(why, settle, wait))
-
-    async def _say_latest(self, why: str, settle: float, wait: float) -> None:
-        try:
-            await self._free(wait, settle)
-            kwargs = self._latest.pop(why, None)
-            if kwargs is not None:   # 返事の中で伝え終えていれば（drop）、言わない
-                self.say(why, **kwargs)
-        finally:
-            self._latest.pop(why, None)
+    def say_latest(self, why: str, *, settle: float = 0., wait: float = 30., merge: bool = False, **kwargs):
+        kinds = {'minutes': 'minutes.notice', 'research': 'research.result',
+                 'image': 'image.received', 'game': 'game.notice'}
+        if why not in kinds:
+            raise ValueError('unknown notice source')
+        kind = kinds[why]
+        if merge and kwargs.get('instructions'):
+            previous = next((event for event in self.reactions.queue.values()
+                             if event.key[0] == why and event.kind == kind and
+                             event.deadline > self.reactions.clock()), None)
+            if previous:
+                kwargs = {**kwargs, 'instructions': previous.kwargs.get('instructions', '') + '\n' + kwargs['instructions']}
+        envelope = self.reactions.envelope(why, kind, {'fact': kwargs.get('instructions', '')})
+        envelope['ttl_ms'] = min(30000, wait * 1000)
+        return self.reactions.receive(why, envelope, why=why, kwargs=kwargs, settle=settle)
 
     def waiting(self) -> dict[str, str]:
-        """まだ言っていない知らせ（why → 指示）。心が、相手への返事の中で伝える（mind.py）"""
-        return {why: kw.get('instructions', '') for why, kw in self._latest.items()}
+        pending = [event for event in self.reactions.queue.values()
+                   if event.deadline > self.reactions.clock() and event.key[0] in ('minutes', 'research', 'image', 'game')
+                   and event.kind != 'game.damage']
+        speech_id = getattr(getattr(self.session, 'current_speech', None), 'id', None)
+        result = {}
+        for event in pending:
+            if event.kwargs.get('instructions'):
+                result[event.why] = event.kwargs['instructions']
+                self._handed[(speech_id, event.why)] = event.key
+        while len(self._handed) > self.reactions.REMEMBER:
+            self._handed.popitem(last=False)
+        return result
 
     def drop(self, why: str) -> None:
-        """返事の中で伝え終えた知らせを、あとで言わない"""
-        self._latest.pop(why, None)
+        speech_id = getattr(getattr(self.session, 'current_speech', None), 'id', None)
+        key = self._handed.pop((speech_id, why), None)
+        event = self.reactions.queue.get(key)
+        if event:
+            self.reactions.finish(event, 'spoken_in_reply')
+
+    def react_latest(self, why, *, instructions, settle=0., merge=False, reaction_kind=None, reaction_event=None):
+        source = 'work' if reaction_kind == 'work.result' else 'game'
+        kind = ('work.result' if source == 'work' else
+                'game.damage' if reaction_kind in ('hurt', 'died', 'flee') else 'game.notice')
+        envelope = self.reactions.envelope(source, kind, {'fact': instructions},
+            event_id=reaction_event.get('event_id') if reaction_event else None)
+        if reaction_event:
+            envelope['occurred_at'] = reaction_event['occurred_at']
+        event = self.reactions.receive(source, envelope, why=why,
+            kwargs={'instructions': instructions}, settle=settle,
+            expression='teary' if kind == 'game.damage' else None)
+        if event is not None and reaction_kind == 'died' and self.reactions.emergency:
+            self.reactions.emergency()
+        return event
+
+    async def react_comment(self, why, *, instructions, wait=30, settle=0., event_id=None,
+                           occurred_at=None, **kwargs):
+        envelope = self.reactions.envelope('comment', 'comment.received', {}, event_id=event_id)
+        if occurred_at is not None:
+            envelope['occurred_at'] = occurred_at
+        envelope['ttl_ms'] = min(30000, wait * 1000)
+        event = self.reactions.receive('comment', envelope, why='comment',
+            kwargs={'instructions': instructions, **kwargs}, settle=settle)
+        return await self.reactions.wait(event)
 
     def summary(self) -> None:
         """会話の終わりに、なぜ何回話したかを出す"""
@@ -110,4 +143,11 @@ class Mouth:
 def of(session) -> Mouth:
     """その会話の口（agent.py が session.userdata.mouth に置く）。無ければ（試験など）その場で作る"""
     mouth = getattr(getattr(session, 'userdata', None), 'mouth', None)
-    return mouth if isinstance(mouth, Mouth) else Mouth(session)
+    if isinstance(mouth, Mouth):
+        return mouth
+    existing = getattr(session, '_ciel_mouth', None)
+    if isinstance(existing, Mouth):
+        return existing
+    instance = Mouth(session)
+    session._ciel_mouth = instance
+    return instance

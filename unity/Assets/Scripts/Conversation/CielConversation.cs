@@ -972,6 +972,9 @@ namespace Ciel.Conversation
             public string expression;
             public float intensity;
             public int ttl_ms;
+            public int priority;
+            public long expires_unix_ms;
+            public string event_id;
             public bool recording;   // minutes.state
             public string talk, presence, reason;   // conversation.style（reason は voice.test でも）
             public string kind, service;   // agent.problem
@@ -1023,7 +1026,10 @@ namespace Ciel.Conversation
             catch (Exception ex) { Debug.LogWarning($"[CielConversation] イベントを読めない: {ex.Message}"); return; }
             if (e.type == "character.expression" && _expression != null)
             {
-                _expression.Set(e.expression, e.ttl_ms / 1000f);
+                if (e.v != 2 || e.expires_unix_ms <= 0 || e.ttl_ms <= 0) return;
+                var remaining = e.expires_unix_ms - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                if (remaining <= 0 || remaining > e.ttl_ms + 1000) return;
+                _expression.Set(e.expression, Math.Min(e.ttl_ms, remaining) / 1000f, e.priority);
                 Debug.Log($"[CielConversation] 表情 {e.expression}（{e.ttl_ms} ms）");
             }
             else if (e.type == "conversation.style")
@@ -1362,11 +1368,17 @@ namespace Ciel.Conversation
 
         /// シエルに触れたことを会話サーバーへ知らせる（CielTouch から。サーバーの touch.py が声の反応を返す）
         /// strength（gentle・hard）と expression（そのときアプリが出した表情）は、ほっぺを引っ張ったときだけ付ける
+        readonly string _touchEpoch = Guid.NewGuid().ToString("N");
+        long _touchSequence;
+
         public void SendTouch(string part, string gesture, string phase, int durationMs, string strength = "", string expression = "")
         {
             if (_room == null || Status != State.Connected) return;
             var extra = strength != "" ? $",\"strength\":\"{strength}\",\"expression\":\"{expression}\"" : "";
-            var json = $"{{\"v\":1,\"type\":\"user.touch\",\"part\":\"{part}\",\"gesture\":\"{gesture}\",\"phase\":\"{phase}\",\"duration_ms\":{durationMs}{extra}}}";
+            var eventId = Guid.NewGuid().ToString("N");
+            var at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+            var timestamp = at.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var json = $"{{\"v\":2,\"event_id\":\"{eventId}\",\"source_epoch\":\"{_touchEpoch}\",\"seq\":{++_touchSequence},\"occurred_at\":{timestamp},\"type\":\"user.touch\",\"part\":\"{part}\",\"gesture\":\"{gesture}\",\"phase\":\"{phase}\",\"duration_ms\":{durationMs}{extra}}}";
             try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.touch"); }
             catch (Exception e) { Debug.LogWarning($"[CielConversation] タッチを送れない: {e.Message}"); }
         }

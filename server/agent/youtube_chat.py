@@ -18,6 +18,7 @@
   道具は、心（pipeline）ではコメントから使ってよいものだけになる（tools/ の FROM_COMMENTS）。心の無い組み立てでは道具を使わせない。
 """
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -453,7 +454,9 @@ class YouTubeChat:
             choice = self.pool.pick()
             if choice is None:
                 continue
-            kwargs = {'instructions': instructions(choice, self.head)}
+            kwargs = {'instructions': instructions(choice, self.head),
+                      'event_id': hashlib.sha256(','.join(c.id for c in choice['comments']).encode()).hexdigest(),
+                      'occurred_at': min(c.at for c in choice['comments'])}
             if self.tool_choice is not None:
                 kwargs['tool_choice'] = self.tool_choice
             self._record(choice)
@@ -462,15 +465,15 @@ class YouTubeChat:
             except Exception as e:
                 log.warning('コメントに返せない error=%s', type(e).__name__)
                 handle = None
-            if handle is None:
-                self.pool.put_back(choice)   # 切れ目が来なかった。次の番にまた選ぶ（古くなれば捨てる）
-            else:
-                self.replied += 1
-                self.publish()
+            if handle is not None:
                 try:
-                    await handle   # 話し終えるまで待つ
+                    await handle
                 except Exception:
                     pass
+                else:
+                    if not getattr(handle, 'interrupted', False):
+                        self.replied += 1
+                        self.publish()
             await asyncio.sleep(GAP_SECONDS)
 
     def _record(self, choice: dict) -> None:

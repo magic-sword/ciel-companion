@@ -1,5 +1,7 @@
 # ゲームとアプリを「環境」としてつなぐ（MCP の形にする設計）
 
+2026-11-10：`ciel.event`のリアクション通知は `input_v=1` と発行ID・世代・順序・時刻を付与する。古い通知は反応に使わず、profile 2 / work 1の状態反映は維持する。[共通反応基盤](service-events-and-reactions-ja.md)を参照。
+
 ゲーム以外を含む最新の方針は[設計方針の正本](design-policy-ja.md)。能力の段階的公開と会話専用MCPは[実装契約](capability-runtime-ja.md)を参照。
 
 2026-11-09：作業の受付・実行は [profile 2 / work 1の作業契約](game-work-contract-ja.md)へ移行した。以下のprofile 1と会話側の段進行APIは過去の設計。現在の責任分担は [シエルとMCPの再設計](minecraft-execution-redesign-ja.md)を参照する。

@@ -115,7 +115,7 @@ class ChatTest(unittest.IsolatedAsyncioTestCase):
 
         async def say_when_free(why, **kwargs):
             said.append((why, kwargs))
-            return None if len(said) == 1 else asyncio.sleep(0)   # 1 回目は切れ目が来なかった
+            return asyncio.sleep(0)   # 待機・失効は共通リアクション基盤が担当する
 
         history = Conversation()
         chat = yt.YouTubeChat(say_when_free, history=history, head='[配信のコメント]', tool_choice='none', key='k')

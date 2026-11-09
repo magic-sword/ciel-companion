@@ -511,7 +511,7 @@ namespace Ciel.Conversation
         // 痛いときの表情は、会話サーバーの表情より優先する
         void ForceExpression(string name, float ttl)
         {
-            if (_expression != null) _expression.Set(name, ttl);
+            if (_expression != null) _expression.Set(name, ttl, name == "teary" ? 90 : 30);
         }
 
         void Send(string gesture, string phase, int durationMs, string strength = "", string expression = "")

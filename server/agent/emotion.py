@@ -82,14 +82,19 @@ class ExpressionEvents:
 
     def __init__(self) -> None:
         self.seq = 0
+        self.dispatch = None
 
     async def send(self, expression: str, ttl_ms: int) -> None:
+        if self.dispatch is not None:
+            self.dispatch(expression, ttl_ms)
+            return
         ctx = get_job_context(required=False)
         if ctx is None:
             return
         self.seq += 1
-        msg = {'v': 1, 'type': 'character.expression', 'seq': self.seq,
-               'expression': expression, 'intensity': 1.0, 'ttl_ms': ttl_ms}
+        msg = {'v': 2, 'type': 'character.expression', 'seq': self.seq,
+               'expression': expression, 'intensity': 1.0, 'ttl_ms': ttl_ms, 'priority': 0,
+               'expires_unix_ms': int(time.time() * 1000) + ttl_ms}
         try:
             await ctx.room.local_participant.publish_data(json.dumps(msg), reliable=True, topic='ciel.event')
         except Exception as e:   # 表情が送れなくても、話は続ける

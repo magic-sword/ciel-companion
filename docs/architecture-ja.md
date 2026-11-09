@@ -1,5 +1,7 @@
 # システムの構成
 
+2026-11-10の追加実装：[サービス入力とリアクション](service-events-and-reactions-ja.md)。標準pipeline向けに共通契約・反応調停を実装した。現在の仕様はリンク先を参照する。
+
 設計判断の正本は[現在の設計方針](design-policy-ja.md)。2026-11-10の能力の段階的ロードと会話専用MCPは[実装契約](capability-runtime-ja.md)を参照。以下は配備構成の地図です。
 
 更新：2026-11-08。リポジトリのCompose・Unityシーン・会話サーバーに基づく構成。稼働先への反映や全機能の実機検証は、各機能の確認記録を参照する。[資料一覧](README.md)／[開発環境構築](development-setup-ja.md)
@@ -263,9 +265,9 @@ sequenceDiagram
 
 | topic | 向き | 中身 | 使い道 |
 |---|---|---|---|
-| `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"character.expression","seq":…,"expression":"happy","intensity":1.0,"ttl_ms":…}` | 声に合わせて表情を変える |
+| `ciel.event` | 会話サーバー → アプリ | `{"v":2,"type":"character.expression","expression":"happy","intensity":1.0,"ttl_ms":…,"priority":…,"expires_unix_ms":…}` | 声に合わせて表情を変える |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"minutes.state","recording":true}` | 議事録をとっているか（アプリの議事録のボタンの表示） |
-| `ciel.touch` | アプリ → 会話サーバー | `{"v":1,"type":"user.touch","part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
+| `ciel.touch` | アプリ → 会話サーバー | `{"v":2,"type":"user.touch","event_id":…,"source_epoch":…,"seq":…,"occurred_at":…,"part":"head","gesture":"stroke","phase":"start","duration_ms":…}` | タッチへの声の反応（[タッチの仕様](ciel-touch-interaction-ja.md)） |
 | `ciel.style` | アプリ → 会話サーバー | `{"v":1,"type":"conversation.style","talk":"chatty","presence":"auto","meeting":false}` | 会話のしかた。おしゃべり度（quiet・normal・chatty）、その場にいる人（auto・solo・close・public）、会議につないでいるか（設定の「声のつなぎ方」）。以前の `ciel.mode`（solo・group）も受け付ける |
 | `ciel.event` | 会話サーバー → アプリ | `{"v":1,"type":"conversation.style","talk":"quiet","presence":"public","reason":"meeting"}` | いまの答え方と覚えていることの出し方（自動のときは会議・聞こえた声の数で決まる）。設定画面の「いまは：…」 |
 | `ciel.soundcheck` | アプリ → 会話サーバー | `{"v":1,"type":"voice.test"}` | シエルの声を試しに流す（会議の確かめ）。会話モデルを使わず決まった一言を読み上げる（`soundcheck.py`） |

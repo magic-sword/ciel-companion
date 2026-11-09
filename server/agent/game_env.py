@@ -10,7 +10,7 @@
   決まりの link_tool で体を受け持つ。体を動かせる会話は 1 つだけで、ほかの会話が使っていれば busy。
 - 様子は resource game://state。変わったという知らせ（notifications/resources/updated）で読み直す。
 - 出来事は MCP の知らせ notifications/message（logger 'ciel.event'）。急ぎの度合い（urgency）で口へ渡す切れ目を決め、
-  同じ種類（key）は SAME_KIND_SECONDS に 1 回まで。日記に残す一文（memorable）は、1 回の会話で同じことは 1 度だけ。
+  発行ID・世代・時刻を検証し、共通反応基盤へ渡す。日記に残す一文は会話で同じことを重複させない。
 - 時間がかかる技（_meta の ciel/long_running）は付箋にし、終わり（kind task_done）で閉じる。同じ頼み（題）が続けて
   うまくいかなかった回数は、ここで数えて知らせに添える。
 - つなぐ先は環境変数 CIEL_GAMES（例 minecraft=http://127.0.0.1:8771/mcp）。今は最初の 1 つだけを使う。空ならつながない。
@@ -20,6 +20,7 @@ import base64
 import contextlib
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -45,7 +46,6 @@ CALL_TIMEOUT = 40.0        # 道具 1 回の答えを待つ上限（景色を撮
 PING_SECONDS = 20.0        # 受け持ち前・待機中も通信を保つ（体の側は 60 秒無通信でセッションを閉じる）
 LINK_RETRY_SECONDS = 3.0   # 使用中・接続待ちからの再試行。ほかの会話の所有権は奪わない
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
-SAME_KIND_SECONDS = 30.0   # 同じ種類の知らせは、この秒数に 1 回まで
 URGENT_SETTLE = 0.3        # 危ない知らせは、すぐの切れ目で言う
 SETTLE = 1.2               # ふつうの知らせは、相手がこの秒数だまってから言う
 SHOWN_ROLES = ('act', 'look', 'know')   # 心に渡す道具の役目（link・goal は会話サーバーが使う）
@@ -156,7 +156,9 @@ class GameEnv:
         self._act_lock = asyncio.Lock()
         self._link_lock = asyncio.Lock()
         self._fails: dict[str, int] = {}
-        self._said: dict[str, float] = {}
+        self._input_epoch = None
+        self._input_seq = -1
+        self._input_ids = set()
         self._remembered: set[str] = set()
         self._stop_event: asyncio.Event | None = None
 
@@ -165,8 +167,19 @@ class GameEnv:
     @contextlib.asynccontextmanager
     async def _connect_http(self):
         async with streamablehttp_client(self.url, timeout=10) as (read, write, _):
-            async with ClientSession(read, write, logging_callback=self._on_log, message_handler=self._on_message) as s:
-                yield s
+            bound = [None]
+            async def log_current(params):
+                if bound[0] is not None and self._session is bound[0]:
+                    await self._on_log(params)
+            async def message_current(message):
+                if bound[0] is not None and self._session is bound[0]:
+                    await self._on_message(message)
+            async with ClientSession(read, write, logging_callback=log_current, message_handler=message_current) as s:
+                bound[0] = s
+                try:
+                    yield s
+                finally:
+                    bound[0] = None
 
     async def prepare(self) -> bool:
         """会話の始め：つないで、決まり・道具・指示を読む。読めなければ False（道具も指示も無し）"""
@@ -365,6 +378,9 @@ class GameEnv:
         self.publish()
 
     def publish(self) -> None:
+        if not self.linked:
+            self._input_epoch, self._input_seq = None, -1
+            self._input_ids.clear()
         """体を受け持ったか・ゲームに入っているかを、変わったときにアプリへ知らせる"""
         shown = (self.linked, self.playing(), '' if self.linked else self.reason)
         if shown == self._shown or self.notify is None:
@@ -559,13 +575,15 @@ class GameEnv:
         if kind == 'task_done':
             self._task_done(e)
             return
+        if not self.linked:
+            return
         if e.get('memorable'):
             self._remember(e['memorable'])
         urgency = e.get('urgency')
         if e.get('say') and self.activity is not None:
             self.activity.log(e['say'].strip('[]'), 'error' if urgency == 'urgent' else 'info')
         if e.get('say') and urgency in ('urgent', 'normal'):
-            self._tell(kind, e['say'], URGENT_SETTLE if urgency == 'urgent' else SETTLE, key=e.get('key'))
+            self._tell(kind, e['say'], URGENT_SETTLE if urgency == 'urgent' else SETTLE, event=e)
 
     def _task_done(self, e: dict) -> None:
         """頼まれた技の終わり。付箋を閉じ、うまくいかなかったら同じ頼みの何回目かを添えて心へ知らせる"""
@@ -595,7 +613,7 @@ class GameEnv:
         elif e.get('ok'):
             self._fails.pop(name, None)
         if say:
-            self._tell('task_done', say, SETTLE, key=None)
+            self._tell('task_done', say, SETTLE, event=e)
 
     @staticmethod
     def _task_key(event: dict):
@@ -643,17 +661,33 @@ class GameEnv:
             return
         self.board.move(card, tasks.DONE if how == 'done' else tasks.FAILED, note=note or None)
 
-    def _tell(self, kind: str, line: str, settle: float, *, key: str | None) -> None:
-        """知らせは、話の切れ目を待つあいだに届いた分をまとめて 1 回で言う（mouth.say_latest の merge）。
+    def _tell(self, kind: str, line: str, settle: float, *, event: dict) -> None:
+        """発行ID・時刻を検証し、所有中の体の出来事を共通反応基盤へ渡す。
         今の様子は、心と小脳へいつも様子の行で渡るので、知らせには入れない"""
-        now = time.monotonic()
-        if key is not None:
-            if now - self._said.get(key, -SAME_KIND_SECONDS) < SAME_KIND_SECONDS:
-                return
-            self._said[key] = now
+        if not self.linked:
+            return
+        if type(event.get('input_v')) is not int or event.get('input_v') != 1 or not isinstance(event.get('event_id'), str) or not isinstance(event.get('source_epoch'), str):
+            debug_log.record('reaction_rejected', source='game', reason='unsupported_game_input')
+            log.warning('ゲーム（%s）の通知形式が未対応。ゲーム側MCPをinput_v 1へ更新してください', self.game)
+            return
+        if not 1 <= len(event['event_id']) <= 160 or not 1 <= len(event['source_epoch']) <= 160:
+            return
+        seq, at = event.get('seq'), event.get('occurred_at')
+        if type(seq) is not int or type(at) not in (int, float) or not math.isfinite(at):
+            return
+        if at > time.time() + 1 or time.time() - at > (5 if kind in ('hurt', 'died', 'flee') else 30):
+            return
+        if self._input_epoch is not None and self._input_epoch != event['source_epoch']:
+            return
+        if seq <= self._input_seq or event['event_id'] in self._input_ids:
+            return
+        self._input_epoch, self._input_seq = event['source_epoch'], seq
+        self._input_ids.add(event['event_id'])
+        if len(self._input_ids) > 512:
+            self._input_ids = {event['event_id']}
         debug_log.record('game', game=self.game, what=kind)
         if self.say is not None:
-            self.say('game', settle=settle, instructions=line, merge=True)
+            self.say('game', settle=settle, instructions=line, merge=True, reaction_kind=kind, reaction_event=event)
 
     def _remember(self, text: str) -> None:
         if self.diary is not None and text not in self._remembered:
