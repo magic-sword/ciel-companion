@@ -1,5 +1,7 @@
 # 長い目的をやり遂げる仕組み（調べたこと）
 
+この文書は調査時点の記録。現在の採用方針は[設計方針の正本](design-policy-ja.md)、実装済みのゲーム契約は[作業契約](game-work-contract-ja.md)を参照。
+
 状態：調べた（2026-11-07）。設計は [目的の係](goal-runner-design-ja.md)。前提は [マインクラフトで遊ぶ設計](minecraft-design-ja.md)（体）、[ゲームの知識の窓口](game-knowledge-design-ja.md)、[会話の組み立て（pipeline）の仕組み](conversation-pipeline-ja.md)（心）。
 
 ## 1. 何に困っているか

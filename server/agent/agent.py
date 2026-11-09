@@ -29,7 +29,7 @@ import uuid
 from dotenv import load_dotenv
 load_dotenv()  # models.py を含む各モジュールが環境変数を読む前に設定する
 from livekit import agents, rtc
-from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, inference
+from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, inference, llm
 from livekit.agents.voice.agent_session import SessionConnectOptions
 from livekit.plugins import openai
 from openai.types.realtime.audio_transcription import AudioTranscription
@@ -57,6 +57,8 @@ import app_env
 import game_env
 import goals
 import game_intake
+from capabilities import CapabilityCatalog
+from session_mcp import SessionMCP
 import mind
 import minutes
 import mode
@@ -206,12 +208,22 @@ class Ciel(Agent):
     def __init__(self, grown: str = '', game=None) -> None:
         persona = load_persona()
         self.persona = persona
+        self.capabilities = CapabilityCatalog(tools.MODULES) if PIPELINE else None
+        self.service_tools = list(tools.TOOLS)
+        if self.capabilities is not None:
+            bridge = SessionMCP(self.capabilities)
+            # Game work already uses the external game MCP; avoid a second transport.
+            self.service_tools = [t if t in tools.goals.TOOLS or t in tools.clock.TOOLS else bridge.wrap(t)
+                                  for t in tools.TOOLS] + [self.capabilities.loader]
+            tools.ENV_FROM_COMMENTS[self.capabilities.loader.id] = True
+            if game is not None:
+                self.capabilities.bind_external(game.tools, "game")
         self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
         self.game = game     # game_env.GameEnv（会話の始めにつないだゲームの環境。無ければ None）
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
         # ゲームの道具（体・見る・知識）は、ゲームの環境が出したものを足す。渡すかは心が決める（mind.py の tools_for）
         super().__init__(instructions=self.instructions_for('normal', 'solo'),
-                         tools=tools.TOOLS + (list(game.tools) if game is not None else []))
+                         tools=self.service_tools + (list(game.tools) if game is not None else []))
         self.events = emotion.ExpressionEvents()
         self.volume = volume.VoiceVolume()   # 設定画面で選んだ声の大きさ（volume.py）
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
@@ -278,6 +290,25 @@ class Ciel(Agent):
             style = self.style
             brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
             ctx, fns = self.mind.build(chat_ctx, talker_instructions=brief, turn=turn), []
+        if who == 'mind' and self.capabilities is not None:
+            state = self.session.userdata
+            self.capabilities.disabled = {name for name, ready in (
+                ('memory', state.book is not None), ('karaoke', state.song is not None),
+                ('research', state.researcher is not None and not models.LOCAL_TEST),
+                ('minutes', state.minutes is not None), ('thoughts', state.initiative is not None),
+                ('conversation', state.history is not None)) if not ready}
+            fns = self.capabilities.select(fns)
+            style = self.style
+            index = next((i for i, item in enumerate(ctx.items) if getattr(item, 'role', None) == 'system'), None)
+            instructions = llm.ChatMessage(role='system', content=[self.instructions_for(
+                style.talk if style else 'normal', style.presence if style else 'solo')])
+            if index is None:
+                ctx.items.insert(0, instructions)
+            else:
+                ctx.items[index] = instructions
+            ctx.add_message(role='system', content=self.capabilities.summary())
+            debug_log.record('capability_exposure', loaded=list(self.capabilities.loaded),
+                             eligible=len(self.capabilities.allowed), exposed=len(fns))
         # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
@@ -367,15 +398,23 @@ class Ciel(Agent):
             # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
             parts.append(p.speaker_instructions)
         # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
-        parts += [p.minutes_voice_instructions, p.conversation_instructions, p.research_voice_instructions,
-                  p.inner_thoughts_voice_instructions]
+        loaded = (set(self.capabilities.loaded) - self.capabilities.disabled) if self.capabilities is not None else None
+        for service, prompt in [('minutes', p.minutes_voice_instructions),
+                                ('conversation', p.conversation_instructions),
+                                ('research', p.research_voice_instructions),
+                                ('thoughts', p.inner_thoughts_voice_instructions)]:
+            if loaded is None or service in loaded:
+                parts.append(prompt)
+        if self.capabilities is not None:
+            parts.append(p.tool_discovery_instructions)
         if PIPELINE:
             parts.append(p.tasks_instructions)   # 付箋の一覧「[今のタスク]」の読み方（board.py）
-            parts.append(p.app_instructions)     # アプリの道具（app_env.py。アプリが出せる道具だけが渡る）
-            if self._game_text():
+            if loaded is None or 'app' in loaded:
+                parts.append(p.app_instructions)     # アプリの道具（app_env.py。アプリが出せる道具だけが渡る）
+            if self._game_text() and (loaded is None or 'game' in loaded):
                 parts.append(self._game_text())   # ゲームで一緒に遊ぶ（game_env.py。ゲームの環境へつなげたときだけ）
             parts.append(p.image_voice_instructions)     # 見せてもらった画像（eyes.py）
-        if VOICE == 'irodori':
+        if VOICE == 'irodori' and (loaded is None or 'karaoke' in loaded):
             parts.append(p.singing_voice_instructions)   # 歌を聴く（singing.py。感想の言い方は聴き終えたときに渡す）
         if SPEAKERS:
             parts.append(self._presence_text(presence))
@@ -758,7 +797,9 @@ async def entrypoint(ctx: JobContext) -> None:
 
         def app_tools_changed() -> None:
             tools.ENV_FROM_COMMENTS.update(app.from_comments())
-            asyncio.create_task(agent.update_tools(tools.TOOLS + (list(game.tools) if game is not None else []) + app.tools))
+            if agent.capabilities is not None:
+                agent.capabilities.bind_external(app.tools, 'app')
+            asyncio.create_task(agent.update_tools(agent.service_tools + (list(game.tools) if game is not None else []) + app.tools))
         app.on_tools = app_tools_changed
         ctx.room.on('data_received', app.on_data)
     # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す

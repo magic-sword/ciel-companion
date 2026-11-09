@@ -1,5 +1,7 @@
 # 会話サーバーを扱うエージェントへ
 
+設計・実装の変更前に[現在の設計方針（正本）](../../docs/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
+
 Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベンチマークスキル](../../.agents/skills/ciel-minecraft-benchmark/SKILL.md)と [評価仕様](../../docs/minecraft-benchmark-ja.md)を読む。実機は自宅サーバーの専用環境を使う。ローカルへの切替設定は [ローカル LLM](../../docs/local-llm-ja.md)。
 
 会話の組み立て（pipeline：小脳と心・聞く係・付箋・口）を直す前に、[会話の組み立て（pipeline）の仕組み](../../docs/conversation-pipeline-ja.md) を読んでください。
@@ -12,3 +14,5 @@ Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベン�
 - 設定は会話開始時に読み込み、その会話内では固定する。プロンプト本文やユーザーの会話をログに出さない。
 - 読み込み・パス解決・エラー処理を変更したらローカルで検証する。本文を変更したら代表的な会話で変更前後を比較し、未実施の確認は明記する。
 - 本番への反映は確認済みの Git コミット単位で行う。編集・設定ファイルの変更だけで本番へ配布したことにはしない。
+
+能力カタログ・道具の公開・MCPアダプターを変えたら、unit suiteに加えて `scripts/server/check-capability-runtime.py` で会話入口からの結合を確認する。実行方法は[回帰テスト](../../docs/regression-tests-ja.md)。

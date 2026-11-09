@@ -81,3 +81,14 @@ python scripts/server/run-regression.py --suite all
 音声の聞き取り、話者識別の精度、会話の自然さ、GPUでの待ち時間、Windows・スマホの2台同時会話、Unityビルドは別の検証が必要。回帰テストの成功を、これらも確認済みという意味では扱わない。
 
 2026-10-18の導入検証：通常テスト128件と、隔離した実PostgreSQLでの5件に合格。Windowsの非同期DB接続に必要なイベントループ設定を入口に含めた。実DBの検証はローカルDockerが停止していたため、一時DBへのSSH転送を使って `--suite all --db-mode external` で実施した。自動Docker起動経路のコンテナ削除はモックで検証済みだが、この端末での実起動は未確認。DB接続先が未設定の場合にエラーとなること、結果に未実行理由が残ることも確認した。本番サービスや本番DBは変更していない。
+
+
+## 能力の段階的ロードとMCP境界を変更したとき
+
+通常のunit suiteに`test_capabilities.py`を含む。加えて、実際の`Ciel._pipeline_llm`を通すオフライン結合確認を行う。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/check-capability-runtime.py
+```
+
+LLMの選択だけを固定し、サービス読込、次の推論への道具・指示の公開、SDKの引数注入、実際のMCP往復、検索ホストへの到達を検証する。モデル・DB・Minecraftは起動しない。出力のスキーマ文字数はコンテキスト規模の参考値で、トークン数・実モデルの選択精度・速度改善の測定ではない。

@@ -1,5 +1,7 @@
 # 会話サーバーとキャラクター設定
 
+設計・実装の変更前に[現在の設計方針（正本）](../../docs/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
+
 現在のComposeは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` です。会話の処理を変更する前に[pipelineの仕組み](../../docs/conversation-pipeline-ja.md)を参照してください。起動・反映は[コマンド集](../../docs/build-ja.md)、テストは[回帰テスト](../../docs/regression-tests-ja.md)が入口です。
 
 ## キャラクター設定を編集する
@@ -25,6 +27,7 @@ pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownと
 | [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/decisions/web-research-ja.md) |
 | [singing_voice.md](config/prompts/singing_voice.md)・[singing_feedback.md](config/prompts/singing_feedback.md) | 歌を聴く道具の使い方と一言、聴き終えたときの感想の言い方（`{facts}` に分析の手がかりが入る）。処理は `singing.py`。[歌を聴く決定記録](../../docs/decisions/singing-ja.md) |
 | [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
+| [tool_discovery.md](config/prompts/tool_discovery.md) | サービス選択と段階的な道具の読み込み。実装は[能力カタログ](../../docs/capability-runtime-ja.md) |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 
 本文は Markdown のソースをそのままモデルへ渡します。見出しや箇条書きを使えます。編集者向けのメモはこの README や管理方針に置いてください。`emotion.md` のタグ名は声・表情の処理が使うため維持してください。

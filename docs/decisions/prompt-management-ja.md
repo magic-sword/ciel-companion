@@ -101,3 +101,8 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 - [Google Genkit: Dotprompt](https://genkit.dev/docs/js/dotprompt/)：本文とモデルなどのメタ情報を分け、ファイルで管理する設計例。
 - [Langfuse: Prompt Version Control](https://langfuse.com/docs/prompt-management/features/prompt-version-control)：履歴と本番採用版を分ける。
 - [MLflow: Prompt Registry](https://mlflow.org/docs/latest/genai/prompt-registry/)：プロンプトの版とモデル設定を併せて追跡する。
+
+
+## 能力の段階的ロード（2026-11-10）
+
+`tool_discovery_instructions_file`（`prompts/tool_discovery.md`）を必須設定として追加した。会話開始時に読み込み、指紋に含める。pipelineでは、議事録・会話検索・Web調査・内なる考え・歌・ゲーム・アプリの使い方は、対応サービスの読み込み後に渡す。人物像、本人確認・保存同意・公開範囲は常時保持する。[能力カタログの契約](../capability-runtime-ja.md)を参照。旧Realtime構成は従来の指示一式を利用する。
