@@ -24,6 +24,7 @@
 .env
 .env.*
 !.env.example
+!.env.dev.example
 !.env.minecraft.example
 !.env.benchmark.example
 *.keystore

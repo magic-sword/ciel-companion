@@ -2,7 +2,9 @@
 
 状態：2026-11-09に [共通GPU API](shared-llm-api-ja.md) として拡張。開発用シエルとMinecraftベンチマークが8094の同じモデルを利用する。1要求32,768トークン・同時2枠。処理は `server/local-llm/`（動かす係）と `server/agent/models.py`（振り分け）。以下の2026-11-07の速度・メモリ記録は当時の小さい入力での結果。
 
-## 返答と道具呼び出しもローカルへ切り替える（2026-11-09）
+## 返答と道具呼び出しもローカルへ切り替える
+
+2026-11-10追加：音声認識も[CPUのVosk](local-stt-ja.md)へ切り替えられる。localの既定は音声入力へ変更し、文字だけの試験では`CIEL_INPUT=text`（Composeでは`CIEL_DEV_INPUT=text`）を明示する。Voskの認識精度は初期測定で課題があり、通常サービスへの配布・人の声の試験は未実施。
 
 Minecraft の課題を繰り返して採点する場合は、[タスクのベンチマーク](minecraft-benchmark-ja.md)を使う。自宅サーバーの専用ワールドで、体だけの評価と自然文からの評価を分けて実行できる。
 
@@ -14,7 +16,7 @@ Qwen 向けには、送信用の会話だけで system の補足を先頭の1件
 
 一括切り替えは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` でだけ使える。ローカル側は `/v1/chat/completions` のストリーミング・道具呼び出し・JSON 出力に対応していること（現在の Qwen と llama-server を想定）。返答にも `CIEL_LOCAL_TIMEOUT`（既定 90 秒）を適用し、Qwen の thinking は無効にする。遅さや、ローカルモデルが正しい道具を選べるかは別途実機で確認する。
 
-OpenAI のクレジットなしで試すため、一括切り替えでは文字入力が既定になる。音声認識・画像認識・Web 検索は今回のローカル LLM には接続していない。マイクは購読せず、画像と Web 検索には利用不可を返す。ゲーム中の発言は道具のある心へ回し、振り分け用の OpenAI 埋め込みと例文の学習を止める。Minecraft の状態取得・行動・手元の Wiki 検索は使える。音声や画像を使った試験、通常の意味による振り分け、会話のリアルタイム性の比較はこのモードの対象外。
+OpenAIのクレジットなしで試す場合、一括切り替えの音声認識はCPUのVoskを使う。画像認識・Web検索は接続せず利用不可を返す。文字入力を明示した場合はマイクを購読しない。ゲーム中の発言は道具のある心へ回し、振り分け用の OpenAI 埋め込みと例文の学習を止める。Minecraft の状態取得・行動・手元の Wiki 検索は使える。画像を使った試験と通常の意味による振り分けは対象外。音声認識の初期測定・制約は[ローカル音声認識](local-stt-ja.md)を参照。
 
 ### 開発用で起動する
 
@@ -28,11 +30,11 @@ curl -f http://127.0.0.1:8094/health
 開発用の `~/work/ciel-companion-dev/server` で（通常の開発用起動と同じ DB 設定を渡す）：
 
 ```sh
-CIEL_DEV_LLM_BACKEND=local CIEL_DEV_LOCAL_TIMEOUT=180 \
+CIEL_DEV_LLM_BACKEND=local CIEL_DEV_INPUT=text CIEL_DEV_LOCAL_TIMEOUT=180 \
   docker compose --env-file ../../ciel-companion/server/.env -f compose.dev.yaml up -d --build agent-dev
 ```
 
-`CIEL_DEV_INPUT` は空のままにすると local では text、openai では voice になる。既存の `CIEL_DEV_MODEL=realtime` を設定している場合は外すか pipeline に戻す。`CIEL_DEV_LOCAL_LLM_URL`・`CIEL_DEV_LOCAL_LLM_MODEL` で接続先とモデルの別名も変えられる。通常の起動へ戻すには、上のコマンドの `CIEL_DEV_LLM_BACKEND=local` を `openai` に替えて agent-dev を再作成する。
+`CIEL_DEV_INPUT`は空ならvoice。文字試験はtextを明示する。設定ファイルは開発用server/.env.devで、再作成時には`--env-file .env.dev`も指定する。既存の `CIEL_DEV_MODEL=realtime` を設定している場合は外すか pipeline に戻す。`CIEL_DEV_LOCAL_LLM_URL`・`CIEL_DEV_LOCAL_LLM_MODEL` で接続先とモデルの別名も変えられる。通常の起動へ戻すには、上のコマンドの `CIEL_DEV_LLM_BACKEND=local` を `openai` に替えて agent-dev を再作成する。
 
 ### 文字で Minecraft に指示する
 
@@ -46,7 +48,7 @@ python local_chat.py --agent ciel-dev --game minecraft
 
 この端末自体は接続先の LLM 設定を変更しない。先に agent-dev を local で起動すること。LiveKit と、設定済みの保存・通知先（DB・Discord）は従来どおり使うため、完全なオフライン実行ではない。開発用で記憶を更新する点も従来どおり。
 
-音声入力も併用したい場合だけ `CIEL_DEV_INPUT=voice` を明示する。この場合、文字の推論はローカルでも、文字起こしは OpenAI API を使い料金がかかる。
+音声入力は`CIEL_DEV_INPUT=voice`で、local時にはVoskを使う。OpenAI音声認識への自動フォールバックはない。モデルの配置と.envの読み分けは[ローカル音声認識](local-stt-ja.md)を参照。
 
 確認済み：外部 API を使わない回帰テストと、SDK の要求を模擬 HTTP 接続で検証する道具呼び出し・結果を受けた続きのテスト。2026-11-09には、自宅の専用ベンチマークで6課題・3配置・各3回を測定し、体45/54、ローカル会話26/54が成功した。道具名を文章に書くだけで操作しない例もあり、返答を成功の証拠にはしない。モデル・予算・環境障害の補完・キャッシュ条件・到達時間は [基準測定](minecraft-benchmark-baseline-2026-11-09-ja.md)を参照する。OpenAIとの比較や、変更前後の改善を示す比較は未実施。
 

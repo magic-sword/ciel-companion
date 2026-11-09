@@ -159,3 +159,7 @@ unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --
 ```
 
 ログは`server/benchmark/data/work-display-unity-retry.log`と`work-display-unity-render.log`。描画画像は`.local/app-refactor/audience-card-work-v2.png`・`audience-card-decision-v2.png`・`audience-card-unknown-v2.png`。900×500の画像を目視し、状態の区別、会話専用行、予算表示、文字の収まりを確認した。Playerビルド、本番配布、実サービスとの接続試験はこの再確認には含まない。
+
+## CPU音声認識（2026-11-10）
+
+[設定・実測と制約](local-stt-ja.md)。通常テスト641件合格（Voskの7件を追加）、失敗・エラー・スキップ0、DB段階は未選択。結果は`server/benchmark/data/vosk-regression/report.json`。自宅サーバーではVosk実モデルのCPU逐次認識と、実LiveKit SDKへの接続も隔離コンテナで確認した。音声入力終了前の途中結果を受信したが、小型モデルの合成音声での認識精度に課題があり、人のマイク・会話全体は未検証。通常サービスの再配布とは区別する。

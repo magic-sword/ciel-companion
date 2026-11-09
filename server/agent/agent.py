@@ -63,6 +63,7 @@ import mind
 import minutes
 import mode
 import models
+import speech_input
 import mouth
 import notes
 import relationship
@@ -99,12 +100,12 @@ REALTIME_MODEL = os.environ.get('CIEL_REALTIME_MODEL', 'gpt-realtime-2.1-mini')
 REALTIME = MODEL == 'realtime'
 # 文字起こし → 心 → 読み上げの組み立て。声は Irodori で作るので、irodori のときだけ
 PIPELINE = MODEL == 'pipeline' and VOICE == 'irodori'
-INPUT = os.environ.get('CIEL_INPUT') or ('text' if models.LOCAL_TEST else 'voice')
+INPUT, STT_BACKEND = speech_input.settings(models.LOCAL_TEST)
 if INPUT not in ('text', 'voice'):
     raise ValueError('CIEL_INPUT must be text or voice')
 TEXT_ONLY = INPUT == 'text'
-if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY) and not PIPELINE:
-    raise ValueError('Local LLM / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
+if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY or STT_BACKEND == 'vosk') and not PIPELINE:
+    raise ValueError('Local LLM / Vosk / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
 BENCHMARK = os.environ.get('CIEL_BENCHMARK') == '1'
 if BENCHMARK and (not PIPELINE or not TEXT_ONLY or os.environ.get('CIEL_DB_URL')
                   or os.environ.get('CIEL_MINUTES_DISCORD_WEBHOOK')
@@ -180,18 +181,21 @@ def make_pipeline(names: list[str]) -> dict:
     if TEXT_ONLY:
         return {'turn_detection': 'manual'}
     vad = inference.VAD()
-    hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
-    model = models.model('stt')
-    # gpt-realtime-whisper は名前のヒント（prompt）を受け付けない（渡すと会話が止まった。2026-10-30）。
-    # gpt-live-transcribe は keywords で名前を渡せる。そのほかのモデルは prompt で渡す
-    if model == 'gpt-live-transcribe':
-        # 名前と、聞く係が拾う言葉（gpt-realtime-whisper では「シエル」が「シェル」、「議事録」が「二次録」になった）
-        hints = {'keywords': ['シエル', '議事録', *names][:30]}
-    elif model == 'gpt-realtime-whisper':
-        hints = {}
+    if STT_BACKEND == 'vosk':
+        stt = speech_input.local_stt()
     else:
-        hints = {'prompt': f'AI キャラクター「シエル」との会話。出てくる名前：{hint}'}
-    stt = openai.STT(model=model, language='ja', vad=vad, **hints)
+        hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
+        model = models.model('stt')
+        # gpt-realtime-whisper は名前のヒント（prompt）を受け付けない（渡すと会話が止まった。2026-10-30）。
+        # gpt-live-transcribe は keywords で名前を渡せる。そのほかのモデルは prompt で渡す
+        if model == 'gpt-live-transcribe':
+            # 名前と、聞く係が拾う言葉（gpt-realtime-whisper では「シエル」が「シェル」、「議事録」が「二次録」になった）
+            hints = {'keywords': ['シエル', '議事録', *names][:30]}
+        elif model == 'gpt-realtime-whisper':
+            hints = {}
+        else:
+            hints = {'prompt': f'AI キャラクター「シエル」との会話。出てくる名前：{hint}'}
+        stt = openai.STT(model=model, language='ja', vad=vad, **hints)
     return {'vad': vad, 'stt': stt,
             # 区切り：声の調子から話し終えたかを見るモデル（手元で動く小さい版。日本語に対応）
             'turn_handling': {'turn_detection': inference.TurnDetector(version='v1-mini'),

@@ -1,5 +1,7 @@
 # 会話の組み立て（pipeline）の仕組み
 
+2026-11-10：local時の音声認識をCPUのVoskへ接続。入力は既定voice、文字試験はtextを明示する。[設定・実測と制約](local-stt-ja.md)を参照。途中結果の生成と、依頼・操作の確定を分ける。
+
 作業と会話の画面通知・操作の最新仕様は[作業・会話の表示契約](work-display-contract-ja.md)を参照する。goal.state / goal.controlはv2で、workの進行と発話状態を別に表示する。
 
 2026-11-10の追加実装：[サービス入力とリアクション](service-events-and-reactions-ja.md)。標準pipeline向けに共通契約・反応調停を実装した。現在の仕様はリンク先を参照する。

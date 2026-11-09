@@ -11,3 +11,5 @@ huggingface_hub==0.25.2   # speechbrain 1.0.3 は、これより新しい版の 
 requests==2.32.4
 psycopg[binary]==3.2.9
 pgvector==0.4.1
+
+vosk==0.3.45   # CPU streaming Japanese STT; no external API

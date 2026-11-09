@@ -24,9 +24,11 @@ services:
       - CIEL_AGENT_NAME=ciel-dev
       # 会話の組み立て（realtime・pipeline）。本番と同じ pipeline が既定。比べるときは、起動し直すシェルで CIEL_DEV_MODEL=realtime を付ける
       - CIEL_MODEL=${CIEL_DEV_MODEL:-pipeline}
-      # local で文字の推論をすべてローカルへ。既定は文字入力で、音声の API を呼ばない。
+      # local で推論は共有LLM、音声認識はCPUのVoskへ。文字試験はCIEL_DEV_INPUT=text。
       - CIEL_LLM_BACKEND=${CIEL_DEV_LLM_BACKEND:-openai}
       - CIEL_INPUT=${CIEL_DEV_INPUT:-}
+      - CIEL_STT_BACKEND=${CIEL_DEV_STT_BACKEND:-}
+      - CIEL_VOSK_MODEL_PATH=/models/vosk-model-small-ja-0.22
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
@@ -45,6 +47,7 @@ services:
       - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
     volumes:
       - ./agent/config:/app/config:ro
+      - ${CIEL_DEV_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
       - ./agent/data/minutes:/app/data/minutes
       - ./agent/data/debug:/app/data/debug
     restart: unless-stopped
