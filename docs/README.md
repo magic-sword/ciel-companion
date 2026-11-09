@@ -13,6 +13,7 @@
 | 目的 | 入口 |
 |---|---|
 | 作業・会話・リアクションの表示と操作を変更したい | [作業・会話の表示契約（v2）](work-display-contract-ja.md) |
+| 本番・開発をローカルモデルへ切り替えたい | [共通の実行設定](local-runtime-ja.md) |
 | OpenAIクレジットなしで音声入力を試したい | [CPUのVosk・設定と実測](local-stt-ja.md) |
 | 何のアプリか知りたい | [トップREADME](../README.md) |
 | 紹介動画を撮りたい | [撮影台本・OBSの収録手順](demo-recording-ja.md) |

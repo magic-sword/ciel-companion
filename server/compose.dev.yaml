@@ -28,7 +28,7 @@ services:
       - CIEL_LLM_BACKEND=${CIEL_DEV_LLM_BACKEND:-openai}
       - CIEL_INPUT=${CIEL_DEV_INPUT:-}
       - CIEL_STT_BACKEND=${CIEL_DEV_STT_BACKEND:-}
-      - CIEL_VOSK_MODEL_PATH=/models/vosk-model-small-ja-0.22
+      - CIEL_VOSK_MODEL_PATH=${CIEL_DEV_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
@@ -37,7 +37,7 @@ services:
       - CIEL_MEMORY_SCOPE=dev
       # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
-      # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。裏で動く役目だけ送る。歌を聴くあいだは CPU の形に切り替える
+      # 本番と共用するローカルLLM。localでは返答・道具選択も使う。歌唱中はCPUへ切り替える
       - CIEL_LOCAL_LLM_URL=${CIEL_DEV_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
       - CIEL_LOCAL_LLM_MODEL=${CIEL_DEV_LOCAL_LLM_MODEL:-local}
       - CIEL_LOCAL_TIMEOUT=${CIEL_DEV_LOCAL_TIMEOUT:-90}

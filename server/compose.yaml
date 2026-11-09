@@ -2,7 +2,7 @@
 #   docker compose up -d --build          会話サーバー・読み上げ・記録の場所（DB）を起動する
 #   docker compose --profile vc up -d     声質変換も起動する（読み上げと GPU を分け合うので、ふだんは止めておく）
 #   docker compose logs -f agent          会話サーバーのログ
-# 秘密情報：agent/.env（OpenAI・LiveKit のキー）と、このフォルダの .env（DB のパスワード CIEL_DB_PASSWORD）。どちらも Git に入れない。
+# 秘密情報：agent/.env（OpenAI・LiveKit のキー）と、このフォルダの .env（DBのパスワード・推論方式とモデル配置）。どちらも Git に入れない。
 # 会話サーバー・読み上げ・声質変換はホストのネットワークを使う（Docker の既定のネットワークでは名前解決ができなかった）。
 # 外から入る口は開かない：読み上げ（8766）・歌を聴く（8767）・声質変換（8765）・DB（5433）は 127.0.0.1 でだけ待ち受ける。
 # Docker Compose 2.18 で動かすため、include は使わずにここへまとめて書く。
@@ -22,6 +22,14 @@ services:
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
       # （docs/conversation-improvements-2026-10-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=pipeline
+      # 本番の切替はserver/.env。開発用は独立したCIEL_DEV_*を使う。
+      - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-openai}
+      - CIEL_INPUT=${CIEL_INPUT:-}
+      - CIEL_STT_BACKEND=${CIEL_STT_BACKEND:-}
+      - CIEL_VOSK_MODEL_PATH=${CIEL_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
+      - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
+      - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
+      - CIEL_LOCAL_TIMEOUT=${CIEL_LOCAL_TIMEOUT:-90}
       # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口（server/minecraft の src/ciel/mcp.js）。
       # 会話の始めにつなぎ、アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけが体を受け持つ。知識の道具も同じ入口から出る
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
@@ -31,6 +39,7 @@ services:
     volumes:
       # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
       - ./agent/config:/app/config:ro
+      - ${CIEL_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
       # 議事録の下書きを Discord へ送れなかったときの保存先（Git・デプロイの外）
       - ./agent/data/minutes:/app/data/minutes
       # デバッグ用の会話ログ（debug_log.py。ふだんは残さない。scripts/server/debug-log.sh で入れる・取り出す）
@@ -57,7 +66,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
-  # ローカル LLM（server/local-llm。docs/local-llm-ja.md）。会話サーバーの裏の役目（内なる考え・まとめ・メモなど）が使う。
+  # 共有ローカルLLM（server/local-llm）。本番・開発・ベンチマークが共用でき、localでは返答・道具選択も使う。
   # 重み（数十 GB）は Git・デプロイの外の LOCAL_LLM_DIR（既定 ~/models/llm）に置く。ふだんは起動しない（profile local-llm）：
   #   docker compose --profile local-llm up -d local-llm
   # GPU を約 2.6 GB 使う形で動き、歌を聴くあいだだけ CPU だけの形に切り替える（LLM は 127.0.0.1:8094、切り替えの窓口は 127.0.0.1:8095）

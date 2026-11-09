@@ -163,3 +163,7 @@ unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --
 ## CPU音声認識（2026-11-10）
 
 [設定・実測と制約](local-stt-ja.md)。通常テスト641件合格（Voskの7件を追加）、失敗・エラー・スキップ0、DB段階は未選択。結果は`server/benchmark/data/vosk-regression/report.json`。自宅サーバーではVosk実モデルのCPU逐次認識と、実LiveKit SDKへの接続も隔離コンテナで確認した。音声入力終了前の途中結果を受信したが、小型モデルの合成音声での認識精度に課題があり、人のマイク・会話全体は未検証。通常サービスの再配布とは区別する。
+
+## 本番・開発のbackend設定（2026-11-10）
+
+[共通の実行設定](local-runtime-ja.md)。`scripts/server/check-compose-backends.py`で自宅サーバー上のComposeを使い7構成を合格確認。本番既定openai、本番local、開発への本番設定の非継承、開発local、本番文字入力、本番・開発の別Voskモデル指定、共有API URLとモデルマウントの読み取り専用を確認した。解決済みの資格情報は表示・保存せず、稼働サービスの配布・再起動は行っていない。Pythonの推論実装は変更していないため、641件の前回回帰結果と今回の構成検証を区別する。

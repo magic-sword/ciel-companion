@@ -14,10 +14,13 @@ Unityから受け取る音声を、会話ホストのVosk STTアダプターがC
 
 | 起動方法 | 設定ファイル | 変数 |
 |---|---|---|
+| 本番Docker Compose | 自宅の`~/work/ciel-companion/server/.env` | `CIEL_LLM_BACKEND=local` |
 | 開発用Docker Compose | 自宅の`~/work/ciel-companion-dev/server/.env.dev` | `CIEL_DEV_LLM_BACKEND=local` |
 | Pythonの会話サーバーを直接起動 | `server/agent/.env` | `CIEL_LLM_BACKEND=local` |
 
 `CIEL_DEV_*`はComposeがコンテナの`CIEL_*`へ変換する。`server/agent/.env`に`CIEL_DEV_LLM_BACKEND`を書くだけでは切り替わらない。コンテナのenvironmentはenv_fileの同名設定より優先される。
+
+本番・開発の切替・反映単位は[共通の実行設定](local-runtime-ja.md)を参照する。本番にも同じVoskアダプターとモデルマウントを使える。
 
 開発用の見本は[server/.env.dev.example](../server/.env.dev.example)。既存.env.devを上書きせず必要な行を編集する。
 
