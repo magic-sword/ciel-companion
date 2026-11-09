@@ -1,6 +1,6 @@
 ---
 name: ciel-minecraft-benchmark
-description: ciel-companion の Minecraft をローカルLLMまたは体だけで試験し、ベンチマーク課題を追加し、変更前後の性能を比較する。自宅サーバーの専用環境を使う評価に適用する。稼働中ワールドの現場調査は ciel-minecraft-debug を使う。
+description: ciel-companion の Minecraft タスクの実用性を評価し、課題・終了条件を設計し、変更前後を比較する。自宅の専用ワールドとシエル共用GPU APIでの評価に使う。稼働中ワールドの現場調査は ciel-minecraft-debug を使う。
 ---
 
 # 共通の評価手順を読む

@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import tarfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'server'))
@@ -82,7 +83,7 @@ if not settings.exists():
     with os.fdopen(fd,'w') as f:
         f.write('MINECRAFT_EULA=TRUE\\nCIEL_BENCH_RCON_PASSWORD='+secrets.token_hex(24)+
                 '\\nCIEL_BENCH_BACKEND=local\\nCIEL_BENCH_LOCAL_MODEL=local\\nCIEL_BENCH_LOCAL_TIMEOUT=600\\nCIEL_BENCH_MODEL_ID='+model+
-                '\\nCIEL_BENCH_LLM_FILE='+model+'\\nCIEL_BENCH_LLM_CTX=32768\\nCIEL_BENCH_LLM_URL=http://127.0.0.1:8096/v1\\n')
+                '\\nCIEL_BENCH_LLM_FILE='+model+'\\nCIEL_BENCH_LLM_CTX=32768\\nCIEL_BENCH_LLM_SERVICE=shared\\nCIEL_BENCH_LLM_URL=http://127.0.0.1:8094/v1\\nCIEL_BENCH_LLM_CONTROL=http://127.0.0.1:8095\\n')
 print('Benchmark staged separately; home-server consent reused, credentials linked, dedicated configuration ready')
 '''
 
@@ -101,6 +102,7 @@ def stage():
             payload=json.dumps(provenance()).encode()
             info=tarfile.TarInfo('benchmark/staged-provenance.json')
             info.size=len(payload)
+            info.mtime=time.time()  # Avoid stale BuildKit metadata cache for equal-size updates.
             archive.addfile(info,io.BytesIO(payload))
     finally:
         process.stdin.close()
@@ -109,13 +111,16 @@ def stage():
     remote(SETUP)
 
 
-def smoke(mode, task_id='gather_logs', seconds=240):
+def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared'):
     # Use a new result directory, and only the dedicated compose project/services.
     code = '''
 from pathlib import Path
-import subprocess, time, urllib.request
+import subprocess, time, urllib.request, os, json
 root=Path.home()/'work/ciel-companion-benchmark/server'
 compose=['docker','compose','--env-file','.env.benchmark','-f','compose.benchmark.yaml','--profile','runner','--profile','conversation','--profile','local']
+os.environ.update(CIEL_BENCH_LLM_SERVICE='SERVICE_VALUE',
+    CIEL_BENCH_LLM_URL='http://127.0.0.1:PORT_VALUE/v1',
+    CIEL_BENCH_LLM_CONTROL='http://127.0.0.1:CONTROL_VALUE')
 def run(*args):
     result=subprocess.run(compose+list(args),cwd=root)
     if result.returncode:
@@ -132,9 +137,9 @@ for attempt in range(90):
 else:
     raise SystemExit('Benchmark bot did not join')
 run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE','--task','TASK_ID',
-    '--seed','11','--repeats','1','--seconds','SECONDS_VALUE','--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
+    '--seed','11','--repeats','1',TIME_ARGS'--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
 '''
-    code=code.replace('MODE_BUILD',",'agent-bench','llm-bench'" if mode=='conversation' else '')
+    code=code.replace('MODE_BUILD',(", 'agent-bench'" + (", 'llm-bench'" if llm_service=='dedicated' else '')) if mode=='conversation' else '')
     code=code.replace('MODE_UP',",'agent-bench'" if mode=='conversation' else '')
     code=code.replace('LLM_START', '''run('up','-d','llm-bench')
 for attempt in range(180):
@@ -146,18 +151,29 @@ for attempt in range(180):
         time.sleep(1)
 else:
     raise SystemExit('Dedicated CPU LLM did not become ready')
-''' if mode=='conversation' else '')
-    remote(code.replace('MODE_VALUE',mode).replace('TASK_ID',task_id).replace('SECONDS_VALUE',str(seconds)))
+''' if mode=='conversation' and llm_service=='dedicated' else ('''with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as response:
+    status=json.load(response)
+with urllib.request.urlopen('http://127.0.0.1:8094/props',timeout=5) as response:
+    props=json.load(response)
+if not status.get('ready') or status.get('mode')!='gpu' or props['default_generation_settings']['n_ctx']<32768:
+    raise SystemExit('Shared GPU API must be ready with at least 32768 context; no dedicated CPU fallback')
+print('Shared inference API:',json.dumps(status))
+''' if mode=='conversation' else ''))
+    code=code.replace('SERVICE_VALUE',llm_service).replace('PORT_VALUE','8094' if llm_service=='shared' else '8096').replace('CONTROL_VALUE','8095' if llm_service=='shared' else '8097')
+    time_args = "'--seconds',"+repr(str(seconds))+"," if seconds is not None else ''
+    remote(code.replace('MODE_VALUE',mode).replace('TASK_ID',task_id).replace('TIME_ARGS',time_args))
 
 
 if __name__ == '__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('action',choices=['inspect','stage','body','conversation','logs','status','pull','recover','stop'])
     ap.add_argument('--task',choices=[t['id'] for t in load_tasks()],default='gather_logs')
-    ap.add_argument('--seconds',type=int,default=240)
+    ap.add_argument('--seconds',type=int,help='Optional stricter cap on the practical task budget')
+    ap.add_argument('--llm-service',choices=['shared','dedicated'],default='shared',
+                    help='Reuse the Ciel GPU API, or explicitly start the isolated CPU model')
     ap.add_argument('--service',choices=['minecraft-bench','body-bench','agent-bench','llm-bench'],default='minecraft-bench')
     args=ap.parse_args()
-    if not 1 <= args.seconds <= 3600:
+    if args.seconds is not None and not 1 <= args.seconds <= 3600:
         ap.error('--seconds must be between 1 and 3600')
     if args.action=='inspect':
         remote(INSPECT)
@@ -223,4 +239,4 @@ subprocess.run(['docker','compose','--env-file','.env.benchmark','-f','compose.b
     '--profile','runner','--profile','conversation','--profile','local','down'],cwd=root,check=True)
 ''')
     else:
-        smoke(args.action,args.task,args.seconds)
+        smoke(args.action,args.task,args.seconds,args.llm_service)

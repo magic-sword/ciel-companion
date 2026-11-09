@@ -52,9 +52,13 @@ def summarize(rows):
     groups = {}
     for row in rows:
         key = row['task']
-        group = groups.setdefault(key, {'trials':0,'passed':0,'failed':0,'infrastructure_error':0})
+        group = groups.setdefault(key, {'trials':0,'passed':0,'failed':0,'infrastructure_error':0,'skipped':0,
+                                        'objectives_achieved':0,'appropriate_stops':0,'reported_stops':0})
         group['trials'] += 1
         group[row['status']] += 1
+        group['objectives_achieved'] += bool(row.get('objective_achieved',row['status']=='passed'))
+        group['appropriate_stops'] += row.get('outcome')=='appropriate_stop'
+        group['reported_stops'] += bool(row.get('reported_stop'))
     for group in groups.values():
         valid = group['passed'] + group['failed']
         group['success_rate'] = group['passed'] / valid if valid else None
@@ -67,10 +71,13 @@ def write_reports(directory, manifest, rows):
                                                    ensure_ascii=False,indent=2),encoding='utf-8')
     lines = ['# Minecraft benchmark', '', f"Mode: {manifest['mode']}; backend: {manifest['backend']}",
              f"Run status: {manifest.get('completion','not recorded')}; error: {manifest.get('run_error','none')}", '',
-             '| Task | Pass / valid | Infrastructure errors | Success rate |', '|---|---:|---:|---:|']
+             '| Task | Expected behavior / valid | Objective achieved | Appropriate stop | Infrastructure errors | Skipped | Pass rate |', '|---|---:|---:|---:|---:|---:|---:|']
     for task, group in summary.items():
         rate = 'N/A' if group['success_rate'] is None else f"{group['success_rate']:.1%}"
-        lines.append(f"| {task} | {group['passed']} / {group['passed']+group['failed']} | {group['infrastructure_error']} | {rate} |")
+        lines.append(f"| {task} | {group['passed']} / {group['passed']+group['failed']} | {group['objectives_achieved']} | {group['appropriate_stops']} | {group['infrastructure_error']} | {group['skipped']} | {rate} |")
     lines += ['', 'Infrastructure errors are excluded from success rates and must be resolved before comparing runs.',
               'Full observations, configuration and traces are in report.json and each trial directory.']
+    lines += ['', 'Appropriate refusal is only a pass for an explicitly infeasible fixture. It is not item creation success.',
+              'Skipped trials are unmeasured. Early-stopped runs are not a complete cohort.',
+              f"Policy: {manifest.get('policy','legacy')}; stop reason: {manifest.get('stop_reason','none')}"]
     (directory/'report.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')

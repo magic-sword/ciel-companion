@@ -153,19 +153,23 @@ class World:
             self._write(command)
         self._write(f'scoreboard players set {self.player} cieldeaths 0')
         for y in range(60, 82):
-            block = 'bedrock' if y == 60 else 'stone' if y < 63 else 'grass_block' if y == 63 else 'air'
+            block = 'bedrock' if y == 60 else 'stone' if y < 63 else task.get('surface','grass_block') if y == 63 else 'air'
             self._write(f'fill -48 {y} -48 48 {y} 48 minecraft:{block}')
         # Contain exploration, so changes outside the arena cannot affect later trials.
         for x1, z1, x2, z2 in [(-48,-48,48,-48),(-48,48,48,48),(-48,-48,-48,48),(48,-48,48,48)]:
             self._write(f'fill {x1} 60 {z1} {x2} 81 {z2} minecraft:bedrock')
         rng = random.Random(seed)
-        if task['forest'] == 'far':
+        if task['forest'] == 'none':
+            trees = []
+        elif task['forest'] == 'far':
             trees = [(38 + seed % 5, z) for z in (-8, 0, 8)]
         elif task['forest'] == 'many':
             trees = [(x + seed % 5, z) for x in (6,12,18,24) for z in (-12,-6,0,6)]
-        else:
+        elif task['forest'] == 'near':
             side = rng.choice((-1, 1))
             trees = [(side*(x + seed % 5), rng.choice((-6, 0, 6))) for x in (6,12,18)]
+        else:
+            raise ValueError('Unknown fixture forest')
         for x, z in trees:
             self._write(f'fill {x} 64 {z} {x} 67 {z} minecraft:oak_log[axis=y]')
         for item, count in task['inventory'].items():

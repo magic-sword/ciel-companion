@@ -16,7 +16,9 @@
 | 日常版と配信版の違いを知りたい | [アプリ構成・配信ウィンドウ](app-composition-ja.md) |
 | 変更を検証したい | [回帰テスト](regression-tests-ja.md)、[料金のかかる試験](paid-checks-ja.md) |
 | Minecraft をローカルモデルで試験・比較したい | [ローカル LLM](local-llm-ja.md)、[ベンチマーク・課題拡張・性能評価](minecraft-benchmark-ja.md)、[評価スキル](../.agents/skills/ciel-minecraft-benchmark/SKILL.md) |
-| Minecraft の現在の測定結果を知りたい | [2026-11-09の基準測定（各54試行）](minecraft-benchmark-baseline-2026-11-09-ja.md) |
+| Minecraft の実測済み範囲を知りたい | [旧CPU・900秒条件の各54試行](minecraft-benchmark-baseline-2026-11-09-ja.md)、[共通GPU APIの実測](shared-llm-api-ja.md)、[現行終了条件の単発確認](minecraft-benchmark-practical-ja.md#確認した範囲2026-11-09) |
+| Minecraft の実用期限・早期終了・材料不足の報告を評価したい | [実用性評価 practical-v1](minecraft-benchmark-practical-ja.md) |
+| GPU推論APIをシエルとベンチマークで共用したい | [共通GPU API・容量測定・接続](shared-llm-api-ja.md) |
 | 利用条件・外部依存を確認したい | [第三者依存関係](third-party-dependencies.md)、[READMEのライセンス説明](../README.md#公開とライセンス) |
 
 ## 会話と記憶

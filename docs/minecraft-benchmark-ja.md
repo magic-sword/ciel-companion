@@ -4,6 +4,8 @@
 
 Codex・Claude Code の作業手順は [共通の評価スキル](../.agents/skills/ciel-minecraft-benchmark/SKILL.md)。この文書を設定・採点・拡張方法の正本とする。ローカル推論の切替は [ローカル LLM](local-llm-ja.md)を参照する。
 
+現在の終了条件は [実用性評価 practical-v1](minecraft-benchmark-practical-ja.md)。課題別60〜120秒、操作未発行・不進行で早期終了し、既定は1配置・1回・実行全体10分。旧900秒条件の基準値とは直接比較しない。
+
 初版のスモーク試験の範囲は末尾の「実機で確認した範囲」にある。その後の [基準測定](minecraft-benchmark-baseline-2026-11-09-ja.md)では体・ローカル会話を各54有効試行で測定済み。成功率は体83.3%・会話48.1%。環境障害2件の補完、キャッシュ区間、到達時間、失敗の履歴は基準測定の文書を参照する。
 
 ## エージェントからの入口
@@ -22,7 +24,7 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../.agents/ski
 
 [MineDojo の課題設計](https://docs.minedojo.org/sections/core_api/sim.html)にある初期条件・資源・技術ツリーの考え方と、[Voyager](https://github.com/MineDojo/Voyager)の段階的な到達・失敗からの修正を参考にした。環境・行動単位・Minecraft の版が違うため、論文のスコアと直接比較するものではない。
 
-## 初版の6課題
+## 課題（初版6課題と材料不足時の判断）
 
 | ID | 目的・初期条件 |
 |---|---|
@@ -31,9 +33,10 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../.agents/ski
 | `stone_pickaxe` | 持ち物なしで石のつるはし1本 |
 | `replenish_materials` | 木のつるはし・作業台・棒2本から、不足する丸石を集めて石のつるはし1本 |
 | `find_logs` | 近くに原木が無い状態から、探して8個集める |
-| `stop_collecting` | 原木64個の採集中、最初の取得を確認したら停止を指示。停止の応答と、その後10秒の持ち物・位置の安定、再実行の有無を確認 |
+| `stop_collecting` | 原木64個の採集中、最初の取得を確認したら停止を指示。5秒以内の停止応答、その後5秒の持ち物・位置の安定と再実行なしを確認 |
+| `stone_pickaxe_unavailable` | 木も所持品もない砂漠の専用領域。会話モードのみ。材料不足の理由を報告し、作業を止めて待てるかを評価。製作成功とは別に集計 |
 
-原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は初版の対象外。世界の seed は `771023`。`--seed` は**ワールド生成の seed ではなく、原木配置の seed**で、既定は11・29・47。同じ配置で既定3回ずつ繰り返す（6課題×3配置×3回＝54試行／モード）。
+原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は初版の対象外。世界のseedは `771023`。`--seed` は**ワールド生成のseedではなく、資源配置のseed**。既定は11・各1回（体6試行、会話7試行）。11・29・47、各3回を明示すると体54・会話63試行になるが、全体予算や連続失敗によって早期停止する場合がある。
 
 毎回、専用領域 x/z=-48〜48、y=60〜81 のブロック・落ちている物・持ち物・位置・体力・死亡数・時刻・天候を復元する。地面の下に石があり、周囲は岩盤の壁。課題ごとに会話と目的実行器を作り直す。経験や記憶を持ち越す評価は行わない。会話側の DB と Discord への送信先は空に固定する。
 
@@ -45,9 +48,11 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../.agents/ski
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py inspect
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py stage
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py body
-.\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --seconds 600
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation
+# 以前の専用CPU構成を明示して試す場合
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --llm-service dedicated
 # 別の課題を1回試す
-.\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --task stone_pickaxe --seconds 600
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --task stone_pickaxe
 # 状態・結果の取得、終了
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py status
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py pull
@@ -58,11 +63,15 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../.agents/ski
 
 `stage` は自宅サーバーの既存 `.env.minecraft` に `MINECRAFT_EULA=TRUE` がある場合だけ、その同意を同じマシンの試験用サーバーにも使う。無ければ止まる。試験用の RCON パスワードは別に生成し、既存の `agent/.env` は参照するだけで書き換えない。ローカル LLM の重みのファイル名を `CIEL_BENCH_MODEL_ID` に記録する。別の重みを使う場合は、配置先の `.env.benchmark` の識別名も合わせて変更する。
 
-`body`・`conversation` はそれぞれ必要なイメージをビルドし、`gather_logs`・配置11・1回の小さな試験を行う。上限は既定240秒で、上の会話モードの例では600秒に延ばしている。失敗も採点結果なので終了コード1になる。初回のイメージ作成・Minecraft 起動には時間がかかる。
+`body`・`conversation` はそれぞれ必要なイメージをビルドし、`gather_logs`・配置11・1回の小さな試験を行う。helperも課題別の実用期限を使う。まず1回だけ試し、全課題・反復へ進む前に不進行や操作未発行を調べる。失敗も採点結果なので終了コード1。イメージ作成・Minecraft起動はrunner開始前の環境準備で、別に時間がかかる。
 
-会話モードは、専用のローカル LLM（8096、CPU、コンテキスト32,768、同時実行1）と既存 Irodori（8766）を使う。重みは読み取り専用で共有し、既存ローカル LLM（8094）の設定・プロセスは変更しない。CPU なので長い指示の読み込みに数分かかる。LLM の要求タイムアウトは既定600秒で、試行の時間枠と合わせて設定する。比較時は他の利用が落ち着いた状態にする。
+会話モードの既定はシエルと共用するGPU併用API（8094、1要求32,768トークン・同時2枠）と既存Irodori（8766）。helperは共有APIのGPUモード・準備完了・実コンテキストを確認し、追加モデルを起動しない。未起動・容量不足をCPUへの自動切替で回避しない。共通サービスの構成・性能測定・他ホストからの接続は [共通GPU API](shared-llm-api-ja.md) を参照する。
 
-実機確認では、通常の会話と道具を含む要求が17,877トークンあり、既存モデルの入力上限12,288を超えたため専用サービスを設けた。ローカル試験モードでは自己画像も送り込まず、Qwen が受け付けるよう system の補足を先頭の1件へまとめる。元の会話と道具呼び出しの順序は変更しない。
+`--llm-service dedicated` の場合だけ従来の専用CPUモデル（8096、32,768トークン・1枠）を起動する。helperは選んだサービスに対応する接続先・制御先をComposeへ渡す。手動実行は `.env.benchmark` の `CIEL_BENCH_LLM_SERVICE`・`CIEL_BENCH_LLM_URL`・`CIEL_BENCH_LLM_CONTROL` を揃える。旧ファイルの8096設定は `stage` で上書きしないため、共有へ移る際に変更する。
+
+runnerは `manifest.inference_server` に実際のモード・モデル・1要求あたりのコンテキスト・同時枠を保存し、容量不足ならワールドの初期化前に拒否する。共有先で歌の分析が始まると通常どおりCPUモードへ切り替わるため、開始時情報だけで試行中ずっとGPUだったと判断しない。速度比較では他クライアントの要求・音声合成・キャッシュ条件も記録する。
+
+最初の実機確認では、通常の会話と道具を含む要求が17,877トークンあり、当時の共有モデルの上限12,288を超えたため専用CPUサービスを設けた。その後に共通APIを拡張した。ローカル試験モードでは自己画像も送り込まず、Qwenが受け付けるようsystemの補足を先頭の1件へまとめる。元の会話と道具呼び出しの順序は変更しない。
 
 ## 自宅サーバーで課題を選んで実行する
 
@@ -80,15 +89,15 @@ docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile run
 
 # 試行数を絞る。--task と --seed は複数指定できる
 docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile runner run --rm --no-deps benchmark-runner \
-  --mode body --task stone_pickaxe --seed 11 --repeats 1 --seconds 600
+  --mode body --task stone_pickaxe --seed 11 --repeats 1
 ```
 
 会話モードは先に専用の会話サーバーを作る：
 
 ```sh
-docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile local up -d --build llm-bench
-# 200になったことを確認してから会話側を開始する（読み込み中は503）
-curl -f http://127.0.0.1:8096/health
+# .env.benchmark は shared / 8094 / 制御8095を指定する
+# 共通APIはベンチマークとは別に起動済みであること
+curl -f http://127.0.0.1:8094/health
 docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile conversation up -d --build agent-bench
 docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile runner run --rm --no-deps benchmark-runner \
   --mode conversation --task gather_logs --seed 11 --repeats 1
@@ -106,15 +115,17 @@ Python 3.11以降と `server/agent/requirements-test.txt` があるホストな�
 
 **エージェントの完了通知を合否の根拠にしない。** 評価器だけが RCON を使い、Minecraft サーバーが保持する持ち物・位置・体力・死亡数を取得する。RCON の資格情報や採点用コマンドはエージェントの道具に渡さない。採集・製作は開始時からの対象アイテムの増加数で成功を決める。
 
-既定の上限は1試行900秒・LLM要求30回・ゲームMCP呼び出し80回。`--seconds`・`--max-llm`・`--max-calls` で変えられる。回数の監視は0.5秒ごとなので、超過した呼び出しが始まる可能性はあるが、超過した試行を成功にはしない。準備と終了処理の呼び出しは予算から分ける。
+課題別の期限は原木・木のつるはし・材料補充90秒、石のつるはし・遠方探索120秒、不能な材料条件での報告・停止60秒。初回操作30秒、不進行30秒（遠方探索45秒）、同じ理由の失敗2回、継続不能後の報告待ち10秒でも終了する。`--seconds` は短くする上限であり、900を指定しても課題の期限を延長しない。詳しい進捗・報告・停止の判定は [practical-v1](minecraft-benchmark-practical-ja.md) を参照する。
 
-持ち物の条件を満たした時刻を `time_to_goal_seconds` に記録し、その後は既定30秒まで目的の done・シエルの返答を観測する（`--report-grace`）。`completion_observed` は体モードでは目的の done、会話モードでは条件成立後の中断されていない返答を確認できたかを示す。返答の意味が正しいという判定ではない。`elapsed_seconds` はこの観測待ちも含む。返答が間に合わなくても持ち物の成功は保持し、回数予算の超過は失敗にする。
+実行全体は既定 `--run-seconds 600`、3連続失敗でも後続を停止する（`--failure-streak 0` で解除可能）。全体予算には課題準備・終了処理も含み、終了用に20秒を確保する。準備最大45秒、切断と体解放確認は各最大10秒。全体の時間切れは `budget_exhausted`、連続失敗の打ち切りは `stopped_early`。予算中断・未実施は `skipped` で合否の分母から除外し、全条件測定済みと扱わない。LLM要求30回・ゲーム要求80回も上限として維持する。
+
+持ち物の条件を満たした時刻を `time_to_goal_seconds` に記録し、その後は既定5秒まで目的のdone・シエルの返答を観測する（`--report-grace`）。`completion_observed` は体モードでは目的のdone、会話モードでは条件成立後の中断されていない返答を確認できたかを示す。返答の意味が正しいという判定ではない。`elapsed_seconds` はこの観測待ちも含む。返答が間に合わなくても持ち物の成功は保持し、回数予算の超過は失敗にする。
 
 結果は `server/benchmark/data/results/<実行時刻>/`：
 
 | ファイル | 内容 |
 |---|---|
-| `report.json` | 実行モード、モデル識別名、Gitコミット・変更の有無、コードと課題のハッシュ、予算、課題別成功率、各試行の結果 |
+| `report.json` | format 2・policy、実行モード、モデル識別名、Gitとコード/課題ハッシュ、実効予算、予定数・打ち切り理由、期待行動の合格率、目的達成数・適切な停止数・未完了/未実施数 |
 | `report.md` | 課題別の成功率と環境障害数 |
 | `<課題>-s<配置>-r<回数>/result.json` | 初期・最終状態、観測できた中間到達、停止時間、誤った目的完了、呼び出し数、失敗理由、修復・再試行数、トークン・料金の記録 |
 | 同 `trace.jsonl` | 復元した配置、RCON観測、目的の状態、MCPの要求と結果、会話サーバーのイベント |
@@ -123,7 +134,7 @@ Python 3.11以降と `server/agent/requirements-test.txt` があるホストな�
 
 `false_goal_done` は目的実行器が done を出したのにアイテム条件が成立していない場合。自然文の「できました」などは `completion_claim_candidates` に候補を残し、単純な文字列一致だけで虚偽と採点しない。料金・トークンの使用量が届かなければ `null` で、0と断定しない。
 
-停止課題は最初の取得後、停止の応答を180秒まで待つ。応答後の位置・持ち物の変化、動作の再要求は失敗。停止が届く前に64個を集め終えた場合も失敗になるため、この課題には推論の遅延も影響する。通常の達成課題とは分けて読む。
+停止課題は最初の取得後、停止の応答を5秒まで待ち、その後5秒の静止を確認する。応答後の位置・持ち物の変化、動作の再要求は失敗。停止が届く前に64個を集め終えた場合も失敗になるため、この課題には推論の遅延も影響する。通常の達成課題とは分けて読む。
 
 終了コードは全成功0、課題の失敗1、準備・観測・後片付けなどの環境障害2。環境障害は成功率の分母から除外して別に報告し、発生した時点で後続の試行は止める。比較前に障害を解消する。
 
@@ -159,7 +170,9 @@ Python 3.11以降と `server/agent/requirements-test.txt` があるホストな�
 | `spec` | 体モードの目的。`{"make": "アイテム名", "count": 1}`。省略すると `item` / `count` から同じ形を作る。採集対象もこの目的形式で渡す |
 | `action` | 既存課題に記載されているが、現在の `BodyDriver.submit()` は読み取らない。課題追加では `spec` を使い、ここへ新しい操作を書くだけで実行できると扱わない |
 | `inventory` | 開始時に与えるアイテムと個数。現在は各1〜64個 |
-| `forest` | 既存の配置は `near` / `far` / `many`。未知の値は現在の実装では近距離配置に入るため、新しい配置名を書くだけでは追加できない |
+| `forest` / `surface` | `near` / `far` / `many` / `none`。未知の値は拒否する。地表は `grass_block` または `sand` |
+| `budget` | `seconds`、`first_action`、`no_progress`、`same_failure`、`blocked_grace`、`stop_grace`。省略項目は実用性ポリシーの既定値 |
+| `modes` / `expected_outcome` | 対応モード、省略時は両方。期待行動は `achieve` または `report_unavailable`。後者は木材・所持品なしで石のつるはしが作れない専用oracleだけに対応 |
 | `milestones` | 中間到達として観測するアイテム。採点条件の代わりではない |
 | `stop_prompt` / `stop_after_gain` | 停止課題専用。取得増加を検出した後に送る停止依頼 / その閾値 |
 
@@ -206,7 +219,7 @@ Pop-Location
 
 キャッシュ・負荷の制御と記録は現時点では自動化されていない。速度を比較するなら、両版で同じ予備実行をしてから計測する等の条件を明記する。実行順の影響が疑われる場合は順番を入れ替えて測る。
 
-helper の `body` / `conversation` は1課題・配置11・1回だけ。全課題は上の「自宅サーバーで課題を選んで実行する」に従い、配置先で runner を起動する。課題・seed 未指定、`--repeats 3` なら初版は54試行／モード。会話側の時間上限と LLM 要求のタイムアウトも合わせる。比較でOpenAIを使う場合は有料実行の明示指定を行い、依頼の範囲で実行する。
+helperの `body` / `conversation` は1課題・配置11・1回だけ。全課題は上の「自宅サーバーで課題を選んで実行する」に従い、配置先でrunnerを起動する。既定は配置11・1回。複数配置・反復数・全体予算は明示し、打ち切った実行を全課題の測定済み結果にしない。比較でOpenAIを使う場合は有料実行の明示指定を行い、依頼の範囲で実行する。
 
 ### 結果を読む
 

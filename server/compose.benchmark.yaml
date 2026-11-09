@@ -66,6 +66,9 @@ services:
       - ./.env.benchmark
     environment:
       CIEL_DB_URL: ''
+      CIEL_BENCH_LLM_SERVICE: ${CIEL_BENCH_LLM_SERVICE:-shared}
+      CIEL_BENCH_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8094/v1}
+      CIEL_BENCH_LLM_CONTROL: ${CIEL_BENCH_LLM_CONTROL:-http://127.0.0.1:8095}
     volumes:
       - ./benchmark/data:/workspace/server/benchmark/data
 
@@ -108,7 +111,7 @@ services:
       CIEL_BENCHMARK: '1'
       CIEL_BENCH_MODEL_ID: ${CIEL_BENCH_MODEL_ID:?Set the exact evaluated model / checkpoint label}
       CIEL_LLM_BACKEND: ${CIEL_BENCH_BACKEND:-local}
-      CIEL_LOCAL_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8096/v1}
+      CIEL_LOCAL_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8094/v1}
       CIEL_LOCAL_LLM_MODEL: ${CIEL_BENCH_LOCAL_MODEL:-local}
       CIEL_LOCAL_TIMEOUT: ${CIEL_BENCH_LOCAL_TIMEOUT:-600}
       CIEL_LOCAL_ROLES: ''

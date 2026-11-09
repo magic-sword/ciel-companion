@@ -27,12 +27,16 @@ MODEL = os.environ.get('LOCAL_LLM_MODEL', '/models/Qwen3.5-35B-A3B-Q4_K_M.gguf')
 HOST = os.environ.get('LOCAL_LLM_HOST', '127.0.0.1')
 LLM_PORT = int(os.environ.get('LOCAL_LLM_PORT', '8094'))
 CONTROL_PORT = int(os.environ.get('LOCAL_LLM_CONTROL_PORT', '8095'))
-CTX = os.environ.get('LOCAL_LLM_CTX', '12288')
-COMMON = ['-m', MODEL, '--host', HOST, '--port', str(LLM_PORT), '-c', CTX, '-t', '8', '-tb', '16', '--jinja',
+CTX = os.environ.get('LOCAL_LLM_CTX', '32768')
+PARALLEL = int(os.environ.get('LOCAL_LLM_PARALLEL', '2'))
+# With explicit --parallel, llama.cpp divides the total context among slots.
+# LOCAL_LLM_CTX describes capacity per request, not the sum across clients.
+COMMON = ['-m', MODEL, '--host', HOST, '--port', str(LLM_PORT), '-c', str(int(CTX)*PARALLEL), '-t', '8', '-tb', '16', '--jinja',
           '--alias', os.environ.get('LOCAL_LLM_ALIAS', 'local')]
-if os.environ.get('LOCAL_LLM_PARALLEL'):
-    COMMON += ['--parallel', str(int(os.environ['LOCAL_LLM_PARALLEL']))]
-ARGS = {'gpu': ['-ngl', '99', '--n-cpu-moe', '99'], 'cpu': ['-ngl', '0']}
+COMMON += ['--parallel', str(PARALLEL)]
+ARGS = {'gpu': ['-ngl', os.environ.get('LOCAL_LLM_GPU_LAYERS', '99'),
+                '--n-cpu-moe', os.environ.get('LOCAL_LLM_CPU_MOE_LAYERS', '99')],
+        'cpu': ['-ngl', '0']}
 READY_TIMEOUT = 180.0
 
 _lock = threading.Lock()
@@ -117,7 +121,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path != '/mode':
             return self._send(404, {'error': 'not_found'})
-        self._send(200, {'mode': _mode, 'ready': _healthy()})
+        self._send(200, {'mode': _mode, 'ready': _healthy(), 'model': os.path.basename(MODEL),
+                         'context': int(CTX), 'parallel': PARALLEL})
 
     def do_POST(self):
         if self.path != '/mode':

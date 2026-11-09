@@ -13,10 +13,12 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import urllib.request
 
 from .drivers import BodyDriver, ConversationDriver, wait_body_released
 from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
+from .policy import VERSION as POLICY_VERSION, Progress, budget
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -45,7 +47,35 @@ def load_tasks(path=SUITE):
     suite = json.loads(path.read_text(encoding='utf-8'))
     if suite['version'] != 1 or len({t['id'] for t in suite['tasks']}) != len(suite['tasks']):
         raise ValueError('Invalid task suite version or duplicate ids')
+    for task in suite['tasks']:
+        budget(task)
+        if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand'):
+            raise ValueError('Unknown fixture layout')
+        if task.get('expected_outcome','achieve') not in ('achieve','report_unavailable'):
+            raise ValueError('Unknown expected outcome')
+        if task.get('expected_outcome') == 'report_unavailable' and (task['forest']!='none' or task['inventory'] or task['item']!='stone_pickaxe'):
+            raise ValueError('Unavailable oracle requires stone_pickaxe with no wood resources or supplies')
     return suite['tasks']
+
+
+def inference_server_info():
+    """Record actual shared/dedicated capacity, without prompts or credentials."""
+    url = os.environ['CIEL_BENCH_LLM_URL'].rstrip('/').removesuffix('/v1')
+    with urllib.request.urlopen(url+'/props', timeout=5) as response:
+        props = json.load(response)
+    context = props['default_generation_settings']['n_ctx']
+    if context < 32768:
+        raise RuntimeError('Local inference context must be at least 32768')
+    info = {'service':os.environ['CIEL_BENCH_LLM_SERVICE'], 'context':context,
+            'parallel':props['total_slots'], 'model':Path(props['model_path']).name}
+    control = os.environ.get('CIEL_BENCH_LLM_CONTROL','').rstrip('/')
+    if control:
+        with urllib.request.urlopen(control+'/mode', timeout=5) as response:
+            status = json.load(response)
+        info.update(mode=status['mode'], ready=status['ready'])
+        if not status['ready']:
+            raise RuntimeError('Local inference server is not ready')
+    return info
 
 
 def provenance():
@@ -100,7 +130,10 @@ def restarted(events):
 
 
 async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max_calls,
-                   poll=0.5, stop_grace=180, stable_seconds=10, report_grace=30, clock=time.monotonic, sleep=asyncio.sleep):
+                   poll=0.5, stop_grace=None, stable_seconds=5, report_grace=5, clock=time.monotonic, sleep=asyncio.sleep):
+    limits = budget(task,seconds)
+    seconds = limits['seconds']
+    stop_grace = limits['stop_grace'] if stop_grace is None else stop_grace
     started = clock()
     trace.phase, trace.started_at = 'execution', time.time()
     await driver.submit(task)
@@ -110,31 +143,50 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
     observed = set()
     false_done = False
     success_at = success_wall = None
+    watch = Progress(initial,task)
+    blocked_at = decline_stable_at = None
+    decline_snapshot = None
+    expected_decline = task.get('expected_outcome') == 'report_unavailable'
+    seen_body = set()
     while True:
+        before = clock()-started
         for e in driver.events():
             trace('agent_event', event=e)
             if e.get('kind') == 'model_error':
                 raise RuntimeError('Inference backend failed; inspect the trial model_error event')
+            watch.event(e,before)
+        # BodyDriver writes directly into Trace, rather than returning agent events.
+        if not hasattr(driver,'path'):
+            for entry in trace.execution():
+                if id(entry) in seen_body or entry['kind'] not in ('game_call','game_result','game_task_result'):
+                    continue
+                seen_body.add(id(entry))
+                watch.event(entry,before)
         current = await asyncio.to_thread(world.snapshot, task['milestones'] + [task['item']])
         now = clock()
+        elapsed = now-started
+        watch.observe(current,elapsed)
         trace('observation', state=current, elapsed=round(now-started,3))
         observed.update(item for item, count in current['inventory'].items()
                         if count > initial['inventory'].get(item,0))
         data = metrics(trace.execution())
         goal = driver.goal_state.get('goal') or {}
         done = achieved(task, initial, current)
-        if done and success_at is None and not task.get('stop_after_gain') and now-started < seconds:
+        if done and success_at is None and not task.get('stop_after_gain') and not expected_decline and elapsed < seconds:
             success_at, success_wall = now, time.time()
             trace('goal_condition_verified',state=current,elapsed=round(now-started,3))
         if goal.get('status') == 'done' and not done and success_at is None and not task.get('stop_after_gain'):
             false_done = True
         reason = None
         passed = False
+        declined = False
         if data['llm_calls'] > max_llm or data['game_calls'] > max_calls:
             reason = 'call_budget'
         elif current['health'] <= 0 or current.get('deaths',0) > initial.get('deaths',0):
             reason = 'died'
-        elif now-started >= seconds:
+        elif false_done:
+            reason = 'false_completion'
+        elif elapsed >= seconds:
             reason,passed = ('inventory_verified',True) if success_at is not None else ('time_budget',False)
         elif task.get('stop_after_gain'):
             gained = current['inventory'].get(task['item'],0) - initial['inventory'].get(task['item'],0)
@@ -149,7 +201,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
             if stopping is not None:
                 if done:
                     reason = 'finished_before_stop'
-                elif now-stopping >= stop_grace:
+                elif stable_at is None and now-stopping >= stop_grace:
                     reason = 'did_not_stop'
                 elif stop_ack(driver, trace.execution()):
                     if ack_index is None:
@@ -162,10 +214,36 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         elif success_at is not None:
             if now-success_at >= report_grace or getattr(driver,'report_complete',lambda after:False)(success_wall):
                 reason, passed = 'inventory_verified', True
+        elif watch.resumed_after_decline:
+            reason = 'resumed_after_decline'
+        elif watch.decline is not None and watch.idle(goal):
+            if decline_stable_at is None or not stable(decline_snapshot,current):
+                decline_stable_at,decline_snapshot = now,current
+            elif now-decline_stable_at >= stable_seconds:
+                declined = True
+                passed = expected_decline
+                reason = 'reported_unavailable_and_stayed' if passed else 'agent_declined_feasible_task'
         elif getattr(driver,'failure_reason',lambda:None)():
             reason = driver.failure_reason()
+        else:
+            decline_stable_at = None
+            if goal.get('status') in ('paused','failed','stopped'):
+                if blocked_at is None:
+                    blocked_at = now
+                elif now-blocked_at >= limits['blocked_grace']:
+                    reason = 'cannot_continue_without_report'
+            else:
+                blocked_at = None
+            reason = reason or watch.reason(elapsed,limits)
+        if reason is None and success_at is None and stopping is None and decline_stable_at is None:
+            reason = watch.reason(elapsed,limits)
         if reason:
             return {'status':'passed' if passed else 'failed', 'reason':reason,
+                    'outcome':'appropriate_stop' if passed and declined else 'achieved' if passed else 'not_achieved',
+                    'objective_achieved':passed and not declined, 'reported_stop':declined,
+                    'decision_evidence':watch.decline,
+                    'first_action_seconds':watch.first_action,'last_progress_seconds':round(watch.last_progress,3),
+                    'budget':limits,
                     'elapsed_seconds':round(now-started,3), 'final':current,
                     'observed_milestones':sorted(observed & set(task['milestones'])),
                     'false_goal_done':false_done, 'metrics':data,
@@ -175,7 +253,9 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         await sleep(poll)
 
 
-async def run(args):
+async def run(args, *, clock=time.monotonic):
+    run_started = clock()
+    deadline = run_started+args.run_seconds
     tasks = load_tasks()
     if args.list:
         for task in tasks:
@@ -193,6 +273,9 @@ async def run(args):
         if selected - {t['id'] for t in tasks}:
             raise ValueError('Unknown task id')
         tasks = [t for t in tasks if t['id'] in selected]
+    if args.task and any(args.mode not in task.get('modes',['body','conversation']) for task in tasks):
+        raise ValueError('Selected task does not support this mode')
+    tasks = [t for t in tasks if args.mode in t.get('modes',['body','conversation'])]
     if args.agent != 'ciel-task-bench':
         raise ValueError('Use the dedicated ciel-task-bench agent')
     if args.url != 'http://127.0.0.1:8773/mcp':
@@ -204,46 +287,72 @@ async def run(args):
         raise ValueError('Set CIEL_BENCH_RCON_PASSWORD in the environment')
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=False)
-    manifest = {'format':1, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
+    plan = [(task,seed,repeat) for task in tasks for seed in args.seed for repeat in range(args.repeats)]
+    manifest = {'format':2, 'policy':POLICY_VERSION, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
                 'backend':args.backend if args.mode == 'conversation' else 'none',
                 'model_id':args.model_id if args.mode == 'conversation' else None,
                 'minecraft_version':'1.21.11', 'seeds':args.seed, 'repeats':args.repeats,
-                'limits':{'seconds':args.seconds,'llm_calls':args.max_llm,'game_calls':args.max_calls,'report_grace':args.report_grace},
+                'planned_trials':len(plan),
+                'limits':{'seconds_cap':args.seconds,'run_seconds':args.run_seconds,'failure_streak':args.failure_streak,
+                          'setup_seconds':args.setup_seconds,'llm_calls':args.max_llm,'game_calls':args.max_calls,'report_grace':args.report_grace,
+                          'tasks':{t['id']:budget(t,args.seconds) for t in tasks}},
                 'task_ids':[t['id'] for t in tasks], 'note':'Seeds select arena layouts; no cross-trial learning.',
                 **provenance()}
     rows = []
+    def skip_remaining(reason, completion):
+        manifest.update(completion=completion,stop_reason=reason)
+        for task,seed,repeat in plan[len(rows):]:
+            rows.append({'task':task['id'],'seed':seed,'repeat':repeat,'status':'skipped','reason':reason})
     write_reports(directory,manifest,rows)
     rcon = world = None
     safe_release = True
     try:
+        if args.mode == 'conversation' and args.backend == 'local' and os.environ.get('CIEL_BENCH_LLM_SERVICE'):
+            manifest['inference_server'] = await asyncio.to_thread(inference_server_info)
         rcon = Rcon(password)
         world = World(rcon)
         world.acquire()
-        await wait_body_released(args.url)
+        await wait_body_released(args.url,timeout=10)
         for task in tasks:
             for seed in args.seed:
                 for repeat in range(args.repeats):
+                    available = deadline-clock()-20  # Reserve bounded cleanup.
+                    if available <= 0:
+                        skip_remaining('run_time_budget','budget_exhausted')
+                        return 1
                     trial = directory/f"{task['id']}-s{seed}-r{repeat}"
                     trial.mkdir()
                     trace = Trace(trial/'trace.jsonl')
                     driver = None
-                    result = {'task':task['id'],'seed':seed,'repeat':repeat}
+                    result = {'task':task['id'],'seed':seed,'repeat':repeat,'budget':budget(task,args.seconds),
+                              'expected_outcome':task.get('expected_outcome','achieve')}
                     try:
-                        fixture = await asyncio.to_thread(world.reset, task, seed)
-                        items = task['milestones'] + [task['item']]
-                        initial = await asyncio.to_thread(world.snapshot, items)
-                        expected = {item:task['inventory'].get(item,0) for item in initial['inventory']}
-                        if initial['inventory'] != expected:
-                            raise RuntimeError('Fixture inventory was not reset correctly')
-                        trace('fixture', fixture=fixture, initial=initial)
-                        driver_type = BodyDriver if args.mode == 'body' else ConversationDriver
-                        driver = driver_type(url=args.url,agent=args.agent,backend=args.backend,model_id=args.model_id,
-                                             debug_dir=args.debug_dir,trace=trace)
                         safe_release = False
-                        await driver.open()
+                        async with asyncio.timeout(min(args.setup_seconds,available)):
+                            fixture = await asyncio.to_thread(world.reset, task, seed)
+                            items = task['milestones'] + [task['item']]
+                            initial = await asyncio.to_thread(world.snapshot, items)
+                            expected = {item:task['inventory'].get(item,0) for item in initial['inventory']}
+                            if initial['inventory'] != expected:
+                                raise RuntimeError('Fixture inventory was not reset correctly')
+                            trace('fixture', fixture=fixture, initial=initial)
+                            driver_type = BodyDriver if args.mode == 'body' else ConversationDriver
+                            driver = driver_type(url=args.url,agent=args.agent,backend=args.backend,model_id=args.model_id,
+                                                 debug_dir=args.debug_dir,trace=trace)
+                            await driver.open()
                         result.update(fixture=fixture,initial=initial)
-                        result.update(await evaluate(task,world,driver,trace,initial,seconds=args.seconds,
-                                                     max_llm=args.max_llm,max_calls=args.max_calls,report_grace=args.report_grace))
+                        available = max(0.01,deadline-clock()-20)
+                        limit = min(budget(task,args.seconds)['seconds'],available)
+                        async with asyncio.timeout(min(available,limit+1)):
+                            result.update(await evaluate(task,world,driver,trace,initial,seconds=limit,
+                                                         max_llm=args.max_llm,max_calls=args.max_calls,report_grace=args.report_grace))
+                        if result['reason']=='time_budget' and limit<budget(task,args.seconds)['seconds']:
+                            result.update(status='skipped',reason='run_time_budget',outcome='unmeasured')
+                    except TimeoutError:
+                        global_timeout = deadline-clock() <= 20.5 and trace.phase=='execution'
+                        result.update(status='skipped' if global_timeout else 'infrastructure_error',
+                                      reason='run_time_budget' if global_timeout else 'setup_timeout' if trace.phase=='setup' else 'observation_timeout',
+                                      metrics=metrics(trace.execution()))
                     except Exception as exc:
                         # Keep credentials and arbitrary network exception bodies out of reports.
                         result.update(status='infrastructure_error',reason=type(exc).__name__,metrics=metrics(trace.execution()),
@@ -254,8 +363,8 @@ async def run(args):
                         trace.phase = 'cleanup'
                         if driver:
                             try:
-                                await asyncio.wait_for(driver.close(),30)
-                                await wait_body_released(args.url)
+                                await asyncio.wait_for(driver.close(),10)
+                                await wait_body_released(args.url,timeout=10)
                                 safe_release = True
                             except Exception as exc:
                                 result.update(status='infrastructure_error',reason='cleanup_'+type(exc).__name__)
@@ -264,8 +373,14 @@ async def run(args):
                     write_reports(directory,manifest,rows)
                     print(task['id'],seed,repeat,result['status'],result['reason'])
                     if result['status'] == 'infrastructure_error':
-                        manifest['completion'] = 'infrastructure_error'
+                        skip_remaining('infrastructure_stop','infrastructure_error')
                         return 2  # Do not reset the next fixture if cleanup or observation failed.
+                    if result['reason']=='run_time_budget':
+                        skip_remaining('run_time_budget','budget_exhausted')
+                        return 1
+                    if args.failure_streak and len(rows)<len(plan) and len(rows)>=args.failure_streak and all(r['status']=='failed' for r in rows[-args.failure_streak:]):
+                        skip_remaining('consecutive_failures','stopped_early')
+                        return 1
         manifest['completion'] = 'complete'
     except Exception as exc:
         manifest.update(completion='infrastructure_error',run_error=type(exc).__name__)
@@ -280,6 +395,7 @@ async def run(args):
         finally:
             if rcon:
                 rcon.close()
+            manifest['run_elapsed_seconds'] = round(clock()-run_started,3)
             write_reports(directory,manifest,rows)
     return 0 if all(r['status'] == 'passed' for r in rows) else 1
 
@@ -295,11 +411,14 @@ def parser():
     ap.add_argument('--url',default='http://127.0.0.1:8773/mcp')
     ap.add_argument('--task',action='append')
     ap.add_argument('--seed',action='append',type=int)
-    ap.add_argument('--repeats',type=int,default=3)
-    ap.add_argument('--seconds',type=float,default=900)
+    ap.add_argument('--repeats',type=int,default=1)
+    ap.add_argument('--seconds',type=float,help='Optional stricter cap; never extends a task deadline')
+    ap.add_argument('--run-seconds',type=float,default=600,help='Whole-run wall budget, including setup and cleanup (max 3600)')
+    ap.add_argument('--setup-seconds',type=float,default=45)
+    ap.add_argument('--failure-streak',type=int,default=3,help='Stop after consecutive failures; 0 disables this guard')
     ap.add_argument('--max-llm',type=int,default=30)
     ap.add_argument('--max-calls',type=int,default=80)
-    ap.add_argument('--report-grace',type=float,default=30,help='Observe completion/reply after the item condition is verified')
+    ap.add_argument('--report-grace',type=float,default=5,help='Observe completion/reply after the item condition is verified')
     ap.add_argument('--debug-dir',default=str(Path(__file__).parent/'data'/'debug'))
     ap.add_argument('--output',default=str(Path(__file__).parent/'data'/'results'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')))
     return ap
@@ -308,8 +427,10 @@ def parser():
 def main(*, native_exit=False):
     ap = parser()
     args = ap.parse_args()
-    args.seed = args.seed or [11,29,47]
-    if min(args.repeats,args.seconds,args.max_calls) <= 0 or min(args.max_llm,args.report_grace) < 0 or len(set(args.seed)) != len(args.seed):
+    args.seed = args.seed or [11]
+    import math
+    values = [args.run_seconds,args.setup_seconds,args.report_grace]+([args.seconds] if args.seconds is not None else [])
+    if any(not math.isfinite(v) for v in values) or min(args.repeats,args.run_seconds,args.setup_seconds,args.max_calls) <= 0 or (args.seconds is not None and args.seconds<=0) or args.run_seconds>3600 or min(args.max_llm,args.report_grace,args.failure_streak) < 0 or len(set(args.seed)) != len(args.seed):
         ap.error('Budgets and repeats must be positive, max-llm nonnegative, and seeds unique')
     try:
         code = asyncio.run(run(args))
