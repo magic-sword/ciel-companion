@@ -134,7 +134,7 @@ LLMの選択だけを固定し、サービス読込、次の推論への道具�
 | 最終のベンチマーク受信検証後の関連テスト | test_minecraft_benchmark.pyの29件合格 |
 | 本体のC#受信・操作・表示ソースを使う.NET検証器 | 35項目合格。時計・JSON・送信はスタブ |
 | Unity本体＋Editor C#コンパイル | Assembly-CSharp-Editor.csproj（本体参照を含む）、エラー0、警告80 |
-| Unity Editorバッチの表示確認 | ライセンスエラー198で実行前に停止。画面画像・Unityの実JSONパーサーは未確認 |
+| Unity Editorバッチの表示確認 | 通常権限で再実行成功。状態・配信表示11項目、カード57項目、アプリ構成42項目合格。実際のJsonUtilityと描画を確認 |
 | 本番配布・Playerビルド・実機接続・ゲーム性能再測定 | 未実施 |
 
 再実行：
@@ -146,3 +146,16 @@ dotnet build unity/Assembly-CSharp-Editor.csproj --no-restore -verbosity:quiet -
 ```
 
 生の結果はGit対象外の`server/benchmark/data/work-display-v2-complete/report.json`、コンパイル結果は`work-display-build-final.log`、起動失敗のログは`work-display-unity.log`。検証器の生成物も同じdata配下に置く。外部APIや共有GPUには接続していない。通知の版をv2へ更新したため、反映時はサーバーとUnityアプリを一緒に更新して会話を再接続する。
+
+### Editor起動の再確認と描画結果
+
+初回の終了コード198は、制限された実行環境で端末情報の取得がアクセス拒否となり、既存のライセンス・Editor登録情報も参照できなかった際の結果だった。通常の端末権限で`unity license status`を確認するとUnity Personalは有効・サインイン済み、`unity editors list --installed --verbose`にも6000.6.4f1が表示された。利用者のライセンス変更・再インストール・MCP登録は行っていない。
+
+通常権限でCLIから同じEditorを明示し、次の2メソッドを順番に実行して終了コード0を確認した。描画にはグラフィックスを使うため`-nographics`は指定していない。CLIの`run`が管理する`-quit`も追加しない。
+
+```powershell
+unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --timeout 180 --no-tail -- -executeMethod Ciel.EditorTools.CielStreamStatusCheck.Run
+unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --timeout 180 --no-tail -- -executeMethod Ciel.EditorTools.CielAudienceCardCheck.Run
+```
+
+ログは`server/benchmark/data/work-display-unity-retry.log`と`work-display-unity-render.log`。描画画像は`.local/app-refactor/audience-card-work-v2.png`・`audience-card-decision-v2.png`・`audience-card-unknown-v2.png`。900×500の画像を目視し、状態の区別、会話専用行、予算表示、文字の収まりを確認した。Playerビルド、本番配布、実サービスとの接続試験はこの再確認には含まない。

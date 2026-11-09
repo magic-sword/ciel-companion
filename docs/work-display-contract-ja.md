@@ -67,7 +67,7 @@
 - .NET 10：`dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`。実際のC#受信・操作・表示ソースをリンクし、時計・JSON・送信だけ代用して35項目を確認。UnityのJsonUtilityそのものや描画を検証する試験ではない。生成物はserver/benchmark/data内。
 - Unity Editor用：`CielStreamStatusCheck.Run`、`CielAudienceCardCheck.Run`。本体・EditorのC#コンパイルと、Unityでの実行・画面描画は別に記録する。
 
-この端末ではEditorバッチ起動がライセンスエラー（198）で停止したため、Editorでの実行・画像出力は未確認。代替のC#検証器は通過した。Python一式とC#ビルドの最終結果は[回帰テスト](regression-tests-ja.md)を参照。
+初回は制限された実行環境でEditorバッチがライセンスエラー（198）となった。通常の端末権限ではUnity Personalが有効で、6000.6.4f1も認識された。同じEditorを通常権限で再実行し、状態・配信表示11項目、配信カード57項目、アプリ構成42項目を通過した。実行中・判断待ち・状態不明の900×500画像も出力して目視確認済み。CLIは利用可能で、MCP登録は必要ない。制限環境からの端末情報・ライセンス情報へのアクセス失敗を、利用者のライセンス未設定と断定しない。Python一式とC#ビルドの結果は[回帰テスト](regression-tests-ja.md)を参照。
 
 ## 反映時の単位
 
