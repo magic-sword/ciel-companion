@@ -1,0 +1,127 @@
+# Isolated Minecraft benchmark. No production world, DB or Discord destinations.
+# Run from server/ with --env-file .env.benchmark -f compose.benchmark.yaml.
+name: ciel-minecraft-benchmark
+services:
+  llm-bench:
+    profiles: [local]
+    build:
+      context: ./local-llm
+      network: host
+    network_mode: host
+    environment:
+      LOCAL_LLM_MODEL: /models/${CIEL_BENCH_LLM_FILE:-Qwen3.5-35B-A3B-Q4_K_M.gguf}
+      LOCAL_LLM_PORT: '8096'
+      LOCAL_LLM_CONTROL_PORT: '8097'
+      LOCAL_LLM_CTX: ${CIEL_BENCH_LLM_CTX:-32768}
+      LOCAL_LLM_MODE: cpu
+      LOCAL_LLM_PARALLEL: '1'
+    volumes:
+      - ${LOCAL_LLM_DIR:-${HOME}/models/llm}:/models:ro
+    restart: 'no'
+
+  minecraft-bench:
+    image: itzg/minecraft-server:2026.10.1-java21
+    environment:
+      EULA: ${MINECRAFT_EULA:-FALSE}
+      TYPE: VANILLA
+      VERSION: 1.21.11
+      LEVEL: ciel-benchmark
+      LEVEL_TYPE: FLAT
+      GENERATOR_SETTINGS: '{"layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:stone","height":126},{"block":"minecraft:grass_block","height":1}],"biome":"minecraft:plains","features":false,"lakes":false,"structure_overrides":[]}'
+      SEED: '771023'
+      ONLINE_MODE: 'FALSE'
+      ENFORCE_SECURE_PROFILE: 'FALSE'
+      ENABLE_WHITELIST: 'TRUE'
+      ENFORCE_WHITELIST: 'TRUE'
+      SPAWN_PROTECTION: '0'
+      MEMORY: 2G
+      ENABLE_RCON: 'TRUE'
+      RCON_PASSWORD: ${CIEL_BENCH_RCON_PASSWORD:?Set a dedicated CIEL_BENCH_RCON_PASSWORD}
+      RCON_CMDS_STARTUP: |-
+        data modify storage ciel_benchmark:meta suite set value "ciel-benchmark-v1"
+        gamerule minecraft:advance_time false
+        gamerule minecraft:advance_weather false
+        gamerule minecraft:spawn_mobs false
+        gamerule minecraft:random_tick_speed 0
+        gamerule minecraft:immediate_respawn true
+        setworldspawn 0 64 0
+    ports:
+      - 127.0.0.1:25566:25565
+      - 127.0.0.1:25576:25575
+    volumes:
+      - ./benchmark/data/world:/data
+      # Offline UUID, as in minecraft/src/whitelist.js; do not resolve an online account.
+      - ./benchmark/whitelist.json:/data/whitelist.json:ro
+    restart: 'no'
+
+  benchmark-runner:
+    profiles: [runner]
+    build:
+      context: .
+      dockerfile: benchmark/Dockerfile
+      network: host
+    network_mode: host
+    env_file:
+      - ./agent/.env
+      - ./.env.benchmark
+    environment:
+      CIEL_DB_URL: ''
+    volumes:
+      - ./benchmark/data:/workspace/server/benchmark/data
+
+  body-bench:
+    build:
+      context: ./minecraft
+      network: host
+    network_mode: host
+    environment:
+      MC_HOST: 127.0.0.1
+      MC_PORT: '25566'
+      MC_VERSION: 1.21.11
+      MC_USERNAME: Ciel_Debug
+      MC_OWNER: ''
+      BODY_HOST: 127.0.0.1
+      BODY_PORT: '8772'
+      CIEL_PORT: '8773'
+      EYE_PORT: '3008'
+      KNOWLEDGE_DATA: /app/knowledge-data
+    volumes:
+      - ${CIEL_BENCH_KNOWLEDGE_DIR:-../../ciel-companion/server/minecraft/knowledge/data}:/app/knowledge-data:ro
+    depends_on:
+      minecraft-bench:
+        condition: service_healthy
+    restart: 'no'
+
+  agent-bench:
+    profiles: [conversation]
+    build:
+      context: ./agent
+      network: host
+    network_mode: host
+    env_file: ./agent/.env
+    environment:
+      CIEL_AGENT_NAME: ciel-task-bench
+      CIEL_AGENT_PORT: '8092'
+      CIEL_MODEL: pipeline
+      CIEL_VOICE: irodori
+      CIEL_INPUT: text
+      CIEL_BENCHMARK: '1'
+      CIEL_BENCH_MODEL_ID: ${CIEL_BENCH_MODEL_ID:?Set the exact evaluated model / checkpoint label}
+      CIEL_LLM_BACKEND: ${CIEL_BENCH_BACKEND:-local}
+      CIEL_LOCAL_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8096/v1}
+      CIEL_LOCAL_LLM_MODEL: ${CIEL_BENCH_LOCAL_MODEL:-local}
+      CIEL_LOCAL_TIMEOUT: ${CIEL_BENCH_LOCAL_TIMEOUT:-600}
+      CIEL_LOCAL_ROLES: ''
+      CIEL_GAMES: minecraft=http://127.0.0.1:8773/mcp
+      CIEL_DB_URL: ''
+      CIEL_MINUTES_DISCORD_WEBHOOK: ''
+      CIEL_DEBUG_LOG: '1'
+      CIEL_AIZUCHI: '0'
+      CIEL_NOD: '0'
+    volumes:
+      - ./agent/config:/app/config:ro
+      - ./benchmark/data/debug:/app/data/debug
+      - ./benchmark/data/minutes:/app/data/minutes
+    depends_on:
+      - body-bench
+    restart: 'no'

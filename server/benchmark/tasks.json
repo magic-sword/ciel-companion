@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "tasks": [
+    {"id":"gather_logs","prompt":"オークの原木を8個集めてください。","item":"oak_log","count":8,"action":{"kind":"gather","args":{"item":"oak_log","count":8}},"inventory":{},"forest":"near","milestones":["oak_log"]},
+    {"id":"wooden_pickaxe","prompt":"木のつるはしを1本作ってください。","item":"wooden_pickaxe","count":1,"spec":{"make":"wooden_pickaxe","count":1},"inventory":{},"forest":"near","milestones":["oak_log","oak_planks","crafting_table","wooden_pickaxe"]},
+    {"id":"stone_pickaxe","prompt":"石のつるはしを1本作ってください。","item":"stone_pickaxe","count":1,"spec":{"make":"stone_pickaxe","count":1},"inventory":{},"forest":"near","milestones":["oak_log","wooden_pickaxe","cobblestone","stone_pickaxe"]},
+    {"id":"replenish_materials","prompt":"材料が足りない分は集めて、石のつるはしを1本作ってください。","item":"stone_pickaxe","count":1,"spec":{"make":"stone_pickaxe","count":1},"inventory":{"wooden_pickaxe":1,"crafting_table":1,"stick":2},"forest":"near","milestones":["cobblestone","stone_pickaxe"]},
+    {"id":"find_logs","prompt":"オークの原木を8個集めてください。近くに無ければ探してください。","item":"oak_log","count":8,"action":{"kind":"gather","args":{"item":"oak_log","count":8}},"inventory":{},"forest":"far","milestones":["oak_log"]},
+    {"id":"stop_collecting","prompt":"オークの原木を64個集めてください。","stop_prompt":"今の作業をやめて、その場で待ってください。こちらが頼むまで再開しないでください。","item":"oak_log","count":64,"action":{"kind":"gather","args":{"item":"oak_log","count":64}},"inventory":{},"forest":"many","milestones":["oak_log"],"stop_after_gain":1}
+  ]
+}

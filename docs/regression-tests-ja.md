@@ -1,5 +1,7 @@
 # サーバーの回帰テスト
 
+Minecraft の実際の採集・製作・停止を採点する試験は、[タスクのベンチマーク](minecraft-benchmark-ja.md)。ここで説明する通常回帰テストには、採点・環境復元のガード・RCON通信・試験要求の照合のオフラインテストも含む。
+
 入口はGit管理の `scripts/server/run-regression.py`。PowerShellからは `scripts/server/test-regression.ps1` でも実行できる。実行場所によらずリポジトリのテストを見つける。
 
 この回帰テストは料金がかからない（API キー・LiveKit・読み上げの接続先を外して動かす）。OpenAI・LiveKit を使う試験（`eval_*`・`bench_*`）は別にして、関係するところを変えたときだけ回す。[料金のかかる試験](paid-checks-ja.md)。

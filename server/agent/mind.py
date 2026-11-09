@@ -313,7 +313,7 @@ class Mind:
             out.add_message(role='system', content=talker_instructions)
         elif instructions is not None:
             out.items.append(instructions)
-        if self.self_image:
+        if self.self_image and not models.LOCAL_TEST:
             out.items.append(llm.ChatMessage(role='user', content=[
                 '[わたしの姿]（わたし、シエルの見た目の絵。いつも知っている自分の姿）',
                 llm.ImageContent(image=self.self_image, inference_detail='low')]))
@@ -506,6 +506,22 @@ def latest_user_text(chat_ctx) -> str:
     """今回の分の、最後の相手の発言"""
     tail = _tail(list(chat_ctx.items))
     return next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
+
+
+def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None) -> llm.ChatContext:
+    """Qwen のテンプレートは system を先頭の1件だけ受け付ける。元の会話と道具の順序は維持する。"""
+    out = llm.ChatContext()
+    instructions = [i.text_content for i in ctx.items if isinstance(i,llm.ChatMessage) and i.role == 'system']
+    if instructions:
+        out.add_message(role='system',content='\n\n'.join(instructions))
+    out.items.extend(i for i in ctx.items if not (isinstance(i,llm.ChatMessage) and i.role == 'system'))
+    if not any(_is_user(i) for i in out.items) and source is not None:
+        # 文字入力の記録が確定するより先に道具の結果が戻ることがある。
+        # Qwen の tool continuation にも、LiveKit が持つ元の依頼を添える。
+        latest = next((i for i in reversed(source.items) if _is_user(i)),None)
+        if latest is not None:
+            out.items.insert(1 if instructions else 0,latest)
+    return out
 
 
 def _tail(items: list) -> list:

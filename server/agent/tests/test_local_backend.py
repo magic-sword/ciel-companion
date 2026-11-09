@@ -13,6 +13,49 @@ import models
 
 
 class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
+    async def test_local_tool_continuation_recovers_unrecorded_text_request(self):
+        import mind
+        original = llm.ChatContext()
+        original.add_message(role='user',content='原木を8個集めて')
+        prepared = llm.ChatContext()
+        prepared.add_message(role='system',content='instructions')
+        call = llm.FunctionCall(call_id='call1',name='minecraft_status',arguments='{}')
+        result = llm.FunctionCallOutput(call_id='call1',name='minecraft_status',output='{}',is_error=False)
+        prepared.items.extend([call,result])
+        out = mind.local_context(prepared,source=original)
+        self.assertEqual(out.items[1].text_content,'原木を8個集めて')
+        self.assertEqual(out.items[-2:],[call,result])
+        self.assertEqual(len(prepared.items),3)
+
+    async def test_local_context_merges_system_notes_and_preserves_tool_continuation(self):
+        import mind
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system',content='instructions')
+        ctx.add_message(role='user',content='request')
+        ctx.add_message(role='system',content='current game state')
+        call = llm.FunctionCall(call_id='call1',name='minecraft_status',arguments='{}')
+        result = llm.FunctionCallOutput(call_id='call1',name='minecraft_status',output='{}',is_error=False)
+        ctx.items.extend([call,result])
+        original = list(ctx.items)
+        out = mind.local_context(ctx)
+        systems = [i for i in out.items if isinstance(i,llm.ChatMessage) and i.role == 'system']
+        self.assertEqual(len(systems),1)
+        self.assertIs(out.items[0],systems[0])
+        self.assertEqual(systems[0].text_content,'instructions\n\ncurrent game state')
+        self.assertEqual(out.items[-2:],[call,result])
+        self.assertEqual(ctx.items,original)
+
+    async def test_text_only_local_context_does_not_include_self_portrait(self):
+        import mind
+        from conversation import Conversation
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system', content='test')
+        ctx.add_message(role='user', content='原木を集めて')
+        with mock.patch.object(models,'LOCAL_TEST',True):
+            m = mind.Mind(Conversation(),self_image='data:image/png;base64,portrait')
+            result = m.build(ctx)
+        self.assertFalse(any(isinstance(c,llm.ImageContent) for i in result.items if isinstance(i,llm.ChatMessage) for c in i.content))
+
     def setUp(self):
         for name, value in [('LOCAL_TEST', True), ('LOCAL_URL', 'http://local-test.invalid/v1'),
                             ('LOCAL_ROLES', set()), ('_local_client', None)]:

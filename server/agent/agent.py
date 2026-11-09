@@ -23,6 +23,8 @@ import asyncio
 import json
 import logging
 import os
+import time
+import uuid
 
 from dotenv import load_dotenv
 load_dotenv()  # models.py を含む各モジュールが環境変数を読む前に設定する
@@ -36,6 +38,7 @@ from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVa
 
 import aizuchi
 import board
+import benchmark_contract
 import clock
 import curiosity
 import debug_log
@@ -100,6 +103,12 @@ if INPUT not in ('text', 'voice'):
 TEXT_ONLY = INPUT == 'text'
 if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY) and not PIPELINE:
     raise ValueError('Local LLM / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
+BENCHMARK = os.environ.get('CIEL_BENCHMARK') == '1'
+if BENCHMARK and (not PIPELINE or not TEXT_ONLY or os.environ.get('CIEL_DB_URL')
+                  or os.environ.get('CIEL_MINUTES_DISCORD_WEBHOOK')
+                  or os.environ.get('CIEL_AGENT_NAME') != 'ciel-task-bench'
+                  or os.environ.get('CIEL_GAMES', '').partition('=')[2] != 'http://127.0.0.1:8773/mcp'):
+    raise ValueError('Benchmark requires dedicated agent / game, text pipeline and no persistent memory or webhook')
 # 心の考える量（pipeline。none・minimal・low…）
 MIND_REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')
 # 話し終えたと決めるまでの最短・最長の待ち（pipeline。秒）
@@ -247,8 +256,12 @@ class Ciel(Agent):
         # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
+        if models.is_local('mind'):
+            ctx = mind.local_context(ctx,source=chat_ctx)
         text, calls, blocked, done = [], [], [], False
         taken: list[str] = []   # この返事で通した道具（体を動かす道具は 1 つだけ。mind.one_body_call）
+        request_id, generation_started = uuid.uuid4().hex, time.monotonic()
+        debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'))
         try:
             async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
                 # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
@@ -275,7 +288,12 @@ class Ciel(Agent):
                             self.activity.call_started(c.call_id, c.name)
                 yield chunk
             done = True
+        except agents.APIError as exc:
+            debug_log.record('model_error', id=request_id, error=type(exc).__name__,
+                             status_code=getattr(exc, 'status_code', None))
+            raise
         finally:
+            debug_log.record('model_response', id=request_id, role=who, seconds=round(time.monotonic()-generation_started,3))
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
             try:
@@ -368,9 +386,15 @@ class Ciel(Agent):
 # 名前を付けると、その名前で呼んだ部屋にだけ入る（試験用の会話サーバー。bench_latency.py）。本番は空のまま
 @server.rtc_session(agent_name=os.environ.get('CIEL_AGENT_NAME', ''))
 async def entrypoint(ctx: JobContext) -> None:
+    benchmark_trial = (benchmark_contract.validate(ctx.job.metadata, models.BACKEND, os.environ.get('CIEL_BENCH_MODEL_ID'))
+                       if BENCHMARK else None)
     logger.info('room=%s に入ります（声：%s、LLM：%s、入力：%s）', ctx.room.name, VOICE, models.BACKEND, INPUT)
     # デバッグ用の会話ログ（debug_log.py）。ふだんは残さない。入れているときだけ、この会話のファイルを作る
     debug_log.start(ctx.room.name, model=MODEL, realtime_model=REALTIME_MODEL if REALTIME else None, voice=VOICE,
+                    benchmark=BENCHMARK, backend=models.BACKEND, input=INPUT,
+                    benchmark_model_id=os.environ.get('CIEL_BENCH_MODEL_ID'),
+                    benchmark_trial=benchmark_trial,
+                    role_models={role: models.model(role) for role in models.ROLES}, mind_reasoning=MIND_REASONING,
                     **({'mind_model': models.model('mind'), 'stt_model': models.model('stt')} if PIPELINE else {}))
     # 返事は turns.py が作らせるので、LiveKit の側でも自動で返事をしない（manual）
     # 話者の識別（speakers.py）。覚えている人は DB から読む（つなげなければ、この会話の間だけ覚える）
@@ -741,13 +765,16 @@ async def entrypoint(ctx: JobContext) -> None:
     await send('ciel.event', game_env.listing(game), {'v': 1, 'type': 'device.hello_request'})
     # あいさつでは道具を使わせない（まだ誰も話していないのに、話者の状態を調べて「声の登録がまだ」と話したことがあった）
     # 今の日付・時間帯（clock.py）も添える（「おはよう」「こんばんは」を合わせる）
-    await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
-                                 tool_choice='none')
+    if not BENCHMARK:
+        await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
+                                     tool_choice='none')
     talker.start()
     if agent.mind is not None:
         agent.mind.start()   # 心が「今のまとめ」を書く見回り
     if AIZUCHI:
         await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく
+    if BENCHMARK:
+        debug_log.record('benchmark_ready')   # 初回あいさつと課題の推論を競合させない
 
 
 async def greeting(agent, book, style) -> str:

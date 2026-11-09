@@ -383,9 +383,12 @@ class GameEnv:
         if self._session is None:
             return {'status': 'unavailable'}
         session = self._session
+        call_id = uuid.uuid4().hex
+        debug_log.record('game_call', id=call_id, name=name, arguments=args)
         try:
             r = await self._session.call_tool(name, args, read_timeout_seconds=timedelta(seconds=timeout))
         except Exception as e:
+            debug_log.record('game_result', id=call_id, name=name, result={'status': 'no_answer', 'reason': type(e).__name__})
             log.info('ゲーム（%s）の道具 %s が答えない：%s', self.game, name, type(e).__name__)
             if (name == (self.profile.get('link_tool') or f'{self.game}_link')
                     or getattr(getattr(e, 'error', None), 'message', '') == 'Session terminated'
@@ -399,6 +402,7 @@ class GameEnv:
             out['_images'] = images
         if getattr(r, 'isError', False) and 'status' not in out:
             out['status'] = 'error'
+        debug_log.record('game_result', id=call_id, name=name, result={k:v for k,v in out.items() if k != '_images'})
         return out
 
     def _wrap(self, name: str, description: str, schema: dict):
@@ -563,6 +567,8 @@ class GameEnv:
         if previous is not None and (not previous.get('_snapshot') or e.get('_snapshot')):
             return
         self._completed[key] = e
+        debug_log.record('game_task_result', id=key, ok=bool(e.get('ok')), failed=bool(e.get('failed')),
+                         reason=e.get('reason'), title=e.get('title'), snapshot=bool(e.get('_snapshot')))
         if len(self._completed) > 512:
             self._completed.pop(next(iter(self._completed)))
         self._observed.discard(key)

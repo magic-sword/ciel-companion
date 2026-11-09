@@ -103,6 +103,7 @@ def client_for(role: str, default):
 def options(role: str, **kwargs) -> dict:
     """chat.completions.create の引数を、その役目の呼び先に合わせる。ローカルなら：モデルの名前を替え、考える段（thinking）を
     切り（Qwen3.5 は切らないと、書ける量を考える段に使い切って答えが空になった）、reasoning_effort は送らず、時間の上限を延ばす"""
+    debug_log.record('model_request', role=role, model=model(role))
     if not is_local(role):
         return kwargs
     kwargs = dict(kwargs)

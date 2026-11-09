@@ -30,6 +30,8 @@ CONTROL_PORT = int(os.environ.get('LOCAL_LLM_CONTROL_PORT', '8095'))
 CTX = os.environ.get('LOCAL_LLM_CTX', '12288')
 COMMON = ['-m', MODEL, '--host', HOST, '--port', str(LLM_PORT), '-c', CTX, '-t', '8', '-tb', '16', '--jinja',
           '--alias', os.environ.get('LOCAL_LLM_ALIAS', 'local')]
+if os.environ.get('LOCAL_LLM_PARALLEL'):
+    COMMON += ['--parallel', str(int(os.environ['LOCAL_LLM_PARALLEL']))]
 ARGS = {'gpu': ['-ngl', '99', '--n-cpu-moe', '99'], 'cpu': ['-ngl', '0']}
 READY_TIMEOUT = 180.0
 

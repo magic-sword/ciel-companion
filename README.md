@@ -89,6 +89,7 @@ Unity＋Live2Dが表示と操作を担当し、LiveKitが声と状態を中継�
 - 初めて参加する：[開発環境構築](docs/development-setup-ja.md) → [システム構成](docs/architecture-ja.md)
 - 会話を変える：[pipelineの仕組み](docs/conversation-pipeline-ja.md) → [プロンプト編集](server/agent/README.md)
 - ゲーム連携を読む：[Minecraft](docs/minecraft-design-ja.md) → [環境のMCP設計と検証状況](docs/game-environment-mcp-design-ja.md)
+- Minecraft を試験・比較する：[ローカル LLM](docs/local-llm-ja.md) → [ベンチマークの実行・課題拡張・性能評価](docs/minecraft-benchmark-ja.md)。エージェント向け手順は [評価スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)
 - モデルを制作する：[Live2D制作仕様](docs/ciel-live2d-production-spec-ja.md) → [現在の制作方針](docs/ciel-live2d-rebuild-analysis-plan-ja.md)
 - その他の機能・研究・決定記録：[資料一覧](docs/README.md)
 

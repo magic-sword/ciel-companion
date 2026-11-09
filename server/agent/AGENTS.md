@@ -1,5 +1,7 @@
 # 会話サーバーを扱うエージェントへ
 
+Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベンチマークスキル](../../.agents/skills/ciel-minecraft-benchmark/SKILL.md)と [評価仕様](../../docs/minecraft-benchmark-ja.md)を読む。実機は自宅サーバーの専用環境を使う。ローカルへの切替設定は [ローカル LLM](../../docs/local-llm-ja.md)。
+
 会話の組み立て（pipeline：小脳と心・聞く係・付箋・口）を直す前に、[会話の組み立て（pipeline）の仕組み](../../docs/conversation-pipeline-ja.md) を読んでください。
 
 プロンプトを編集・追加する前に、[プロンプト管理方針](../../docs/decisions/prompt-management-ja.md) と [編集手順](README.md) を読んでください。
