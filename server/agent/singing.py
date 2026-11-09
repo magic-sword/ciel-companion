@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""シエルに歌を聴いてもらう（docs/singing-evaluation-research-ja.md）。
+"""シエルに歌を聴いてもらう（docs/singing-scoring-ja.md）。
 
 頼まれたら（声の道具 tools/singing.py、アプリの ciel.song）、シエルが「どうぞ」と言い、そのあいだから会話モデルへの声を止めて、
 マイクの声を会話サーバーの中だけでためる。歌声は OpenAI へ送らない（session.input の音声を外す）。
@@ -30,7 +30,7 @@ LIVE_URL = os.environ.get('CIEL_SINGING_LIVE_URL', 'http://127.0.0.1:8767/live')
 # 分析の前に、読み上げに作業用の GPU のメモリーを手放してもらう（同じ GPU に分析が入らないため。server/tts-irodori の /release）
 TTS_RELEASE_URL = os.environ.get('CIEL_TTS_RELEASE_URL', 'http://127.0.0.1:8766/release')
 # ローカル LLM（server/local-llm）も同じ GPU を約 2.6 GB 使う。歌を聴くあいだは CPU だけの形にしてもらい、分析が終わったら戻す
-# （声・LLM・分析が同じ 12 GB に入らない。docs/local-llm-ja.md）。空なら何もしない
+# （声・LLM・分析が同じ 12 GB に入らない。docs/local-runtime-ja.md）。空なら何もしない
 LOCAL_LLM_CONTROL = os.environ.get('CIEL_LOCAL_LLM_CONTROL', '')
 LLM_SWITCH_TIMEOUT = 90.0
 LLM_BACK_AFTER_CANCEL = 35.0   # やめたとき：分析のモデルが外れる（server/singing の IDLE_SECONDS 30 秒）のを待ってから戻す

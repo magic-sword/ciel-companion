@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """出来事から育つシエルの好み。会話の終わりに、本当にあった出来事（diary.py）を見て、好みを 1 つ足す・変える・外すかを決める。
 
-人物像を 3 つに分けて持つ（参考：docs/ciel-growth-research-ja.md）：
+人物像を 3 つに分けて持つ（参考：docs/shared-memory-ja.md）：
 - 芯：変わらない好み・苦手・こだわり（config/prompts/ciel_self.md）。ここでは変えない
 - 育った好み：出来事から少しずつ育つもの（DB の ciel_likes。ここで書く）
 - 物語：本当にあった出来事（DB の ciel_events。diary.py が書く）

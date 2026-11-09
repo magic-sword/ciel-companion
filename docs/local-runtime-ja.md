@@ -1,5 +1,7 @@
 # 本番・開発でローカル推論を選ぶ
 
+> 責務：本番・開発の推論設定、設定ファイルの優先順位、切替・反映単位。
+
 2026-11-10。本番Compose・開発用Composeの両方で、LLMとCPU音声認識を設定から選べる。構成対応をソースに実装し、LinuxサーバーのDocker Composeで設定の解決を確認した。稼働中の本番・開発サービスの設定変更、配布、再起動はこの整備では行っていない。
 
 ## 同じ処理を使い、設定を分離する
@@ -64,12 +66,12 @@ docker compose --env-file ../../ciel-companion/server/.env --env-file .env.dev \
 
 これらは将来の反映手順であり、今回実行したコマンドではない。モデル・DB・TTS等の依存先は事前に稼働していることが前提。OpenAIへ戻す場合は対象のLLM_BACKENDをopenaiへ戻し、STT_BACKENDが空であることを確認して対象agentを再作成する。
 
-## 検証
+## 文字入力で確認する
 
-`scripts/server/check-compose-backends.py`は、手元の本番・開発Composeを自宅LinuxサーバーのComposeで読み取り専用検証する。資格情報を含む解決結果はメモリ内だけで扱い、選択したbackend・inputと検証成否だけを出力する。サービスを起動・停止・再作成しない。
+`CIEL_DEV_INPUT=text`を指定して開発用agentを再作成し、LiveKit設定のある`server/agent`で`python local_chat.py --agent ciel-dev --game minecraft`を実行する。端末は試験用の別の部屋を作るため、Unityの既存の会話へそのまま入力するものではない。返答と操作の完了を待って次を送り、`/quit`で終了する。接続先の推論設定は端末自身では変更しない。
 
-```powershell
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/check-compose-backends.py
-```
+通常の開発用DB・同意範囲を使うことと、永続記憶を無効にした専用ベンチマークを区別する。手順・採点を伴う評価は[ベンチマーク](minecraft-benchmark-ja.md)を使う。
 
-今回7構成を合格確認：本番の既定openai、本番local、開発への本番設定の非継承、開発local、本番local文字入力、本番・開発それぞれの別Voskモデル指定。共有APIのURLと読み取り専用モデルマウントも確認した。推論・音声認識の品質試験ではない。実際の会話動作・Voskの計測は[ローカルLLM](local-llm-ja.md)、[CPU音声認識](local-stt-ja.md)の確認済み範囲を参照する。
+## 設定の検証
+
+`scripts/server/check-compose-backends.py`は手元の本番・開発Composeを自宅サーバーのComposeで読み取り専用検証する。秘密を含む解決結果は表示・保存せず、サービスを起動・再作成しない。確認済みの構成と未確認範囲は[確認状況](verification-status-ja.md)に集約する。

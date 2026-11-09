@@ -10,5 +10,5 @@
 
 ほっぺは `ParamCielCheekPoke/PullX/PullY/Jiggle{L,R}`。揺れ（Jiggle）は物理演算の6・7番目のグループ `PhysicsSettingCielCheekL/R` の出力。
 
-再検証: `python -B scripts/live2d/v64/adopt-cheek.py`。Unity への反映は、Unity を閉じた状態で `Unity.exe -batchmode -quit -projectPath unity -executeMethod Ciel.EditorTools.CielModelUpdate.ApplyCurrent` でもできる。
+再検証・更新は[現行リグの更新手順](../../../docs/ciel-live2d-rig-design-ja.md)を参照する。
 再書き出し時はCubismで正式モデルを保存し、SDKを検証・採用してから `prepare-current-runtime.py <書き出しフォルダ>` を使う。モデルや素材のハッシュが異なる場合は更新を止める。

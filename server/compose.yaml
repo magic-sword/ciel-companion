@@ -20,7 +20,7 @@ services:
       # シエルの声：Irodori-TTS で読み上げる（tts が同じマシンで動いていること）
       - CIEL_VOICE=irodori
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
-      # （docs/conversation-improvements-2026-10-ja.md）。戻すときは realtime にする
+      # （docs/conversation-pipeline-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=pipeline
       # 本番の切替はserver/.env。開発用は独立したCIEL_DEV_*を使う。
       - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-openai}
@@ -184,7 +184,7 @@ services:
       - minecraft
     restart: unless-stopped
 
-  # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/game-knowledge-design-ja.md）。体と同じイメージで、別のコンテナ。
+  # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/minecraft-design-ja.md）。体と同じイメージで、別のコンテナ。
   # 会話サーバーは今は体の MCP の入口（:8771）から同じ道具を使うので、ここへはつながない。Wiki を取り出す（下の exec）ために残す。
   # このマシンの中だけで開く
   minecraft-knowledge:

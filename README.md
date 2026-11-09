@@ -24,7 +24,7 @@
 | 配信する | Windows用のCIEL Broadcast。操作画面と、OBSに取り込むシエル映像・目的カードを別ウィンドウで表示 |
 | 会議・歌を楽しむ | 仮想オーディオを使った会議参加、議事録、歌を聴いて感想を返す機能 |
 
-**開発中のプロジェクトです。** 日常の音声会話はWindows・Androidでの確認記録があります。MinecraftのMCP統合など、追加実装の試験と実ゲームでの確認は別に管理しています。各機能の確認範囲は[資料一覧](docs/README.md)から参照してください。iOSは未検証です。
+**開発中のプロジェクトです。** 日常の音声会話はWindows・Androidでの確認記録があります。MinecraftのMCP統合など、追加実装の試験と実ゲームでの確認は別に管理しています。各機能の確認範囲は[現在の確認状況](docs/verification-status-ja.md)を参照してください。iOSは未検証です。
 
 ## 日常版と配信版
 
@@ -49,7 +49,7 @@
 このリポジトリはソースコードと制作資料です。Unityでの表示確認と、サーバーに接続した音声会話では必要な準備が異なります。
 
 1. **画面・モデルを確認する**：Git LFSとUnity **6000.6.4f1**を用意し、Live2D Cubism **5 SDK R5（URP）**を別途復元して、`unity/`を開きます。[セットアップ手順](docs/development-setup-ja.md)
-2. **音声会話を試す**：LiveKitの接続設定、会話サーバー、Irodori-TTSが必要です。OpenAI・LiveKitの資格情報はサーバー側に設定します。[接続手順](docs/development-setup-ja.md#7-音声会話を試す場合)
+2. **音声会話を試す**：LiveKitの接続設定、会話サーバー、Irodori-TTSが必要です。LiveKitの資格情報をサーバー側に設定し、推論はOpenAIまたはローカルを選びます。[推論の実行設定](docs/local-runtime-ja.md)[接続手順](docs/development-setup-ja.md#7-音声会話を試す場合)
 3. **コードから参加する**：通常のPython回帰テストはAPIキー・GPUなしで実行できます。[テストの準備と実行](docs/regression-tests-ja.md)
 
 クローンの例（PowerShell）：
@@ -89,8 +89,8 @@ Unity＋Live2Dが表示と操作を担当し、LiveKitが声と状態を中継�
 - 初めて参加する：[開発環境構築](docs/development-setup-ja.md) → [システム構成](docs/architecture-ja.md)
 - 会話を変える：[pipelineの仕組み](docs/conversation-pipeline-ja.md) → [プロンプト編集](server/agent/README.md)
 - ゲーム連携を読む：[Minecraft](docs/minecraft-design-ja.md) → [環境のMCP設計と検証状況](docs/game-environment-mcp-design-ja.md)
-- Minecraft を試験・比較する：[ローカル LLM](docs/local-llm-ja.md) → [ベンチマークの実行・課題拡張・性能評価](docs/minecraft-benchmark-ja.md)。エージェント向け手順は [評価スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)
-- モデルを制作する：[Live2D制作仕様](docs/ciel-live2d-production-spec-ja.md) → [現在の制作方針](docs/ciel-live2d-rebuild-analysis-plan-ja.md)
+- Minecraft を試験・比較する：[ローカル LLM](docs/local-runtime-ja.md) → [ベンチマークの実行・課題拡張・性能評価](docs/minecraft-benchmark-ja.md)。エージェント向け手順は [評価スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)
+- モデルを制作する：[Live2D制作仕様](docs/ciel-live2d-production-spec-ja.md) → [現在の制作方針](docs/ciel-live2d-production-spec-ja.md)
 - その他の機能・研究・決定記録：[資料一覧](docs/README.md)
 
 変更した箇所に応じた[回帰テスト](docs/regression-tests-ja.md)を実行してください。`server/agent/`の変更では、その配下の[AGENTS.md](server/agent/AGENTS.md)も確認してください。

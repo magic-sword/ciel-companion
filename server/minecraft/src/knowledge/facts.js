@@ -1,4 +1,4 @@
-// マイクラの知識の窓口の facts：minecraft-data（体と同じ版）から、正確な値を引く。docs/game-knowledge-design-ja.md の 3.2。
+// マイクラの知識の窓口の facts：minecraft-data（体と同じ版）から、正確な値を引く。docs/minecraft-design-ja.md。
 // 体の動き（src/craft-plan.js・src/skills.js）と同じ部品を使い、答えと体の動きが食い違わないようにする。
 import { createRequire } from 'node:module';
 

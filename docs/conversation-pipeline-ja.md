@@ -1,239 +1,69 @@
-# 会話の組み立て（pipeline）の仕組み
+# 会話pipeline
 
-2026-11-10：local時の音声認識をCPUのVoskへ接続。入力は既定voice、文字試験はtextを明示する。[設定・実測と制約](local-stt-ja.md)を参照。途中結果の生成と、依頼・操作の確定を分ける。
+> 責務：入力から返答までの実行順、共通履歴、経路選択、発話の調停。
 
-作業と会話の画面通知・操作の最新仕様は[作業・会話の表示契約](work-display-contract-ja.md)を参照する。goal.state / goal.controlはv2で、workの進行と発話状態を別に表示する。
+この資料は音声・文字入力から返答、履歴、通知を組み立てる現在の実行順と状態の所有者を説明する。モデル設定は[実行設定](local-runtime-ja.md)、道具公開は[能力カタログ](capability-runtime-ja.md)、サービス入力の優先順位は[反応契約](service-events-and-reactions-ja.md)を正本とする。
 
-2026-11-10の追加実装：[サービス入力とリアクション](service-events-and-reactions-ja.md)。標準pipeline向けに共通契約・反応調停を実装した。現在の仕様はリンク先を参照する。
-
-2026-11-10：検索・記憶保守・画像説明・YouTube取得・アプリ操作の経路を[サービス境界](service-boundaries-ja.md)へ統一。自発的処理も同じMCP処理を使い、発話・受付・イベントの選択はホストが担当する。
-
-2026-11-10：pipelineの心に渡す道具とドメインの使い方は[能力カタログ](capability-runtime-ja.md)で段階的に公開する。以下の「全部の指示・道具」は変更前の説明であり、現在は発言元・権限・読み込み済みサービスの積で絞る。全体の判断は[設計方針の正本](design-policy-ja.md)を参照。
-
-2026-11-09のゲーム実行の変更：[作業契約](game-work-contract-ja.md)。ゲーム中は `game_intake.py` が依頼を構造化して受け付け、計画・実行はゲーム側が行う。通常の会話もゲーム中は道具を扱える一つの判断経路を使い、小脳から心への約束再実行は起動しない。作業結果は確認済みの短い通知をMouth経由で伝える。以下の小脳・意味ルーティング・約束の受け皿の説明は、ゲーム中の新しい実行経路には適用しない。
-
-更新：2026-10-31（日本時間）。本番と開発用の会話サーバーは `CIEL_MODEL=pipeline` で動く（`server/compose.yaml`・`server/compose.dev.yaml`）。
-
-この文書は、会話サーバー（`server/agent/`）を直す人と AI エージェント（Claude Code・Codex）向けの **今の作りの地図** です。
-- 何が良くなったか・なぜそうしたかは [会話の作り直しの成果](conversation-improvements-2026-10-ja.md) にあります。
-- 経緯と測定の記録は [聞く・考える・話すの作り直し（設計）](attention-and-thinking-design-ja.md) にあります。
-- 全体の構成（アプリ・LiveKit・読み上げ・DB）は [システムの構成](architecture-ja.md) にあります。
-
-## 0. 先に知っておくこと（要点）
-
-1. **返事は 2 つの係が作る。** ふだんの返事は **小脳**（短い指示・道具なし・最近の 16 発言）が作る。頼みごと・長い話・会議などは **心**（全部の指示・道具あり・最近の 40 発言）が作る。どちらが作るかは **コードが決める**（`mind.py` の `Mind.route`）。モデルには決めさせない。
-2. **会話の記録は 1 つ。** 正は `conversation.py` の `Conversation` です。返事のたびに、この記録から送る会話を組み立てる（`Mind.build`）。LiveKit が持つ会話からは「今回の分」（最後のシエルの返事より後ろ）だけを使う。LiveKit の会話は書き換えない。
-3. **シエルを話させる入り口は 1 つ。** `mouth.py` の `Mouth` です。`session.generate_reply` を直接呼ばない。
-4. **頼みごとは付箋で持つ。** `board.py` の `Board` に置く。今の状態は過去の発言から推し量らず、付箋の一覧「[今のタスク]」で渡す。頼んだ発言は、送る会話の中で「（→ #1 会議の議事録をとる：実行中）」に置き換える。
-5. **話の途中の頼みは聞く係が拾う。** `listener.py` の `Listener` が、文字起こしの区切りごとに見る。返事を待たず、コードが議事録を始める・終える。
-6. **大事な振る舞いは、指示文ではなくコードで止める。** 道具を渡さない、返事を作らない、などで止める。指示文（`config/prompts/*.md`）は補助にとどめる。
-7. **プロンプトの本文は `config/prompts/*.md` に置く。** 参照先は `config/persona.toml` です。Python に本文を書かない（`server/agent/AGENTS.md`）。
-
-## 1. 全体の流れ
+## 入力から返答まで
 
 ```mermaid
 flowchart TD
-    MIC["アプリのマイク音声<br>（LiveKit のトラック）"] --> VAD["音声検出 1 つ<br>silero（inference.VAD）"]
-    MIC --> TAP["speakers.AudioTap<br>話者識別用に声を写す"]
-    VAD --> STT["文字起こし<br>gpt-live-transcribe<br>話している途中から文字が出る"]
-    VAD --> TD["区切り<br>TurnDetector v1-mini<br>＋ endpointing（dynamic 0.6〜1.5 秒）"]
-    STT -->|"区切りごとの確定文<br>user_input_transcribed"| EAR["聞く係 listener.py<br>「録・まとめ」→ 軽いモデルで確認"]
-    STT --> REC["ConversationRecorder<br>→ Conversation（唯一の記録）"]
-    EAR -->|"頼みなら"| MIN["minutes.Minutes<br>start / finish"]
-    MIN --> BOARD["board.Board<br>付箋の一覧"]
-    EAR --> BOARD
-    TD -->|"話し終えた（先に作り始めることもある）"| LLM["Ciel._pipeline_llm<br>agent.py"]
-    LLM --> TURN["turns.pipeline_turn<br>話者・覚えていること・タッチ・話した長さ"]
-    LLM --> ROUTE{"Mind.route"}
-    ROUTE -->|talker| TALKER["小脳<br>talker 指示・道具なし"]
-    ROUTE -->|mind| MIND["心<br>全部の指示・tools_for の道具"]
-    ROUTE -->|skip| SKIP["返事を作らない<br>（頼みだけの発言）"]
-    TALKER --> TTS["emotion.tts_node<br>→ Irodori-TTS 1 文ずつ"]
-    MIND --> TTS
-    TTS --> OUT["アプリへ声と表情"]
-    MIN -->|"知らせ"| MOUTH["mouth.Mouth<br>say_latest：切れ目で言う"]
-    MOUTH -->|"待っている知らせ"| MIND
-    MOUTH --> LLM
-    REC --> BRIEF["Mind の見回り<br>「今のまとめ」を書く（mind_brief.md）"]
-    BRIEF --> TALKER
-    BRIEF --> MIND
+  I[音声または文字] --> S[逐次認識・発話区切り]
+  S --> H[共通会話履歴・本人確認]
+  H --> R[Mindの経路選択]
+  R --> C[必要な能力と指示だけをロード]
+  C --> L[LLMの返答・構造化した操作]
+  L --> M[Mouthの発話管理]
+  M --> T[感情タグ・Irodori・LiveKit]
+  E[サービスの出来事] --> Q[反応調停]
+  Q --> M
+  Q --> H
 ```
 
-組み立ては `agent.py` の `make_pipeline` と `entrypoint` の `if PIPELINE:` の中で行う。`PIPELINE` は `CIEL_MODEL=pipeline` かつ `CIEL_VOICE=irodori` のときだけ真になる。
+1. `agent.make_pipeline`が入力部品を組み立てる。voiceではVAD、OpenAIまたはVoskの途中結果・確定結果、発話区切りを使用する。textではマイクを購読せずmanual入力とする。
+2. `conversation_recording.py`と`Conversation`が、確定状態・発言ID・話者・時刻を記録する。途中の認識と確定した依頼を区別する。
+3. `listener.py`は文字起こしの確定から議事録等の依頼を確認し、`game_intake.py`はゲームの構造化した依頼・明示停止を受け付ける。停止を推論の完了まで待たせない。
+4. `turns.py`が声の区間、本人確認、記憶、接触等を返答の補足へまとめる。話者不明・「たぶん」を確かな本人に昇格させない。
+5. `Ciel._pipeline_llm`が`Mind.route/build/tools_for`を使用する。付箋に受け付け済みの依頼を重複実行しない。
+6. サービスの結果や発話要求は`Mouth`で順番・取消を管理し、`emotion.py`とIrodori経由で声・表情を送る。生成完了と最後まで発話したことは別に確認する。
 
-## 2. 1 回の返事ができるまで（処理の順）
+## 経路選択
 
-| 順 | どこで | 何をする |
-|---|---|---|
-| 1 | LiveKit（`make_pipeline`） | 音声検出が話し始め・話し終わりを見る。区切りのモデルと endpointing が「話し終えた」を決める。決まる前から返事と声を作り始める（`preemptive_generation`）。 |
-| 2 | `listener.Listener.on_transcribed` | 文字起こしが区切られるたびに呼ばれる。「録・まとめ」があれば、確認中の付箋を出して軽いモデルで確かめる。頼みなら `Minutes.start/finish` を呼び、その発言を付箋に結び付ける。 |
-| 3 | `Ciel.on_user_turn_completed` → `turns.pipeline_end_turn` | 長く話したなら相づちを流す（`aizuchi.py`）。声の登録の読み上げ中なら `StopResponse` で返事を作らない。 |
-| 4 | `Ciel.llm_node` → `_pipeline_llm` | ここから返事を作る。`Agent.default.llm_node` はここでしか呼ばない。 |
-| 5 | `turns.TurnReplies.pipeline_turn` | 前の発言のあとに話した区間で、話者を決める（`speakers.py`）。返す値は `tag`（話者の 1 行）・`memory`（覚えていること）・`touch`（タッチの 1 行）・`seconds`（話した長さ）・`enroll`。 |
-| 6 | `Listener.settled(3.0)` | 確かめている頼みがあれば、終わるまで待つ（ふだんは約 1 秒）。聞く係と心が同じ頼みを同時に受けないようにするため。 |
-| 7 | `Mind.route` | `talker`・`mind`・`skip` のどれかを決める（3 章）。 |
-| 8 | `Mind.build`（＋心なら `Mind.tools_for`） | 送る会話を組み立てる（4 章）。 |
-| 9 | `emotion.tts_node` | 文の頭の感情の印（`[happy]` など）を読む。1 文ずつ、その感情の声で Irodori-TTS に読ませ、表情のイベントをアプリへ送る。`[silent]` の返事は読まない（`mode.drop_silent`）。 |
-| 10 | `conversation_item_added` | `ConversationRecorder` が記録に書く。心が知らせを添えた返事を最後まで言えたら、その知らせを口から外す（`agent.py` の `on_said`）。 |
+一般会話は短い指示・履歴のtalkerと、道具や確認を扱うmindをコードで選ぶ。道具結果の続き、内部通知、依頼、長い発言、ひかえめの会議などはmindで判断する。付箋になった依頼だけの発言はskipし、担当サービスからの報告と二重に返答しない。正確な判定順は`mind.py`の`route`を参照する。
 
-シエルが話している途中に相手が話すと、LiveKit が止める。0.8 秒より短い声（咳・相づち）では止めない（`interruption: {'mode': 'vad', 'min_duration': interruptions.CONFIRM_SECONDS}`。`CIEL_INTERRUPT_SECONDS` で変えられる）。
+ゲーム中は`agent.py`がmind経路を使い、道具のない返答から約束を再実行させる旧経路を通常のゲーム実行に使わない。計画と修復は[ゲーム側の作業契約](game-work-contract-ja.md)が所有する。ローカルモードでは埋め込みAPIによる意味ルーター・例文学習を使わない。
 
-## 3. 小脳と心の振り分け（`Mind.route`）
+mindへは能力の概要を渡し、`load_capabilities`で必要なサービスのスキーマと指示をロードする。実行時にも話者・コメントの権限と公開範囲を検証する。コメントからの道具結果の続きも、持ち主の依頼へ権限を昇格させない。
 
-上から順に見て、最初に当てはまったものに決める。
+## 会話の組み立てと履歴
 
-| 条件 | 結果 | 理由（`debug_log` の `mind_route`） |
-|---|---|---|
-| 今回の分に道具の結果（`function_call_output`）がある | 心 | 道具の結果を受けた続き |
-| 口が `minutes`・`song`・`enrolled`・`comment` などを頼んだ直後（`Mind.on_say` が `_deep` を立てる。`DEEP_WHY`） | 心 | 知らせ・コメントへの返事は心が作る |
-| 今回の分に相手の発言が無い（自分から話しかける・タッチなど） | 小脳 | — |
-| 最後の発言から付箋になった頼みを除くと、つなぎの言葉（`FILLER`）しか残らない | **skip** | `on_board`。一言は議事録係の知らせが言う |
-| 口に、まだ言っていない知らせが待っている | 心 | `notice`。返事の中で伝える |
-| 頼みごとの言葉がある（`REQUEST`：録・まとめ・調べ・検索・何時・名前・覚えて・歌 など） | 心 | `request` |
-| 10 秒以上話した、または 80 字以上 | 心 | `long` |
-| ひかえめでなく、シエルのあと 2 人以上が話した | 心 | `people` |
-| ひかえめで「シエル」（聞き間違いを含む `NAME`）と呼ばれた | 心 | `named` |
-| ひかえめ（会議）のとき | 心 | `quiet`。黙るか答えるかを心が見極める |
-| どれでもない | 小脳 | — |
-| （小脳に決まったあと）遊んでいるあいだ、発言が道具ごとのきっかけ（`config/routes/<game>.json`・DB の `route_examples`）に意味で近い | 心 | `semantic`（`Mind.second_look`・`router.py`。[決定記録](decisions/semantic-route-ja.md)） |
-| （返事のあと）遊んでいるあいだ、小脳が体の動きを約束した（`PROMISE`） | 話し終えたら心 | `promise`（口の why `game` で、心が約束を道具でやる） |
+履歴の正本は部屋ごとの`Conversation`。LiveKitの`chat_ctx`を直接書き換えず、送信用の会話を組み立てる。人物像・保存同意等の常時指示、最近の発言、現在の日時・本人・作業・まとめ、今回の入力と道具結果を用いる。今回の入力を保存履歴とLiveKit側から二重に送らない。保持数等の変更は`mind.py`・`conversation.py`とテストを同時に更新する。
 
-遊んでいるあいだの振り分けの例文は育つ（`Mind.after_reply`）：心が体・ゲームの道具を呼んだ発言はその道具のきっかけに、小脳が約束だけした発言は心がやった道具のきっかけに、意味で心へ回したのに体を動かす道具を使わなかった発言は小脳の例文に足す。
+会話本文は原則接続中のメモリーに保持する。共通履歴は最大3000発言・合計200万字・1発言16000字。古い保持範囲の欠落と未確定・省略を検索結果に示し、見つからないことを未発言の証拠にしない。会話検索は同じ接続内の履歴だけを対象とし、人物DBや別会話の全文とは区別する。
 
-**頼みの言葉を探す前に、付箋になった部分を除く**（`Board.strip`）。除かないと、「議事録開始して」が残っている限り心に回し続け、心が終了の頼みと取り違えた。
+人物メモ・関係・議事録は履歴のカーソルと確定状態を使う。永続化の同意は[共有記憶](shared-memory-ja.md)、議事録の範囲は[議事録](meeting-minutes-ja.md)が正本。デバッグ用の明示的なログ保存は[運用](build-ja.md)で扱う。
 
-**心に渡す道具**（`Mind.tools_for`）：議事録を動かす道具（`start_minutes`・`finish_minutes`・`summarize_past_minutes`）は、今回の発言に `MINUTES_ASK`（録・まとめ・終わ・終了・止め・ストップ・送って）があるときだけ渡す。相手の発言が無い返事（知らせ）では全部渡す。指示で「終えない」と書いても、心は終える道具を呼んだ。そのため、道具そのものを渡さない。
+## 発話・自発的な思考・付箋
 
-**コメントへの返事の道具**：口の why が `comment`（配信のコメントへの返事）のときは、その道具の結果を受けた続きも含めて、コメントから使ってよい道具（`tools/` の `FROM_COMMENTS`）だけを渡す。LiveKit は、送らなかった道具でも Agent の道具なら呼んでしまうので、渡していない道具の呼び出しは `mind.py` の `only_given` で返事の流れから落とす（[道具の決定記録](decisions/tools-ja.md)）。
+`mouth.py`を発話の入口とし、各機能から無秩序に`generate_reply`しない。`initiative.py`の自発的な思考と`curiosity.py`の調査は、利用者の入力・作業の正式状態とは独立する。会話の番、出来事、発話済み・用済みの状態で調停し、生成しただけで通知を消費しない。
 
-## 4. 送る会話の組み立て（`Mind.build`）
+`Board`は依頼受付と説明用の付箋を持つ。体の現在状態やゲーム内の計画ツリーの正本にはしない。本人の記憶・検索・歌等の処理本体は[サービス境界](service-boundaries-ja.md)を使い、受付と発話は会話ホストが行う。
 
-モデルに送る会話は、上から次の順に並べる。
+接触・被ダメージ等の即時表情はLLMを待たず、発話はTTL・優先順位・会話の世代を検証する。作業の状態と会話・リアクションは[表示契約](work-display-contract-ja.md)に従って並行表示する。
 
-```
-[system] 指示
-         小脳：Ciel.talker_instructions_for（人物像・感情の印・タッチ・talker.md・tasks.md・その場にいる人・おしゃべり度）
-         心　：Ciel.instructions_for（上に加えて、話者・議事録・会話の道具・調べもの・内なる考え・歌の使い方）
-[user / assistant] 最近の発言（Conversation から。小脳 16・心 40。1 発言 1200 字まで）
-         user は「名前：本文」。付箋になった頼みは「（→ #番号 内容：状態）」に置き換える
-         今回の発言（LiveKit の側にある分）は、ここには入れない
-[system] 補足（Mind._notes）
-         今の日時（clock.now_line）
-         [今のまとめ]（心が書いたもの）
-         [今のタスク]（Board.context）
-         心だけ：議事録の状態（Minutes.context）と、議事録係からの一言（take_note）
-         覚えていること（pipeline_turn の memory）
-         ひかえめのときの念押し（talk_quiet_turn.md）
-         心で、相手の発言があり、知らせが待っているとき：[まだ伝えていない知らせ]
-[system] 今回の発言の話者（[発言者：…]）とタッチの 1 行
-[今回の分] LiveKit の会話の、最後のシエルの返事より後ろ（今回の発言・今回だけの指示・道具の呼び出しと結果）
-```
+## ローカル推論と正規化
 
-決まり：
-- **LiveKit の会話（`chat_ctx`）は書き換えない。** 書き換えると、先に作り始めた返事が「発言が変わった」とみなされて捨てられ、毎回作り直しになった。話者の 1 行も、送る会話にだけ置く。
-- **今回の発言は LiveKit の側の分を使う。** 記録の側の同じ発言（とその切れ端）は飛ばす。文字起こしの確定が返事より遅れることがあるため。
-- **「今のまとめ」** は、心が裏で書く（`Mind.step`・`_write_brief`、`config/prompts/mind_brief.md`）。いつ書くかは、発言が増えたら、`summaries/live.py` の `due` と同じ決め方で決める。小脳は最近の 16 発言しか読まないので、会話全体の流れはここで伝える。
+ローカルLLMへ送る会話だけでsystemの補足を先頭へまとめ、連続assistantを順序を保って結合する。元の履歴・道具呼び出しと結果の境界は変更しない。末尾assistantがprefillと扱われる場合は現在の内部イベントを末尾へ渡し、過去の利用者の依頼を繰り返さない。thinkingの無効化・JSONと道具呼び出しは`models.py`・`mind.local_context`を参照する。
 
-## 5. 付箋（`board.py`）
+## 変更と確認の入口
 
-```mermaid
-stateDiagram-v2
-    [*] --> 確認中: 聞く係が「録・まとめ」を聞いた
-    確認中 --> [*]: 頼みではなかった（付箋を外す）
-    確認中 --> 実行中: 議事録を始めた
-    [*] --> 実行中: 心の道具・アプリのボタンで始めた
-    実行中 --> 仕上げ中: 終えた（清書して送る）
-    [*] --> 仕上げ中: 過去の分をまとめて送る
-    仕上げ中 --> 完了
-    仕上げ中 --> 失敗
-    完了 --> [*]: 120 秒で一覧から消える
-    失敗 --> [*]: 120 秒で一覧から消える
-```
-
-- 付箋は、聞く係・心の道具・アプリのボタンのどれが受けても 1 枚です。動かすのは `minutes.py` の `start`・`finish`・清書の終わりです。
-- `Card.said` に、頼んだ発言の文字起こしを持つ。それを `mark`（印に置き換える）・`strip`（頼みとして数えない）が使う。
-- 変わるたびに `board.state` をアプリへ送る（`ciel.event`）。アプリはまだ表示しない。
-- 議事録のほかに、シエル自身が気になっていること（内なる考え、`initiative.py`）を「気になっている」（`want`、`by='self'`）の付箋にする。気持ち 4 以上で今の話題に新しいもの 2 つまで。話した・用済みになったら外す。ひかえめのあいだは外す。
-- シエルが自分で調べていること（`curiosity.py`）も「気になって調べている」（`research`、`by='self'`）の付箋にする。分かったら完了にし、知らせ（why `research`）で話す。
-- 頼まれた調べもの・歌・声の登録は、まだ乗っていない。
-
-### 自分から話す（話す番）
-
-沈黙の秒数では話さない（満腹度も使わない）。話すのは次のときだけで、どちらも口の why は `initiative`、作るのは心（`DEEP_WHY`）。指示は `config/prompts/initiative_open.md` で、話す価値が無ければ `[silent]` を返す。
-- 相手への返事を話し終えて、相手が 1.5〜4 秒話し始めないとき（`Initiative.continuing`）に、気になっている付箋がある。ふつう・おしゃべりのどちらでも。話し終えたときに考え中なら、考え終わるまで 6 秒まで開けておく（`CONTINUE_HOLD`）。付箋が間に合うように、相手の発言は 20 秒の間を待たずに考える。
-- おしゃべりのとき、静かなあいだに気持ち 5 の考えが新しく浮かんだ。話しかけて返事が無ければ、相手が話すまで次は無い。
-
-言い直し（`correction`、気持ち 5）は付箋にせず、ふつうのときに 3 秒の間で話す（今までどおり）。
-
-調べてみたいこと（`research`）で調べる質問（`query`）があれば、付箋にする前に `curiosity.Curiosity.offer` に渡し、シエルが自分で調べる。分かったことは知らせ（`say_latest('research')`、`config/prompts/research_found.md`）で、話の切れ目か次の返事の中で話す。ひかえめ・止めている間・頼まれた調べものの最中・1 時間 3 回を超えたら調べない。分かったことは考える係にも渡し（`Initiative.learn` → 入力の `learned`）、報告を話し終えたらすぐ見直させる。見直すまでは「気になっている」付箋を外し、話す番も開かない（調べて答えが出た「聞きたいこと」を聞き直さないため）。
-
-## 6. 口と知らせ（`mouth.py`）
-
-| 呼び方 | 使う場面 |
+| 変更 | 主な実装 |
 |---|---|
-| `say(why, **kwargs)` | 今すぐ話させる（あいさつ・返事・タッチ・歌・自分から話しかける）。`before_say` で心に why を知らせる |
-| `say_when_free(why, wait, anyway, settle)` | だれも話しておらず、シエルも考え中・話している最中でない切れ目を待ってから話す（声の登録のあとの一言） |
-| `say_latest(why, settle)` | 知らせを切れ目で言う。待つあいだに同じ why が来たら、最新の 1 つだけ言う（議事録の知らせ。`MINUTES_SETTLE = 1.2` 秒黙ってから） |
-| `waiting()` / `drop(why)` | まだ言っていない知らせを心が読み、返事の中で伝える。言い終えたら外す |
+| 音声認識と発話区切り | `agent.py`、`speech_input.py`、`vosk_stt.py`、`vosk_engine.py` |
+| 経路と履歴の組み立て | `mind.py`、`turns.py`、`conversation.py` |
+| 指示本文 | [プロンプト管理](prompt-management-ja.md)、`config/persona.toml` |
+| 本人確認・保存 | `speakers.py`、`speaker_store.py`、`tools/memory.py` |
+| 受付・付箋・発話 | `listener.py`、`game_intake.py`、`board.py`、`mouth.py` |
+| 反応・音声・表情 | `reactions.py`、`emotion.py`、`irodori_tts.py` |
 
-知らせの流れ（例：長い話の途中で「議事録開始して」）：
-1. 聞く係が議事録を始める。`Minutes.on_change` → `agent.py` の `on_minutes` → `say_latest('minutes', ...)` が切れ目を待つ。
-2. 相手が話し終えて返事を作る。`route` は `notice` で心に回す。`build` が待っている知らせを `[まだ伝えていない知らせ]` に入れ、`handed` に覚える。
-3. 心の返事が止められずに最後まで言えたら、`on_said` が `voice.drop('minutes')` を呼び、知らせは別に言わない。止められたら知らせは待ち続け、切れ目で言う。
-
-## 7. 設定（環境変数）
-
-| 環境変数 | 既定 | 意味 |
-|---|---|---|
-| `CIEL_MODEL` | コードは `realtime`、Compose は `pipeline` | 組み立て。`realtime` に戻すと以前の形 |
-| `CIEL_VOICE` | `irodori` | pipeline は irodori のときだけ |
-| `CIEL_MIND_MODEL` | `gpt-5.4-mini` | 小脳と心の両方のモデル（`openai.LLM`） |
-| `CIEL_MIND_REASONING` | `none` | 小脳と心の考える量 |
-| `CIEL_STT_MODEL` | `gpt-live-transcribe` | 文字起こし。`keywords` で「シエル」「議事録」と覚えている人の名前を渡す |
-| `CIEL_LISTENER_MODEL` | `gpt-5.4-mini` | 聞く係の確認 |
-| `CIEL_BRIEF_MODEL` | `gpt-5.4-mini` | 今のまとめ |
-| `CIEL_ENDPOINT_MODE` / `_MIN` / `_MAX` | `dynamic` / 0.6 / 1.5 | 話し終えたと決めるまでの待ち |
-
-モデルの一覧と単価は `models.py` の `ROLES`・`PRICES`・`PER_MINUTE` が正です。
-
-使う指示文（`config/prompts/`）：
-- 小脳だけ：`talker.md`
-- 小脳と心の両方：`tasks.md`
-- 今のまとめ：`mind_brief.md`
-- 聞く係：`listener.md`
-- 心：`character.md` ほか、`instructions_for` が並べるもの
-
-## 8. 直したいときの入口
-
-| やりたいこと | 触る場所 | 気をつけること |
-|---|---|---|
-| どちらの係が返すかを変える | `mind.py` の `route`・`REQUEST`・`LONG_*` | `test_mind.py` に場面を足す。`debug_log` の `mind_route` で確かめる |
-| 小脳の話し方 | `config/prompts/talker.md`・`talker_instructions_for` | 小脳は道具を持たない。「しました」と言わせない |
-| 心に渡す道具を絞る | `mind.py` の `tools_for` | 知らせ（発言なし）の返事では全部渡す |
-| 話の途中で拾う頼みを増やす | `listener.py`（`WORDS`・`act`）・`listener.md`・`board.py` | 付箋に結び付けないと、心が同じ頼みを受け直す |
-| 新しい種類の付箋（調べもの・歌など） | `board.py` の `add/move`、その係のモジュール | `said` を結び付ける。`tasks.md` は種類によらず読める形のまま |
-| 新しい知らせ | `mouth.py` の `WHY`、`mind.py` の `DEEP_WHY` | `say_latest` を使い、`generate_reply` を直接呼ばない |
-| 区切り・割り込みの秒数 | `agent.py` の `make_pipeline`・`ENDPOINT_*`・`interruptions.CONFIRM_SECONDS` | 短くすると、息つぎで返事を始めては止められる |
-
-## 9. 確かめ方
-
-- **単体テスト（料金なし）：** リポジトリのルートで `.venv/Scripts/python.exe -m unittest discover -s server/agent/tests`、または `scripts/server/run-regression.py`（[回帰テスト](regression-tests-ja.md)）。関係するのは `test_mind.py`・`test_mouth.py`・`test_board.py`・`test_listener.py`・`test_minutes_*.py`。
-- **場面の比べ（料金あり、全場面 2 回で約 0.6 ドル）：** 開発用のコンテナで `bench_compare.py` を回す（solo・long_request・meeting・idle）。回す前に料金を伝える（[料金のかかる確認](paid-checks-ja.md)）。
-- **デバッグ用の会話ログ：** 開発用はいつも残す。`scripts/server/debug-log.sh pull --dev` で取り出す。pipeline で見る種類は次のとおり。
-  - `mind_route`（振り分けの理由）
-  - `mind_brief`（今のまとめ）
-  - `board`（付箋の動き）
-  - `listener_action`（聞く係が動かしたもの）
-  - `speak`（口の why）
-  - `item`（返事の文と、止められたか）
-  - `model_usage`（料金）
-  - `mind_output`（小脳・心が作った文と道具の呼び出し・最後まで作れたか）と、`speech`・`speech_done`（話す予定ができた・声になったか止められたか）。返事が消えたとき・話す番で黙ったか（`[silent]`）は、この 3 つを id と時刻で見比べる
-  - `thought_opening`（話す番）・`curiosity_start`・`curiosity_done`（自分で調べた）
-- **反映：** 開発用は `scripts/server/deploy-server.sh --dev`、本番は `scripts/server/deploy-server.sh`（[ビルド・サーバーデプロイ](build-ja.md)）。
-
-## 10. まだ残っていること
-
-詳しくは [成果の 4 章](conversation-improvements-2026-10-ja.md#4-残っていること) にあります。
-- 止められた直後に、次の返事が声にならないことがある。原因はまだ分からない。調べるには、作った文と道具の呼び出しをログに残す必要がある。
-- 会議で、人どうしの話に 1 回ほど口をはさむ。
-- 調べもの・歌・声の登録は、まだ付箋に乗っていない。
+試験コマンドは[回帰テスト](regression-tests-ja.md)、確認済み範囲と未確認項目は[確認状況](verification-status-ja.md)を参照する。

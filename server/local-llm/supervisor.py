@@ -1,4 +1,4 @@
-"""ローカル LLM（llama.cpp の llama-server）を動かし、GPU を使う形と CPU だけの形を切り替える係。docs/local-llm-ja.md。
+"""ローカル LLM（llama.cpp の llama-server）を動かし、GPU を使う形と CPU だけの形を切り替える係。docs/local-runtime-ja.md。
 
 - llama-server は OpenAI と同じ形の窓口（LLM_PORT、既定 8094。/v1/chat/completions）。会話サーバーの裏の役目（内なる考え・
   まとめ・メモ・関係・育つ好み）が使う（server/agent/models.py の CIEL_LOCAL_ROLES）。

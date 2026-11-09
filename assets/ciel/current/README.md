@@ -24,4 +24,4 @@
 - ほっぺ（L＝モデルの左＝画面の右）：`ParamCielCheekPoke{L,R}` 押す0〜1（くぼみの影の不透明度は0→0.3）、`ParamCielCheekPullX{L,R}` 外向き＋・`PullY{L,R}` 下向き＋で−1〜1、`ParamCielCheekJiggle{L,R}` は物理演算の出力（押す量を入力にした短い振り子）。顔の回転の下に `Cheek_Squish_L/R` のワープを挟み、顔・口・鼻の曲面をその子にした。Unityでは `CielTouch` がつつき・引っ張りを扱い、内側へは変形させず、上へはわずかにだけ引く。引っ張りの強さで困り顔／半泣きにし、会話サーバーへ `cheek`・`pull` を知らせる。
 - 頬の赤みは、表情用も含めて目の下の部品より上に描く。
 
-再検証: `python -B scripts/live2d/v64/adopt-cheek.py`。過去の版は Git の履歴（タグ `archive/pre-history-cleanup` 以前）とローカルの `.local/history/` にある。
+再検証・更新は[現行リグの更新手順](../../../docs/ciel-live2d-rig-design-ja.md)を参照する。

@@ -1,5 +1,7 @@
 # ゲーム側MCPの作業契約
 
+> 責務：ゲーム非依存の依頼・予算・判断・取消・work状態の契約。
+
 2026-11-09実装。接続profileは2、`profile.work.version`は1。ゲーム側が計画と実行状態の正本を持ち、シエル側は受付・判断回答・中止・状態の投影を行う。最初の能力はMinecraftのアイテム調達。
 
 ## 通信の対応
@@ -48,4 +50,4 @@
 
 Unityへは[作業・会話の表示契約](work-display-contract-ja.md)の `goal.state v2` で送る。元のstate、session/task_id/revision、判断ID、確認の有効期間、残り予算を保持する。操作は `goal.control v2` で表示対象を固定する。空の段一覧、旧pausedへの集約、can_resumeは撤去した。画面と配信が同じ表示モデルを使い、会話・リアクションは作業と並行して示す。
 
-関連：[全体の再設計](minecraft-execution-redesign-ja.md)、[ベンチマーク](minecraft-benchmark-ja.md)。
+関連：[全体の再設計](game-work-contract-ja.md)、[ベンチマーク](minecraft-benchmark-ja.md)。

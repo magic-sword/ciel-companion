@@ -48,7 +48,7 @@ AUDIO_INPUT = {'gpt-realtime-2.1-mini': (10.00, 0.30)}   # 音声の入力・そ
 PER_MINUTE = {'gpt-realtime-whisper': 0.017, 'gpt-live-transcribe': 0.017}
 
 
-# ローカル LLM（server/local-llm。docs/local-llm-ja.md）。CIEL_LOCAL_ROLES に書いた役目だけ、OpenAI ではなくここへ送る。
+# ローカル LLM（server/local-llm。docs/local-runtime-ja.md）。CIEL_LOCAL_ROLES に書いた役目だけ、OpenAI ではなくここへ送る。
 # 裏で動く役目（内なる考え・まとめ・メモ・関係・育つ好み）向け：少し遅れても会話は止まらない（1 回 13〜50 秒）
 LOCAL_URL = os.environ.get('CIEL_LOCAL_LLM_URL', 'http://127.0.0.1:8094/v1' if LOCAL_TEST else '').strip()
 LOCAL_ROLES = {r.strip() for r in os.environ.get('CIEL_LOCAL_ROLES', '').split(',') if r.strip()}

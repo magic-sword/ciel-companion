@@ -5,7 +5,7 @@ description: ciel-companion の Minecraft タスクの実用性を評価し、�
 
 # Minecraft タスクを評価する
 
-最初に [実用性評価 practical-v1](../../../docs/minecraft-benchmark-practical-ja.md)と [仕様・実行手順](../../../docs/minecraft-benchmark-ja.md)を読む。課題追加・比較では仕様の該当章も読む。API容量や共有負荷を調べる場合は [共通GPU API](../../../docs/shared-llm-api-ja.md)、推論の役目を切り替える場合は [ローカル LLM](../../../docs/local-llm-ja.md)を確認する。パス・コマンドの作業起点はリポジトリのルート。
+最初に[ベンチマークの仕様・practical-v1・実行手順](../../../docs/minecraft-benchmark-ja.md)を読む。課題追加・比較では仕様の該当章も読む。API容量や共有負荷を調べる場合は [共通GPU API](../../../docs/shared-llm-api-ja.md)、推論の役目を切り替える場合は [ローカル LLM](../../../docs/local-runtime-ja.md)を確認する。パス・コマンドの作業起点はリポジトリのルート。
 
 ## 環境とモードを選ぶ
 
@@ -47,9 +47,4 @@ helperは1課題・配置11・1回用。全課題・複数配置・反復・`--r
 
 policy・モード・共有/専用・モデル/コード/source/suiteの識別情報、課題・seed・反復・実効期限・全体予算、打ち切り理由、結果の保存先、未測定範囲を日本語で報告する。通常のシエルと共有APIが稼働しているか、専用サービスの後片付けも確認する。生の結果はGit対象外なので、文書のコミットだけで保存されたと扱わない。
 
-確認済み範囲は用途に合わせて読む。単発成功を性能基準、API容量試験をMinecraftの全課題評価とは呼ばない。
-
-- [旧基準測定](../../../docs/minecraft-benchmark-baseline-2026-11-09-ja.md)：CPU・900秒条件の各54試行。現在の期限・共有GPU・課題集合とは異なる。
-- [共通GPU APIの実測](../../../docs/shared-llm-api-ja.md)：容量・同時負荷・キャッシュ条件と単発のMinecraft確認。
-- [practical-v1の導入確認](../../../docs/minecraft-benchmark-practical-ja.md#確認した範囲2026-11-09)：終了条件を導入した時点の単発確認。
-- [作業契約への移行と実測](../../../docs/minecraft-work-refactor-2026-11-09-ja.md)：配置11・各1回の一巡で7課題合格、適切な断念と採集中の停止も確認。その後の通知修正は別ソースの石の単発。一巡と単発を合成して同じ版の全課題評価と扱わない。実行経路と計測イベントは [作業契約](../../../docs/game-work-contract-ja.md)を読む。
+確認済みの条件・ソース・未確認範囲は[確認状況](../../../docs/verification-status-ja.md)を参照する。現在の作業契約は[game-work-contract](../../../docs/game-work-contract-ja.md)。日付付き報告を増やさず、仕様と確認状況の正本を更新する。

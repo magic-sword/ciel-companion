@@ -1,5 +1,7 @@
 # 作業・会話の表示契約
 
+> 責務：goal.state/control v2、鮮度、表示対象を固定した操作と共通表示。
+
 更新：2026-11-10。送信元、Unityの操作画面・配信映像・独立状態カード、ベンチマークを同じ契約へ移行済み。旧段一覧、pausedへの状態集約、作業を指定しない停止・再開は撤去した。ソースとオフライン検証の記録であり、本番配布の記録ではない。
 
 ## 表示する事実
@@ -60,14 +62,9 @@
 
 ## 実装と検証
 
-- 送信・操作検証：`server/agent/goals.py`。状態確認の例外でも監視を継続する。
-- Unity：`CielConversation.Goal.cs`の受信・操作と`CielWorkPresentation`が共通契約。操作パネル、配信の重畳表示、独立状態カードが同じ表示モデルを使う。
-- ベンチマーク：drivers/run/policyもtask.stateを参照する。採点は従来どおりRCONで実物を確認し、表示を採点の正解にはしない。期限・課題集合は変更していない。停止未確認のcancellingは不能報告後の待機とみなさず、旧形式の受信は環境障害として中断する。
-- Python：`test_goals.py`、実MCPの`test_game_env.py`、ベンチマークの回帰。
-- .NET 10：`dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`。実際のC#受信・操作・表示ソースをリンクし、時計・JSON・送信だけ代用して35項目を確認。UnityのJsonUtilityそのものや描画を検証する試験ではない。生成物はserver/benchmark/data内。
-- Unity Editor用：`CielStreamStatusCheck.Run`、`CielAudienceCardCheck.Run`。本体・EditorのC#コンパイルと、Unityでの実行・画面描画は別に記録する。
+送信と操作検証は`server/agent/goals.py`。Unityの受信と共通表示モデルは`CielConversation.Goal.cs`の`CielWorkPresentation`で、操作パネル・配信映像・独立カードが使用する。ベンチマークもtask.stateを参照し、RCONの実物による採点を維持する。
 
-初回は制限された実行環境でEditorバッチがライセンスエラー（198）となった。通常の端末権限ではUnity Personalが有効で、6000.6.4f1も認識された。同じEditorを通常権限で再実行し、状態・配信表示11項目、配信カード57項目、アプリ構成42項目を通過した。実行中・判断待ち・状態不明の900×500画像も出力して目視確認済み。CLIは利用可能で、MCP登録は必要ない。制限環境からの端末情報・ライセンス情報へのアクセス失敗を、利用者のライセンス未設定と断定しない。Python一式とC#ビルドの結果は[回帰テスト](regression-tests-ja.md)を参照。
+確認方法は[回帰テスト](regression-tests-ja.md)、実行済みの件数・描画・未確認範囲は[確認状況](verification-status-ja.md)に集約する。
 
 ## 反映時の単位
 

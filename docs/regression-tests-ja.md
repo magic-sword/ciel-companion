@@ -1,5 +1,7 @@
 # サーバーの回帰テスト
 
+> 責務：変更に応じたテストの選び方、コマンド、終了コード。
+
 Minecraft の実際の採集・製作・停止を採点する試験は、[タスクのベンチマーク](minecraft-benchmark-ja.md)。ここで説明する通常回帰テストには、採点・環境復元のガード・RCON通信・試験要求の照合のオフラインテストも含む。
 
 入口はGit管理の `scripts/server/run-regression.py`。PowerShellからは `scripts/server/test-regression.ps1` でも実行できる。実行場所によらずリポジトリのテストを見つける。
@@ -80,90 +82,18 @@ python scripts/server/run-regression.py --suite all
 
 音声の聞き取り、話者識別の精度、会話の自然さ、GPUでの待ち時間、Windows・スマホの2台同時会話、Unityビルドは別の検証が必要。回帰テストの成功を、これらも確認済みという意味では扱わない。
 
-2026-10-18の導入検証：通常テスト128件と、隔離した実PostgreSQLでの5件に合格。Windowsの非同期DB接続に必要なイベントループ設定を入口に含めた。実DBの検証はローカルDockerが停止していたため、一時DBへのSSH転送を使って `--suite all --db-mode external` で実施した。自動Docker起動経路のコンテナ削除はモックで検証済みだが、この端末での実起動は未確認。DB接続先が未設定の場合にエラーとなること、結果に未実行理由が残ることも確認した。本番サービスや本番DBは変更していない。
 
+## 変更内容ごとの追加確認
 
-## 能力の段階的ロードとMCP境界を変更したとき
-
-通常のunit suiteに`test_capabilities.py`を含む。加えて、実際の`Ciel._pipeline_llm`を通すオフライン結合確認を行う。
-
-```powershell
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/check-capability-runtime.py
-```
-
-LLMの選択だけを固定し、サービス読込、次の推論への道具・指示の公開、SDKの引数注入、実際のMCP往復、検索ホストへの到達を検証する。モデル・DB・Minecraftは起動しない。出力のスキーマ文字数はコンテキスト規模の参考値で、トークン数・実モデルの選択精度・速度改善の測定ではない。
-
-サービスの処理本体と基盤専用呼び出しは `test_service_boundaries.py` で検証する。自発的検索の実MCP経路、画像参照の期限、アプリのraw schema、記憶生成取消時の要求再投入、サービス期限と取消伝播、任意YouTube操作の拒否を含む。DBのスコープ・同意・競合検知まで確認する場合は `--suite all` を使う。
-
-
-## サービス入力とリアクションの検証（初版実装済み）
-
-[入力イベントと反応調停の設計](service-events-and-reactions-ja.md)に従い、`test_reactions.py`と既存のMouth・GameEnv・SongListenerのテストで共通ロジックを確認する。以下の実機条件を自動テストだけで確認済みとは扱わない。
-
-| ケース | 確認すること |
+| 変更 | 実行・対象 |
 |---|---|
-| 未ロードのサービスから被ダメージ通知 | 道具をロードせず受信し、許可された反応を行える |
-| 接触後にGPU推論が遅延 | 即時表情が推論を待たず、後続発話が期限切れなら再生しない |
-| 同じイベントの再送・順序逆転・再接続 | 反応を重複させず、過去の状態や体感を再生しない |
-| コメントと持ち主の入力が同時到着 | コメントの本文を命令へ昇格させず、道具の続きでも権限を維持する |
-| 歌唱中に歌の変化・コメント・被ダメージ | 通常の歌の変化は表情中心とし、緊急度に応じて明示した規則で調停する |
-| 被ダメージ中に通常のLLM表情が到着 | 痛がる表情の優先と有効期限を維持する |
-| 作業結果と被ダメージが同時到着 | 作業状態を確定し、双方の反応を識別して通知の先行returnで失わない |
-| キュー満杯・期限切れ | 件数と本文量を制限し、正式な状態を失わず、破棄理由を記録する |
-| 生成失敗・発話割り込み | 表情適用と発話済みを区別し、未発話を完了扱いにしない |
-| 会話終了・接続所有者の変更 | 受信と待機中の反応を閉じ、他の会話や未所有の体へ反応を流さない |
+| 能力公開・MCP・サービス境界 | `scripts/server/check-capability-runtime.py` |
+| サービス入力・反応・割り込み | `scripts/server/check-reaction-runtime.py`と`test_reactions.py` |
+| 本番・開発の推論設定 | `scripts/server/check-compose-backends.py`（自宅Composeで読み取り専用） |
+| ローカル音声 | `test_vosk_stt.py`、[CPU音声認識](local-stt-ja.md)の専用実測 |
+| Minecraftの技・作業 | Nodeのテスト、PythonのGameEnv/Goal、[専用ベンチマーク](minecraft-benchmark-ja.md) |
+| Unity作業表示 | `dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`、本体・Editorのコンパイル |
 
-オフライン確認は仮想時計と模擬サービスで行う。実機では表情・音声の反応時間、重複、取りこぼし、不要な割り込みを確認する。Minecraftは既定の専用環境を使う。モデル・GPU共有負荷・入力種別・推論回数を記録し、既存の能力ロードやサービス処理の回帰テスト結果とは別に報告する。
+Unityの実パーサー・描画はEditorで`CielStreamStatusCheck.Run`、`CielAudienceCardCheck.Run`を実行する。CLIでは`run`管理下の`-quit`を二重指定せず、描画確認には`-nographics`を使わない。制限環境でEditorやライセンスが見えない場合は、通常の端末権限で`unity license status`とEditorの登録を切り分ける。ライセンス情報を変更する前にアクセス失敗を調べる。
 
-
-入力調停を変更したら、実際の`Ciel._pipeline_llm`と音声ゲートを通す次の結合確認も行う。
-
-```powershell
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/check-reaction-runtime.py
-```
-
-固定したモデル応答で、作業通知が被ダメージを置き換えないこと、期限切れの生成と音声を出さないこと、割り込みを検証する。実モデル・LiveKit接続・Minecraft・GPUは起動しない。Unity側は `dotnet build unity/Assembly-CSharp.csproj --no-restore` によるC#コンパイルと、Unity Editor／実機での確認を区別する。タッチv2・表情v2・ゲーム通知input_v 1の送受信を同時に更新し、旧版への無言のフォールバックを追加しない。
-
-## 作業・会話の表示v2（2026-11-10）
-
-仕様は[作業・会話の表示契約](work-display-contract-ja.md)。段一覧・進捗率の推定を撤去し、7種類のwork状態、確認の失効・復旧、対象を固定した操作、会話との並行表示を検証した。
-
-| 検証 | 結果 |
-|---|---|
-| Python通常テスト一式 | 634件合格、失敗・エラー・スキップ0。DB段階は未選択 |
-| 最終のベンチマーク受信検証後の関連テスト | test_minecraft_benchmark.pyの29件合格 |
-| 本体のC#受信・操作・表示ソースを使う.NET検証器 | 35項目合格。時計・JSON・送信はスタブ |
-| Unity本体＋Editor C#コンパイル | Assembly-CSharp-Editor.csproj（本体参照を含む）、エラー0、警告80 |
-| Unity Editorバッチの表示確認 | 通常権限で再実行成功。状態・配信表示11項目、カード57項目、アプリ構成42項目合格。実際のJsonUtilityと描画を確認 |
-| 本番配布・Playerビルド・実機接続・ゲーム性能再測定 | 未実施 |
-
-再実行：
-
-```powershell
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/run-regression.py --suite unit --output server/benchmark/data/work-display-v2-complete
-dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj
-dotnet build unity/Assembly-CSharp-Editor.csproj --no-restore -verbosity:quiet -nologo
-```
-
-生の結果はGit対象外の`server/benchmark/data/work-display-v2-complete/report.json`、コンパイル結果は`work-display-build-final.log`、起動失敗のログは`work-display-unity.log`。検証器の生成物も同じdata配下に置く。外部APIや共有GPUには接続していない。通知の版をv2へ更新したため、反映時はサーバーとUnityアプリを一緒に更新して会話を再接続する。
-
-### Editor起動の再確認と描画結果
-
-初回の終了コード198は、制限された実行環境で端末情報の取得がアクセス拒否となり、既存のライセンス・Editor登録情報も参照できなかった際の結果だった。通常の端末権限で`unity license status`を確認するとUnity Personalは有効・サインイン済み、`unity editors list --installed --verbose`にも6000.6.4f1が表示された。利用者のライセンス変更・再インストール・MCP登録は行っていない。
-
-通常権限でCLIから同じEditorを明示し、次の2メソッドを順番に実行して終了コード0を確認した。描画にはグラフィックスを使うため`-nographics`は指定していない。CLIの`run`が管理する`-quit`も追加しない。
-
-```powershell
-unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --timeout 180 --no-tail -- -executeMethod Ciel.EditorTools.CielStreamStatusCheck.Run
-unity run unity --editor-path C:/app/unity/editor/6000.6.4f1/Editor/Unity.exe --timeout 180 --no-tail -- -executeMethod Ciel.EditorTools.CielAudienceCardCheck.Run
-```
-
-ログは`server/benchmark/data/work-display-unity-retry.log`と`work-display-unity-render.log`。描画画像は`.local/app-refactor/audience-card-work-v2.png`・`audience-card-decision-v2.png`・`audience-card-unknown-v2.png`。900×500の画像を目視し、状態の区別、会話専用行、予算表示、文字の収まりを確認した。Playerビルド、本番配布、実サービスとの接続試験はこの再確認には含まない。
-
-## CPU音声認識（2026-11-10）
-
-[設定・実測と制約](local-stt-ja.md)。通常テスト641件合格（Voskの7件を追加）、失敗・エラー・スキップ0、DB段階は未選択。結果は`server/benchmark/data/vosk-regression/report.json`。自宅サーバーではVosk実モデルのCPU逐次認識と、実LiveKit SDKへの接続も隔離コンテナで確認した。音声入力終了前の途中結果を受信したが、小型モデルの合成音声での認識精度に課題があり、人のマイク・会話全体は未検証。通常サービスの再配布とは区別する。
-
-## 本番・開発のbackend設定（2026-11-10）
-
-[共通の実行設定](local-runtime-ja.md)。`scripts/server/check-compose-backends.py`で自宅サーバー上のComposeを使い7構成を合格確認。本番既定openai、本番local、開発への本番設定の非継承、開発local、本番文字入力、本番・開発の別Voskモデル指定、共有API URLとモデルマウントの読み取り専用を確認した。解決済みの資格情報は表示・保存せず、稼働サービスの配布・再起動は行っていない。Pythonの推論実装は変更していないため、641件の前回回帰結果と今回の構成検証を区別する。
+実行したソースと条件、結果、未確認範囲は[確認状況](verification-status-ja.md)の該当項目を更新する。手順書へ試験結果の履歴を追記しない。

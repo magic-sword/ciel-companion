@@ -17,7 +17,7 @@
 - 長い会議で人を増やしすぎない：だれにも似ていない短めの声と、まだ出ていない覚えている人に「たぶん」似ただけの声は保留にし、
   似た声がもう一度来たら参加者にする。知らない人どうしの声が近づいたら、同じ人にまとめ直す。
 - 声の特徴は 192 次元のベクトル（録音そのものではない）。それでも個人を識別できる情報なので、名前や特徴をログに出さない。
-  決めたことは docs/decisions/speaker-identification-ja.md。
+  決めたことは docs/shared-memory-ja.md。
 """
 import asyncio
 import collections
@@ -54,7 +54,7 @@ SHORT_VOICED = float(os.environ.get('CIEL_SPK_SHORT_SECONDS', '0.3'))
 # 声で本人を確かめることはできない。なので、ほかの人だとはっきり分かるときだけ断り、それ以外は直前の人の返事とみなす
 SHORT_MATCH = float(os.environ.get('CIEL_SPK_SHORT_MATCH', '0.35'))
 SHORT_WITHIN = 30.0   # 直前の人が話してからこの秒数を過ぎた短い発言は、返事とみなさない
-# コサイン類似度の基準（Zoom を通した声で測って決める。docs/decisions/speaker-identification-ja.md）
+# コサイン類似度の基準（Zoom を通した声で測って決める。docs/shared-memory-ja.md）
 MATCH = float(os.environ.get('CIEL_SPK_MATCH', '0.45'))   # この会話で聞いた（まだ覚えていない）人は、これ以上なら同じ人
 # 覚えている人は、これ以上なら「確か」（メモの元にしてよい）。0.45 では、覚えている人しかいない会話の最初に、
 # ほかの人の発言が 0.47 で「確か」になった（2026-10-18）。本人は 0.60〜0.88 だった
@@ -549,7 +549,7 @@ class SpeakerBook:
         self._merge(src, dst)
         return dst
 
-    # ---- 声の登録（アプリの「声を登録する」。docs/speaker-recognition-research-ja.md の案 A） ----
+    # ---- 声の登録（アプリの「声を登録する」。docs/shared-memory-ja.md の案 A） ----
 
     def enroll_state(self) -> dict:
         en = self.enrolling

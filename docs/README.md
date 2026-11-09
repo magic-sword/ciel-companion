@@ -1,82 +1,75 @@
-# 資料一覧
+# 現在のドキュメント
 
-設計・実装の変更前に[現在の設計方針（正本）](design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
+> 責務：全資料の索引と各ファイルの責務。仕様・手順・結果の本文は複製しない。
 
-基盤と機能の分担・バックグラウンド処理の契約は[サービス境界](service-boundaries-ja.md)を参照。
+この一覧から目的に合う正本を選ぶ。各ファイルは下記の責務だけを持ち、過去の仕様・改修履歴はGitから参照する。[管理ルール](documentation-policy-ja.md)に従って既存の正本を更新する。
 
-更新：2026-11-10。[アプリの紹介へ戻る](../README.md)
+## 読む順番
 
-現在の実装を知るには、まず構成・セットアップ・各機能の最新の検証記録を読む。設計書には提案や未実装の項目も含まれるため、冒頭の状態と検証章を確認する。「試験に通った」と「実機で動作確認した」は区別する。
+設計変更は[設計方針](design-policy-ja.md)と対象の契約から、導入は[開発環境](development-setup-ja.md)から始める。本番・開発の切替は[実行設定](local-runtime-ja.md)、実際に確認できている範囲は[確認状況](verification-status-ja.md)を参照する。
 
-## まず読む資料
+## 入口
 
-| 目的 | 入口 |
+| 資料 | このファイルが所有する内容 |
 |---|---|
-| 作業・会話・リアクションの表示と操作を変更したい | [作業・会話の表示契約（v2）](work-display-contract-ja.md) |
-| 本番・開発をローカルモデルへ切り替えたい | [共通の実行設定](local-runtime-ja.md) |
-| OpenAIクレジットなしで音声入力を試したい | [CPUのVosk・設定と実測](local-stt-ja.md) |
-| 何のアプリか知りたい | [トップREADME](../README.md) |
-| 紹介動画を撮りたい | [撮影台本・OBSの収録手順](demo-recording-ja.md) |
-| 自分の環境で始めたい | [開発環境構築](development-setup-ja.md) |
-| 接触・被ダメージ・コメント・歌の変化への反応を設計したい | [サービス入力とリアクション（初版実装済み）](service-events-and-reactions-ja.md) |
-| 全体のつながりを知りたい | [システム構成](architecture-ja.md) |
-| ビルド・サーバー反映をしたい | [コマンド集](build-ja.md) |
-| 日常版と配信版の違いを知りたい | [アプリ構成・配信ウィンドウ](app-composition-ja.md) |
-| 変更を検証したい | [回帰テスト](regression-tests-ja.md)、[料金のかかる試験](paid-checks-ja.md) |
-| Minecraft をローカルモデルで試験・比較したい | [ローカル LLM](local-llm-ja.md)、[ベンチマーク・課題拡張・性能評価](minecraft-benchmark-ja.md)、[評価スキル](../.agents/skills/ciel-minecraft-benchmark/SKILL.md) |
-| Minecraft の実測済み範囲を知りたい | [作業契約への移行・7課題合格と通知修正](minecraft-work-refactor-2026-11-09-ja.md)、[改修前GPU一巡](minecraft-benchmark-gpu-shared-2026-11-09-ja.md)、[旧CPU・各54試行](minecraft-benchmark-baseline-2026-11-09-ja.md) |
-| ゲーム実行の構成とMCP契約を知りたい | [シエルとMCPの再設計](minecraft-execution-redesign-ja.md)、[実装済みの作業契約](game-work-contract-ja.md) |
-| Minecraft の実用期限・早期終了・材料不足の報告を評価したい | [実用性評価 practical-v1](minecraft-benchmark-practical-ja.md) |
-| GPU推論APIをシエルとベンチマークで共用したい | [共通GPU API・容量測定・接続](shared-llm-api-ja.md) |
-| 利用条件・外部依存を確認したい | [第三者依存関係](third-party-dependencies.md)、[READMEのライセンス説明](../README.md#公開とライセンス) |
+| [README.md](README.md) | 全資料の索引と各ファイルの責務。仕様・手順・結果の本文は複製しない。 |
+| [documentation-policy-ja.md](documentation-policy-ja.md) | 資料の所有範囲、更新・統合・削除、リンク検証の管理ルール。 |
+| [design-policy-ja.md](design-policy-ja.md) | 責任分担と採用する設計判断。詳細スキーマ・コマンド・測定値は各正本へ委ねる。 |
+| [architecture-ja.md](architecture-ja.md) | プロセス・配置・接続・共有範囲の地図。 |
 
-## 会話と記憶
+## 開発と運用
 
-| 資料 | 内容 |
+| 資料 | このファイルが所有する内容 |
 |---|---|
-| [pipelineの仕組み](conversation-pipeline-ja.md) | 現在の会話の流れと、変更時に守る境界 |
-| [会話の改善と確認記録](conversation-improvements-2026-10-ja.md) | pipelineを採用した理由・測定結果 |
-| [プロンプト編集](../server/agent/README.md) | キャラクター設定とMarkdownの編集・反映 |
-| [人を覚える機能](people-memory-ja.md) | 同意、名前・呼び名・メモ、確認・削除 |
-| [共有記憶](shared-memory-ja.md) | 接続をまたいだ記憶と同期 |
-| [タッチ](ciel-touch-interaction-ja.md) | 頬などの操作と反応 |
-| [会議への参加](meeting-bridge-ja.md) | 仮想オーディオ、OBS、複数人との会話 |
-| [歌を聴く仕組み](singing-scoring-ja.md)、[使用モデル](singing-models-ja.md) | 分析・感想・採点の扱い |
-| [YouTubeコメント](youtube-comments-design-ja.md) | 配信コメントの選別・返答・道具の制限 |
-| [エラーの扱い](errors-design-ja.md) | 接続や処理の失敗の通知 |
-| [ローカルLLM](local-llm-ja.md) | ローカル推論を使う構成 |
+| [development-setup-ja.md](development-setup-ja.md) | クローン後の依存復元、SDK導入、最初の表示・開発環境の準備。 |
+| [build-ja.md](build-ja.md) | アプリのビルド、配置、更新、ログ取得の操作。 |
+| [sdk-setup-ja.md](sdk-setup-ja.md) | 固定SDKの復元・互換修正・パッケージ確認。 |
+| [local-runtime-ja.md](local-runtime-ja.md) | 本番・開発の推論設定、設定ファイルの優先順位、切替・反映単位。 |
+| [shared-llm-api-ja.md](shared-llm-api-ja.md) | 共用LLM APIの接続・容量設定・GPU/CPU制御と測定方法。 |
+| [regression-tests-ja.md](regression-tests-ja.md) | 変更に応じたテストの選び方、コマンド、終了コード。 |
+| [paid-checks-ja.md](paid-checks-ja.md) | 外部APIを呼ぶ試験、費用と実行範囲の確認方法。 |
+| [verification-status-ja.md](verification-status-ja.md) | 直近の検証・性能の条件、ソース識別、生データの場所、未確認範囲。 |
 
-## ゲーム・視覚・目的
+## 会話とサービス
 
-| 資料 | 内容 |
+| 資料 | このファイルが所有する内容 |
 |---|---|
-| [Minecraftの設計](minecraft-design-ja.md) | Java版の体、行動、接続、検証記録 |
-| [環境のMCP設計](game-environment-mcp-design-ja.md) | ゲーム・アプリとの共通の接続。実装済み範囲と実ゲームでの未確認項目 |
-| [目的の管理](goal-runner-design-ja.md) | 計画、実行、確認、修正、相談 |
-| [体の作業の状態](body-command-lifecycle-ja.md) | 開始から完了・停止までの状態通知 |
-| [ゲームの知識](game-knowledge-design-ja.md) | 物・制作方法・攻略知識の取得 |
-| [視覚の設計](vision-design-ja.md)、[Minecraftの視覚](minecraft-vision-design-ja.md) | 景色の取得と理解 |
+| [conversation-pipeline-ja.md](conversation-pipeline-ja.md) | 入力から返答までの実行順、共通履歴、経路選択、発話の調停。 |
+| [prompt-management-ja.md](prompt-management-ja.md) | Markdown/TOMLの指示管理、ロード・指紋・編集・評価の契約。 |
+| [capability-runtime-ja.md](capability-runtime-ja.md) | 能力カタログ、段階的な公開、呼び出し権限と実行管理。 |
+| [service-boundaries-ja.md](service-boundaries-ja.md) | 各サービスと会話ホスト、公開操作と基盤専用操作の分担。 |
+| [service-events-and-reactions-ja.md](service-events-and-reactions-ja.md) | 非同期入力の契約、TTL・優先・集約・発話/表情の調停。 |
+| [local-stt-ja.md](local-stt-ja.md) | CPU音声認識のアダプター、途中/確定結果、モデル配置と評価方法。 |
+| [shared-memory-ja.md](shared-memory-ja.md) | 本人確認・保存同意・DBスコープ、共有記憶と競合・忘却の実装契約。 |
+| [people-memory-ja.md](people-memory-ja.md) | 利用者による人物・声・メモの登録、訂正、参照、削除の操作。 |
+| [meeting-minutes-ja.md](meeting-minutes-ja.md) | 議事録の受付、対象範囲、ライブ・清書・送信・保存の契約。 |
+| [meeting-bridge-ja.md](meeting-bridge-ja.md) | 会議へ参加する端末の音声・映像設定と利用手順。 |
+| [web-research-ja.md](web-research-ja.md) | Web調査の依頼、引用確認、結果保持、画面と発話への対応。 |
+| [singing-scoring-ja.md](singing-scoring-ja.md) | 歌の解析モデル、主観評価・途中反応・音声保持・GPUの扱い。 |
+| [youtube-comments-design-ja.md](youtube-comments-design-ja.md) | 配信コメントの取得・選別・権限・会話への入力。 |
+| [vision-design-ja.md](vision-design-ja.md) | 画像の受信・保持・参照ID・理解と利用不可の扱い。 |
+| [errors-design-ja.md](errors-design-ja.md) | 失敗の分類、利用者へ見せる通知、正常状態へ変換しない規則。 |
 
-## キャラクター・Live2D制作
+## ゲーム
 
-現在の制作方針は[作り直しの計画](ciel-live2d-rebuild-analysis-plan-ja.md)の6〜8章から読む。素材とモデルの入口は[assets/ciel](../assets/ciel/README.md)。
+| 資料 | このファイルが所有する内容 |
+|---|---|
+| [game-environment-mcp-design-ja.md](game-environment-mcp-design-ja.md) | 環境を追加するためのMCP接続・profile・観測・所有権・通知。 |
+| [game-work-contract-ja.md](game-work-contract-ja.md) | ゲーム非依存の依頼・予算・判断・取消・work状態の契約。 |
+| [body-command-lifecycle-ja.md](body-command-lifecycle-ja.md) | 低水準の体の命令、世代・切替・後片付け・停止確認。 |
+| [minecraft-design-ja.md](minecraft-design-ja.md) | Minecraft固有の体・計画・知識・視覚と接続先・変更入口。 |
+| [minecraft-benchmark-ja.md](minecraft-benchmark-ja.md) | 課題・practical-v1・採点・専用環境・実行・拡張・比較の方法。 |
 
-- [制作仕様](ciel-live2d-production-spec-ja.md)、[リグ設計](ciel-live2d-rig-design-ja.md)、[体・衣装](ciel-live2d-body-outfit-design-ja.md)
-- [素材を依頼する手順](ciel-codex-request-guide-ja.md)、[パーツの相談資料](ciel-codex-consult-parts-ja.md)、[パーツの制約](ciel-design-constraints-for-parts-ja.md)
-- [現行素材](../assets/ciel/current/README.md)、[作業リグ](../assets/ciel/rig/README.md)、[アプリ向けモデル](../assets/ciel/runtime/README.md)、[Minecraftスキン](../assets/minecraft/skins/README.md)
-- [参考リグの分析](ciel-live2d-reference-rig-analysis-ja.md)、[素材制作の調査](ciel-live2d-material-guidelines-research-ja.md)、[リギングの調査](live2d-rigging-best-practices-ja.md)
+## アプリとモデル
 
-## 研究・設計の背景
-
-実装済み機能の一覧ではなく、比較・検討・採用理由を読むための資料。
-
-- [聞く・考える・話す設計](attention-and-thinking-design-ja.md)、[自発的な発話の参考研究](inner-thoughts-research-ja.md)
-- [長い目的の計画](long-horizon-planning-research-ja.md)、[シエルの成長](ciel-growth-research-ja.md)
-- [話者識別](speaker-recognition-research-ja.md)、[歌の評価](singing-evaluation-research-ja.md)
-- [決定記録の一覧](decisions/README.md)
-
-## 初期仕様と過去の図
-
-[初期仕様書](specification-ja.md)は2026-10-05時点の提案。Seed-VCを中心とした初期方針やiOSを含む目標が残っており、現在の実装状況には使わない。[旧システム構成図](system-overview-ja.svg)もRealtime経路を描いたもの。現在は[システム構成](architecture-ja.md)と[pipelineの仕組み](conversation-pipeline-ja.md)を参照する。
-
-[開発環境構築図](development-setup-ja.svg)は導入順の補助資料。起動シーンや製品の違い、手順の更新は[文章のセットアップ手順](development-setup-ja.md)を優先する。
+| 資料 | このファイルが所有する内容 |
+|---|---|
+| [app-composition-ja.md](app-composition-ja.md) | Companion/Broadcastの共通Prefab・シーンと操作/配信出力の構成。 |
+| [work-display-contract-ja.md](work-display-contract-ja.md) | goal.state/control v2、鮮度、表示対象を固定した操作と共通表示。 |
+| [ciel-touch-interaction-ja.md](ciel-touch-interaction-ja.md) | タッチの当たり判定、部位・変形・入力の送信と端末内反応。 |
+| [ciel-live2d-production-spec-ja.md](ciel-live2d-production-spec-ja.md) | 外観と素材の制約、正式成果物、採用・組み込みの受け入れ条件。 |
+| [ciel-live2d-rig-design-ja.md](ciel-live2d-rig-design-ja.md) | 現行リグの制御パラメーター、変形・物理・書き出し・採用操作。 |
+| [ciel-live2d-reference-rig-analysis-ja.md](ciel-live2d-reference-rig-analysis-ja.md) | 参考サンプルの構造・数値と制作へ使う条件。現行モデルの台帳ではない。 |
+| [demo-recording-ja.md](demo-recording-ja.md) | 紹介映像の台本、撮影条件、OBSへの取り込みと公開物の確認。 |
+| [assets/showcase/README.md](assets/showcase/README.md) | README掲載スクリーンショットの用途と差し替え方法。 |
+| [third-party-dependencies.md](third-party-dependencies.md) | SDK・モデル・素材の依存と利用許諾、リポジトリへ含める範囲。 |

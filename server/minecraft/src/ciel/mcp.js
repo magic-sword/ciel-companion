@@ -1,4 +1,4 @@
-﻿// シエルの体の MCP の入口。docs/game-environment-mcp-design-ja.md の 4 章（シエルのゲームの決まり、版 1）。
+// ゲーム環境のMCP入口。profile 2 / work 1。docs/game-environment-mcp-design-ja.md。
 // - 会話サーバーは会話の始めに MCP でつなぎ、道具・遊び方の指示（prompt play）・決まり（resource game://profile）を読む。
 //   つないだだけでは体を動かさない。アプリの設定でオンにしたら minecraft_link(on=true) で体を受け持つ（体を動かせる会話は 1 つだけ）。
 // - 様子は resource game://state。変わったら、受け持っている会話へ notifications/resources/updated を送る。

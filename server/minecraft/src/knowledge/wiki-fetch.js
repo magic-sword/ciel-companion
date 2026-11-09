@@ -1,5 +1,5 @@
 // Minecraft Wiki から、1.21.11 が出たころの版を記事ごとに取り出して、索引（wiki-index.js）に入れる。1 回だけ手で動かす。
-// docs/game-knowledge-design-ja.md の 3.2。
+// docs/minecraft-design-ja.md。
 //   node src/knowledge/wiki-fetch.js [--list-only] [--limit N] [--date 2025-12-10T00:00:00Z]
 // - 記事の一覧：カテゴリ（ROOTS）から 2 段下までの Java 版の記事。版ごとの更新記事・開発版・ほかのゲームの記事は入れない。
 // - 版：各記事の DATE より前の最後の版を API で引き、その版を描き出した HTML（action=parse&oldid）を取る。

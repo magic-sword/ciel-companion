@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """遊んでいるあいだ、相手の発言を心へ回すかを、例文との意味の近さで見分ける係（小脳と心の振り分けの 2 段目）。
-docs/conversation-pipeline-ja.md の 3 章、docs/decisions/semantic-route-ja.md。
+docs/conversation-pipeline-ja.md の 3 章、docs/conversation-pipeline-ja.md。
 
 - 1 段目は今までどおり決まった言葉（mind.py の GAME_ASK など）。そこで小脳に決まった発言だけを、ここで見直す。
 - 例文：道具ごとの「呼ぶきっかけ」（ゲームの道具の _meta の ciel/triggers と、ゲームの決まりの goal_triggers・

@@ -19,7 +19,7 @@ foreach ($change in $changes) {
     if ($oldCount -eq 0 -and $newCount -eq $change.Count) { continue }
     if ($oldCount -ne $change.Count) { throw "Unexpected SDK source in $path; check SDK version before patching." }
     $source = $source.Replace($change.Old, $change.New)
-    $source = '// Modified by CIEL: Unity 6.6 compatibility. See docs/decisions/sdk-setup.md.' + [Environment]::NewLine + $source
+    $source = '// Modified by CIEL: Unity 6.6 compatibility. See docs/sdk-setup-ja.md.' + [Environment]::NewLine + $source
     $prepared += @{ Path = $path; Source = $source }
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'cubism/CubismMotionEventId.cs') -Destination (Join-Path $cubismRoot 'Framework/CubismMotionEventId.cs') -Force

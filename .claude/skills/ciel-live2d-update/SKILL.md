@@ -15,7 +15,7 @@ description: シエルの Live2D モデルに部品・表情・動き（パラ�
 
 ## 役割と合否
 
-- 素材（絵）は Codex に頼む（`scripts/codex/run-codex.ps1`、`docs/ciel-codex-request-guide-ja.md`）。白紙から部品を描かせず、承認済みの絵の編集か、丸ごと描かせて切り分ける。プログラムで絵を描き足さない。
+- 素材（絵）は Codex に頼む（`scripts/codex/run-codex.ps1`、`docs/ciel-live2d-production-spec-ja.md`）。白紙から部品を描かせず、承認済みの絵の編集か、丸ごと描かせて切り分ける。プログラムで絵を描き足さない。
 - リグ・書き出し・Unity・確認の道具は Claude が担当する。
 - 合否は「自然でかわいいか」。画素一致や数値だけで良いと言わない。確認図・GIF をユーザーに見せ、判断を仰ぐ。
 

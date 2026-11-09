@@ -1,10 +1,12 @@
 # 開発環境の構築
 
+> 責務：クローン後の依存復元、SDK導入、最初の表示・開発環境の準備。
+
 更新：2026-11-08（日本時間）。Windows PC と VS Code を使い、クローンから Unity の表示確認・最初の修正まで進める手順。コーディング AI は VS Code 拡張の Codex・Claude Code を使う。サーバーの通常テストは、GPU や API キーを用意せずに始められる。
 
-[セットアップ図を開く・拡大する](development-setup-ja.svg) ／ [システム全体の構成](architecture-ja.md)
+[セットアップ図を開く・拡大する](development-setup-ja.md) ／ [システム全体の構成](architecture-ja.md)
 
-![クローンからVS Code・AI拡張・Unityでの表示確認、音声接続、Pythonテストまでの開発環境構築図](development-setup-ja.svg)
+[クローンからVS Code・AI拡張・Unityでの表示確認、音声接続、Pythonテストまでの開発環境構築図](development-setup-ja.md)
 
 ## 1 最初に入れるもの
 
@@ -151,7 +153,7 @@ git switch -c onboarding/first-change
 git status --short
 ```
 
-担当箇所を AI と確認し、小さい修正から始める。`server/agent/` の編集時は [AGENTS.md](../server/agent/AGENTS.md) を読む。プロンプト変更は [編集手順](../server/agent/README.md)と[管理方針](decisions/prompt-management-ja.md)に従う。実装後は差分と担当範囲の検証結果を確認し、[ビルド・反映手順](build-ja.md)へ進む。
+担当箇所を AI と確認し、小さい修正から始める。`server/agent/` の編集時は [AGENTS.md](../server/agent/AGENTS.md) を読む。プロンプト変更は [編集手順](../server/agent/README.md)と[管理方針](prompt-management-ja.md)に従う。実装後は差分と担当範囲の検証結果を確認し、[ビルド・反映手順](build-ja.md)へ進む。
 
 ## 困ったとき
 

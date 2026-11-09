@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """歌声から「聴いた印象の手がかり」を取り出す（server.py から使う。numpy だけで動き、モデルの結果は引数で受け取る）。
 
-方針（docs/singing-evaluation-research-ja.md の 7 章）：音程を原曲に合わせることは目標にしない。
+方針（docs/singing-scoring-ja.md の 7 章）：音程を原曲に合わせることは目標にしない。
 - 心に響いたか：Audiobox Aesthetics の CE（Content Enjoyment）を区間ごとに見て、いちばん響いた所を探す
 - 感動の瞬間の候補：曲の展開の変化（MERT の特徴の変わり目）と、盛り上がり（920〜4400 Hz の音量の増加。鳥肌の研究）
 - 個性：曲を通して繰り返すくせ（しゃくり・フォール・ビブラート）はほめる側に回す

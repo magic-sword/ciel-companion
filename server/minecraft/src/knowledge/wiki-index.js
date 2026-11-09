@@ -1,4 +1,4 @@
-// 手元に置いた Minecraft Wiki の索引（SQLite の全文検索 FTS5）。docs/game-knowledge-design-ja.md の 3.2。
+// 手元に置いた Minecraft Wiki の索引（SQLite の全文検索 FTS5）。docs/minecraft-design-ja.md。
 // 置き場は KNOWLEDGE_DATA（既定 /app/knowledge-data）の wiki.sqlite。Git・デプロイの外。
 // node:sqlite を使う（Node 22.23 の組み込み。手元の Node 22.14 は FTS5 が無いので、試験は FTS5 があるときだけ）。
 import { DatabaseSync } from 'node:sqlite';
