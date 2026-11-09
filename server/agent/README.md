@@ -57,3 +57,10 @@ python -c "from persona import load_persona; p = load_persona(); print('OK:', p.
 ファイルがない、不正な TOML・UTF-8、必須の参照先が未指定、本文が空の場合は、ファイルや項目を示すエラーになります。このコマンドは読み込みだけの確認です。本文を変更したら、管理方針にある代表的な会話で品質も確認してください。
 
 会話開始時のログに `persona_sha256` とモデル・声の設定が出ます。本文一式を識別するための値で、プロンプト本文は記録しません。編集したファイルは Git で管理し、本番には確認済みのコミットの一式を配布します。
+
+
+## サービス処理の配置
+
+現在の分担は[サービス境界](../../docs/service-boundaries-ja.md)を参照。`service_mcp.py`は共通の通信・検証・期限・取消、`session_mcp.py`はモデルに公開する道具の権限とRunContext注入を担当する。
+
+検索本体は`research_service.py`、画像説明は`image_analysis.py`、配信データ取得は`youtube_source.py`。記憶のメモ整理・関係性・好み・出来事の処理は既存の各ワーカーが`memory_jobs.py`の基盤専用入口から実行する。会話の受付・発話・LiveKit受信・バックグラウンド処理の実行契機はホスト側に置く。

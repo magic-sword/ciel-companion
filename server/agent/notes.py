@@ -21,6 +21,8 @@ import os
 
 import openai
 
+from memory_jobs import run_memory_job
+
 import models
 import speakers
 from conversation import Conversation, Turn
@@ -143,6 +145,9 @@ class NoteTaker:
         self._arm_timer()
 
     async def _write_once(self, pid: int) -> bool | None:
+        return await run_memory_job('consolidate_notes', lambda: self._consolidate(pid))
+
+    async def _consolidate(self, pid: int) -> bool | None:
         lock = self._locks.setdefault(pid, asyncio.Lock())
         async with lock:
             start, end = self._done.get(pid, 0), self.history.settled_through()
@@ -185,6 +190,10 @@ class NoteTaker:
                               {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
                 models.record('notes', models.LOCAL_MODEL if models.is_local('notes') else MODEL, getattr(r, 'usage', None))
                 result = json.loads(r.choices[0].message.content or '{}')
+            except asyncio.CancelledError:
+                self._requested.setdefault(pid, [])[:0] = requested
+                self._forgets.setdefault(pid, [])[:0] = forgets
+                raise
             except Exception as e:   # メモが書けなくても、会話は続ける（頼まれた分は次の機会に回す）
                 log.warning('メモを書けない：%s', type(e).__name__)
                 self._requested.setdefault(pid, [])[:0] = requested
@@ -197,7 +206,7 @@ class NoteTaker:
             delete = [int(i) for i in result.get('delete', []) if i in valid and i not in update]
             try:
                 committed = await store.apply_notes(pid, snapshot, add, update, delete)
-            except Exception:
+            except (Exception, asyncio.CancelledError):
                 self._requested.setdefault(pid, [])[:0] = requested
                 self._forgets.setdefault(pid, [])[:0] = forgets
                 raise

@@ -18,6 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 import openai
 
+from memory_jobs import run_memory_job
+
 import models
 from jst import JST
 from speaker_store import Relationship
@@ -83,6 +85,9 @@ class RelationKeeper:
         log.info('関係 #%d：同時更新のため今回は保存を見送る', pid)
 
     async def _update_once(self, pid: int, n_turns: int) -> bool | None:
+        return await run_memory_job('revise_relationship', lambda: self._revise(pid, n_turns))
+
+    async def _revise(self, pid: int, n_turns: int) -> bool | None:
         store = self.book.store
         k = next((k for k in self.book.known if k.person_id == pid), None)
         if store is None or k is None or not k.notes_ok or (n_turns < 2 and pid not in self.note_taker.forgotten):

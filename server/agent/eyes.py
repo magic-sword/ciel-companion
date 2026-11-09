@@ -21,11 +21,11 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-import openai
 from livekit.agents import llm
 
 import debug_log
 import models
+from image_analysis import ImageAnalysis
 
 log = logging.getLogger('ciel-agent.eyes')
 
@@ -195,18 +195,13 @@ class Eyes:
     # ---- 説明文 ----
 
     async def _caption(self, pic: Picture) -> None:
-        if models.LOCAL_TEST:
-            return
-        model = models.model('eyes')
+        service = ImageAnalysis(self.caption_instructions,
+            lambda ref: next((p.data_url for p in self.pictures if str(p.id) == ref), None),
+            lambda: self.client)
         try:
-            r = await models.client_for('eyes', self.client).chat.completions.create(**models.options('eyes',
-                model=model, timeout=CAPTION_TIMEOUT,
-                messages=[{'role': 'system', 'content': self.caption_instructions},
-                          {'role': 'user', 'content': [{'type': 'image_url',
-                                                        'image_url': {'url': pic.data_url, 'detail': 'low'}}]}]))
-            models.record('eyes', model, getattr(r, 'usage', None))
-            text = ' '.join((r.choices[0].message.content or '').split())
-        except Exception as e:   # 書けなくても会話は続ける（画像を指した話では、画像そのものをもう一度見る）
+            result = await service.describe(pic.id, timeout=CAPTION_TIMEOUT, max_chars=CAPTION_CHARS)
+            text = result.get('caption') if result.get('status') == 'completed' else None
+        except Exception as e:
             log.warning('画像の説明文を書けない：%s', type(e).__name__)
             return
         if text:

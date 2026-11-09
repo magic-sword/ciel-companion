@@ -9,9 +9,7 @@ import time
 
 from livekit.agents import RunContext, ToolError, ToolResult, function_tool
 from livekit.agents.llm import utils
-from mcp import types
-from mcp.server.lowlevel import Server
-from mcp.shared.memory import create_connected_server_and_client_session
+from service_mcp import call_service
 
 import debug_log
 
@@ -21,7 +19,8 @@ class SessionMCP:
         self.catalog = catalog
 
     def wrap(self, original):
-        schema = utils.build_legacy_openai_schema(original)['function']
+        schema = getattr(original.info, 'raw_schema', None) or utils.build_legacy_openai_schema(original)['function']
+        schema = {**schema, 'parameters': dict(schema['parameters'])}
         schema['parameters']['additionalProperties'] = False
 
         async def invoke(raw_arguments: dict, context: RunContext):
@@ -32,17 +31,9 @@ class SessionMCP:
         return function_tool(invoke, raw_schema=schema)
 
     async def call(self, original, schema, arguments, context):
-        server = Server('ciel-' + (self.catalog.service_for(original.id) or 'host'))
-
-        @server.list_tools()
-        async def listing():
-            return [types.Tool(name=original.id, description=schema['description'],
-                               inputSchema=schema['parameters'])]
-
-        @server.call_tool()
-        async def execute(name, arguments):
+        async def execute(arguments):
             # Authorization is checked in the server too; loading a schema is insufficient.
-            if name != original.id or name not in self.catalog.exposed:
+            if original.id not in self.catalog.exposed:
                 raise ValueError('tool_not_exposed')
             args, kwargs = utils.prepare_function_arguments(
                 fnc=original, json_arguments=json.dumps(arguments), call_ctx=context)
@@ -58,15 +49,9 @@ class SessionMCP:
         started = time.monotonic()
         status = 'failed'
         try:
-            # Each transport has one owner task: cancellation closes streams and the server.
-            # Domain-specific deadlines remain shorter where appropriate.
-            async with asyncio.timeout(90):
-                async with create_connected_server_and_client_session(server) as client:
-                    result = await client.call_tool(original.id, arguments)
-                    packet = None if result.isError else result.structuredContent
-            # Raise outside the SDK task groups so callers receive ToolError, not ExceptionGroup.
-            if packet is None:
-                raise ToolError('サービスの処理に失敗しました。')
+            packet = await call_service(self.catalog.service_for(original.id) or 'host', original.id, execute,
+                                        schema=schema['parameters'], arguments=arguments,
+                                        call_id=getattr(getattr(context, 'function_call', None), 'call_id', None))
             status = 'transport_completed'
             return ToolResult(packet['output'], reply_required=packet['reply_required'])
         except asyncio.CancelledError:

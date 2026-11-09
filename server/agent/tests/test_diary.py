@@ -30,7 +30,7 @@ class DiaryTests(unittest.IsolatedAsyncioTestCase):
         d = diary.Diary(store)
         await d.load()
         d.add('research', '気になって調べた：サモエドの毛が白い理由\n→ 寒い地方で…' + 'あ' * 200, at=NOW)
-        await asyncio.sleep(0)
+        await d.drain()
         store.add_ciel_event.assert_awaited_once()
         kind, text, keep = store.add_ciel_event.await_args.args
         self.assertEqual((kind, keep), ('research', diary.KEEP))
@@ -54,7 +54,7 @@ class DiaryTests(unittest.IsolatedAsyncioTestCase):
                                         add_ciel_event=AsyncMock(side_effect=RuntimeError)))
         await d.load()
         d.add('song', '歌を最後まで聴かせてもらった（0:40）', at=NOW)
-        await asyncio.sleep(0)
+        await d.drain()
         self.assertEqual(len(d.events), 1)
 
 

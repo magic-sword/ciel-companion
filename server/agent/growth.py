@@ -23,6 +23,8 @@ from datetime import datetime, timedelta, timezone
 import openai
 
 import debug_log
+from memory_jobs import run_memory_job
+
 import models
 from jst import JST
 
@@ -94,6 +96,9 @@ class Grower:
         return self._client
 
     async def flush(self, now: datetime | None = None) -> str:
+        return await run_memory_job('grow_preferences', lambda: self._grow(now))
+
+    async def _grow(self, now: datetime | None = None) -> str:
         """会話の終わりに 1 回。何をしたかを返す（テストとログのため）"""
         if self.store is None or self.diary is None or self.diary.added == 0:
             return 'skip'

@@ -32,6 +32,8 @@ import aiohttp
 
 import debug_log
 
+from youtube_source import read_youtube
+
 log = logging.getLogger('ciel-agent.youtube')
 
 TOPIC = 'ciel.youtube'
@@ -339,13 +341,7 @@ class YouTubeChat:
     # ---- 取り込み ----
 
     async def _get(self, http: aiohttp.ClientSession, path: str, **params) -> tuple[int, dict]:
-        params['key'] = self.key
-        async with http.get(f'{API}/{path}', params=params) as r:
-            try:
-                body = await r.json(content_type=None)
-            except (ValueError, aiohttp.ContentTypeError):
-                body = {}
-            return r.status, body if isinstance(body, dict) else {}
+        return await read_youtube(http, API, self.key, path, params, timeout=HTTP_TIMEOUT)
 
     @staticmethod
     def _error_reason(body: dict) -> str:

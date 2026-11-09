@@ -16,3 +16,5 @@ Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベン�
 - 本番への反映は確認済みの Git コミット単位で行う。編集・設定ファイルの変更だけで本番へ配布したことにはしない。
 
 能力カタログ・道具の公開・MCPアダプターを変えたら、unit suiteに加えて `scripts/server/check-capability-runtime.py` で会話入口からの結合を確認する。実行方法は[回帰テスト](../../docs/regression-tests-ja.md)。
+
+モデルの道具・自発的処理・記憶保守を追加／変更するときは[サービス境界](../../docs/service-boundaries-ja.md)を読む。処理本体は共通MCP入口を使い、基盤専用操作をLLMのカタログへ自動公開しない。

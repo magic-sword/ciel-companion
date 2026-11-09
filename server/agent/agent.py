@@ -211,7 +211,7 @@ class Ciel(Agent):
         self.capabilities = CapabilityCatalog(tools.MODULES) if PIPELINE else None
         self.service_tools = list(tools.TOOLS)
         if self.capabilities is not None:
-            bridge = SessionMCP(self.capabilities)
+            bridge = self.service_bridge = SessionMCP(self.capabilities)
             # Game work already uses the external game MCP; avoid a second transport.
             self.service_tools = [t if t in tools.goals.TOOLS or t in tools.clock.TOOLS else bridge.wrap(t)
                                   for t in tools.TOOLS] + [self.capabilities.loader]
@@ -799,7 +799,8 @@ async def entrypoint(ctx: JobContext) -> None:
             tools.ENV_FROM_COMMENTS.update(app.from_comments())
             if agent.capabilities is not None:
                 agent.capabilities.bind_external(app.tools, 'app')
-            asyncio.create_task(agent.update_tools(agent.service_tools + (list(game.tools) if game is not None else []) + app.tools))
+            app_tools = [agent.service_bridge.wrap(t) for t in app.tools]
+            asyncio.create_task(agent.update_tools(agent.service_tools + (list(game.tools) if game is not None else []) + app_tools))
         app.on_tools = app_tools_changed
         ctx.room.on('data_received', app.on_data)
     # 音の確かめ（soundcheck.py。アプリの「シエルの声を試しに流す」）。会話モデルを使わず、決まった一言を相づちのトラックで流す

@@ -14,6 +14,8 @@ import asyncio
 import logging
 from datetime import datetime
 
+from memory_jobs import run_memory_job
+
 import debug_log
 from jst import JST
 
@@ -45,6 +47,9 @@ class Diary:
         self.added = 0       # この会話で残した数（growth.py が、新しい出来事があった会話だけ好みを見直す）
 
     async def load(self) -> None:
+        await run_memory_job('load_events', self._load)
+
+    async def _load(self) -> None:
         """前の会話までの出来事を読む（読めなくても会話は続ける）"""
         if self.store is None:
             return
@@ -73,7 +78,7 @@ class Diary:
 
     async def _save(self, kind: str, text: str) -> None:
         try:
-            await self.store.add_ciel_event(kind, text, KEEP)
+            await run_memory_job('record_event', lambda: self.store.add_ciel_event(kind, text, KEEP))
         except Exception as e:
             log.warning('シエルの出来事を残せない: %s', type(e).__name__)
 
