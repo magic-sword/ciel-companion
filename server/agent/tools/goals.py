@@ -1,77 +1,41 @@
-"""長い目的を、目的の係（goals.py）に預ける道具。docs/goal-runner-design-ja.md の 3.1。
-目的を始めるのは、持ち主の頼みでも、シエル自身の思いつきでもよい。始めた目的の段は、係が 1 つずつ進めて確かめる。
-使い方は config/prompts/goals.md。"""
+"""Validated work requests; the game owns planning and execution."""
 import json
-
 from livekit.agents import RunContext, function_tool
 
 
-def _runner(context: RunContext):
-    return getattr(context.userdata, 'goals', None)
-
-
-def _result(r: dict) -> str:
-    return json.dumps(r, ensure_ascii=False)
+@function_tool
+async def submit_game_task(context: RunContext, capability: str, arguments: dict, constraints: dict,
+                           title: str, seconds: int = 90) -> str:
+    """ゲームの公開する能力へ作業を依頼する。引数と制約は公開schemaに従う。受付は完了ではない。"""
+    runner = context.userdata.goals
+    activity = getattr(context.userdata, 'activity', None)
+    if runner and getattr(activity, 'thinking_origin', '') == 'initiative' and runner.work and runner.work['state'] != 'succeeded':
+        return json.dumps({'status': 'busy', 'reason': 'awaiting_owner'})
+    return json.dumps(await runner.start(capability, arguments, constraints=constraints, title=title, seconds=seconds)
+                      if runner else {'status': 'unavailable'}, ensure_ascii=False)
 
 
 @function_tool
-async def start_goal(context: RunContext, title: str, make_item: str | None = None, count: int = 1, why: str = '',
-                     by_myself: bool = False, first: bool = False, game: str = '', queue: bool = False) -> str:
-    """いくつもの段がある目的を始める（目的の係が、計画して 1 つずつ進め、できたかを確かめる）。
-    title は見せる言葉（日本語。例「石のつるはしを作る」）。物を作る目的なら make_item に英語の ID（stone_pickaxe など）と count。
-    why は目的のわけ（あれば）。by_myself は、頼まれたのではなく自分で決めた目的なら true。
-    新しいお願いは今の目的から切り替える。「終わったら・その後で」と頼まれた場合は queue=true。
-    自分で決めた目的は、持ち主の作業のあとに並べる。first は以前の呼び出しとの互換用。"""
-    runner = _runner(context)
-    if runner is None:
-        return _result({'status': 'unavailable'})
-    spec = {'make': make_item, 'count': max(1, min(64, count))} if make_item else {}
-    return _result(await runner.start(game, title, spec, why=why, by='ciel' if by_myself else 'owner', first=first, queue=queue))
+async def answer_game_task(context: RunContext, decision_id: str, action: str) -> str:
+    """ゲームの判断要求へ回答する。actionはretryかcancel。期限や利用者の制約を変更しない。"""
+    runner = context.userdata.goals
+    return json.dumps(await runner.answer(decision_id, action) if runner else {'status': 'unavailable'}, ensure_ascii=False)
 
 
 @function_tool
-async def add_subgoal(context: RunContext, title: str, make_item: str | None = None, count: int = 1, why: str = '') -> str:
-    """目的の段が止まったとき、その原因を片づける小さな目標を作る。できたら自動で、止まった段からやり直す。
-    小さな目標の中でまた止まれば、さらに小さな目標を作れる。title は見せる言葉（例「作業台を置ける広い場所へ移る」）。
-    物を作る・集めるなら make_item に英語の ID と count（係が段に分ける）。無ければ自分で体の道具を使って進め、finish_step で終える。
-    上の目標と同じものは作れない（輪になる）。"""
-    runner = _runner(context)
-    if runner is None:
-        return _result({'status': 'unavailable'})
-    spec = {'make': make_item, 'count': max(1, min(64, count))} if make_item else {}
-    return _result(await runner.add_subgoal(title, spec, why=why))
+async def stop_game_task(context: RunContext) -> str:
+    """現在のゲーム作業を中止する。cancelledの確認前に止まったと断言しない。"""
+    runner = context.userdata.goals
+    return json.dumps(await runner.stop() if runner else {'status': 'unavailable'}, ensure_ascii=False)
 
 
 @function_tool
-async def stop_goal(context: RunContext, only_subgoal: bool = False) -> str:
-    """今の目的をやめる（あとでやる目的も消す）。only_subgoal=true なら、今の小さな目標だけやめて、上の目標で止まって待つ。"""
-    runner = _runner(context)
-    return _result(await runner.stop(only_current=only_subgoal) if runner else {'status': 'unavailable'})
+async def game_task_status(context: RunContext) -> str:
+    """現在のゲーム作業と、達成や中止の根拠を見る。"""
+    runner = context.userdata.goals
+    return json.dumps(runner.status() if runner else {'status': 'unavailable'}, ensure_ascii=False)
 
 
-@function_tool
-async def resume_goal(context: RunContext) -> str:
-    """止まっている目的を、止まった段から続ける（手を変えて用意したあと・持ち主が「続けて」と言ったとき）。"""
-    runner = _runner(context)
-    return _result(runner.resume() if runner else {'status': 'unavailable'})
-
-
-@function_tool
-async def finish_step(context: RunContext, ok: bool, note: str = '') -> str:
-    """目的の係に任された段（「自分で考えて進める」段）を終える。できたら ok=true、できなければ ok=false と理由。"""
-    runner = _runner(context)
-    return _result(runner.finish_step(ok, note) if runner else {'status': 'unavailable'})
-
-
-@function_tool
-async def goal_status(context: RunContext) -> str:
-    """今の目的・段・直したこと・あとでやる目的を見る。"""
-    runner = _runner(context)
-    return _result(runner.status() if runner else {'status': 'unavailable'})
-
-
-TOOLS = [start_goal, add_subgoal, stop_goal, resume_goal, finish_step, goal_status]
+TOOLS = [submit_game_task, answer_game_task, stop_game_task, game_task_status]
 GOAL_TOOLS = tuple(t.id for t in TOOLS)
-# 配信のコメントからは目的を動かさない（体を動かすのは持ち主とシエルだけ）。見るだけはよい
-FROM_COMMENTS = {start_goal: False, add_subgoal: False, stop_goal: False, resume_goal: False, finish_step: False,
-                 goal_status: True}
+FROM_COMMENTS = {submit_game_task: False, answer_game_task: False, stop_game_task: False, game_task_status: True}

@@ -1,6 +1,6 @@
 # 目的の係（長い目的をやり遂げる仕組み・設計）
 
-次の実装方針は [ゲーム実行を前提にしたシエルとMCPの再設計](minecraft-execution-redesign-ja.md)。共通部は作業管理に絞り、ゲーム固有の計画・段進行・修復はゲーム側へ移す。以下の既存GoalRunnerの構成やADK不採用の方針は経緯として読み、次の構成を固定する制約にはしない。新しい方針は未実装。
+現在の実装は [シエルとMCPの再設計](minecraft-execution-redesign-ja.md)と [作業契約](game-work-contract-ja.md)。ゲーム固有の計画・段進行・修復をゲーム側へ移し、PythonのGoalRunnerは作業クライアントへ置き換えた。以下の子目標ツリー・旧MCP API・ADK不採用の方針は過去の設計として読む。
 
 > **2026-11-07 から：** 会話サーバーとのつなぎ方を、MCP の「ゲームの環境」に変えた（[ゲームとアプリを環境としてつなぐ設計](game-environment-mcp-design-ja.md)）。この文書の `minecraft.py`・`tools/minecraft.py`・`config/prompts/minecraft.md`・WebSocket の決まりは、そのときまでの形。今は、体の MCP の入口（`server/minecraft/src/ciel/`）がシエル向けの言葉・道具・遊び方の指示を持ち、会話サーバーは `game_env.py` でつなぐ。
 

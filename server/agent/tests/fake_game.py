@@ -12,11 +12,12 @@ from mcp.shared.memory import create_client_server_memory_streams
 JPEG = b'\xff\xd8\xff\xe0' + b'0' * 64
 
 PROFILE = {
-    'profile': 1, 'game': 'test', 'label': 'テスト',
+    'profile': 2, 'game': 'test', 'label': 'テスト',
     'route_words': '跳んで|拾って',
     'link_tool': 'test_link', 'stop_tool': 'test_stop',
-    'goals': {'plan': 'test_goal_plan', 'step': 'test_goal_step', 'repair': 'test_goal_repair'},
-    'goal_triggers': {'start_goal': ['宝箱を作っておいて']},
+    'work': {'version': 1, 'submit': 'test_work_submit', 'status': 'test_work_status',
+             'cancel': 'test_work_cancel', 'answer': 'test_work_answer',
+             'capabilities': [{'name': 'test.solve_puzzle'}]},
     'talker_examples': ['えらいね'],
     'reasons': {'stopped': '止められた', 'no_key': '鍵が無い', 'error': 'うまくいかなかった'},
     'quiet_reasons': ['stopped'],
@@ -32,12 +33,8 @@ TOOLS = [
                _meta={'ciel/role': 'know', 'ciel/from_comments': True}),
     types.Tool(name='test_link', description='受け持つ', inputSchema={'type': 'object', 'properties': {'on': {'type': 'boolean'}}},
                _meta={'ciel/role': 'link'}),
-    types.Tool(name='test_goal_plan', description='計画', inputSchema={'type': 'object', 'properties': {'spec': {'type': 'object'}}},
-               _meta={'ciel/role': 'goal'}),
-    types.Tool(name='test_goal_step', description='段', inputSchema={'type': 'object', 'properties': {'step': {'type': 'object'}}},
-               _meta={'ciel/role': 'goal'}),
-    types.Tool(name='test_goal_repair', description='直す', inputSchema={'type': 'object', 'properties': {}},
-               _meta={'ciel/role': 'goal'}),
+    *[types.Tool(name='test_work_' + action, description=action, inputSchema=EMPTY, _meta={'ciel/role': 'work'})
+      for action in ('submit', 'status', 'cancel', 'answer')],
     types.Tool(name='other_thing', description='名前の頭が違う', inputSchema=EMPTY, _meta={'ciel/role': 'act'}),
 ]
 
@@ -48,9 +45,7 @@ class FakeGame:
         self.busy = False          # ほかの会話が体を使っている
         self.linked = False
         self.calls: list[tuple[str, dict]] = []
-        self.steps: list[dict] = []        # 段の結果（goal_step が順に返す）
-        self.repairs: list[dict] = []      # 直し方（goal_repair が順に返す）
-        self.plan = {'steps': [{'kind': 'make', 'args': {'item': 'chest'}, 'label': '宝箱を作る', 'progress': None}]}
+        self.work = None
         self.state = {'label': 'テスト', 'linked': True, 'playing': True, 'reason': '', 'text': 'シエル：元気', 'fingerprint': 'a'}
         self.state['body'] = {'version': 1, 'session': 'test', 'epoch': 'test', 'revision': 0, 'current': None, 'pending': None, 'last': None}
         self.session = None
@@ -103,12 +98,17 @@ class FakeGame:
                     *text({'status': 'seen', 'note': '北を向いている'})]
         if name == 'test_facts':
             return text({'status': 'ok', 'fact': '宝箱は板 8 枚'})
-        if name == 'test_goal_plan':
-            return text(self.plan)
-        if name == 'test_goal_step':
-            return text(self.steps.pop(0))
-        if name == 'test_goal_repair':
-            return text(self.repairs.pop(0) if self.repairs else {'steps': None})
+        if name == 'test_work_submit':
+            self.work = {'version': 1, 'session': 'puzzle-session', 'task_id': 'puzzle-work',
+                         'request_id': a['request_id'], 'revision': 1, 'state': 'running', 'evidence': {}, 'message': ''}
+            return text(self.work)
+        if name == 'test_work_status':
+            return text(self.work)
+        if name == 'test_work_cancel':
+            self.work = {**self.work, 'state': 'cancelled', 'revision': self.work['revision'] + 1, 'message': 'Stopped'}
+            return text(self.work)
+        if name == 'test_work_answer':
+            return text({'status': 'error', 'reason': 'stale_decision'})
         return text({'status': 'error'})
 
     async def emit(self, event: dict):

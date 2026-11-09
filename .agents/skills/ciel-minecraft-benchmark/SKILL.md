@@ -51,4 +51,5 @@ policy・モード・共有/専用・モデル/コード/source/suiteの識別�
 
 - [旧基準測定](../../../docs/minecraft-benchmark-baseline-2026-11-09-ja.md)：CPU・900秒条件の各54試行。現在の期限・共有GPU・課題集合とは異なる。
 - [共通GPU APIの実測](../../../docs/shared-llm-api-ja.md)：容量・同時負荷・キャッシュ条件と単発のMinecraft確認。
-- [practical-v1の確認](../../../docs/minecraft-benchmark-practical-ja.md#確認した範囲2026-11-09)：新しい終了条件の単発確認。実モデルの適切な断念成功と、全課題の新基準値は未確認。
+- [practical-v1の導入確認](../../../docs/minecraft-benchmark-practical-ja.md#確認した範囲2026-11-09)：終了条件を導入した時点の単発確認。
+- [作業契約への移行と実測](../../../docs/minecraft-work-refactor-2026-11-09-ja.md)：配置11・各1回の一巡で7課題合格、適切な断念と採集中の停止も確認。その後の通知修正は別ソースの石の単発。一巡と単発を合成して同じ版の全課題評価と扱わない。実行経路と計測イベントは [作業契約](../../../docs/game-work-contract-ja.md)を読む。

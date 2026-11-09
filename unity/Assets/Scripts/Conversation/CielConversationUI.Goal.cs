@@ -137,7 +137,7 @@ namespace Ciel.Conversation
             if (g.next != null && g.next.Length > 0) b.Append($"\n<color=#9FDDF0>あとで</color>\n・{Esc(string.Join("\n・", g.next))}\n");
             _goalPanelBody.text = b.ToString();
             _goalStop.SetActive(g.Active);
-            _goalResume.SetActive(g.goal.status == "paused");
+            _goalResume.SetActive(g.goal.can_resume);
         }
 
         // 配信用の札：見出し・目的・段（5 つまで。多ければ済んだ段をたたむ）・直したこと（最後の 1 つ）・つぎ

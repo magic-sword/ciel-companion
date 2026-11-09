@@ -56,8 +56,8 @@ import activity as activity_
 import app_env
 import game_env
 import goals
+import game_intake
 import mind
-import router
 import minutes
 import mode
 import models
@@ -239,6 +239,28 @@ class Ciel(Agent):
         if self.ear is not None:
             await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
         who = self.mind.route(chat_ctx, turn)
+        work = self.mind.goals
+        if work is not None and work.notice is not None and self.mind.reply_origin in ('game', 'initiative'):
+            self.mind.handed = 'game'
+            yield work.report()
+            return
+        if work is not None and work.body_step() and self.mind.reply_origin == 'initiative':
+            yield '[silent]'
+            return
+        intake = getattr(self, 'game_intake', None)
+        intake_checked = False
+        if intake is not None and self.mind.is_owner() and not self.mind.from_comment and self.mind.reply_origin == 'reply':
+            tail = mind._tail(list(chat_ctx.items))
+            user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
+            if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
+                reply = await intake.handle(user_item)
+                intake_checked = True
+                if reply is not None:
+                    yield reply
+                    return
+        # While playing, one decision-capable loop handles conversation. No game talker/promise handoff.
+        if self.mind.playing() and who != 'skip':
+            who = 'mind'
         if who == 'talker':
             who = await self.mind.second_look(chat_ctx)   # 遊んでいるあいだは、意味の近さでもう一度見る（router.py）
         if who == 'skip':
@@ -248,6 +270,9 @@ class Ciel(Agent):
         if who == 'mind':
             # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
             ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
+            if intake_checked:
+                # The work decision already classified this input as conversation.
+                fns = [fn for fn in fns if getattr(fn, 'id', None) not in mind.GOAL_MOVING]
         else:
             # 小脳：短い指示・道具なしで、すぐ返す
             style = self.style
@@ -540,8 +565,8 @@ async def entrypoint(ctx: JobContext) -> None:
             def goal_say(why: str, **kw) -> None:
                 act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
                 voice.say_latest(why, **kw)
-            goal_runner = goals.GoalRunner(goal_say, publish=goal_publish)
-            goal_runner.register(body.game, game_env.GoalsAdapter(body), body.label)
+            goal_runner = goals.GoalRunner(goal_say, publish=goal_publish, env=body)
+            ctx.add_shutdown_callback(goal_runner.close)
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
             body.goals = goal_runner   # 係が体を使っているあいだは、心の体の道具を断る
@@ -569,34 +594,11 @@ async def entrypoint(ctx: JobContext) -> None:
                                eyes=seeing, self_image=agent.persona.self_image)
         agent.mind.goals = goal_runner
         if body is not None:
-            # 遊んでいるあいだの振り分けの 2 段目：道具ごとのきっかけ（ゲームの決まりの ciel/triggers）と、遊びながら育った例文
-            # （DB の route_examples）との意味の近さで、小脳に決まった発言を見直す（router.py）
-            agent.mind.router = router.Router(body.game, store=store, seeds=body.seeds())
-            agent.mind.router.start()
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
-            # 体の道具が始めずに断られたのに、心が言葉だけで返したら、話し終えたあとに次の手を道具でさせる（1 度だけ）
-            def stalled(name: str, r: dict) -> None:
-                act.log(f'心へ：{act.label(name)}が始めなかったのに言葉だけで止まったので、次の手をうながした', 'wait')
-                say_stalled(name, r)
-            agent.mind.on_stalled = stalled
-            say_stalled = lambda name, r: voice.say_latest(   # noqa: E731
-                'game', settle=1.0,
-                instructions=f'[さっきの {name} は始めていない（{r.get("why") or r.get("reason")}）。そのあと道具を呼ばず、'
-                             f'言葉だけで終わっている。次の手：{r.get("next")}。今、その手の道具を呼んで実際に始め、'
-                             '始めたことだけを短く言う。持ち主に聞かないと決められないときだけ、短く聞く]')
-            # 小脳が「渡しますね」と約束だけしたら、話し終えたあとに心が体の道具で続きをする（取りこぼしの受け皿）
-            def promised(said: str, text: str) -> None:
-                act.log('心へ：小脳が約束だけしたので、体の道具で続きをうながした', 'wait')
-                say_promised(said, text)
-            agent.mind.on_promise = promised
-            say_promised = lambda said, text: voice.say_latest(   # noqa: E731
-                'game', settle=1.0,
-                instructions=f'[さっき相手の「{said[:60]}」に、小脳が「{text[:80]}」と答えたが、体の道具はまだ使っていない。'
-                             '小脳は会話の流れを読み違えることがある。まず会話を見て、相手が本当にそれを頼んだかを確かめる。'
-                             '頼んでいたら、今、体の道具で実際にやり、やったことだけを短く言う。読み違いなら道具は使わず、'
-                             '相手が頼んだことを短く確かめる（「石のつるはしを作る、で合っていますか」）。'
-                             'もう済んでいる・できないなら、そのことを短く言う]')
+            agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions)
+            session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
+            ctx.add_shutdown_callback(agent.game_intake.close)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 
@@ -607,6 +609,8 @@ async def entrypoint(ctx: JobContext) -> None:
                 return
             if not getattr(item, 'interrupted', False) and (item.text_content or '').strip():
                 voice.drop(agent.mind.handed)
+                if goal_runner is not None and agent.mind.handed == 'game':
+                    goal_runner.reported()
             agent.mind.handed = None
         session.on('conversation_item_added', on_said)
         # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）

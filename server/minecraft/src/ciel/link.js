@@ -5,6 +5,7 @@
 // - 以前は会話サーバーの minecraft.py の Body がしていたことを、ここでする。
 import { doneFor, eventFor, fingerprint, reasons, refused, stateText, title } from './words.js';
 import { randomUUID } from 'node:crypto';
+import { GameTasks } from './tasks.js';
 
 let nextCommandId = 1;   // 受け持つ会話が替わっても、遅い終了とIDを衝突させない
 
@@ -37,6 +38,7 @@ export class CielLink {
     this._shown = '';
     this._cancelledRequests = new Set();
     this._requests = new Map();
+    this.work = new GameTasks(this);
   }
 
   // ---- 体から（main.js の send） ----
@@ -153,9 +155,9 @@ export class CielLink {
   }
 
   // 目的の係が頼む技：始めて、終わりまで待って、体の done（ok・reason・note）を返す。付箋も知らせも作らない
-  runSkill(skill, args, requestId) {
+  runSkill(skill, args, requestId, timeoutMs = STEP_TIMEOUT_MS) {
     if (requestId && this._requests.has(requestId)) return this._requests.get(requestId);
-    const result = this._runSkill(skill, args, requestId);
+    const result = this._runSkill(skill, args, requestId, timeoutMs);
     if (requestId) {
       this._requests.set(requestId, result);
       if (this._requests.size > 512) this._requests.delete(this._requests.keys().next().value);
@@ -163,7 +165,7 @@ export class CielLink {
     return result;
   }
 
-  async _runSkill(skill, args, requestId) {
+  async _runSkill(skill, args, requestId, timeoutMs) {
     if (requestId && this._cancelledRequests.has(requestId)) return { ok: false, reason: 'stopped' };
     const id = nextCommandId++;
     const done = new Promise((resolve) => this._waiting.set(id, resolve));
@@ -178,7 +180,7 @@ export class CielLink {
       const r = refused(s);
       return { ok: false, reason: r.reason, note: s.note ?? {}, why: r.why };
     }
-    return timeout(done, STEP_TIMEOUT_MS, () => {
+    return timeout(done, Math.min(STEP_TIMEOUT_MS, timeoutMs), () => {
       this._waiting.delete(id);
       this.stop(id);
       return { ok: false, reason: 'error', detail: 'timeout' };
@@ -218,6 +220,7 @@ export class CielLink {
 
   // 会話が離れた：待っているものを、切れた扱いで終える
   close() {
+    this.work.close();
     this.readyState = 3;
     for (const r of this._pending.values()) r({ type: 'error', reason: 'unlinked' });
     this._pending.clear();

@@ -15,11 +15,10 @@ import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextp
 import { z } from 'zod';
 
 import { registerKnowledge } from '../knowledge/main.js';
-import { repair, skillFor, stepResult, stepsFrom } from './goals.js';
-import { STEP_TIMEOUT_MS } from './link.js';
+import { CAPABILITIES, TASK_VERSION } from './tasks.js';
 import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText } from './words.js';
 
-export const PROFILE_VERSION = 1;
+export const PROFILE_VERSION = 2;
 const GAME = 'minecraft';
 const LABEL = 'マイクラ';
 const MAX_BODY = 64 * 1024;
@@ -45,8 +44,8 @@ export function profile() {
     profile: PROFILE_VERSION, game: GAME, label: LABEL,
     route_words: ROUTE_WORDS,
     link_tool: 'minecraft_link', stop_tool: 'minecraft_stop_moving',
-    goals: { plan: 'minecraft_goal_plan', step: 'minecraft_goal_step', repair: 'minecraft_goal_repair' },
-    goal_triggers: ROUTES.goal_tools ?? {},
+    work: { version: TASK_VERSION, submit: 'minecraft_task_submit', status: 'minecraft_task_status',
+      answer: 'minecraft_task_answer', cancel: 'minecraft_task_cancel', capabilities: CAPABILITIES },
     talker_examples: ROUTES.talker ?? [],
     reasons, quiet_reasons: QUIET_REASONS,
   };
@@ -61,6 +60,7 @@ export function makeServer(hub, sessionId) {
   const mine = () => (hub.controller !== null && hub.controller === sessionId() ? hub.link : null);
   const body = async (fn) => {
     const l = mine();
+    if (l?.work.active && !['succeeded', 'failed', 'cancelled'].includes(l.work.active.state)) return json({ status: 'busy' });
     if (l) return json(await fn(l));
     return json({ status: hub.controller || hub.busy ? 'busy' : 'unavailable' });
   };
@@ -86,24 +86,12 @@ export function makeServer(hub, sessionId) {
   server.registerTool('minecraft_go_to_place', { title: '場所へ行く', description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
     inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true }) },
   ({ x, z: zz }) => body((l) => l.do('go_to', { x, z: zz })));
-  server.registerTool('minecraft_collect_blocks', {
-    title: '集める',
-    description: 'マイクラで、見えている近くのブロックを掘って集める。block はブロックの英語の ID（oak_log・poppy・crafting_table など）か、'
-      + '呼び名（flower・log・dirt・stone・sand・coal・iron など）。count は 1〜64。必要な道具がなければ材料を集めて作ってから続ける。作業台の回収は block=crafting_table。明示した対象以外の建築ブロックは壊さない。',
-    inputSchema: { block: z.string(), count: z.number().int() }, ...ACT('minecraft_collect_blocks', { 'ciel/long_running': true }),
-  }, ({ block, count }) => body((l) => l.do('collect', { block, count })));
   server.registerTool('minecraft_find_blocks', {
     title: '探す',
     description: 'マイクラで、見える所に無いブロックを探す（見つけたら止まる。集めるのは minecraft_collect_blocks）。block は英語の ID か呼び名。'
       + 'how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。掘る探索では目的の鉱石に必要な道具を先に用意し、装備する。',
     inputSchema: { block: z.string(), how: z.string().optional() }, ...ACT('minecraft_find_blocks', { 'ciel/long_running': true }),
   }, ({ block, how }) => body((l) => l.do('find', { block, how: ['walk', 'dig', 'auto'].includes(how) ? how : 'auto' })));
-  server.registerTool('minecraft_craft_item', {
-    title: '作る',
-    description: 'マイクラで、持ち物から物を作る（oak_planks・stick・crafting_table・wooden_pickaxe など）。item は英語の ID、count は作りたい数（1〜64）。'
-      + '作業台が要る物は、近くの作業台か、持っている作業台を置いて使う。材料が足りなければ、足りない物が返る。',
-    inputSchema: { item: z.string(), count: z.number().int().optional() }, ...ACT('minecraft_craft_item', { 'ciel/long_running': true }),
-  }, ({ item, count }) => body((l) => l.do('craft', { item, count: count ?? 1 })));
   server.registerTool('minecraft_give_item', {
     title: '渡す',
     description: 'マイクラで、持ち物を持ち主に渡す（そばへ行って投げる）。item は英語の ID（oak_log など）。count を省けば持っている分すべて。',
@@ -119,7 +107,11 @@ export function makeServer(hub, sessionId) {
     description: 'マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。',
     inputSchema: { request_id: z.string().max(160).optional() },
     ...ACT('minecraft_stop_moving', { 'ciel/stops': true }),
-  }, ({ request_id }) => body((l) => l.stop(undefined, request_id)));
+  }, ({ request_id }) => {
+    const l = mine();
+    if (!l) return json({ status: 'unavailable' });
+    return l.work.active ? l.work.cancel(l.work.active.id).then(json) : json(l.stop(undefined, request_id));
+  });
 
   // ---- 見る ----
   server.registerTool('minecraft_look_around', {
@@ -146,41 +138,28 @@ export function makeServer(hub, sessionId) {
   // ---- 知識（以前の minecraft-knowledge の窓口） ----
   registerKnowledge(server, ROUTES.tools);
 
-  // ---- 目的の係のための道具（心には渡さない） ----
-  const GOAL = { _meta: { 'ciel/role': 'goal' } };
-  const step = z.object({ kind: z.string(), args: z.record(z.string(), z.any()), label: z.string(), progress: z.array(z.number()).nullable().optional() });
-  server.registerTool('minecraft_goal_plan', { description: '目的を段の一覧にする（物を作る目的：spec.make に英語の ID、spec.count）',
-    inputSchema: { spec: z.record(z.string(), z.any()) }, ...GOAL }, async ({ spec }) => {
-    if (!spec?.make) return json({ steps: null });   // 作る目的でなければ、係では分けられない（心が進める）
-    if (!mine()) return json({ error: 'unavailable' });
-    const r = await hub.link.plan(spec.make, Number(spec.count ?? 1) || 1);
-    return json(r.error ? { error: r.error, why: r.why } : { steps: stepsFrom(r.steps) });
-  });
-  server.registerTool('minecraft_goal_step', { description: '目的の段を 1 つ、終わるまで動かす',
-    inputSchema: { step, request_id: z.string().max(160).optional() }, ...GOAL },
-    async ({ step: s, request_id }) => {
-      const l = mine();
-      if (!l) return json({ ok: false, reason: 'unlinked', complete: false });
-      const sk = skillFor(s);
-      if (!sk) return json({ ok: false, reason: 'error', complete: false });
-      return json(stepResult(s, await l.runSkill(sk[0], sk[1], request_id)));
-    });
-  server.registerTool('minecraft_goal_repair', { description: 'うまくいかなかった段を、決まった直し方で直す',
-    inputSchema: { spec: z.record(z.string(), z.any()), step, result: z.record(z.string(), z.any()), remaining: z.array(step) }, ...GOAL },
-  async (a) => {
-    if (!mine()) return json({ steps: null });
-    let planned = null;
-    if (a.spec?.make) planned = await hub.link.plan(a.spec.make, Number(a.spec.count ?? 1) || 1);
-    const r = repair(a, () => planned ?? { error: 'no_plan' });
-    return json(r ?? { steps: null });
-  });
+  // Work contract: only the owning MCP session can submit, inspect, decide or cancel.
+  const WORK = { _meta: { 'ciel/role': 'work' } };
+  const work = async fn => mine() ? json(await fn(mine().work)) : json({ status: 'unavailable' });
+  server.registerTool('minecraft_task_submit', { description: '期限付きの作業を受け付ける。段の計画と実行はゲームが行う。',
+    inputSchema: { request_id: z.string().min(1).max(160), capability: z.string(), arguments: z.record(z.string(), z.any()),
+      budget_ms: z.number().int().min(100).max(120000), constraints: z.record(z.string(), z.any()) }, ...WORK },
+  r => work(w => w.submit(r)));
+  server.registerTool('minecraft_task_status', { description: '作業の最新状態と根拠を取得する。',
+    inputSchema: { task_id: z.string() }, ...WORK },
+  ({ task_id }) => work(w => w.tasks.has(task_id) ? w.view(w.tasks.get(task_id)) : { status: 'error', reason: 'unknown_task' }));
+  server.registerTool('minecraft_task_answer', { description: 'ゲームからの判断要求に回答する。期限と制約は変更しない。',
+    inputSchema: { task_id: z.string(), decision_id: z.string(), action: z.enum(['retry', 'cancel']) }, ...WORK },
+  ({ task_id, decision_id, action }) => work(w => w.answer(task_id, decision_id, action)));
+  server.registerTool('minecraft_task_cancel', { description: '作業を中止し、体の停止を確認する。',
+    inputSchema: { task_id: z.string() }, ...WORK }, ({ task_id }) => work(w => w.cancel(task_id)));
 
   // ---- 様子・決まり・遊び方 ----
   server.registerResource('state', 'game://state', { mimeType: 'application/json', description: '今の体の様子（シエルが読む文）' },
     async (uri) => {
       const l = mine();
       const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
-        body: l.body }
+        body: l.body, work: l.work.view() }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

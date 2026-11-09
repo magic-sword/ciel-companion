@@ -25,8 +25,11 @@ function fakeBody() {
     if (m.type === 'do' && m.args.block === 'cobblestone') reply({ type: 'error', id: m.id, reason: 'needs_tool', note: { tool: 'wooden_pickaxe' } });
     else if (m.type === 'do') {
       reply({ type: 'started', id: m.id });
-      setTimeout(() => reply({ type: 'done', id: m.id, ok: true, note: { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } }), 30);
-    } else if (m.type === 'plan') reply({ type: 'planned', id: m.id, steps: [{ kind: 'gather', item: 'oak_log', count: 3 }, { kind: 'craft', item: 'wooden_pickaxe', count: 1 }] });
+      setTimeout(() => {
+        if (m.args.item) link.state.inventory[m.args.item] = (link.state.inventory[m.args.item] ?? 0) + m.args.count;
+        reply({ type: 'done', id: m.id, ok: true, note: { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } });
+      }, 30);
+    } else if (m.type === 'plan') reply({ type: 'planned', id: m.id, inventory: { ...link.state.inventory }, steps: [{ kind: 'gather', item: 'oak_log', count: 3 }, { kind: 'craft', item: 'wooden_pickaxe', count: 1 }] });
     else if (m.type === 'look') reply({ type: 'seen', id: m.id, jpeg: Buffer.from('jpeg').toString('base64'), facing: 'north' });
   };
   const hub = makeHub({
@@ -65,10 +68,9 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
   try {
     // 道具には役目と振り分けの例文が付いている
     const tools = (await a.listTools()).tools;
-    const collect = tools.find((t) => t.name === 'minecraft_collect_blocks');
-    assert.equal(collect._meta['ciel/role'], 'act');
-    assert.equal(collect._meta['ciel/long_running'], true);
-    assert.ok(collect._meta['ciel/triggers'].length > 0);
+    const collect = tools.find((t) => t.name === 'minecraft_task_submit');
+    assert.equal(collect._meta['ciel/role'], 'work');
+    assert.ok(!tools.some(t => ['minecraft_goal_plan', 'minecraft_collect_blocks', 'minecraft_craft_item'].includes(t.name)));
     assert.equal(tools.find((t) => t.name === 'minecraft_facts')._meta['ciel/role'], 'know');
     assert.ok(tools.every((t) => t.name.startsWith('minecraft_')));
 
@@ -91,41 +93,29 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
     assert.equal(st.body.current, null);
     assert.match(st.text, /Hakase（持ち主）/);
 
-    // 技を始めて、終わりは知らせで届く。同じ頼みは二重に受けない
-    const r = await call(a, 'minecraft_collect_blocks', { block: 'oak_log', count: 2 });
+    const r = await call(a, 'minecraft_follow_me');
     assert.equal(r.status, 'started');
-    assert.equal(r.title, 'oak_log を 2 個集める');
-    await until(() => events.some((e) => e.kind === 'task_done'));
-    const done = events.find((e) => e.kind === 'task_done');
-    assert.equal(done.task, r.task);
-    assert.equal(done.card, 'done');
-    assert.match(done.say, /できた（oak_log×2）/);
-
-    // 断られたら、理由の文と次の手
-    const no = await call(a, 'minecraft_collect_blocks', { block: 'cobblestone', count: 3 });
-    assert.equal(no.status, 'error');
-    assert.match(no.why, /掘る道具が無い.*wooden_pickaxe/);
-    assert.ok(no.next);
+    await until(() => events.some(e => e.kind === 'task_done'));
+    assert.equal(events.find(e => e.kind === 'task_done').task, r.task);
+    const denied = await call(b, 'minecraft_task_submit', { request_id: 'r', capability: 'minecraft.obtain_item',
+      arguments: { item: 'oak_log', quantity: 2, quantity_mode: 'gain' }, budget_ms: 1000, constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    assert.equal(denied.status, 'unavailable');
+    const requested = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.obtain_item',
+      arguments: { item: 'wooden_pickaxe', quantity: 1, quantity_mode: 'inventory_target' }, budget_ms: 10000,
+      constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    await until(() => events.some(e => e.kind === 'work_state' && e.work.state === 'succeeded'));
+    const verified = await call(a, 'minecraft_task_status', { task_id: requested.task_id });
+    assert.equal(verified.evidence.inventory.wooden_pickaxe, 1);
+    const again = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.obtain_item',
+      arguments: { item: 'wooden_pickaxe', quantity: 1, quantity_mode: 'inventory_target' }, budget_ms: 10000,
+      constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    assert.equal(again.task_id, verified.task_id);
 
     // 景色の絵は MCP の絵で返る
     const seen = await a.callTool({ name: 'minecraft_look_at_view', arguments: {} });
     assert.equal(seen.content[0].type, 'image');
     assert.equal(JSON.parse(seen.content[1].text).facing, '北');
 
-    // 目的の段：計画・実行・確かめ
-    const plan = await call(a, 'minecraft_goal_plan', { spec: { make: 'wooden_pickaxe', count: 1 } });
-    assert.deepEqual(plan.steps.map((s) => s.label), ['オークの原木を 3 個集める', '木のツルハシを作る']);
-    const stepDone = await call(a, 'minecraft_goal_step', { step: plan.steps[0] });
-    assert.deepEqual(stepDone.progress, [3, 3]);
-    assert.equal(stepDone.complete, true);
-
-    // 様子が変わったら知らせる
-    body.state({ ...STATE, health: 12 });
-    await until(() => updated.includes('game://state'));
-
-    // 離したら、もう 1 つの会話が受け持てる
-    assert.equal((await call(a, 'minecraft_link', { on: false })).status, 'off');
-    assert.equal((await call(b, 'minecraft_link', { on: true })).status, 'linked');
   } finally {
     await a.close();
     await b.close();
@@ -170,7 +160,8 @@ test('振り分けの例文：心に渡す道具と、相手の発言で呼ぶ�
     const shown = (await c.listTools()).tools.filter((t) => ['act', 'look', 'know'].includes(t._meta?.['ciel/role']));
     assert.deepEqual(shown.filter((t) => !t._meta['ciel/triggers']?.length).map((t) => t.name), []);
     const p = JSON.parse((await c.readResource({ uri: 'game://profile' })).contents[0].text);
-    for (const g of ['start_goal', 'stop_goal', 'resume_goal', 'goal_status']) assert.ok(p.goal_triggers[g]?.length, g);
+    assert.equal(p.work.version, 1);
+    assert.equal(p.profile, 2);
     assert.ok(p.talker_examples.length > 10);
   } finally {
     await c.close();

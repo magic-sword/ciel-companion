@@ -126,7 +126,8 @@ MOVING_TOOLS = {'minecraft_collect_blocks','minecraft_goal_step','minecraft_craf
 
 
 def restarted(events):
-    return any(e.get('event',e).get('kind') == 'game_call' and e.get('event',e).get('name') in MOVING_TOOLS for e in events)
+    return any(e.get('event',e).get('kind') == 'work_action' or
+               (e.get('event',e).get('kind') == 'game_call' and e.get('event',e).get('name') in MOVING_TOOLS) for e in events)
 
 
 async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max_calls,
@@ -158,7 +159,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         # BodyDriver writes directly into Trace, rather than returning agent events.
         if not hasattr(driver,'path'):
             for entry in trace.execution():
-                if id(entry) in seen_body or entry['kind'] not in ('game_call','game_result','game_task_result'):
+                if id(entry) in seen_body or entry['kind'] not in ('game_call','game_result','game_task_result','work_action','work_action_result'):
                     continue
                 seen_body.add(id(entry))
                 watch.event(entry,before)
@@ -180,7 +181,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         reason = None
         passed = False
         declined = False
-        if data['llm_calls'] > max_llm or data['game_calls'] > max_calls:
+        if data['llm_calls'] > max_llm or data['game_calls'] + data.get('work_actions', 0) > max_calls:
             reason = 'call_budget'
         elif current['health'] <= 0 or current.get('deaths',0) > initial.get('deaths',0):
             reason = 'died'

@@ -36,6 +36,12 @@ class BodyDriver:
                            reason=event.get('reason'),title=event.get('title'),snapshot=bool(event.get('_snapshot')))
 
         self.env._task_done = task_done
+        original_event = self.env.on_event
+        def event(e):
+            original_event(e)
+            if e.get('kind') in ('work_action', 'work_action_result'):
+                self.trace(e['kind'], **{k: v for k, v in e.items() if k != 'kind'})
+        self.env.on_event = event
         if not await self.env.prepare():
             raise RuntimeError('Benchmark MCP is unavailable')
         self.env.wanted = True
@@ -47,13 +53,13 @@ class BodyDriver:
             self.goal_state = state
             self.trace('goal_state', state=state)
 
-        self.runner = goals.GoalRunner(lambda why, **kw: self.trace('notice', why=why, **kw), publish=publish)
-        self.runner.register('minecraft', game_env.GoalsAdapter(self.env), self.env.label)
+        self.runner = goals.GoalRunner(lambda why, **kw: self.trace('notice', why=why, **kw), publish=publish, env=self.env)
         self.env.goals = self.runner
 
     async def submit(self, task):
-        spec = task.get('spec') or {'make': task['item'], 'count': task['count']}
-        self.task = asyncio.create_task(self.runner.start('minecraft', task['prompt'], spec))
+        self.task = asyncio.create_task(self.runner.start('minecraft.obtain_item',
+            {'item': task['item'], 'quantity': task['count'], 'quantity_mode': 'gain' if task.get('action') else 'inventory_target'},
+            constraints={'resource_scope': 'search', 'failure_policy': 'ask'}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
     async def stop(self, task):
         await self.runner.stop()
@@ -67,7 +73,7 @@ class BodyDriver:
         return (self.goal_state.get('goal') or {}).get('status') == 'stopped'
 
     def failure_reason(self):
-        if self.runner and self.runner._mind_step is not None:
+        if self.runner and (self.runner.work or {}).get('state') == 'needs_decision':
             return 'needs_mind'
         if (self.goal_state.get('goal') or {}).get('status') in ('paused','failed'):
             return 'body_cannot_continue'
@@ -81,7 +87,7 @@ class BodyDriver:
             self.task.cancel()
             await asyncio.gather(self.task, return_exceptions=True)
         if self.runner:
-            await self.runner.stop()
+            await self.runner.close()
         if self.env:
             await self.env.close()
 

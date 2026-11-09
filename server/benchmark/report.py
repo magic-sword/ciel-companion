@@ -30,7 +30,9 @@ def metrics(events):
                 failed_keys.discard(key)
     return {
         'llm_calls': sum(e['kind'] == 'model_request' for e in agent),
-        'game_calls': sum(e['kind'] == 'game_call' for e in raw),
+        'game_calls': sum(e['kind'] == 'game_call' and not e.get('name', '').endswith('_task_status') for e in raw),
+        'status_polls': sum(e['kind'] == 'game_call' and e.get('name', '').endswith('_task_status') for e in raw),
+        'work_actions': sum(e['kind'] == 'work_action' for e in raw),
         'llm_tool_calls': sum(e['kind'] == 'tool' for e in agent),
         'failed_game_calls': len(failed),
         'failed_game_tasks': len(failed_tasks),

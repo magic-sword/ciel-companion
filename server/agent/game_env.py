@@ -39,10 +39,9 @@ log = logging.getLogger('ciel-agent.game')
 ENV = 'CIEL_GAMES'
 TOPIC = 'ciel.game'
 VERSION = 1
-PROFILE_VERSION = 1
+PROFILE_VERSION = 2
 PREPARE_TIMEOUT = 4.0      # 会話の始めに、ゲームのサーバーの決まり・道具・指示を読むのを待つ上限
 CALL_TIMEOUT = 40.0        # 道具 1 回の答えを待つ上限（景色を撮るのに 25 秒かかることがある）
-STEP_TIMEOUT = 960.0       # 目的の段（技 1 つ）が終わるまで待つ上限（体の側は 900 秒で止める）
 PING_SECONDS = 20.0        # 受け持ち前・待機中も通信を保つ（体の側は 60 秒無通信でセッションを閉じる）
 LINK_RETRY_SECONDS = 3.0   # 使用中・接続待ちからの再試行。ほかの会話の所有権は奪わない
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
@@ -427,16 +426,17 @@ class GameEnv:
             return {'status': 'unavailable'}
         if role == 'act' and not meta.get('ciel/stops') and not self._body_protocol_valid:
             return {'status': 'error', 'reason': 'body_protocol_mismatch'}
-        busy = self.goals.body_step() if self.goals is not None and role == 'act' and not meta.get('ciel/stops') else None
-        active_goal = getattr(self.goals, 'active', None)
-        planning = active_goal is not None and active_goal.status == 'planning'
+        busy = self.goals.body_step() if self.goals is not None and role == 'act' else None
+        planning = False
         spontaneous = self.activity is not None and self.activity.thinking_origin == 'initiative'
         if role == 'act' and spontaneous and (busy is not None or planning or self._body.get('current') or self._body.get('pending')):
             return {'status': 'goal_running', 'why': '依頼された体の作業を進めている'}
-        if role == 'act' and (busy is not None or planning or (meta.get('ciel/stops') and active_goal is not None)):
+        if role == 'act' and busy is not None:
             if spontaneous:
                 return {'status': 'goal_running', 'why': '持ち主の目的を進めている'}
-            await self.goals.stop(reason='stopped' if meta.get('ciel/stops') else 'replaced')
+            if not meta.get('ciel/stops'):
+                return {'status': 'busy'}
+            return await self.goals.stop()
         epoch = self._connection_epoch
         r = await self._call(name, args)
         if epoch != self._connection_epoch:
@@ -546,6 +546,13 @@ class GameEnv:
 
     def on_event(self, e: dict) -> None:
         kind = e.get('kind')
+        if kind == 'work_state':
+            if self.goals is not None and self.goals.work:
+                self.goals.accept(e.get('work'))
+            return
+        if kind in ('work_action', 'work_action_result'):
+            debug_log.record(kind, **{k: v for k, v in e.items() if k != 'kind'})
+            return
         if e.get('error'):   # 体の中のエラー（errors.py で記録・アプリへ）
             ERRORS.report(str(e['error'].get('where') or 'body'), RuntimeError(str(e['error'].get('detail') or 'error')),
                           kind='body')
@@ -604,7 +611,7 @@ class GameEnv:
         self._observed.update(active)
         last = b.get('last') or {}
         last_key = self._task_key({'session': b.get('session'), 'task': last.get('id')})
-        if last.get('id') is not None:
+        if last.get('id') is not None and (last_key in self._cards or last_key in self._observed):
             result = last.get('result') or {}
             self._task_done({'session': b.get('session'), 'task': last['id'], 'title': last.get('title', ''),
                              'ok': bool(result.get('ok')), 'reason': result.get('reason'), 'failed': False, '_snapshot': True})
@@ -655,70 +662,3 @@ class GameEnv:
                 self.diary.add(self.game, text)
             except Exception as e:
                 log.info('日記に書けない：%s', type(e).__name__)
-
-
-class GoalsAdapter:
-    """目的の係（goals.py）のゲームの係を、ゲームの MCP の道具（決まりの goals）で動かす。段の中身はゲームが持つ"""
-
-    def __init__(self, env: GameEnv) -> None:
-        self.env = env
-        self._running: str | None = None
-
-    def _tool(self, key: str) -> str | None:
-        return (self.env.profile.get('goals') or {}).get(key)
-
-    def available(self) -> bool:
-        return bool(self.env.linked and self.env._body_protocol_valid and self._tool('plan'))
-
-    def body_busy(self) -> bool:
-        b = self.env._body
-        return bool(b.get('current') or b.get('pending') or b.get('owner') or b.get('blocked'))
-
-    async def begin(self) -> None:
-        # 計画を待つあいだも古い追従を続けない。体側は停止完了後に次を始める。
-        self._running = None
-        tool = self.env.profile.get('stop_tool')
-        if tool:
-            await self.env._call(tool, {})
-
-    @staticmethod
-    def _step_dict(s) -> dict:
-        return {'kind': s.kind, 'args': s.args, 'label': s.label, 'progress': s.progress}
-
-    async def plan(self, goal):
-        r = await self.env._call(self._tool('plan'), {'spec': goal.spec or {}})
-        if r.get('error') or r.get('status') in ('unavailable', 'no_answer', 'busy', 'error'):
-            return {'error': r.get('error') or r.get('status'), 'why': r.get('why')}
-        return r.get('steps')   # None：係では分けられない目的（心が進める）
-
-    async def run(self, goal, step) -> dict:
-        request = str(uuid.uuid4())
-        # stop()はキャンセル後にも呼ばれるため、対象は次のrunまで保持する。
-        self._running = request
-        return await self.env._call(self._tool('step'), {'step': self._step_dict(step), 'request_id': request}, timeout=STEP_TIMEOUT)
-
-    def check(self, goal, step, result) -> tuple[bool, list | None]:
-        result = result or {}
-        progress = result.get('progress', step.progress)
-        return bool(result.get('complete', result.get('ok'))), progress
-
-    async def repair(self, goal, step, result):
-        remaining = [self._step_dict(s) for s in goal.steps if s.status != 'done']
-        r = await self.env._call(self._tool('repair'), {'spec': goal.spec or {}, 'step': self._step_dict(step),
-                                                         'result': result or {}, 'remaining': remaining})
-        if not r.get('steps'):
-            return None
-        return r['steps'], r.get('text') or '計画を直した'
-
-    def snapshot(self):
-        return self.env.snapshot()
-
-    def why(self, reason: str, result: dict | None = None) -> str:
-        return ((result or {}).get('why_short') or (self.env.profile.get('reasons') or {}).get(reason)
-                or (self.env.profile.get('reasons') or {}).get('error') or 'うまくいかなかった')
-
-    async def stop(self) -> None:
-        tool = self.env.profile.get('stop_tool')
-        if tool:
-            request = self._running
-            await self.env._call(tool, {'request_id': request} if request else {})

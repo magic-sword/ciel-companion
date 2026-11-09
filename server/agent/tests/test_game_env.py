@@ -81,7 +81,6 @@ class PrepareTest(EnvCase):
         self.assertEqual({t.id for t in env.tools}, {'test_jump', 'test_stop', 'test_look', 'test_facts'})
         self.assertEqual(env.tool_ids('act'), {'test_jump', 'test_stop'})
         self.assertIn(('ちょっと跳んでみて', 'test_jump'), env.seeds())
-        self.assertIn(('宝箱を作っておいて', 'start_goal'), env.seeds())
         self.assertIn(('えらいね', None), env.seeds())
         self.assertEqual(env.from_comments(), {'test_jump': False, 'test_stop': False, 'test_look': False, 'test_facts': True})
 
@@ -271,37 +270,39 @@ class EventTest(EnvCase):
         self.assertEqual(seen, [(b'\xff\xd8\xff', '北を向いている', 'テスト')])
 
 
-class GoalsAdapterTest(EnvCase):
-    async def test_the_runner_plans_runs_checks_and_repairs_through_the_game(self):
+class WorkContractTest(EnvCase):
+    async def test_opaque_work_runs_over_actual_mcp_without_client_planning(self):
         await self.link()
-        self.fake.steps = [{'ok': False, 'reason': 'no_key', 'complete': False, 'why_short': '鍵が無い'},
-                           {'ok': True, 'complete': True, 'progress': None},
-                           {'ok': True, 'complete': True, 'progress': None}]
-        self.fake.repairs = [{'steps': [{'kind': 'find', 'args': {'item': 'key'}, 'label': '鍵を探す', 'progress': None},
-                                        {'kind': 'make', 'args': {'item': 'chest'}, 'label': '宝箱を作る', 'progress': None}],
-                              'text': '鍵が無いので、探す段を足した'}]
-        runner = goals.GoalRunner(Said())
-        runner.register('test', game_env.GoalsAdapter(self.env), 'テスト')
-        r = await runner.start('test', '宝箱を作る', {'make': 'chest'})
-        self.assertEqual(r['steps'], ['宝箱を作る'])
-        await until(lambda: runner.goal.status == 'done')
-        self.assertEqual(runner.state()['changes'], ['鍵が無いので、探す段を足した'])
-        steps = [a['step']['label'] for n, a in self.fake.calls if n == 'test_goal_step']
-        self.assertEqual(steps, ['宝箱を作る', '鍵を探す', '宝箱を作る'])
-        await runner.stop()
+        runner = goals.GoalRunner(self.said, env=self.env)
+        self.env.goals = runner
+        try:
+            result = await runner.start('test.solve_puzzle', {'board': 'abc'}, constraints={'moves': 7})
+            self.assertEqual(result['state'], 'running')
+            self.assertEqual(runner.state()['steps'], [])
+            self.fake.work = {**self.fake.work, 'revision': 2, 'state': 'needs_decision',
+                              'decision': {'decision_id': 'd'}, 'message': 'Need a decision'}
+            await self.fake.emit({'kind': 'work_state', 'work': self.fake.work})
+            await until(lambda: runner.work['state'] == 'needs_decision')
+            self.assertEqual((await runner.answer('old', 'retry'))['reason'], 'stale_decision')
+            await runner.stop()
+            self.assertEqual(runner.work['state'], 'cancelled')
+            self.assertFalse(any('_goal_' in name for name, args in self.fake.calls))
+        finally:
+            await runner.close()
 
 
 class GoalHoldsBodyTest(EnvCase):
-    async def test_new_body_command_stops_goal_before_submission(self):
+    async def test_direct_body_command_cannot_replace_owned_work(self):
         await self.link()
         stop = mock.AsyncMock()
         self.env.goals = types.SimpleNamespace(body_step=lambda: 'オークの原木を 2 個集める', stop=stop)
         r = await self.env.use('test_jump', {})
-        self.assertEqual(r['status'], 'started')
-        stop.assert_awaited_once_with(reason='replaced')
-        self.assertEqual((await self.env.use('test_stop', {}))['status'], 'stopped')   # 止めるのはよい
+        self.assertEqual(r['status'], 'busy')
+        stop.assert_not_awaited()
+        stop.return_value = {'state': 'cancelled'}
+        self.assertEqual((await self.env.use('test_stop', {}))['state'], 'cancelled')   # 止めるのはよい
         self.assertEqual((await self.env.use('test_look', {}))['status'], 'seen')      # 見るのはよい
-        self.assertIn(('test_jump', {}), self.fake.calls)
+        self.assertNotIn(('test_jump', {}), self.fake.calls)
         self.env.goals = types.SimpleNamespace(body_step=lambda: None)
         self.assertEqual((await self.env.use('test_jump', {}))['status'], 'started')
 
@@ -352,6 +353,12 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
         self.env.on_event({**event, 'session': 'two'})
         self.assertEqual(len(said.calls), 2)
 
+    async def test_unowned_last_snapshot_is_not_a_new_task_result(self):
+        self.env._body = {'session': 'new', 'revision': 1, 'current': None,
+            'last': {'id': 99, 'title': 'old task', 'result': {'ok': True}}}
+        self.env._reconcile_body()
+        self.assertEqual(self.env._completed, {})
+
     async def test_snapshot_repairs_missed_done_and_real_notice_still_reaches_mind(self):
         said = Said()
         self.env.say = said
@@ -391,16 +398,16 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
         release.set()
         await task
 
-    async def test_direct_command_cancels_goal_that_is_still_planning(self):
+    async def test_direct_command_cannot_overtake_planning_work(self):
         stop = mock.AsyncMock()
-        self.env.goals = types.SimpleNamespace(body_step=lambda: None,
-            active=types.SimpleNamespace(status='planning'), stop=stop)
+        self.env.goals = types.SimpleNamespace(body_step=lambda: 'planning', stop=stop)
         async def call(name, args):
             self.assertEqual(stop.await_count, 1)
             return {'status': 'accepted', 'task': 1}
         self.env._call = call
-        await self.env.use('test_jump', {})
-        stop.assert_awaited_once_with(reason='replaced')
+        result = await self.env.use('test_jump', {})
+        self.assertEqual(result['status'], 'busy')
+        stop.assert_not_awaited()
 
     async def test_spontaneous_action_cannot_replace_current_body_command(self):
         self.env.activity.thinking_origin = 'initiative'
@@ -429,13 +436,13 @@ class MindGameTest(EnvCase):
         m = mind.Mind(Conversation(), body=self.env)
         all_tools = tools.TOOLS + self.env.tools
         ids = lambda: {t.id for t in m.tools_for(ctx_with('跳んで'), all_tools)}   # noqa: E731
-        self.assertFalse({'test_jump', 'test_facts', 'start_goal'} & ids())
+        self.assertFalse({'test_jump', 'test_facts', 'submit_game_task'} & ids())
         await self.link()
-        self.assertTrue({'test_jump', 'test_look', 'test_facts', 'start_goal'} <= ids())
+        self.assertTrue({'test_jump', 'test_look', 'test_facts', 'submit_game_task'} <= ids())
         self.assertIn('test_jump', m.moving_calls())
         self.assertNotIn('test_look', m.moving_calls())
         self.assertIn('test_facts', m.game_calls())
-        self.assertIn('add_subgoal', m.one_call_tools())
+        self.assertIn('answer_game_task', m.one_call_tools())
 
     async def test_the_state_goes_to_the_talker_and_the_mind(self):
         await self.link()

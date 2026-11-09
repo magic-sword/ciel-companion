@@ -16,8 +16,8 @@
 | 日常版と配信版の違いを知りたい | [アプリ構成・配信ウィンドウ](app-composition-ja.md) |
 | 変更を検証したい | [回帰テスト](regression-tests-ja.md)、[料金のかかる試験](paid-checks-ja.md) |
 | Minecraft をローカルモデルで試験・比較したい | [ローカル LLM](local-llm-ja.md)、[ベンチマーク・課題拡張・性能評価](minecraft-benchmark-ja.md)、[評価スキル](../.agents/skills/ciel-minecraft-benchmark/SKILL.md) |
-| Minecraft の実測済み範囲を知りたい | [GPU共用・改修前7課題一巡](minecraft-benchmark-gpu-shared-2026-11-09-ja.md)、[旧CPU・900秒条件の各54試行](minecraft-benchmark-baseline-2026-11-09-ja.md)、[共通GPU APIの実測](shared-llm-api-ja.md) |
-| ゲーム実行を前提にシエルの構成を見直したい | [シエルとMCPの再設計](minecraft-execution-redesign-ja.md)（責任分担・作業契約・VoyagerとADKの参照方針） |
+| Minecraft の実測済み範囲を知りたい | [作業契約への移行・7課題合格と通知修正](minecraft-work-refactor-2026-11-09-ja.md)、[改修前GPU一巡](minecraft-benchmark-gpu-shared-2026-11-09-ja.md)、[旧CPU・各54試行](minecraft-benchmark-baseline-2026-11-09-ja.md) |
+| ゲーム実行の構成とMCP契約を知りたい | [シエルとMCPの再設計](minecraft-execution-redesign-ja.md)、[実装済みの作業契約](game-work-contract-ja.md) |
 | Minecraft の実用期限・早期終了・材料不足の報告を評価したい | [実用性評価 practical-v1](minecraft-benchmark-practical-ja.md) |
 | GPU推論APIをシエルとベンチマークで共用したい | [共通GPU API・容量測定・接続](shared-llm-api-ja.md) |
 | 利用条件・外部依存を確認したい | [第三者依存関係](third-party-dependencies.md)、[READMEのライセンス説明](../README.md#公開とライセンス) |

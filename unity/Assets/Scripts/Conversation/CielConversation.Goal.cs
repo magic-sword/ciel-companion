@@ -14,6 +14,8 @@ namespace Ciel.Conversation
         public class GoalInfo
         {
             public int id;
+            public bool can_resume;
+            public string task_id;
             public string game, game_label, title, by, by_label, status, why;
         }
 

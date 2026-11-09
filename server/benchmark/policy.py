@@ -64,12 +64,16 @@ class Progress:
             self.failures[key] = self.failures.get(key,0)+1
 
     def event(self, e, elapsed):
+        if e['kind'] == 'work_action':
+            e = {**e, 'kind': 'game_call', 'name': 'minecraft_work_step'}
+        elif e['kind'] == 'work_action_result':
+            e = {**e, 'kind': 'game_result'}
         kind = e['kind']
         if kind == 'game_call':
             args = {k:v for k,v in e.get('arguments',{}).items() if k!='request_id'}
             signature = (e.get('name'),json.dumps(args,sort_keys=True,ensure_ascii=False))
             self.calls[e.get('id')] = signature
-            if e.get('name') in ACTION_TOOLS:
+            if e.get('name') in ACTION_TOOLS or e.get('name') == 'minecraft_work_step':
                 if self.first_action is None:
                     self.first_action = elapsed
                 if self.decline is not None:

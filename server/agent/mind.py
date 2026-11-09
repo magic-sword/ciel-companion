@@ -52,9 +52,9 @@ MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
 # 目的の道具のうち、相手の発言で呼ぶもの（育つ例文の印）・体を動かすもの。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を
 # 終える）は除く。ゲームの道具は、ゲームの決まりの役目（act・look・know）で決める（game_env.py）。体を動かす頼みの言葉も
 # ゲームの決まり（route_words）にある。「ついてきて」は短いので、小脳に行くと、道具を持たない小脳が「はーい」と言うだけになる
-GOAL_ASKED = frozenset(GOAL_TOOLS) - {'add_subgoal', 'finish_step'}
-GOAL_MOVING = GOAL_ASKED - {'goal_status'}
-GOAL_ONE = frozenset(GOAL_TOOLS) - {'goal_status'}   # 1 つの返事で 1 つだけ通す目的の道具（見るだけの道具は、いくつでもよい）
+GOAL_ASKED = frozenset(GOAL_TOOLS)
+GOAL_MOVING = GOAL_ASKED - {'game_task_status'}
+GOAL_ONE = GOAL_MOVING
 # 小脳が体の動きを約束した言い方（シエル自身の口ぐせなので、相手の言い方よりそろっている）。約束しても小脳は道具を持たないので、
 # 話し終えたら心が続きをする（「すぐに渡しますね」と言うだけで渡さなかった。2026-11-07）
 PROMISE = re.compile(r'(渡し|作り|作って|集め|集めて|取って|取り|掘り|掘って|探し|探して|持って|置き|置いて|拾い|拾って|降り|向かい|ついていき|ついて行き|そっちに行き|行き|あげ|止まり|待ち)(ます|ますね|ますよ|ましょう|きます|おきます|いきます|るのです|ますのです)')

@@ -37,8 +37,8 @@ export const QUIET_REASONS = ['stopped', 'replaced', 'unlinked', 'disconnected']
 // うまくいかなかったときの次の手（道具の返事と知らせに添える）。心が「石を探してから」と言うだけで探す道具を呼ばなかった・
 // 足りない物を集めずに同じ物を作り直した（2026-11-07）
 export const NEXT_STEP = {
-  missing_materials: 'start_goal（make_item にその物）で目的にすると、足りない物を集める段から係が進める',
-  needs_tool: 'start_goal で目的にすると、道具を作る段から係が進める',
+  missing_materials: '公開する能力をsubmit_game_taskで頼むと、ゲーム側が不足分を調達する',
+  needs_tool: '公開する能力をsubmit_game_taskで頼むと、ゲーム側が必要な道具を用意する',
   not_found: 'minecraft_find_blocks で探せる（地中の物は how=dig、地面の上の物は how=walk）',
 };
 export const SKILL_NAMES = {
