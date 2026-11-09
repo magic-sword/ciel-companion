@@ -9,7 +9,7 @@ description: 稼働中のマイクラのシエルの体（server/minecraft）が
 
 ## 決まり
 
-- 試験用に入れるプレイヤーは **`Ciel_Debug`** だけ（スキンは `assets/minecraft/skins/Ciel_Debug.png`、シエルの 2P カラー。`docs/minecraft-design-ja.md` の 20 章）。`CielEye` など別の名前を使わない。ホワイトリストにいなければ、12 章「初回」の 3 で入れ直す（その場しのぎに `whitelist add` しない）。
+- 試験用に入れるプレイヤーは **`Ciel_Debug`** だけ（スキンは `assets/minecraft/skins/Ciel_Debug.png`、シエルの 2P カラー。`docs/games/minecraft/minecraft-design-ja.md` の 20 章）。`CielEye` など別の名前を使わない。ホワイトリストにいなければ、12 章「初回」の 3 で入れ直す（その場しのぎに `whitelist add` しない）。
 - 世界はユーザーの世界。試すと原木を掘る・作業台を置くなど世界が変わる。持ち主の建物の近くで試さない。試したこと（掘った・置いた場所）は報告に書く。
 - 動いているシエル本人（`Ciel`）には、会話がつないでいる（体へつなげる会話は 1 つだけ）。シエルで直接試さず、`Ciel_Debug` で同じ技を試す。
 - 体のコンテナを入れ直すと、シエルはマイクラから数秒抜けて入り直す（会話は切れない）。配信中ならユーザーに言ってから。
@@ -44,7 +44,7 @@ scripts/server/debug-log.sh pull --dev        # 会話の記録（.local/debug-l
 .claude/skills/ciel-minecraft-debug/scripts/run.sh craft '{"item":"wooden_pickaxe","count":1}' --tp "17.5 67 41.3" --clear --give "oak_log 3"
 ```
 
-- 体のコンテナの中で、体と同じ `src/skills.js` の Runner を動かす（配ってある版。手元の変更を試すときは、先に体を配る：`docs/minecraft-design-ja.md` の 12 章の起動と同じ `--env-file`・`--profile` で `build`・`up -d minecraft-body`）。
+- 体のコンテナの中で、体と同じ `src/skills.js` の Runner を動かす（配ってある版。手元の変更を試すときは、先に体を配る：`docs/games/minecraft/minecraft-design-ja.md` の 12 章の起動と同じ `--env-file`・`--profile` で `build`・`up -d minecraft-body`）。
 - 記録：`goto`・`collect`・`dig`（掘る時間・足元・水の中）・`craft`・`path_update`/`path_reset`・`blockUpdate`・拾った物。
 - シエルと同じ場所で試すと、シエルの困りごとを再現しやすい（`rcon-cli "data get entity Ciel Pos"` の座標を `--tp` に）。tp した先が水や空中だと落ちるので、始めた位置（`始める ... pos`）を確かめる。
 - 終わると、写したファイルと、中に残ったプロセスを消す。
@@ -62,4 +62,4 @@ scripts/server/debug-log.sh pull --dev        # 会話の記録（.local/debug-l
 ## 5. 報告
 
 - 何が起きていたか（記録の時刻と中身）、原因、直したこと、確かめたこと（どこで何を試したか）、世界に残したもの（掘った・置いた場所）を、ユーザーに日本語で伝える。
-- 直したら `docs/minecraft-design-ja.md` に、何が起きて何を直したかを書く（章の番号が重ならないよう、最後の章を見てから足す）。
+- 直したら `docs/games/minecraft/minecraft-design-ja.md` に、何が起きて何を直したかを書く（章の番号が重ならないよう、最後の章を見てから足す）。

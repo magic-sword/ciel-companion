@@ -9,9 +9,9 @@
   <img src="assets/ciel/current/proofs/idle.gif" width="350" alt="シエルのLive2Dモデルの待機動作プレビュー">
 </p>
 
-左：日常版の実装画面（Unityで接続せずに描画）。右：Live2Dモデルの動作確認GIF。会話・ゲームのプレイ動画はこれから収録します。[紹介動画の撮影台本](docs/demo-recording-ja.md)にシーンと手順をまとめています。
+左：日常版の実装画面（Unityで接続せずに描画）。右：Live2Dモデルの動作確認GIF。会話・ゲームのプレイ動画はこれから収録します。[紹介動画の撮影台本](docs/publishing/demo-recording-ja.md)にシーンと手順をまとめています。
 
-[開発を始める](docs/development-setup-ja.md) · [システム構成](docs/architecture-ja.md) · [資料一覧](docs/README.md)
+[開発を始める](docs/development/development-setup-ja.md) · [システム構成](docs/project/architecture-ja.md) · [資料一覧](docs/README.md)
 
 ## シエルとできること
 
@@ -24,7 +24,7 @@
 | 配信する | Windows用のCIEL Broadcast。操作画面と、OBSに取り込むシエル映像・目的カードを別ウィンドウで表示 |
 | 会議・歌を楽しむ | 仮想オーディオを使った会議参加、議事録、歌を聴いて感想を返す機能 |
 
-**開発中のプロジェクトです。** 日常の音声会話はWindows・Androidでの確認記録があります。MinecraftのMCP統合など、追加実装の試験と実ゲームでの確認は別に管理しています。各機能の確認範囲は[現在の確認状況](docs/verification-status-ja.md)を参照してください。iOSは未検証です。
+**開発中のプロジェクトです。** 日常の音声会話はWindows・Androidでの確認記録があります。MinecraftのMCP統合など、追加実装の試験と実ゲームでの確認は別に管理しています。各機能の確認範囲は[現在の確認状況](docs/testing/verification-status-ja.md)を参照してください。iOSは未検証です。
 
 ## 日常版と配信版
 
@@ -40,7 +40,7 @@
 
 ![CIEL Broadcastの操作画面。目的と現在の処理を表示（未接続）](docs/assets/showcase/broadcast.png)
 
-この画像は接続前の画面です。配信時はシエル映像と目的カードを別ウィンドウからOBSに取り込みます。[アプリ構成の詳細](docs/app-composition-ja.md)
+この画像は接続前の画面です。配信時はシエル映像と目的カードを別ウィンドウからOBSに取り込みます。[アプリ構成の詳細](docs/app/app-composition-ja.md)
 
 </details>
 
@@ -48,9 +48,9 @@
 
 このリポジトリはソースコードと制作資料です。Unityでの表示確認と、サーバーに接続した音声会話では必要な準備が異なります。
 
-1. **画面・モデルを確認する**：Git LFSとUnity **6000.6.4f1**を用意し、Live2D Cubism **5 SDK R5（URP）**を別途復元して、`unity/`を開きます。[セットアップ手順](docs/development-setup-ja.md)
-2. **音声会話を試す**：LiveKitの接続設定、会話サーバー、Irodori-TTSが必要です。LiveKitの資格情報をサーバー側に設定し、推論はOpenAIまたはローカルを選びます。[推論の実行設定](docs/local-runtime-ja.md)[接続手順](docs/development-setup-ja.md#7-音声会話を試す場合)
-3. **コードから参加する**：通常のPython回帰テストはAPIキー・GPUなしで実行できます。[テストの準備と実行](docs/regression-tests-ja.md)
+1. **画面・モデルを確認する**：Git LFSとUnity **6000.6.4f1**を用意し、Live2D Cubism **5 SDK R5（URP）**を別途復元して、`unity/`を開きます。[セットアップ手順](docs/development/development-setup-ja.md)
+2. **音声会話を試す**：LiveKitの接続設定、会話サーバー、Irodori-TTSが必要です。LiveKitの資格情報をサーバー側に設定し、推論はOpenAIまたはローカルを選びます。[推論の実行設定](docs/operations/local-runtime-ja.md)[接続手順](docs/development/development-setup-ja.md#7-音声会話を試す場合)
+3. **コードから参加する**：通常のPython回帰テストはAPIキー・GPUなしで実行できます。[テストの準備と実行](docs/testing/regression-tests-ja.md)
 
 クローンの例（PowerShell）：
 
@@ -67,11 +67,11 @@ SDK復元後にUnityを開く：
 .\scripts\unity.ps1 open .
 ```
 
-クローンだけでは音声会話は動きません。API・クラウドサービスの利用費や、音声合成用GPUなどの実行環境も必要です。ビルド方法とサーバーの起動・反映は[コマンド集](docs/build-ja.md)を参照してください。
+クローンだけでは音声会話は動きません。API・クラウドサービスの利用費や、音声合成用GPUなどの実行環境も必要です。ビルド方法とサーバーの起動・反映は[コマンド集](docs/development/build-ja.md)を参照してください。
 
 ## 仕組みとリポジトリ
 
-Unity＋Live2Dが表示と操作を担当し、LiveKitが声と状態を中継します。会話サーバーは「聞く・考える・話す」を分けたpipeline構成で、Irodori-TTSがシエルの声を作ります。MinecraftはMineflayerの体とMCPを介して接続します。[構成図と設定の入口](docs/architecture-ja.md)
+Unity＋Live2Dが表示と操作を担当し、LiveKitが声と状態を中継します。会話サーバーは「聞く・考える・話す」を分けたpipeline構成で、Irodori-TTSがシエルの声を作ります。MinecraftはMineflayerの体とMCPを介して接続します。[構成図と設定の入口](docs/project/architecture-ja.md)
 
 | 場所 | 内容 |
 |---|---|
@@ -86,17 +86,17 @@ Unity＋Live2Dが表示と操作を担当し、LiveKitが声と状態を中継�
 
 ## 開発・資料の読み方
 
-- 初めて参加する：[開発環境構築](docs/development-setup-ja.md) → [システム構成](docs/architecture-ja.md)
-- 会話を変える：[pipelineの仕組み](docs/conversation-pipeline-ja.md) → [プロンプト編集](server/agent/README.md)
-- ゲーム連携を読む：[Minecraft](docs/minecraft-design-ja.md) → [環境のMCP設計と検証状況](docs/game-environment-mcp-design-ja.md)
-- Minecraft を試験・比較する：[ローカル LLM](docs/local-runtime-ja.md) → [ベンチマークの実行・課題拡張・性能評価](docs/minecraft-benchmark-ja.md)。エージェント向け手順は [評価スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)
-- モデルを制作する：[Live2D制作仕様](docs/ciel-live2d-production-spec-ja.md) → [現在の制作方針](docs/ciel-live2d-production-spec-ja.md)
+- 初めて参加する：[開発環境構築](docs/development/development-setup-ja.md) → [システム構成](docs/project/architecture-ja.md)
+- 会話を変える：[pipelineの仕組み](docs/conversation/conversation-pipeline-ja.md) → [プロンプト編集](server/agent/README.md)
+- ゲーム連携を読む：[Minecraft](docs/games/minecraft/minecraft-design-ja.md) → [環境のMCP設計と検証状況](docs/games/game-environment-mcp-design-ja.md)
+- Minecraft を試験・比較する：[ローカル LLM](docs/operations/local-runtime-ja.md) → [ベンチマークの実行・課題拡張・性能評価](docs/games/minecraft/minecraft-benchmark-ja.md)。エージェント向け手順は [評価スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)
+- モデルを制作する：[Live2D制作仕様](docs/app/live2d/ciel-live2d-production-spec-ja.md) → [現在の制作方針](docs/app/live2d/ciel-live2d-production-spec-ja.md)
 - その他の機能・研究・決定記録：[資料一覧](docs/README.md)
 
-変更した箇所に応じた[回帰テスト](docs/regression-tests-ja.md)を実行してください。`server/agent/`の変更では、その配下の[AGENTS.md](server/agent/AGENTS.md)も確認してください。
+変更した箇所に応じた[回帰テスト](docs/testing/regression-tests-ja.md)を実行してください。`server/agent/`の変更では、その配下の[AGENTS.md](server/agent/AGENTS.md)も確認してください。
 
 ## 公開とライセンス
 
-プロジェクト自身のLICENSEは未選定です。現時点ではOSSライセンスによる利用許諾は付与していません。Live2D SDKは同梱せず、別途その利用条件に従って取得・復元します。コード、キャラクター素材、外部SDKの利用条件を同一とみなさないでください。[第三者依存関係](docs/third-party-dependencies.md)
+プロジェクト自身のLICENSEは未選定です。現時点ではOSSライセンスによる利用許諾は付与していません。Live2D SDKは同梱せず、別途その利用条件に従って取得・復元します。コード、キャラクター素材、外部SDKの利用条件を同一とみなさないでください。[第三者依存関係](docs/project/third-party-dependencies.md)
 
 更新：2026-11-08（リポジトリの実装・設定・検証記録に基づく）。

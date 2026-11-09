@@ -15,7 +15,7 @@
 - device_owners：端末の持ち主（アプリの端末 ID と、端末だけが持つ合言葉のハッシュ）。合言葉そのものは置かない
 - voiceprints.channel：その見本を録った経路（端末の ID など。マイクや経路で声の特徴が変わるので、同じ経路の見本を優先して比べる）
 - people.origin・people.shared・person_notes.origin：本番（main）と開発用（dev）の会話サーバーが同じ DB を使うための印
-  （docs/shared-memory-ja.md）。CIEL_MEMORY_SCOPE が見える人を決める。本番は origin='main' の人、開発用は origin='dev' の人と
+  （docs/services/shared-memory-ja.md）。CIEL_MEMORY_SCOPE が見える人を決める。本番は origin='main' の人、開発用は origin='dev' の人と
   shared の人（持ち主のハカセ）。開発用からは、自分の印でない人を消す・呼び名を変える・端末の持ち主をやめることはできない。
   シエル自身の出来事・好みは、両方で 1 つ（印なし）
 録音そのものは置かない。表は会話サーバーが起動のたびに作る（あれば何もしない）。

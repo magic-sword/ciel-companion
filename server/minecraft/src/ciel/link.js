@@ -1,4 +1,4 @@
-// 体と MCP のあいだのつなぎ役。docs/game-environment-mcp-design-ja.md の 4 章。
+// 体と MCP のあいだのつなぎ役。docs/games/game-environment-mcp-design-ja.md の 4 章。
 // - 体（main.js）から見ると、WebSocket の会話と同じ「つながっている相手」（readyState・send）。体が送る機械の言葉を受け、
 //   シエル向けの言葉（words.js）にして MCP の側へ渡す。体へは、WebSocket と同じ JSON の命令を command で送る
 //   （形の確かめは protocol.js のまま。任意のコードは実行しない）。

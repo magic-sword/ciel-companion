@@ -1,4 +1,4 @@
-// 会話サーバーと体のあいだの決まり（JSON、v:1）。docs/minecraft-design-ja.md の 4.2。
+// 会話サーバーと体のあいだの決まり（JSON、v:1）。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 受けた命令は、ここで形を確かめてから動かす。一覧に無い技・形の違う引数は動かさない（任意のコードは実行しない）。
 
 export const VERSION = 1;

@@ -1,4 +1,4 @@
-"""本番（main）と開発用（dev）が同じ DB を使うときの、見える人と直せる人の決まり（docs/shared-memory-ja.md）。DB は使わない。"""
+"""本番（main）と開発用（dev）が同じ DB を使うときの、見える人と直せる人の決まり（docs/services/shared-memory-ja.md）。DB は使わない。"""
 import os
 import unittest
 from types import SimpleNamespace

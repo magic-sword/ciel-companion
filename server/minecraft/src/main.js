@@ -1,6 +1,6 @@
-// シエルの体：マイクラ（Java 版）にプレイヤーとして入り、会話サーバーの命令で動く。docs/minecraft-design-ja.md。
+// シエルの体：マイクラ（Java 版）にプレイヤーとして入り、会話サーバーの命令で動く。docs/games/minecraft/minecraft-design-ja.md。
 // - 会話とは別に動き続ける。会話サーバーは MCP（http://BODY_HOST:CIEL_PORT/mcp、src/ciel/mcp.js）でつなぐ。
-//   以前の WebSocket（ws://BODY_HOST:BODY_PORT）も、移り終えるまで残す（docs/game-environment-mcp-design-ja.md の 10 章）。
+//   以前の WebSocket（ws://BODY_HOST:BODY_PORT）も、移り終えるまで残す（docs/games/game-environment-mcp-design-ja.md の 10 章）。
 //   体を動かせる会話は、どちらの入口でも合わせて 1 つだけ。
 // - 会話モデルは使わない。MCP では、出来事をシエル向けの言葉にして、話すものだけを知らせる（src/ciel/words.js）。
 // - ゲームのチャットの中身はログに出さない（会話と同じ扱い）。

@@ -1,4 +1,4 @@
-// シエルの目：体（ボット）が今いる場所から見た景色を、1 枚の JPEG にする。docs/minecraft-design-ja.md。
+// シエルの目：体（ボット）が今いる場所から見た景色を、1 枚の JPEG にする。docs/games/minecraft/minecraft-design-ja.md。
 // - prismarine-viewer の一人称の視点（Web のページ）を 127.0.0.1 だけで開き、同じコンテナの画面の無い Chromium で見る。
 //   prismarine-viewer の mineflayer() は全部のアドレスで待ち受けるので使わず、同じ中身をここで 127.0.0.1 に開く。
 // - 見る（look）たびに開き直さず、ページを開いたまま景色を描き続け、そのときの 1 コマを撮る（あとで画面共有へ広げる土台。

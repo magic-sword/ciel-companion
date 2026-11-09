@@ -2,7 +2,7 @@
 // うなずく（nod）・首をかしげる（tilt）・首を横にふる（shake）・耳をぴくっと動かす（ear）。
 // タッチの反応（CielTouch）と同じく、頭の角度と耳のパラメーターに、その場で値を足す（表情・目線・物理演算はそのまま）。
 // 頭の角度は物理演算の入力なので、髪も一緒に揺れる。腕を振る動きはリグが無いので出さない。
-// 動きの大きさ・長さは目で見て直すこと（docs/ciel-live2d-rig-design-ja.md。合否は自然でかわいいか）。
+// 動きの大きさ・長さは目で見て直すこと（docs/app/live2d/ciel-live2d-rig-design-ja.md。合否は自然でかわいいか）。
 using System.Collections.Generic;
 using Live2D.Cubism.Core;
 using Live2D.Cubism.Framework;

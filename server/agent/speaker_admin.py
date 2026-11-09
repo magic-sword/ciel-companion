@@ -12,7 +12,7 @@
   docker compose exec agent python speaker_admin.py drop-dev-notes <番号>   開発用の会話で書いたメモだけを消す
 
 声の特徴そのものは表示しない。メモとシエルの気持ちは本人に関わる情報なので、見るのは管理のときだけにする。
-本番と開発用は同じ DB を使う（docs/shared-memory-ja.md）。見えるのは、CIEL_MEMORY_SCOPE の会話サーバーから見える人だけ。
+本番と開発用は同じ DB を使う（docs/services/shared-memory-ja.md）。見えるのは、CIEL_MEMORY_SCOPE の会話サーバーから見える人だけ。
 開発用からは、本番と共有している人の呼び名を変える・消すことはできない。delete-all も、その会話サーバーで覚えた人だけを消す。
 """
 import asyncio

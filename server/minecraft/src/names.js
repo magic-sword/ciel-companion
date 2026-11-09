@@ -1,4 +1,4 @@
-// 「花」「土」「石炭」のような呼び名から、集めるブロックを決める。docs/minecraft-design-ja.md の 18 章。
+// 「花」「土」「石炭」のような呼び名から、集めるブロックを決める。docs/games/minecraft/minecraft-design-ja.md の 18 章。
 // 心は「flower」のような、ブロックの ID ではない名前で頼むことがある（花を集めてと頼まれ、flower で頼んで断られた。2026-11-06）。
 // ブロックの ID ならそのまま。持ち物の名前（dirt・cobblestone・coal など）なら、それが落ちるブロックも入れる。
 

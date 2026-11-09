@@ -5,7 +5,7 @@
   会話の後ろに置く（turns.py）。会話の始めの指示に入れると、変わるたびに指示を書き換えることになり、Realtime API の
   キャッシュが効かなくなるので入れない。あいさつ（agent.py）にも添える。
 - 分単位の時刻は、聞かれたときに道具 current_time で返す（tools/clock.py）。
-決めたことは docs/conversation-pipeline-ja.md。
+決めたことは docs/conversation/conversation-pipeline-ja.md。
 """
 from datetime import datetime
 

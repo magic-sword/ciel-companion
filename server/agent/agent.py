@@ -13,7 +13,7 @@ LiveKit Cloud のルームにアプリが入ると、このプログラムが呼
   realtime（コードの既定）… OpenAI Realtime API（gpt-realtime 系）。2026-10-31 までの本番
   pipeline        … 音声検出 1 つ（silero）→ 話している途中から出る文字起こし → 区切りのモデル → 小脳と心（mind.py）
                     → Irodori。返事のたびに会話の記録から文脈を作る。本番・開発用の Compose はこれ
-                    （仕組みは docs/conversation-pipeline-ja.md）
+                    （仕組みは docs/conversation/conversation-pipeline-ja.md）
   gpt-live        … GPT-Live（全二重。利用権限が要る。irodori とは組み合わせない）
 
 実行（開発）  python -m livekit.agents start agent.py --dev

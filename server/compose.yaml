@@ -20,7 +20,7 @@ services:
       # シエルの声：Irodori-TTS で読み上げる（tts が同じマシンで動いていること）
       - CIEL_VOICE=irodori
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
-      # （docs/conversation-pipeline-ja.md）。戻すときは realtime にする
+      # （docs/conversation/conversation-pipeline-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=pipeline
       # 本番の切替はserver/.env。開発用は独立したCIEL_DEV_*を使う。
       - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-openai}
@@ -30,10 +30,10 @@ services:
       - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
       - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
       - CIEL_LOCAL_TIMEOUT=${CIEL_LOCAL_TIMEOUT:-90}
-      # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口（server/minecraft の src/ciel/mcp.js）。
+      # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口（server/minecraft の src/ciel/mcp.js）。
       # 会話の始めにつなぎ、アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけが体を受け持つ。知識の道具も同じ入口から出る
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
-      # 覚えている人の記録（speaker_store.py）。開発用も同じ DB を使い、印（main・dev）で分ける（docs/shared-memory-ja.md）
+      # 覚えている人の記録（speaker_store.py）。開発用も同じ DB を使い、印（main・dev）で分ける（docs/services/shared-memory-ja.md）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?server/.env に CIEL_DB_PASSWORD を書く}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=main
     volumes:
@@ -130,10 +130,10 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
-  # マイクラのサーバー（Java 版。docs/minecraft-design-ja.md）。ふだんは起動しない。
+  # マイクラのサーバー（Java 版。docs/games/minecraft/minecraft-design-ja.md）。ふだんは起動しない。
   #   docker compose --env-file .env --env-file .env.minecraft --profile minecraft up -d minecraft minecraft-body
   # シエル用のアカウントを買わないので、アカウントの確認なし（online-mode=false）で動かす。だれでも好きな名前で入れるので、
-  # 家の中のネットワークだけで使い、ルーターで 25565 を開かない。入れるのはホワイトリストの人だけ（docs/minecraft-design-ja.md の 12 章）。
+  # 家の中のネットワークだけで使い、ルーターで 25565 を開かない。入れるのはホワイトリストの人だけ（docs/games/minecraft/minecraft-design-ja.md の 12 章）。
   # 世界は ./minecraft/data（Git・デプロイの外）
   minecraft:
     profiles: [minecraft]
@@ -160,7 +160,7 @@ services:
     restart: unless-stopped
 
   # シエルの体（server/minecraft。マイクラにプレイヤーとして入るボット）。会話サーバーは MCP の http://127.0.0.1:8771/mcp へつなぐ。
-  # 以前の ws://127.0.0.1:8768 も、移り終えるまで残す（docs/game-environment-mcp-design-ja.md の 10 章）
+  # 以前の ws://127.0.0.1:8768 も、移り終えるまで残す（docs/games/game-environment-mcp-design-ja.md の 10 章）
   minecraft-body:
     profiles: [minecraft]
     build:
@@ -184,7 +184,7 @@ services:
       - minecraft
     restart: unless-stopped
 
-  # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/minecraft-design-ja.md）。体と同じイメージで、別のコンテナ。
+  # マイクラの知識の窓口（MCP。server/minecraft/src/knowledge。docs/games/minecraft/minecraft-design-ja.md）。体と同じイメージで、別のコンテナ。
   # 会話サーバーは今は体の MCP の入口（:8771）から同じ道具を使うので、ここへはつながない。Wiki を取り出す（下の exec）ために残す。
   # このマシンの中だけで開く
   minecraft-knowledge:

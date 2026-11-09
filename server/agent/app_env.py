@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """アプリの環境：アプリが出せる道具（画面にカードを出す・シエルの体の動き など）を、心が呼べる道具にする。
-docs/game-environment-mcp-design-ja.md の 6 章。
+docs/games/game-environment-mcp-design-ja.md の 6 章。
 
 - アプリは、つないだときと device.hello_request を受けたときに、出せる道具の一覧を送る（topic ciel.app の app.hello。
   道具の形は MCP の tools/list と同じ：name・description・inputSchema・_meta）。アプリの版ごとに出せるものが違ってよい

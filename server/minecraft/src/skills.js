@@ -1,5 +1,5 @@
 import { BodyCommands, commandBot } from './body-command.js';
-// 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/minecraft-design-ja.md の 4.2。
+// 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 技は一度に 1 つ。新しい技を受けたら、今の技を止めてから始める。終わったら（止めたときも）必ず done を 1 回送る。
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
 import pathfinderPkg from 'mineflayer-pathfinder';
@@ -352,7 +352,7 @@ const SKILL_RUN = {
   },
 
   // 足元を depth ブロック掘って降りる。自然のブロックだけを掘り、すぐ下が溶岩・水なら掘らない
-  // 見える所に無いブロックを探す（docs/minecraft-design-ja.md の 25 章）。how：
+  // 見える所に無いブロックを探す（docs/games/minecraft/minecraft-design-ja.md の 25 章）。how：
   //   walk：始めた所から 8 方向へ、少しずつ遠くまで歩いて見回す（木・花・砂・水辺など、地面の上の物）
   //   dig：固い地面から、階段状に掘り下げながら見る（石・鉱石など、地中の物。上り道が残る）
   //   auto：ツルハシが要るブロック（石・鉱石）なら、まず近くを歩いて見回し（山肌・崖に出ていることが多い）、無ければ dig。

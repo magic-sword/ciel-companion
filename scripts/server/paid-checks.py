@@ -50,7 +50,7 @@ def main() -> None:
         if hits:
             print(f'  関係する変更：{", ".join(hits)}')
         print(f'  動かし方：{c["command"]}')
-    print(f'\n全部回すと最大でおよそ {total:.1f} ドル。必要なものだけ回してください（docs/paid-checks-ja.md）。')
+    print(f'\n全部回すと最大でおよそ {total:.1f} ドル。必要なものだけ回してください（docs/testing/paid-checks-ja.md）。')
 
 
 if __name__ == '__main__':

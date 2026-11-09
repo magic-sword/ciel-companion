@@ -1,4 +1,4 @@
-// Minecraft Wiki の記事（action=parse の HTML）を、調べられるかたまりにする。docs/minecraft-design-ja.md。
+// Minecraft Wiki の記事（action=parse の HTML）を、調べられるかたまりにする。docs/games/minecraft/minecraft-design-ja.md。
 // - 本文と表を残す（MineDojo に倣う。鉱石の高さごとの出やすさ・宝箱の中身・作り方は表にある）。表は 1 行ずつ「見出し：値」にする。
 // - 版の歴史・ギャラリー・脚注・ナビゲーション・音・データ値などは落とす（今の版の知識だけにする）。
 // - 見出し（h2・h3）ごとに区切り、長ければ CHUNK_CHARS ほどで分ける。

@@ -1,4 +1,4 @@
-// 会話（CielConversation）のうち、アプリの道具（docs/game-environment-mcp-design-ja.md の 6 章）。
+// 会話（CielConversation）のうち、アプリの道具（docs/games/game-environment-mcp-design-ja.md の 6 章）。
 // アプリが出せる道具を、つないだとき・device.hello_request を受けたときに会話サーバーへ知らせる（topic ciel.app の app.hello。
 // 形は MCP の tools/list と同じ）。会話サーバーの心が道具を呼ぶと app.call（id・tool・args）が届くので、名前と引数を確かめて動かし、
 // app.result（id・result）で返す。知らない道具・知らない引数は動かさない（server/agent/app_env.py）。

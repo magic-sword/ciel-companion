@@ -469,7 +469,7 @@ class MindGameTest(EnvCase):
 
 class NoGameNamesTest(unittest.TestCase):
     def test_the_conversation_server_does_not_know_the_game(self):
-        # 会話サーバーのコードに、ゲームの名前を書かない（ゲームの側が持つ。docs/game-environment-mcp-design-ja.md の 5.4）。
+        # 会話サーバーのコードに、ゲームの名前を書かない（ゲームの側が持つ。docs/games/game-environment-mcp-design-ja.md の 5.4）。
         # 見るのはコードの名前と短い文字列（'minecraft' のような値）。コメント・説明の文・文書への参照は見ない
         import ast
         from pathlib import Path

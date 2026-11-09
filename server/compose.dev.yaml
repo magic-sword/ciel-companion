@@ -4,7 +4,7 @@
 # 読み上げ（Irodori-TTS、127.0.0.1:8766）と DB のコンテナは、本番のものを共通で使う。
 # - 名前 ciel-dev を付ける。アプリが「ciel-dev を呼ぶ」部屋（設定画面の開発スイッチ）にだけ入る。本番の会話サーバーはその部屋に入らない。
 # - デバッグ用の会話ログはいつも残す（data/debug、7 日で消える）。
-# - 覚えている人の記録は、本番と同じデータベース ciel を使う（docs/shared-memory-ja.md）。CIEL_MEMORY_SCOPE=dev で、見えるのは
+# - 覚えている人の記録は、本番と同じデータベース ciel を使う（docs/services/shared-memory-ja.md）。CIEL_MEMORY_SCOPE=dev で、見えるのは
 #   本番と共有している人（持ち主のハカセ）と、開発用で覚えた人だけ。開発用で覚えた人は本番から見えない。シエルの日記・好みは本番と 1 つ。
 #   開発用からは、共有している人を消す・呼び名を変える・端末の持ち主をやめることはできない（「忘れて」は効く）。
 # - 議事録の下書きは、開発用の Discord のチャンネルへ（server/.env.dev の CIEL_DEV_DISCORD_WEBHOOK。空ならサーバーに保存するだけ）。
@@ -35,7 +35,7 @@ services:
       # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
-      # ゲームの環境（MCP。docs/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
+      # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
       # 本番と共用するローカルLLM。localでは返答・道具選択も使う。歌唱中はCPUへ切り替える
       - CIEL_LOCAL_LLM_URL=${CIEL_DEV_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}

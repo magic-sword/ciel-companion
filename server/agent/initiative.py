@@ -42,7 +42,7 @@ Agents with Inner Thoughts」（Liu ほか、2025）の作りに沿って、決�
 - 調べて分かったら（learn）、分かったことを考える係に渡し（learned）、報告を話し終えたらすぐ見直させる。見直すまでは
   付箋を外し、話す番も開かない。調べて答えが出た「聞きたいこと」が残って、報告のあとに「いつか分かったら教えて」と
   聞き直した（2026-10-31、bench_compare.py の curious）。
-決めたことは docs/conversation-pipeline-ja.md、参考にした研究と設計の原点は docs/conversation-pipeline-ja.md。
+決めたことは docs/conversation/conversation-pipeline-ja.md、参考にした研究と設計の原点は docs/conversation/conversation-pipeline-ja.md。
 """
 import asyncio
 import json

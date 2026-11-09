@@ -436,7 +436,7 @@ namespace Ciel.Conversation
             return $"いまは：配信につなげませんでした（{c.YouTubeReason}）";
         }
 
-        // ゲームで一緒に遊ぶ（CielConversation.Game.cs。docs/game-environment-mcp-design-ja.md の 6.4）。
+        // ゲームで一緒に遊ぶ（CielConversation.Game.cs。docs/games/game-environment-mcp-design-ja.md の 6.4）。
         // ゲームの名前は会話サーバーの一覧（env.list）から出す。届くまで・以前の会話サーバーでは「ゲーム」
         void BuildGameSection(RectTransform content)
         {

@@ -67,12 +67,13 @@ def check(root):
     for name in sorted(set(catalog)-actual):errors.append('docs/'+name+': catalog entry has no file')
     for name in sorted(actual & set(catalog)):
         target,role=catalog[name]
+        if name!='README.md' and len(Path(name).parts)==1:errors.append('docs/'+name+': use a responsibility folder, not the docs root')
         if target!=name:errors.append('docs/'+name+': catalog target must match file name')
         text=(docs/name).read_text(encoding='utf-8-sig')
         if '> 責務：'+role not in text:errors.append('docs/'+name+': responsibility header differs from index')
         if re.search(r'20\d{2}-\d{2}(?:-\d{2})?',name):errors.append('docs/'+name+': historical filenames belong in Git')
         if sum(bool(re.match(r'^#\s',line)) for line in prose(text,inline=False).splitlines())!=1:errors.append('docs/'+name+': more than one document title')
-    command=['git','-c','safe.directory='+root.as_posix(),'ls-files','-z']
+    command=['git','-c','safe.directory='+root.as_posix(),'ls-files','--cached','--others','--exclude-standard','-z']
     tracked=subprocess.check_output(command,cwd=root).decode('utf-8').split('\0')
     files={root/p for p in tracked if p.endswith('.md')}|set(docs.rglob('*.md'))
     for source in sorted(files):
@@ -93,6 +94,19 @@ class LinkTests(unittest.TestCase):
             self.assertIn('missing target',link_error(root,file,'missing.md'))
     def test_heading_code_text_is_preserved_and_fenced_titles_ignored(self):
         self.assertEqual(anchors('# `goal.state` の契約\n```sh\n# example\n```'),{'goalstate-の契約'})
+
+    def test_nested_documents_resolve_parent_links_and_images(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/'docs/games/minecraft/task.md'
+            source.parent.mkdir(parents=True)
+            source.write_text('# Task',encoding='utf-8')
+            guide=root/'docs/project/policy.md';guide.parent.mkdir(parents=True)
+            guide.write_text('# Policy',encoding='utf-8')
+            picture=root/'docs/assets/example.png';picture.parent.mkdir(parents=True)
+            picture.write_bytes(b'image')
+            self.assertIsNone(link_error(root,source,'../../project/policy.md#policy'))
+            self.assertIsNone(link_error(root,source,'../../assets/example.png'))
+            self.assertIn('missing target',link_error(root,source,'../project/policy.md'))
 
     def test_external_links_are_not_fetched(self):
         self.assertIsNone(link_error(Path('.'),Path('x.md'),'https://example.com/missing#any'))

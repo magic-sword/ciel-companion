@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """心（全部の指示と道具）と小脳（短い指示・道具なし）で、文字のモデルが返事を書き始めるまでの秒数を比べる（mind.py）。
 
-【料金がかかる】OpenAI を使う。既定（各 10 回）で約 0.02〜0.03 ドル。回す前に docs/paid-checks-ja.md を見る。
+【料金がかかる】OpenAI を使う。既定（各 10 回）で約 0.02〜0.03 ドル。回す前に docs/testing/paid-checks-ja.md を見る。
 声・LiveKit の部屋は使わない。返事の作り方は会話サーバーと同じ（LiveKit の openai.LLM に、会話の指示・最近の発言・今回の発言を渡す）。
 
   python bench_ttft.py [--rounds 10] [--model gpt-5.4-mini] [--reasoning none]

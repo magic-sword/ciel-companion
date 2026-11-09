@@ -1,4 +1,4 @@
-// 会話（CielConversation）のうち、シエルに画像を見せる（docs/vision-design-ja.md）。
+// 会話（CielConversation）のうち、シエルに画像を見せる（docs/services/vision-design-ja.md）。
 // 画像を選び（Windows：WindowsFileDialog、Android：Plugins/Android/CielImagePicker.java の標準の選ぶ画面）、長い辺 MaxSide に縮めて JPEG にし、LiveKit のファイル送信（topic ciel.image）で
 // 会話サーバー（server/agent/eyes.py）へ送る。受け取ったか・だめだった理由は、会話サーバーが image.state で返す。
 // 送るために一時ファイルを書き、送り終えたら消す。

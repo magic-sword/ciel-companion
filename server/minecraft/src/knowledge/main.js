@@ -1,4 +1,4 @@
-// マイクラの知識の窓口（MCP）。docs/minecraft-design-ja.md。
+// マイクラの知識の窓口（MCP）。docs/games/minecraft/minecraft-design-ja.md。
 // - シエルの会話サーバーが、マイクラで遊んでいる間だけ、ここの道具を心に渡す（CIEL_GAME_KNOWLEDGE）。
 // - 道具は読むだけ。ゲームの中は動かさない。料金もかからない。
 //   minecraft_facts：minecraft-data（体と同じ版）から正確な値を返す

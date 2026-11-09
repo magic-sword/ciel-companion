@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ゲームの環境（MCP）へつなぐ係。docs/game-environment-mcp-design-ja.md の 5 章。
+"""ゲームの環境（MCP）へつなぐ係。docs/games/game-environment-mcp-design-ja.md の 5 章。
 
 - 会話サーバーはゲームを知らない。ゲームは MCP のサーバー（マイクラなら server/minecraft の src/ciel/mcp.js）で、
   「シエルのゲームの決まり」（版 1）に沿って、道具・様子・遊び方の指示・出来事を出す。ここはそれを受けて、心・口・付箋・

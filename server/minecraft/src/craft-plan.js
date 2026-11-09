@@ -1,4 +1,4 @@
-// 物を作る手順を決める（体の技 craft と、知識の窓口の facts が使う）。docs/minecraft-design-ja.md の 21 章。
+// 物を作る手順を決める（体の技 craft と、知識の窓口の facts が使う）。docs/games/minecraft/minecraft-design-ja.md の 21 章。
 
 const total = (g) => Object.values(g).reduce((a, b) => a + b, 0);
 

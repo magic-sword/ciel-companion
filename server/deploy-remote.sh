@@ -14,7 +14,7 @@ if [ "${1:-}" = dev ]; then
     (umask 077; printf '# 開発用の Discord のチャンネルの Webhook の URL（Git に入れない）\nCIEL_DEV_DISCORD_WEBHOOK=\n' > .env.dev)
     echo '開発用の設定を作った（server/.env.dev。議事録の送り先は空）'
   fi
-  # 覚えている人の記録：本番と同じデータベース ciel を、印で分けて使う（docs/shared-memory-ja.md）。
+  # 覚えている人の記録：本番と同じデータベース ciel を、印で分けて使う（docs/services/shared-memory-ja.md）。
   # 開発中のコードが起動のときに表を作り替えるので、その前に毎回バックアップを取る（新しい 14 個を残す。Git・デプロイの外）
   BACKUPS=../../ciel-db-backups
   mkdir -p $BACKUPS && chmod 700 $BACKUPS

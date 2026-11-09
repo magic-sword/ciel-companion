@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """作り直しの前と後を比べる：決まった場面を合成した声で流し、速さ・料金・依頼の拾い方・黙るべきときに黙ったか・
-自分から話した回数を、1 つの JSON にまとめる（docs/conversation-pipeline-ja.md の 6 章）。
+自分から話した回数を、1 つの JSON にまとめる（docs/conversation/conversation-pipeline-ja.md の 6 章）。
 
 【料金がかかる】OpenAI・LiveKit を使う。全場面 1 回で約 0.3〜0.6 ドル（場面ごとの目安は SCENES）。
-回す前に scripts/server/paid-checks.py と docs/paid-checks-ja.md を見る。
+回す前に scripts/server/paid-checks.py と docs/testing/paid-checks-ja.md を見る。
 
 開発用の会話サーバー（--agent。既定 ciel-dev）のコンテナの中で動かす。料金は、その会話のデバッグ用の会話ログ
 （debug_log。開発用はいつも残す）の使用量（usage・model_usage）を足して出すので、同じコンテナの中で動かす必要がある。

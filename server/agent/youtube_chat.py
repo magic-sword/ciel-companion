@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""YouTube の配信のコメントを受け取って、話の切れ目にシエルが返す係。docs/youtube-comments-design-ja.md。
+"""YouTube の配信のコメントを受け取って、話の切れ目にシエルが返す係。docs/services/youtube-comments-design-ja.md。
 
 - つなぐ配信は、アプリの設定（「配信」の「YouTube のコメント」）で URL を入れて選ぶ（topic ciel.youtube の youtube.link）。
   どこまでつながったかは、アプリへ youtube.state で知らせる（state：off・connecting・waiting（予約した配信が始まるのを待つ）・live・error。

@@ -2,7 +2,7 @@
 """シエルの小脳と心（CIEL_MODEL=pipeline のとき）。返事を作るたびに、会話の記録（conversation.Conversation）から文脈を組み立てる。
 
 Realtime の組み立てでは、会話モデルが自分の会話をもう 1 つ持ち、そこへ話者の行・時刻・議事録の状態・心の状態を
-system の項目として差し込んで合わせていた（記録が 2 つ。docs/conversation-pipeline-ja.md の 2 章）。
+system の項目として差し込んで合わせていた（記録が 2 つ。docs/conversation/conversation-pipeline-ja.md の 2 章）。
 ここでは、LiveKit が持つ会話からは今回の分（今回の発言・今回だけの指示・道具の呼び出し）だけを使い、ほかは記録から作る。
 
 返事は 2 つの係で作る（研究 Talker-Reasoner の形。速く話す係と、裏で考える係を分ける）。

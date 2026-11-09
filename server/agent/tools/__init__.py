@@ -7,7 +7,7 @@
   いつ使うかは config/prompts/ の Markdown で教える（関数の説明は短く、使い方の決まりはプロンプトに書く）。
 - 道具の中では、会話の状態（話者の帳簿など）を context.userdata（State）から使う。
 - pipeline は capabilities.py で段階的に公開し、会話専用サービスは session_mcp.py 経由で呼ぶ。
-- 外部ゲーム MCP は game_env.py が接続する。契約と責務は docs/design-policy-ja.md が入口。
+- 外部ゲーム MCP は game_env.py が接続する。契約と責務は docs/project/design-policy-ja.md が入口。
 """
 from dataclasses import dataclass
 

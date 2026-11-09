@@ -4,5 +4,5 @@
 - templates.py：テンプレート（config/summaries/）。見出しと種類の組み合わせと、書き方の指示。
 - state.py：ID の付いた項目の一覧。ライブの差分（足す・直す・消す）と、清書での置き換え。
 - live.py：会議の途中に、新しい発言の分だけ軽いモデルで差分を作る。
-決めたことは docs/meeting-minutes-ja.md。
+決めたことは docs/services/meeting-minutes-ja.md。
 """

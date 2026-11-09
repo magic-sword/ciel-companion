@@ -1,5 +1,5 @@
 // シエル向けの言葉：体の機械の言葉（reason: 'needs_tool'・oak_log）を、シエルが話せる言葉に直す。
-// docs/game-environment-mcp-design-ja.md の 4 章。以前は会話サーバーの minecraft.py が持っていた（会話サーバーはゲームを知らない形にした）。
+// docs/games/game-environment-mcp-design-ja.md の 4 章。以前は会話サーバーの minecraft.py が持っていた（会話サーバーはゲームを知らない形にした）。
 
 // うまくいかなかった理由（体の done・error の reason）。（ ）の前が付箋の短いひとこと
 export const WHY_FAILED = {

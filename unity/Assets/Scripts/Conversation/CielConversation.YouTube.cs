@@ -1,4 +1,4 @@
-// 会話（CielConversation）のうち、YouTube の配信のコメントを受け取るか（docs/youtube-comments-design-ja.md）。
+// 会話（CielConversation）のうち、YouTube の配信のコメントを受け取るか（docs/services/youtube-comments-design-ja.md）。
 // 設定画面で配信の URL を入れてスイッチを入れると（PlayerPrefs）、つないだとき・会話サーバーが入ってきたとき・変えたときに、
 // 会話サーバーへ送る（topic ciel.youtube の youtube.link。server/agent/youtube_chat.py）。コメントを読むのは会話サーバーで、
 // API キーも会話サーバーが持つ（アプリはログインもキーも要らない）。どこまでつながったかは、会話サーバーが youtube.state で返す。

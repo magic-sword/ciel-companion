@@ -118,7 +118,7 @@ class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows, [(None, 1), ('device:x', 20)])
 
     async def test_dev_sees_only_shared_and_its_own_people(self):
-        """本番（main）と開発用（dev）が同じ DB を使う（docs/shared-memory-ja.md）"""
+        """本番（main）と開発用（dev）が同じ DB を使う（docs/services/shared-memory-ja.md）"""
         dev = Store(self.a.conn, 'dev')
         guest = await self.a.remember_person('Synthetic guest', [np.ones(192)])
         self.extra.append(guest)

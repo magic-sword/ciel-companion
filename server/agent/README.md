@@ -1,12 +1,12 @@
 # 会話サーバーとキャラクター設定
 
-設計・実装の変更前に[現在の設計方針（正本）](../../docs/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
+設計・実装の変更前に[現在の設計方針（正本）](../../docs/project/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
 
-現在のComposeは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` です。会話の処理を変更する前に[pipelineの仕組み](../../docs/conversation-pipeline-ja.md)を参照してください。起動・反映は[コマンド集](../../docs/build-ja.md)、テストは[回帰テスト](../../docs/regression-tests-ja.md)が入口です。
+現在のComposeは `CIEL_MODEL=pipeline`・`CIEL_VOICE=irodori` です。会話の処理を変更する前に[pipelineの仕組み](../../docs/conversation/conversation-pipeline-ja.md)を参照してください。起動・反映は[コマンド集](../../docs/development/build-ja.md)、テストは[回帰テスト](../../docs/testing/regression-tests-ja.md)が入口です。
 
 ## キャラクター設定を編集する
 
-pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownとして編集します。[管理方針・引き継ぎ手順](../../docs/prompt-management-ja.md)に、構成の理由、検証・公開・履歴管理の方法をまとめています。
+pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownとして編集します。[管理方針・引き継ぎ手順](../../docs/conversation/prompt-management-ja.md)に、構成の理由、検証・公開・履歴管理の方法をまとめています。
 
 | 編集するファイル | 内容 |
 |---|---|
@@ -22,12 +22,12 @@ pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownと
 | [presence_solo.md](config/prompts/presence_solo.md)・[presence_close.md](config/prompts/presence_close.md)・[presence_public.md](config/prompts/presence_public.md) | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | [speakers.md](config/prompts/speakers.md) | 発言者の補足情報、自己紹介・他者紹介の仮名簿、本人確認と同意後の永続保存、本人の保存状態の確認、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
-| [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/conversation-pipeline-ja.md) |
-| [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/meeting-minutes-ja.md) |
-| [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/web-research-ja.md) |
-| [singing_voice.md](config/prompts/singing_voice.md)・[singing_feedback.md](config/prompts/singing_feedback.md) | 歌を聴く道具の使い方と一言、聴き終えたときの感想の言い方（`{facts}` に分析の手がかりが入る）。処理は `singing.py`。[歌を聴く決定記録](../../docs/singing-scoring-ja.md) |
+| [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/conversation/conversation-pipeline-ja.md) |
+| [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/services/meeting-minutes-ja.md) |
+| [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/services/web-research-ja.md) |
+| [singing_voice.md](config/prompts/singing_voice.md)・[singing_feedback.md](config/prompts/singing_feedback.md) | 歌を聴く道具の使い方と一言、聴き終えたときの感想の言い方（`{facts}` に分析の手がかりが入る）。処理は `singing.py`。[歌を聴く決定記録](../../docs/services/singing-scoring-ja.md) |
 | [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
-| [tool_discovery.md](config/prompts/tool_discovery.md) | サービス選択と段階的な道具の読み込み。実装は[能力カタログ](../../docs/capability-runtime-ja.md) |
+| [tool_discovery.md](config/prompts/tool_discovery.md) | サービス選択と段階的な道具の読み込み。実装は[能力カタログ](../../docs/conversation/capability-runtime-ja.md) |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 
 本文は Markdown のソースをそのままモデルへ渡します。見出しや箇条書きを使えます。編集者向けのメモはこの README や管理方針に置いてください。`emotion.md` のタグ名は声・表情の処理が使うため維持してください。
@@ -44,9 +44,9 @@ VS Code では `Alt+Z` で行を折り返し、Markdown の `Ctrl+K` → `V` で
 
 ## ローカルで読み込みを確認する
 
-機能の回帰テストは[実行手順](../../docs/regression-tests-ja.md)を参照。リポジトリ直下の `scripts/server/run-regression.py --suite unit` が入口で、DBを含める場合は `--suite all` を指定します。
+機能の回帰テストは[実行手順](../../docs/testing/regression-tests-ja.md)を参照。リポジトリ直下の `scripts/server/run-regression.py --suite unit` が入口で、DBを含める場合は `--suite all` を指定します。
 
-複数端末の独立した会話、DBの版番号による記憶の同期・競合検知、音声合成の待機制御は[決定記録](../../docs/architecture-ja.md)を参照。共通履歴は部屋をまたいで共有しません。DB結合テストの使い捨て接続先も同記録に記載しています。
+複数端末の独立した会話、DBの版番号による記憶の同期・競合検知、音声合成の待機制御は[決定記録](../../docs/project/architecture-ja.md)を参照。共通履歴は部屋をまたいで共有しません。DB結合テストの使い捨て接続先も同記録に記載しています。
 
 Python 3.11 以降で、`server/agent/` から実行します。LiveKit や API キーは不要です。
 
@@ -61,6 +61,6 @@ python -c "from persona import load_persona; p = load_persona(); print('OK:', p.
 
 ## サービス処理の配置
 
-現在の分担は[サービス境界](../../docs/service-boundaries-ja.md)を参照。`service_mcp.py`は共通の通信・検証・期限・取消、`session_mcp.py`はモデルに公開する道具の権限とRunContext注入を担当する。
+現在の分担は[サービス境界](../../docs/conversation/service-boundaries-ja.md)を参照。`service_mcp.py`は共通の通信・検証・期限・取消、`session_mcp.py`はモデルに公開する道具の権限とRunContext注入を担当する。
 
 検索本体は`research_service.py`、画像説明は`image_analysis.py`、配信データ取得は`youtube_source.py`。記憶のメモ整理・関係性・好み・出来事の処理は既存の各ワーカーが`memory_jobs.py`の基盤専用入口から実行する。会話の受付・発話・LiveKit受信・バックグラウンド処理の実行契機はホスト側に置く。

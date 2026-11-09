@@ -1,4 +1,4 @@
-// 会話（CielConversation）のうち、ゲームで一緒に遊ぶか（docs/game-environment-mcp-design-ja.md の 6.4）。
+// 会話（CielConversation）のうち、ゲームで一緒に遊ぶか（docs/games/game-environment-mcp-design-ja.md の 6.4）。
 // アプリはゲームの名前を持たない。会話サーバーが、つなげるゲームの一覧（env.list：game・label）を送り、設定画面はその名前で
 // スイッチを出す。スイッチはゲームごとに覚え（PlayerPrefs の ciel.game.<game>）、つないだとき・会話サーバーが入ってきたとき・
 // 変えたときに env.link（game・on）を送る（topic ciel.game。server/agent/game_env.py）。オンのときだけ、会話サーバーが

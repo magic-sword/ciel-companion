@@ -30,7 +30,7 @@ REMOTE=$(cat <<EOF
 set -u
 $KILL
 docker cp /tmp/ciel-debug-bot.mjs $BODY:/app/ciel-debug-bot.mjs
-docker exec $MC rcon-cli "whitelist list" | grep -q $NAME || echo "注意：$NAME がホワイトリストにいない（docs/minecraft-design-ja.md の 12 章「初回」の 3）"
+docker exec $MC rcon-cli "whitelist list" | grep -q $NAME || echo "注意：$NAME がホワイトリストにいない（docs/games/minecraft/minecraft-design-ja.md の 12 章「初回」の 3）"
 (docker exec -w /app -e SKILL='$SKILL' -e ARGS='$ARGS' -e WAIT_MS=8000 -e SECONDS_LIMIT=$SECONDS_LIMIT $BODY node ciel-debug-bot.mjs > /tmp/ciel-debug-bot.log 2>&1 &)
 for i in \$(seq 1 20); do sleep 1; docker exec $MC rcon-cli list | grep -q $NAME && break; done
 [ -n "$TP" ] && docker exec $MC rcon-cli "tp $NAME $TP"

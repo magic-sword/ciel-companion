@@ -1,6 +1,6 @@
-# 料金のかかる試験の一覧（scripts/server/paid-checks.py が読む）。説明は docs/paid-checks-ja.md。
+# 料金のかかる試験の一覧（scripts/server/paid-checks.py が読む）。説明は docs/testing/paid-checks-ja.md。
 # 回帰テスト（scripts/server/run-regression.py）は API を使わないので無料。ここに並べるものは OpenAI・LiveKit を使う。
-# cost：1 回の目安（2026-10 の単価。docs/paid-checks-ja.md の計算）。covers：このファイルを変えたら回す候補（server/agent からの相対パス、前方一致）。
+# cost：1 回の目安（2026-10 の単価。docs/testing/paid-checks-ja.md の計算）。covers：このファイルを変えたら回す候補（server/agent からの相対パス、前方一致）。
 # command：開発用の会話サーバー（ciel-dev-agent-dev-1）の中で動かす。
 
 [eval_thoughts]

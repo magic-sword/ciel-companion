@@ -1,5 +1,5 @@
 """試験用の小さなゲーム（MCP のサーバー）。マイクラを使わずに、会話サーバーがゲームを知らずに動くかを確かめる。
-「シエルのゲームの決まり」（版 1。docs/game-environment-mcp-design-ja.md の 4 章）だけを守る、作り物のゲーム「テスト」。"""
+「シエルのゲームの決まり」（版 1。docs/games/game-environment-mcp-design-ja.md の 4 章）だけを守る、作り物のゲーム「テスト」。"""
 import base64
 import contextlib
 import json

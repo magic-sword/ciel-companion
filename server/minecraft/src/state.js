@@ -1,4 +1,4 @@
-// 体の様子を、会話サーバーへ送る形にまとめる（2 秒ごと、と頼まれたとき）。docs/minecraft-design-ja.md の 4.2。
+// 体の様子を、会話サーバーへ送る形にまとめる（2 秒ごと、と頼まれたとき）。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // ブロックと敵は、シエルの目から見えるものだけを入れる（sight.js。地中の鉱石を話して不自然だった。2026-11-06）
 import { FLOWER_NAMES } from './names.js';
 import { canSee, notices, remember } from './sight.js';

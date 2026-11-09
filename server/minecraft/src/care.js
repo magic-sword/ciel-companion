@@ -1,4 +1,4 @@
-// 体の手入れ：おなかが減ったら、持っている食べ物を自分で食べる。docs/minecraft-design-ja.md の 4.2。
+// 体の手入れ：おなかが減ったら、持っている食べ物を自分で食べる。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 体の空き時間だけ食べる。命令や防御と装備を奪い合わない。
 
 const EVERY_MS = 2000;

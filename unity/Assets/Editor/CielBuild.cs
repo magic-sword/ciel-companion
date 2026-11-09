@@ -2,7 +2,7 @@
 // 標準の File ＞ Build Profiles からでもビルドできるが、ここを通すと、シーン・出力先・プレイヤー設定がいつも同じになり、
 // エディタを開かずにコマンドからもビルドできる。出力は Builds/（Git 管理外）。
 // ビルドには接続の設定（Assets/Settings/LiveKitTokenSource.asset）が入るので、ビルドしたものは配らない。
-// 使い方は docs/build-ja.md。
+// 使い方は docs/development/build-ja.md。
 using System;
 using System.IO;
 using UnityEditor;

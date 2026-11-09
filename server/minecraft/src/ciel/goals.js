@@ -1,4 +1,4 @@
-// Minecraft内の計画・段の実行・修復。外側の受付と状態はdocs/game-work-contract-ja.md。
+// Minecraft内の計画・段の実行・修復。外側の受付と状態はdocs/games/game-work-contract-ja.md。
 // 会話サーバーは段の中身を知らない。段は {kind, args, label, progress} で、ここが作り、ここが動かし、ここが確かめる。
 import { ja, shortWhy, WHY_FAILED } from './words.js';
 
