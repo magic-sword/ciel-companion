@@ -46,6 +46,6 @@
 
 ベンチマークはこれらのイベントで初回操作・未完了操作を追跡し、MCPの状態取得回数は `status_polls`、技の発行は `work_actions` として分ける。状態取得だけで操作回数の上限を消費しない。最終採点はRCONの所持品等で独立して行い、作業の成功通知を採点の正解にしない。
 
-Unityへは既存の `goal.state` の表示形式に投影する。`task_id` と `can_resume` を追加し、判断待ちだけに再開ボタンを表示する。中止確認待ちに再開を表示しない。画面の段一覧はゲーム側の内部計画の複製として持たない。
+Unityへは[作業・会話の表示契約](work-display-contract-ja.md)の `goal.state v2` で送る。元のstate、session/task_id/revision、判断ID、確認の有効期間、残り予算を保持する。操作は `goal.control v2` で表示対象を固定する。空の段一覧、旧pausedへの集約、can_resumeは撤去した。画面と配信が同じ表示モデルを使い、会話・リアクションは作業と並行して示す。
 
 関連：[全体の再設計](minecraft-execution-redesign-ja.md)、[ベンチマーク](minecraft-benchmark-ja.md)。

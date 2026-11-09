@@ -23,78 +23,54 @@ namespace Ciel.EditorTools
         {
             _checks = 0;
             var goal = new CielConversation.GoalState {
-                goal = new CielConversation.GoalInfo { id = 1, title = "鉄を10個集める", status = "running", by_label = "非公開の名前" },
-                steps = new[] { new CielConversation.GoalStep { label = "鉄を集める", status = "running", progress = new[] { 3, 10 } } }
+                v = 2, type = "goal.state", stream_id = "stream", revision = 1, has_task = true,
+                confirmed = true, valid_for_ms = 10000, receivedAt = Time.unscaledTime,
+                task = new CielConversation.WorkInfo { session = "server", task_id = "task", revision = 1,
+                    title = "鉄を10個集める", state = "running", can_stop = true, remaining_known = true, remaining_ms = 45000 }
             };
-            var activity = new CielConversation.ActivityState { body = new CielConversation.ActivityBody { version = 1, phase = "running", title = "鉄鉱石を探している" } };
+            var activity = new CielConversation.ActivityState { mind = "speaking", detail_version = 1,
+                body = new CielConversation.ActivityBody { version = 1, phase = "running", title = "鉄鉱石を探している" } };
             var state = CielAudienceCardState.From(goal, activity, true, false);
-            Check(state.visible && state.title == goal.goal.title && state.current.Contains(activity.body.title), "objective and current work");
-            Check(state.progress == "現在の手順：3 / 10" && Math.Abs(state.fraction - .3f) < .001, "received progress");
-            Check(!(state.heading + state.title + state.current + state.progress).Contains("非公開"), "owner name excluded");
-            Render(state, "audience-card-progress", true);
-            goal.steps[0].progress = null;
-            Check(CielAudienceCardState.From(goal, activity, true, false).progress == "手順完了：0 / 1", "step count labelled");
-            goal.steps = null;
-            Check(CielAudienceCardState.From(goal, activity, true, false).fraction < 0, "unknown progress not invented");
-            goal.goal.status = "paused";
-            goal.attention = "石のツルハシの材料が足りない";
+            Check(state.visible && state.title == goal.task.title && state.conversation.Contains("話しています"), "work and conversation coexist");
+            Check(state.progress.Contains("予算") && state.fraction < 0, "budget is not progress");
+            Render(state, "audience-card-work-v2", false);
+            foreach (var phase in new[] { "accepted", "running", "needs_decision", "cancelling", "succeeded", "failed", "cancelled" })
+            {
+                goal.task.state = phase;
+                var view = CielWorkPresentation.From(goal);
+                Check(view.phase == phase, "preserve state " + phase);
+                Check(!view.Summary.Contains("0/0"), "no fabricated steps " + phase);
+            }
+            goal.task.state = "needs_decision";
+            goal.task.decision_id = "decision";
+            goal.task.decision_message = "材料がありません。再試行しますか？";
+            goal.task.can_retry = true;
+            Check(CielWorkPresentation.From(goal).canRetry, "confirmed decision allows retry");
             state = CielAudienceCardState.From(goal, activity, true, false);
-            Check(state.attention && state.current == goal.attention, "pause reason");
-            Render(state, "audience-card-paused", false);
-            goal.goal.status = "done";
-            Check(CielAudienceCardState.From(goal, activity, true, true).title == activity.body.title, "next direct task replaces completed goal");
-            Check(CielAudienceCardState.From(null, activity, true, false).visible, "task without goal");
-            var idle = new CielConversation.ActivityState { detail_version = 1, mind = "listening", log = new[] { new CielConversation.ActivityLog { text = "内部ログ" } } };
-            state = CielAudienceCardState.From(null, idle, true, false);
-            Check(state.visible && state.phase == "idle" && !state.current.Contains("内部ログ"), "idle remains visible without internal logs");
-            Render(state, "audience-card-idle", false);
-            var bodyActivity = new CielConversation.ActivityState {
-                body = new CielConversation.ActivityBody { version = 1, phase = "idle" }
-            };
-            Check(CielAudienceCardState.From(null, bodyActivity, true, false).phase == "idle", "body snapshot overrides stale task rows");
-            bodyActivity.body.phase = "stopping";
-            bodyActivity.body.title = "持ち主についていく";
-            bodyActivity.body.next_title = "石のツルハシを作る";
-            bodyActivity.body.for_s = 2;
-            state = CielAudienceCardState.From(null, bodyActivity, true, false);
-            Check(state.phase == "stopping" && state.title == bodyActivity.body.next_title && state.current.Contains("停止"), "handoff shows pending request and stopping");
-            Render(state, "audience-card-stopping", false);
-            bodyActivity.body.reason = "stop_timeout";
-            Check(CielAudienceCardState.From(null, bodyActivity, true, false).attention, "stop timeout visible");
-            bodyActivity.body.phase = "waiting";
-            bodyActivity.body.reason = "defending";
-            Check(CielAudienceCardState.From(null, bodyActivity, true, false).current.Contains("身を守"), "defense wait has reason");
-            bodyActivity.body.phase = "idle";
-            bodyActivity.body.reason = "";
-            bodyActivity.body.last_phase = "failed";
-            bodyActivity.body.last_title = "石のツルハシを作る";
-            bodyActivity.body.last_note = "材料が足りない";
-            state = CielAudienceCardState.From(null, bodyActivity, true, false);
-            Check(state.phase == "failed" && state.current == "材料が足りない", "failed preparation stays visible");
-            state = CielAudienceCardState.From(goal, activity, false, true);
-            Check(state.visible && state.phase == "disconnected" && !state.title.Contains("鉄"), "disconnect is explicit without stale work");
-            Check(CielAudienceCardState.From(goal, idle, true, true).current == "できた！", "brief completion");
-            Check(CielAudienceCardState.From(goal, idle, true, false).phase == "idle", "completion returns to visible idle");
-            var thinking = new CielConversation.ActivityState { mind = "thinking", mind_for = 4, thinking_origin = "reply" };
-            state = CielAudienceCardState.From(null, thinking, true, false, 3);
-            Check(state.phase == "thinking" && state.elapsed == "7秒経過", "thinking timer advances without another message");
-            Render(state, "audience-card-thinking", false);
-            thinking.thinking_origin = "initiative";
-            Check(CielAudienceCardState.From(null, thinking, true, false).heading.Contains("自発的"), "initiative is explicit");
-            var background = new CielConversation.ActivityState { background_thinking = true, background_for = 3 };
-            state = CielAudienceCardState.From(null, background, true, false);
-            Check(state.phase == "background", "background thought differs from waiting");
-            Render(state, "audience-card-background", false);
-            var calling = new CielConversation.ActivityState { calls = new[] { new CielConversation.ActivityCall { label = "ついていく", for_s = 8 } } };
-            state = CielAudienceCardState.From(null, calling, true, false);
-            Check(state.phase == "calling" && state.elapsed == "8秒経過" && state.current.Contains("返答"), "tool acknowledgement wait is visible");
-            Render(state, "audience-card-calling", false);
-            calling.body = activity.body;
-            Check(CielAudienceCardState.From(null, calling, true, false).phase == "calling", "pending tool is not masked by another running task");
-            calling.calls[0].for_s = 45;
-            Check(CielAudienceCardState.From(null, calling, true, false).attention, "long tool wait is distinguished from failure");
-            Check(CielAudienceCardState.From(null, idle, true, false, 0, true).phase == "listening", "speech receipt is distinct from idle listening mode");
-            Check(CielAudienceCardState.From(null, null, true, false).phase == "unknown", "missing state is not falsely idle");
+            Check(state.phase == "needs_decision" && state.current.Contains("材料"), "decision reason");
+            Render(state, "audience-card-decision-v2", false);
+            goal.task.state = "cancelling";
+            Check(!CielWorkPresentation.From(goal).canRetry && !CielWorkPresentation.From(goal).canStop, "no controls during cancellation");
+            Check(CielWorkPresentation.From(goal).status == "停止確認中", "cancelling is not stopped");
+            goal.task.state = "running";
+            goal.receivedAt = Time.unscaledTime - 11;
+            var stale = CielWorkPresentation.From(goal);
+            Check(stale.phase == "unknown" && stale.canStop && !stale.canRetry && stale.budget == "", "lease expiry retains targeted stop");
+            Render(CielAudienceCardState.From(goal, activity, true, false), "audience-card-unknown-v2", false);
+            goal.receivedAt = Time.unscaledTime;
+            Check(CielWorkPresentation.From(goal).phase == "running", "fresh confirmation recovers");
+            goal.task.state = "succeeded";
+            goal.receivedAt -= 11;
+            Check(CielWorkPresentation.From(goal).phase == "succeeded", "terminal fact survives lease expiry");
+            Check(!CielWorkPresentation.From(goal).canStop, "no terminal stop");
+            var idle = new CielConversation.ActivityState { mind = "listening", detail_version = 1,
+                body = new CielConversation.ActivityBody { version = 1, phase = "idle" } };
+            Check(CielAudienceCardState.From(goal, idle, true, true).heading.Contains("できた"), "brief completion");
+            Check(CielAudienceCardState.From(goal, idle, true, false).phase == "idle", "completion expires");
+            Check(CielAudienceCardState.From(null, activity, true, false).visible, "direct work remains visible");
+            Check(CielAudienceCardState.From(goal, activity, false, true).phase == "disconnected", "disconnect explicit");
+            Check(CielAudienceCardState.From(null, null, true, false).phase == "unknown", "missing state not idle");
+            Check(CielAudienceCardState.Conversation(new CielConversation.ActivityState { mind = "thinking", thinking_origin = "comment" }).Contains("コメント"), "reaction origin");
             CielAppCompositionCheck.Run();
             Debug.Log("CIEL_AUDIENCE_CARD_CHECK_OK " + _checks);
         }

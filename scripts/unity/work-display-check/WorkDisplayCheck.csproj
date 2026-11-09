@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputPath>../../../server/benchmark/data/work-display-check/bin/</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../../unity/Assets/Scripts/Conversation/CielConversation.Goal.cs" Link="Work.cs" />
+    <Compile Include="../../../unity/Assets/Scripts/Conversation/CielConversation.Activity.cs" Link="Activity.cs" />
+    <Compile Include="../../../unity/Assets/Scripts/Conversation/CielAudienceCardState.cs" Link="Audience.cs" />
+  </ItemGroup>
+</Project>

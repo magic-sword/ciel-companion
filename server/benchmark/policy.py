@@ -107,7 +107,7 @@ class Progress:
                 self.resumed_after_decline = False
 
     def idle(self, goal):
-        return not self.pending and goal.get('status') not in ('running','planning')
+        return not self.pending and goal.get('state') not in ('accepted','running','cancelling')
 
     def reason(self, elapsed, limits):
         if self.first_action is None and elapsed >= limits['first_action']:

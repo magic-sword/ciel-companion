@@ -171,12 +171,12 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         observed.update(item for item, count in current['inventory'].items()
                         if count > initial['inventory'].get(item,0))
         data = metrics(trace.execution())
-        goal = driver.goal_state.get('goal') or {}
+        goal = driver.goal_state.get('task') or {}
         done = achieved(task, initial, current)
         if done and success_at is None and not task.get('stop_after_gain') and not expected_decline and elapsed < seconds:
             success_at, success_wall = now, time.time()
             trace('goal_condition_verified',state=current,elapsed=round(now-started,3))
-        if goal.get('status') == 'done' and not done and success_at is None and not task.get('stop_after_gain'):
+        if goal.get('state') == 'succeeded' and not done and success_at is None and not task.get('stop_after_gain'):
             false_done = True
         reason = None
         passed = False
@@ -228,7 +228,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
             reason = driver.failure_reason()
         else:
             decline_stable_at = None
-            if goal.get('status') in ('paused','failed','stopped'):
+            if goal.get('state') in ('needs_decision','failed','cancelled'):
                 if blocked_at is None:
                     blocked_at = now
                 elif now-blocked_at >= limits['blocked_grace']:

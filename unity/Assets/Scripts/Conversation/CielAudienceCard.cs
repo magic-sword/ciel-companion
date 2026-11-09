@@ -11,7 +11,7 @@ namespace Ciel.Conversation
         CielConversation _conversation;
         Canvas _canvas;
         GameObject _panel;
-        Text _heading, _title, _current, _progress, _elapsed;
+        Text _heading, _title, _current, _progress, _elapsed, _conversationLine;
         Image _bar, _accent;
 
         void Awake()
@@ -54,21 +54,28 @@ namespace Ciel.Conversation
             var font = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP" }, 64);
             _heading = Label("Heading", panel, font, 42, 38, 30, 50);
             _heading.rectTransform.offsetMax = new Vector2(-250, -30);
+            _heading.resizeTextForBestFit = true;
+            _heading.resizeTextMinSize = 24;
+            _heading.resizeTextMaxSize = 42;
             _elapsed = Label("Elapsed", panel, font, 28, 650, 38, 42);
             _elapsed.alignment = TextAnchor.UpperRight;
-            _title = Label("Title", panel, font, 64, 38, 100, 140);
+            _title = Label("Title", panel, font, 64, 38, 100, 110);
             _title.fontStyle = FontStyle.Bold;
             _title.resizeTextForBestFit = true;
             _title.resizeTextMinSize = 36;
             _title.resizeTextMaxSize = 64;
-            _current = Label("Current", panel, font, 46, 38, 258, 98);
+            _current = Label("Current", panel, font, 42, 38, 222, 100);
             _current.resizeTextForBestFit = true;
             _current.resizeTextMinSize = 32;
-            _current.resizeTextMaxSize = 46;
-            _progress = Label("Progress", panel, font, 38, 38, 385, 55);
+            _current.resizeTextMaxSize = 42;
+            _conversationLine = Label("Conversation", panel, font, 32, 38, 330, 50);
+            _conversationLine.resizeTextForBestFit = true;
+            _conversationLine.resizeTextMinSize = 24;
+            _conversationLine.resizeTextMaxSize = 32;
+            _progress = Label("Budget", panel, font, 32, 38, 392, 68);
             _progress.resizeTextForBestFit = true;
             _progress.resizeTextMinSize = 28;
-            _progress.resizeTextMaxSize = 38;
+            _progress.resizeTextMaxSize = 32;
             var track = Box("ProgressTrack", panel, new Vector2(0, 0), new Vector2(1, 0), new Vector2(38, 24), new Vector2(-38, 34));
             track.gameObject.AddComponent<Image>().color = new Color(0.14f, 0.25f, 0.3f);
             _bar = Box("ProgressFill", track, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
@@ -114,6 +121,7 @@ namespace Ciel.Conversation
             _heading.text = state.heading;
             _title.text = state.title;
             _current.text = string.IsNullOrEmpty(state.current) ? "" : "いま：" + state.current;
+            _conversationLine.text = string.IsNullOrEmpty(state.conversation) ? "" : "会話：" + state.conversation;
             _progress.text = state.progress;
             _elapsed.text = state.elapsed;
             var color = state.attention ? new Color(1, 0.77f, 0.42f) : new Color(0.5f, 0.91f, 1);

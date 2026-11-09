@@ -70,17 +70,17 @@ class BodyDriver:
         return []
 
     def stopped(self):
-        return (self.goal_state.get('goal') or {}).get('status') == 'stopped'
+        return (self.goal_state.get('task') or {}).get('state') == 'cancelled'
 
     def failure_reason(self):
         if self.runner and (self.runner.work or {}).get('state') == 'needs_decision':
             return 'needs_mind'
-        if (self.goal_state.get('goal') or {}).get('status') in ('paused','failed'):
+        if (self.goal_state.get('task') or {}).get('state') in ('needs_decision','failed'):
             return 'body_cannot_continue'
         return None
 
     def report_complete(self, after):
-        return (self.goal_state.get('goal') or {}).get('status') == 'done'
+        return (self.goal_state.get('task') or {}).get('state') == 'succeeded'
 
     async def close(self):
         if self.task and not self.task.done():
@@ -104,6 +104,22 @@ class ConversationDriver:
         self.goal_state = {}
         self.tasks = set()
         self.last_reply_at = 0
+        self._goal_protocol_error = False
+
+    def _receive_goal_state(self, state):
+        task = state.get('task') if isinstance(state, dict) else None
+        if (not isinstance(state, dict) or state.get('v') != 2 or state.get('type') != 'goal.state'
+                or type(state.get('has_task')) is not bool or type(state.get('confirmed')) is not bool
+                or not state.get('stream_id') or type(state.get('revision')) is not int or state['revision'] <= 0
+                or state.get('valid_for_ms') != 10000
+                or (state.get('has_task') and (not isinstance(task, dict) or not task.get('task_id') or not task.get('session')
+                    or type(task.get('revision')) is not int or task['revision'] <= 0 or task.get('state') not in
+                    ('accepted', 'running', 'needs_decision', 'cancelling', 'succeeded', 'failed', 'cancelled')))):
+            self._goal_protocol_error = True
+            self.trace('work_display_protocol_error')
+            return
+        self.goal_state = state
+        self.trace('goal_state', state=state)
 
     async def open(self):
         from livekit import api, rtc
@@ -117,14 +133,15 @@ class ConversationDriver:
                 state = json.loads(packet.data.decode('utf-8'))
             except (ValueError, UnicodeDecodeError):
                 return
+            if not isinstance(state, dict):
+                return
             if packet.topic == 'ciel.event' and state.get('type') == 'env.list':
                 ready.set()
             if packet.topic == 'ciel.event' and state.get('type') == 'env.state' and state.get('game') == 'minecraft':
                 if state.get('playing'):
                     linked.set()
             if packet.topic == 'ciel.goal':
-                self.goal_state = state
-                self.trace('goal_state', state=state)
+                self._receive_goal_state(state)
 
         async def read(reader):
             self.trace('transcription', text=await reader.read_all())
@@ -171,6 +188,8 @@ class ConversationDriver:
         await self.room.local_participant.send_text(task['stop_prompt'], topic='lk.chat')
 
     def events(self):
+        if self._goal_protocol_error:
+            raise RuntimeError('Work display protocol mismatch; update the benchmark and agent together')
         if not self.path:
             return []
         events = []
@@ -190,7 +209,7 @@ class ConversationDriver:
         return events
 
     def stopped(self):
-        return (self.goal_state.get('goal') or {}).get('status') == 'stopped'
+        return (self.goal_state.get('task') or {}).get('state') == 'cancelled'
 
     def report_complete(self, after):
         return self.last_reply_at >= after

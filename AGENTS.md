@@ -10,3 +10,5 @@
 - ゲーム実行の構成は [再設計](docs/minecraft-execution-redesign-ja.md)と [実装済みの作業契約](docs/game-work-contract-ja.md)を読む。profile 2 / work 1で、シエル側は受付・作業管理、ゲーム側は計画・実行・修復を担当する。旧goal_plan/step/repairと直接の採集・製作APIは撤去済み。評価器や試行初期化を変えた比較は旧アプリ側も同条件で測り直す。
 - 稼働中の Minecraft で発生した不具合の現場調査には、[ciel-minecraft-debug](.claude/skills/ciel-minecraft-debug/SKILL.md)を使う。専用ベンチマークとは接続先・復元範囲が異なる。
 - 会話サーバーを変更するときは、追加で [server/agent/AGENTS.md](server/agent/AGENTS.md)を読む。通常の検証方法は [回帰テスト](docs/regression-tests-ja.md)、全体の入口は [資料一覧](docs/README.md)。
+
+- 作業・目標や会話中の表示を変更するときは[表示契約](docs/work-display-contract-ja.md)を読む。goal.state / goal.control v2、元のwork状態と確認の有効期間、表示対象のID・版を維持する。旧段一覧・paused集約へ戻さない。

@@ -67,3 +67,6 @@ __pycache__/
 /server/.env.benchmark
 # 手元に取り出した Minecraft Wiki（CC BY-NC-SA 3.0。docs/game-knowledge-design-ja.md）
 /server/minecraft/knowledge/data/
+
+# Offline Unity work-display checks (outputs stay in server/benchmark/data).
+!scripts/unity/work-display-check/WorkDisplayCheck.csproj

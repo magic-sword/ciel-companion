@@ -1,0 +1,3 @@
+<Project><PropertyGroup>
+  <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../../server/benchmark/data/work-display-check/obj/</BaseIntermediateOutputPath>
+</PropertyGroup></Project>

@@ -16,6 +16,23 @@ from benchmark.report import metrics, summarize, write_reports
 from benchmark.world import MARKER, Rcon, World, achieved
 
 
+class DisplayContractTest(unittest.TestCase):
+    def test_old_display_is_an_environment_error_not_idle(self):
+        from benchmark.drivers import ConversationDriver
+        driver = ConversationDriver('agent', 'local', 'model', '.', lambda *a, **kw: None)
+        driver._receive_goal_state({'v':1, 'type':'goal.state', 'goal':{'status':'done'}})
+        with self.assertRaisesRegex(RuntimeError, 'protocol mismatch'):
+            driver.events()
+
+    def test_new_display_preserves_the_service_state(self):
+        from benchmark.drivers import ConversationDriver
+        driver = ConversationDriver('agent', 'local', 'model', '.', lambda *a, **kw: None)
+        driver._receive_goal_state({'v':2, 'type':'goal.state', 'has_task':True, 'confirmed':True,
+            'stream_id':'stream', 'revision':1, 'valid_for_ms':10000,
+            'task':{'state':'cancelled', 'session':'server', 'task_id':'task', 'revision':1}})
+        self.assertTrue(driver.stopped())
+
+
 class CliExitTest(unittest.TestCase):
     def test_conversation_cli_exits_after_cleanup_with_the_actual_result_code(self):
         import benchmark.run as runner
@@ -61,7 +78,7 @@ class FakeWorld:
 
 class FakeDriver:
     def __init__(self, *, stopped=False, done=False, budget=False):
-        self.goal_state = {'goal':{'status':'done' if done else 'running'}}
+        self.goal_state = {'v':2, 'type':'goal.state', 'task':{'state':'succeeded' if done else 'running'}}
         self.ack, self.budget = stopped, budget
         self.sent = []
         self.rows = []

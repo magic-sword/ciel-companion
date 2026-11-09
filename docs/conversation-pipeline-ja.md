@@ -1,5 +1,7 @@
 # 会話の組み立て（pipeline）の仕組み
 
+作業と会話の画面通知・操作の最新仕様は[作業・会話の表示契約](work-display-contract-ja.md)を参照する。goal.state / goal.controlはv2で、workの進行と発話状態を別に表示する。
+
 2026-11-10の追加実装：[サービス入力とリアクション](service-events-and-reactions-ja.md)。標準pipeline向けに共通契約・反応調停を実装した。現在の仕様はリンク先を参照する。
 
 2026-11-10：検索・記憶保守・画像説明・YouTube取得・アプリ操作の経路を[サービス境界](service-boundaries-ja.md)へ統一。自発的処理も同じMCP処理を使い、発話・受付・イベントの選択はホストが担当する。

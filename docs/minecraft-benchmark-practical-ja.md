@@ -21,8 +21,8 @@
 - `first_action_timeout`：30秒以内に操作・観察を発行しなかった。道具名を文章に書くだけでは発行に数えない。
 - `no_progress`：所持数の最高値、または初めて入った2ブロック単位の場所が増えない。同じ場所の往復、同じ観察、モデル要求・返事の追加では時計を戻さない。移動を続けても課題全体の期限は延びない。
 - `repeated_failure`：同じ操作・引数が同じ理由で2回失敗した。同一の非同期失敗の再通知は重複計上せず、実状態に進捗があれば反復失敗数をリセットする。
-- `cannot_continue_without_report`：目的がpaused/failed/stoppedのまま、10秒以内に報告も復帰もできなかった。体だけでは `needs_mind`・`body_cannot_continue` が先に確定する場合がある。
-- `false_completion`：目的がdoneでも実物の条件を満たしていない。自然文の「できた」も成功の代用にしない。
+- `cannot_continue_without_report`：作業がneeds_decision/failed/cancelledのまま、10秒以内に報告も復帰もできなかった。体だけでは `needs_mind`・`body_cannot_continue` が先に確定する場合がある。
+- `false_completion`：作業がsucceededでも実物の条件を満たしていない。自然文の「できた」も成功の代用にしない。
 - `time_budget`：課題全体の期限までに完了しなかった。
 
 停止課題は、最初の原木取得を確認してから停止を依頼する。応答まで5秒、応答後にさらに5秒の位置・所持品の安定と再開なしを確認する。安定観測は5秒の応答期限とは別枠。終了の監視間隔は0.5秒なので、その程度の幅はある。

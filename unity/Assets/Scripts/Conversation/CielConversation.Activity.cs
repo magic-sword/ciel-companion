@@ -30,7 +30,7 @@ namespace Ciel.Conversation
             public int version, revision;
             public string session, phase, title, next_title, reason, last_title, last_phase, last_reason, last_note;
             public float for_s;
-            public bool Active => phase != "idle" && phase != "unknown";
+            public bool Active => !string.IsNullOrEmpty(phase) && phase != "idle" && phase != "unknown";
             public string Description => reason == "body_protocol_mismatch" ? "体のサービスの更新が必要です" : reason == "stop_timeout" ? "停止の確認に時間がかかっています"
                 : reason == "defending" ? "身を守っています（作業を一時中断）"
                 : reason == "eating" ? "食事をしています"

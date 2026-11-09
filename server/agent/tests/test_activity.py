@@ -27,6 +27,10 @@ class ActivityTest(unittest.TestCase):
         self.a = activity.Activity(self.sent.append, clock=self.clock)
         self.a.titles['minecraft_craft_item'] = '作る'
 
+    def test_capability_selection_has_a_user_facing_label(self):
+        self.a.call_started('select', 'load_capabilities')
+        self.assertEqual(self.a.state()['calls'][0]['label'], '使う機能を確認')
+
     def test_a_tool_is_waiting_until_its_result_comes_back(self):
         self.a.thinking('mind')
         self.a.call_started('c1', 'minecraft_craft_item')

@@ -88,7 +88,14 @@ class Activity:
     # ---- 道具 ----
 
     def label(self, name: str) -> str:
-        return self.titles.get(name) or name
+        labels = {
+            'load_capabilities': '使う機能を確認',
+            'submit_game_task': '作業を依頼',
+            'game_task_status': '作業の状態を確認',
+            'stop_game_task': '作業の停止を確認',
+            'answer_game_task': '作業への判断を送信',
+        }
+        return labels.get(name) or self.titles.get(name) or name
 
     def call_started(self, call_id: str, name: str) -> None:
         """心が道具を呼ぶと決めた（結果が返るまで「呼んでいる」）"""

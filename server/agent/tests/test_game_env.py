@@ -282,7 +282,8 @@ class WorkContractTest(EnvCase):
         try:
             result = await runner.start('test.solve_puzzle', {'board': 'abc'}, constraints={'moves': 7})
             self.assertEqual(result['state'], 'running')
-            self.assertEqual(runner.state()['steps'], [])
+            self.assertEqual(runner.state()['v'], 2)
+            self.assertNotIn('steps', runner.state())
             self.fake.work = {**self.fake.work, 'revision': 2, 'state': 'needs_decision',
                               'decision': {'decision_id': 'd'}, 'message': 'Need a decision'}
             await self.fake.emit({'kind': 'work_state', 'work': self.fake.work})

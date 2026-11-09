@@ -8,7 +8,6 @@ namespace Ciel.Conversation
     partial class CielConversationUI
     {
         const string StreamGoalPrefKey = "ciel.streamGoal";
-        const int StreamStepsShown = 5;
         // 配信用の札
         Canvas _streamGoalCanvas;
         RectTransform _streamGoalCard;
@@ -79,27 +78,8 @@ namespace Ciel.Conversation
 
         static string StreamText(CielConversation.GoalState g)
         {
-            var b = new StringBuilder();
-            b.Append($"<size=12><color=#9FDDF0>いまの目的・{Esc(g.goal.game_label)}</color></size>\n");
-            var st = g.goal.status;
-            var tail = st == "done" ? "  <color=#5BF0C8>できた！</color>" : st == "stopped" ? "  <color=#8FB3C3>やめた</color>" : "";
-            b.Append($"<b>{Esc(g.goal.title)}</b>{tail}\n<size=12><color=#8FB3C3>{Esc(g.goal.by_label)}</color></size>\n");
-            if (g.SubPath != null) b.Append($"<size=13><color=#9FDDF0>› 先に：{Esc(g.SubPath)}</color></size>\n");
-            var steps = g.steps ?? new CielConversation.GoalStep[0];
-            var (done, _, _) = Count(g);
-            var skip = Mathf.Max(0, Mathf.Min(done, steps.Length - StreamStepsShown));
-            if (skip > 0) b.Append($"<color=#5BF0C8>●</color> <color=#8FB3C3>済んだ段 {skip}</color>\n");
-            int shown = 0;
-            for (int i = 0, d = 0; i < steps.Length && shown < StreamStepsShown; i++)
-            {
-                if (steps[i].status == "done" && d++ < skip) continue;
-                b.Append($"{Mark(steps[i].status)} {Esc(steps[i].label)}{Progress(steps[i])}\n");
-                shown++;
-            }
-            if (!string.IsNullOrEmpty(g.attention)) b.Append($"<size=12><color=#FFC46B>止まっている：{Esc(g.attention)}</color></size>\n");
-            if (g.changes != null && g.changes.Length > 0) b.Append($"<size=12><color=#CDEFFA>直した：{Esc(g.changes[g.changes.Length - 1])}</color></size>\n");
-            if (g.next != null && g.next.Length > 0) b.Append($"<size=12><color=#CDEFFA>つぎ：{Esc(g.next[0])}</color></size>");
-            return b.ToString().TrimEnd('\n');
+            var view = CielWorkPresentation.From(g);
+            return Esc(view.Summary);
         }
 
         void UpdateBroadcastOutput(bool connected)

@@ -1,6 +1,7 @@
 """Game-independent work client. Plans, steps and repairs belong to the MCP server."""
 import asyncio
 import json
+import math
 import time
 import uuid
 
@@ -23,7 +24,10 @@ class GoalRunner:
         self._notified = set()
         self.notice = None
         self.spoken_notice = None
-        self._display_id = 0
+        self._stream_id = uuid.uuid4().hex
+        self._display_revision = 1
+        self._confirmed_at = 0
+        self._unknown = False
         self.presence = lambda: 'solo'
         self.owner_name = lambda: None
 
@@ -33,7 +37,10 @@ class GoalRunner:
     async def _call(self, key, args):
         if not self.env.linked or not self._tool(key):
             return {'status': 'unavailable'}
-        return await self.env._call(self._tool(key), args, timeout=6)
+        try:
+            return await self.env._call(self._tool(key), args, timeout=6)
+        except Exception:
+            return {'status': 'unavailable'}
 
     async def start(self, capability, arguments, *, constraints=None, seconds=90, title='', request_id=None):
         async with self._lock:
@@ -48,9 +55,8 @@ class GoalRunner:
             r = await self._call('submit', {'request_id': request_id or uuid.uuid4().hex, 'capability': capability,
                 'arguments': arguments, 'constraints': constraints or {}, 'budget_ms': int(seconds * 1000)})
             if not self.valid(r):
-                return r if r.get('status') else {'status': 'error', 'reason': 'work_protocol_mismatch'}
+                return r if isinstance(r, dict) and r.get('status') else {'status': 'error', 'reason': 'work_protocol_mismatch'}
             self.work = None
-            self._display_id += 1
             self.accept(r)
             if self._watch:
                 self._watch.cancel()
@@ -59,19 +65,35 @@ class GoalRunner:
 
     @staticmethod
     def valid(w):
-        return (isinstance(w, dict) and w.get('version') == 1 and w.get('state') in STATES
-                and isinstance(w.get('task_id'), str) and bool(w['task_id']) and isinstance(w.get('session'), str)
+        return (isinstance(w, dict) and type(w.get('version')) is int and w['version'] == 1
+                and isinstance(w.get('state'), str) and w['state'] in STATES
+                and isinstance(w.get('task_id'), str) and bool(w['task_id']) and isinstance(w.get('session'), str) and bool(w['session'])
+                and (w.get('decision') is None or isinstance(w.get('decision'), dict))
+                and (w.get('remaining_ms') is None or (type(w['remaining_ms']) in (int, float)
+                     and math.isfinite(w['remaining_ms']) and w['remaining_ms'] >= 0))
                 and type(w.get('revision')) is int and w['revision'] > 0)
 
     def accept(self, w):
         if not self.valid(w):
             return False
-        if self.work and (w['task_id'] != self.work['task_id'] or w['session'] != self.work['session']
-                          or w['revision'] <= self.work['revision']):
-            return False
-        if self.work and self.work['state'] in TERMINAL and w['state'] != self.work['state']:
-            return False
-        self.work = w
+        if self.work:
+            if (w['task_id'] != self.work['task_id'] or w['session'] != self.work['session']
+                    or w['revision'] < self.work['revision']):
+                return False
+            if w['revision'] == self.work['revision']:
+                if ({k: v for k, v in w.items() if k != 'remaining_ms'}
+                        != {k: v for k, v in self.work.items() if k != 'remaining_ms'}):
+                    return False
+                self.work = dict(w)
+                self._unknown = False
+                self._confirmed_at = time.monotonic()
+                self._publish()
+                return False
+            if self.work['state'] in TERMINAL and w['state'] != self.work['state']:
+                return False
+        self.work = dict(w)
+        self._unknown = False
+        self._confirmed_at = time.monotonic()
         debug_log.record('work_state', work=w)
         self._publish()
         if w['state'] in TERMINAL or w['state'] == 'needs_decision':
@@ -91,8 +113,8 @@ class GoalRunner:
                 if not self.valid(r):
                     # Transport loss is not success, failure or a confirmed stop.
                     self._publish(unknown=True)
-                else:
-                    self.accept(r)
+                elif not self.accept(r) and r != self.work:
+                    self._publish(unknown=True)
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
             pass
@@ -101,14 +123,19 @@ class GoalRunner:
         if not self.work:
             return {'status': 'no_task'}
         r = await self._call('cancel', {'task_id': self.work['task_id']})
-        self.accept(r)
+        if not self.accept(r) and r != self.work:
+            self._publish(unknown=True)
         return r
 
     async def answer(self, decision_id, action):
         if not self.work:
             return {'status': 'no_task'}
+        if (self.work['state'] != 'needs_decision' or action not in ('retry', 'cancel')
+                or decision_id != (self.work.get('decision') or {}).get('decision_id')):
+            return {'status': 'error', 'reason': 'stale_decision'}
         r = await self._call('answer', {'task_id': self.work['task_id'], 'decision_id': decision_id, 'action': action})
-        self.accept(r)
+        if not self.accept(r) and r != self.work:
+            self._publish(unknown=True)
         return r
 
     def body_step(self):
@@ -130,18 +157,48 @@ class GoalRunner:
         self.spoken_notice = None
 
     def state(self, unknown=False):
-        # Existing UI projection; no recipe steps or separate execution state lives here.
+        if unknown:
+            self._unknown = True
         w = self.work
-        status = {'accepted': 'planning', 'running': 'running', 'needs_decision': 'paused', 'cancelling': 'paused',
-                  'succeeded': 'done', 'failed': 'failed', 'cancelled': 'stopped'}
-        return {'v': 1, 'type': 'goal.state', 'goal': ({'id': self._display_id, 'game': self.env.game, 'game_label': self.env.label,
-            'title': self.title, 'by': 'owner', 'by_label': '持ち主のお願い', 'status': 'paused' if unknown else status[w['state']],
-            'why': '', 'task_id': w['task_id'], 'can_resume': w['state'] == 'needs_decision'} if w else None), 'steps': [], 'path': [], 'changes': [], 'next': [],
-            'attention': '状態不明・停止未確認' if unknown else (w.get('reason') if w else None)}
+        age = max(0, time.monotonic() - self._confirmed_at) if w else 0
+        confirmed = not self._unknown and (not w or age < 10)
+        task = None
+        if w:
+            remaining = w.get('remaining_ms')
+            known = type(remaining) in (int, float) and remaining >= 0
+            decision = w.get('decision') or {}
+            task = {key: w[key] for key in ('session', 'task_id', 'revision', 'state')}
+            task.update(service=self.env.game, service_label=self.env.label, title=self.title,
+                message=w.get('message') or '', reason=w.get('reason') or '',
+                remaining_known=known,
+                remaining_ms=max(0, int(min(remaining - age * 1000, (self._deadline - time.monotonic()) * 1000))) if known else 0,
+                decision_id=decision.get('decision_id') or '', decision_message=decision.get('message') or '',
+                can_stop=w['state'] in ACTIVE and w['state'] != 'cancelling',
+                can_retry=confirmed and w['state'] == 'needs_decision' and bool(decision.get('decision_id')))
+        return {'v': 2, 'type': 'goal.state', 'stream_id': self._stream_id,
+                'revision': self._display_revision, 'confirmed': confirmed,
+                'confirmed_ago_ms': int(age * 1000), 'valid_for_ms': 10000, 'has_task': bool(w), 'task': task}
 
     def _publish(self, unknown=False):
+        self._display_revision += 1
+        state = self.state(unknown)
         if self.publish:
-            self.publish(self.state(unknown))
+            self.publish(state)
+
+    async def _control(self, m):
+        # Check again inside the lock: a queued click must not act on a replacement task.
+        async with self._lock:
+            w = self.work
+            if (not w or m.get('stream_id') != self._stream_id or m.get('session') != w['session']
+                    or m.get('task_id') != w['task_id'] or type(m.get('revision')) is not int
+                    or m.get('revision') != w['revision']
+                    or w['state'] in TERMINAL):
+                return
+            if m.get('action') == 'stop':
+                await self.stop()
+            elif (m.get('action') == 'retry' and self.state()['confirmed']
+                    and m.get('decision_id') == (w.get('decision') or {}).get('decision_id')):
+                await self.answer(m.get('decision_id'), 'retry')
 
     def on_data(self, packet):
         if getattr(packet, 'topic', None) != TOPIC:
@@ -150,10 +207,8 @@ class GoalRunner:
             m = json.loads(packet.data.decode())
         except (ValueError, AttributeError):
             return
-        if m.get('type') == 'goal.control' and m.get('action') == 'stop':
-            asyncio.create_task(self.stop())
-        if m.get('type') == 'goal.control' and m.get('action') == 'resume' and self.work and self.work['state'] == 'needs_decision':
-            asyncio.create_task(self.answer(self.work['decision']['decision_id'], 'retry'))
+        if isinstance(m, dict) and m.get('v') == 2 and m.get('type') == 'goal.control':
+            asyncio.create_task(self._control(m))
 
     async def close(self):
         if self._watch:

@@ -123,3 +123,26 @@ LLMの選択だけを固定し、サービス読込、次の推論への道具�
 ```
 
 固定したモデル応答で、作業通知が被ダメージを置き換えないこと、期限切れの生成と音声を出さないこと、割り込みを検証する。実モデル・LiveKit接続・Minecraft・GPUは起動しない。Unity側は `dotnet build unity/Assembly-CSharp.csproj --no-restore` によるC#コンパイルと、Unity Editor／実機での確認を区別する。タッチv2・表情v2・ゲーム通知input_v 1の送受信を同時に更新し、旧版への無言のフォールバックを追加しない。
+
+## 作業・会話の表示v2（2026-11-10）
+
+仕様は[作業・会話の表示契約](work-display-contract-ja.md)。段一覧・進捗率の推定を撤去し、7種類のwork状態、確認の失効・復旧、対象を固定した操作、会話との並行表示を検証した。
+
+| 検証 | 結果 |
+|---|---|
+| Python通常テスト一式 | 634件合格、失敗・エラー・スキップ0。DB段階は未選択 |
+| 最終のベンチマーク受信検証後の関連テスト | test_minecraft_benchmark.pyの29件合格 |
+| 本体のC#受信・操作・表示ソースを使う.NET検証器 | 35項目合格。時計・JSON・送信はスタブ |
+| Unity本体＋Editor C#コンパイル | Assembly-CSharp-Editor.csproj（本体参照を含む）、エラー0、警告80 |
+| Unity Editorバッチの表示確認 | ライセンスエラー198で実行前に停止。画面画像・Unityの実JSONパーサーは未確認 |
+| 本番配布・Playerビルド・実機接続・ゲーム性能再測定 | 未実施 |
+
+再実行：
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/run-regression.py --suite unit --output server/benchmark/data/work-display-v2-complete
+dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj
+dotnet build unity/Assembly-CSharp-Editor.csproj --no-restore -verbosity:quiet -nologo
+```
+
+生の結果はGit対象外の`server/benchmark/data/work-display-v2-complete/report.json`、コンパイル結果は`work-display-build-final.log`、起動失敗のログは`work-display-unity.log`。検証器の生成物も同じdata配下に置く。外部APIや共有GPUには接続していない。通知の版をv2へ更新したため、反映時はサーバーとUnityアプリを一緒に更新して会話を再接続する。

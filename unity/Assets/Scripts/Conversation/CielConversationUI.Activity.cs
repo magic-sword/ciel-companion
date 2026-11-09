@@ -15,7 +15,7 @@ namespace Ciel.Conversation
         const float ActivityRecent = 20f;   // 何も動いていないとき、最近のことを札に出しておく秒数
         static readonly Color ActivityGlass = new Color(0.10f, 0.16f, 0.30f, 0.72f);
 
-        (GameObject go, Text label, Image dot) _activityTask;
+        (GameObject go, Text label, Image dot) _activityTask, _bodyWorkTask;
         GameObject _activityPanel;
         Text _activityBody;
         float _activityFilled = -1f;
@@ -27,6 +27,8 @@ namespace Ciel.Conversation
                 _activityPanel.SetActive(!_activityPanel.activeSelf);
                 _activityFilled = -1f;
             });
+
+            _bodyWorkTask = TaskChip("BodyWork", ActivityGlass, Cyan, () => _activityPanel.SetActive(!_activityPanel.activeSelf));
 
             var panel = Rect("ActivityPanel", root, Center, Center, Vector2.zero, Vector2.zero);
             panel.anchorMin = Vector2.zero;
@@ -58,6 +60,9 @@ namespace Ciel.Conversation
             var a = connected ? c.Activity : null;
             var (text, color, show) = a != null ? ActivityChip(c, a) : ("", Idle, false);
             SetTask(_activityTask, show, text);
+            var body = a?.body;
+            var directBody = body != null && !string.IsNullOrEmpty(body.phase) && body.phase != "idle" && !(c.Goal?.Active ?? false);
+            SetTask(_bodyWorkTask, directBody, directBody ? "体：" + body.Description : "");
             if (show)
             {
                 var moving = color != Idle;
@@ -78,20 +83,17 @@ namespace Ciel.Conversation
 
         static string Sec(float s) => $"{Mathf.Max(0, (int)s)}秒";
 
-        static string WhoName(string who) => who == "talker" ? "小脳" : who == "mind" ? "心" : "";
+        static string WhoName(string who) => who == "talker" ? "返事" : who == "mind" ? "判断" : "";
 
         // 札の文言・点の色・出すか
         static (string text, Color color, bool show) ActivityChip(CielConversation c, CielConversation.ActivityState a, bool activeOnly = false)
         {
+            var conversation = CielAudienceCardState.Conversation(a, c.MicEnabled && c.UserSpeaking);
+            if (!string.IsNullOrEmpty(conversation)) return ("会話：" + conversation, Mint, true);
             if (a.calls != null && a.calls.Length > 0)
-                return ($"いま：{a.calls[0].label}の結果を待っている {Sec(c.ActivitySeconds(a.calls[0].for_s))}", Amber, true);
+                return ($"機能：{a.calls[0].label}・応答待ち {Sec(c.ActivitySeconds(a.calls[0].for_s))}", Amber, true);
             if (a.body != null && a.body.phase != "idle")
-                return ($"いま：{a.body.Description} {Sec(c.ActivitySeconds(a.body.for_s))}", a.body.phase == "running" ? Cyan : Amber, true);
-            if (a.mind == "thinking")
-                return ($"いま：{(a.thinking_origin == "initiative" ? "自発的に" : "")}考えている {Sec(c.ActivitySeconds(a.mind_for))}", Mint, true);
-            if (a.mind == "speaking") return ("いま：話している", Mint, true);
-            if (a.background_thinking)
-                return ($"いま：裏で自発的に考えている {Sec(c.ActivitySeconds(a.background_for))}", Mint, true);
+                return ($"体：{a.body.Description} {Sec(c.ActivitySeconds(a.body.for_s))}", a.body.phase == "running" ? Cyan : Amber, true);
             if (!activeOnly && a.log != null && a.log.Length > 0 && c.ActivitySeconds(a.log[0].ago) < ActivityRecent)
                 return ($"いま：{a.log[0].text}", KindColor(a.log[0].kind), true);
             if (!activeOnly && c.GameLinked) return ("いま：待っている", Idle, true);
@@ -110,7 +112,7 @@ namespace Ciel.Conversation
             // 心
             var mind = a.mind == "thinking" ? $"考えている（{(WhoName(a.who) != "" ? WhoName(a.who) : "返事")}）{Sec(c.ActivitySeconds(a.mind_for))}"
                 : a.mind == "speaking" ? "話している" : a.mind == "listening" ? "聞いている" : "待っている";
-            b.Append(Head("心")).Append("　").Append(Esc(mind)).Append('\n');
+            b.Append(Head("会話・リアクション")).Append("　").Append(Esc(mind)).Append('\n');
             b.Append(Head("裏の思考")).Append(a.background_thinking
                 ? $"　自発的に考えを整理している {Sec(c.ActivitySeconds(a.background_for))}\n"
                 : a.detail_version >= 1 ? "　いまは考えを生成していない\n" : "　詳しい状態はまだ確認できていない\n");
@@ -133,10 +135,7 @@ namespace Ciel.Conversation
             var g = c.Goal;
             if (g != null && g.Active)
             {
-                var (done, all, now) = Count(g);
-                b.Append(Head("目的")).Append("　").Append(Esc(g.goal.title)).Append($"（{done}/{all}");
-                if (now != null) b.Append($"：{Esc(now.label)}");
-                b.Append(g.goal.status == "paused" ? $"・止まっている：{Esc(g.attention)}）\n" : "）\n");
+                b.Append(Head("作業")).Append("\n").Append(Esc(CielWorkPresentation.From(g).Summary)).Append('\n');
             }
             // 最近のこと
             b.Append(Head("最近のこと")).Append('\n');

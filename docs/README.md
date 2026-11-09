@@ -12,6 +12,7 @@
 
 | 目的 | 入口 |
 |---|---|
+| 作業・会話・リアクションの表示と操作を変更したい | [作業・会話の表示契約（v2）](work-display-contract-ja.md) |
 | 何のアプリか知りたい | [トップREADME](../README.md) |
 | 紹介動画を撮りたい | [撮影台本・OBSの収録手順](demo-recording-ja.md) |
 | 自分の環境で始めたい | [開発環境構築](development-setup-ja.md) |

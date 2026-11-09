@@ -21,7 +21,7 @@ def state(logs=0,x=0):
 class Driver:
     def __init__(self,events=(),goal=None):
         self.rows=list(events)
-        self.goal_state={'goal':goal}
+        self.goal_state={'v':2, 'type':'goal.state', 'task':goal}
     async def submit(self,task):
         pass
     async def stop(self,task):
@@ -60,11 +60,11 @@ class PracticalTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((result['reason'],result['elapsed_seconds']),('no_progress',30))
 
     async def test_blocked_goal_gets_bounded_time_to_report(self):
-        result=await self.evaluate(driver=Driver(goal={'status':'paused'}))
+        result=await self.evaluate(driver=Driver(goal={'state':'needs_decision'}))
         self.assertEqual((result['reason'],result['elapsed_seconds']),('cannot_continue_without_report',10))
 
     async def test_false_goal_completion_ends_immediately(self):
-        result=await self.evaluate(driver=Driver(goal={'status':'done'}))
+        result=await self.evaluate(driver=Driver(goal={'state':'succeeded'}))
         self.assertEqual((result['reason'],result['elapsed_seconds']),('false_completion',0))
 
     async def test_correct_unavailable_report_is_not_item_success(self):
@@ -105,6 +105,12 @@ class PracticalTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['elapsed_seconds'],8)
 
 class ProgressTest(unittest.TestCase):
+    def test_unconfirmed_cancellation_is_not_idle_for_decline(self):
+        watch = Progress(state(), load_tasks()[0])
+        for phase in ('accepted', 'running', 'cancelling'):
+            self.assertFalse(watch.idle({'state':phase}))
+        self.assertTrue(watch.idle({'state':'cancelled'}))
+
     def test_unavailability_cannot_be_asserted_for_an_available_resource(self):
         task=copy.deepcopy(next(t for t in load_tasks() if t['id']=='stone_pickaxe_unavailable'))
         task['item']='sand'

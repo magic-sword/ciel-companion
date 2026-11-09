@@ -1,5 +1,4 @@
-// 配信用の札の回帰確認。Unity -batchmode -executeMethod Ciel.EditorTools.CielStreamStatusCheck.Run -quit
-// 会話サーバーへの接続なしで、目的の完了後に直接の作業を頼む流れを確認する。
+// Offline contract/consumer regression checks. Run via Unity -executeMethod.
 using System;
 using System.Reflection;
 using System.Text;
@@ -10,56 +9,43 @@ namespace Ciel.EditorTools
 {
     public static class CielStreamStatusCheck
     {
-        const BindingFlags StaticPrivate = BindingFlags.Static | BindingFlags.NonPublic;
-
         public static void Run()
         {
-            var go = new GameObject("StreamStatusCheck");
+            var go = new GameObject("WorkDisplayCheck");
+            int checks = 0;
+            void Check(bool ok, string name) { if (!ok) throw new Exception("Work display: " + name); checks++; }
             try
             {
-                var c = go.AddComponent<CielConversation>();
-                c.enabled = false;
-                var ui = typeof(CielConversation).Assembly.GetType("Ciel.Conversation.CielConversationUI");
-                var render = ui.GetMethod("StreamStatusText", StaticPrivate);
-                var chip = ui.GetMethod("ActivityChip", StaticPrivate);
-                var receive = typeof(CielConversation).GetMethod("OnActivity", BindingFlags.Instance | BindingFlags.NonPublic);
-
-                string Activity(string json)
-                {
-                    receive.Invoke(c, new object[] { Encoding.UTF8.GetBytes(json) });
-                    var result = ((string text, Color color, bool show))chip.Invoke(null, new object[] { c, c.Activity, true });
-                    return result.text;
-                }
-                string Render(CielConversation.GoalState goal, bool recent, string current) =>
-                    (string)render.Invoke(null, new object[] { goal, recent, current });
-                void Check(bool ok, string name)
-                {
-                    if (!ok) throw new Exception("Stream status regression: " + name);
-                }
-
-                var goal = new CielConversation.GoalState {
-                    goal = new CielConversation.GoalInfo { id = 1, title = "ツルハシを作る", status = "done", game_label = "マイクラ" }
-                };
-                Check(Render(goal, true, "").Contains("できた！"), "completed goal remains briefly");
-                Check(Render(goal, false, "") == "", "completed goal expires");
-
-                var first = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"running\",\"title\":\"鉄を探す\",\"for_s\":2}}");
-                Check(Render(goal, false, first).Contains("鉄を探す"), "next task appears after goal expires");
-                Check(!Render(goal, true, first).Contains("ツルハシを作る"), "new task replaces recently completed goal");
-
-                var next = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"running\",\"title\":\"鉄を集める\",\"for_s\":1}}");
-                Check(Render(goal, false, next).Contains("鉄を集める") && !Render(goal, false, next).Contains("鉄を探す"),
-                    "subsequent task updates with the same goal object");
-
-                goal.goal.status = "running";
-                var both = Render(goal, false, next);
-                Check(both.Contains("ツルハシを作る") && both.Contains("鉄を集める"), "active goal and current task are shown together");
-                Check(Render(null, false, next).Contains("鉄を集める"), "task without any goal appears");
-                Check(Render(null, false, "いま：<鉄>").Contains("＜鉄＞"), "task title escapes rich text");
-
-                var idle = Activity("{\"type\":\"activity.state\",\"mind\":\"listening\",\"body\":{\"version\":1,\"phase\":\"idle\"},\"log\":[{\"text\":\"内部の知らせ\",\"ago\":0}]}");
-                Check(Render(null, false, idle) == "", "idle state and internal log do not leave a stale card");
-                Debug.Log("STREAM_STATUS_CHECK_OK (9 checks)");
+                var c = go.AddComponent<CielConversation>(); c.enabled = false;
+                var receive = typeof(CielConversation).GetMethod("OnGoalData", BindingFlags.Instance | BindingFlags.NonPublic);
+                var render = typeof(CielConversation).Assembly.GetType("Ciel.Conversation.CielConversationUI")
+                    .GetMethod("StreamStatusText", BindingFlags.Static | BindingFlags.NonPublic);
+                string Render(CielConversation.GoalState g, bool recent, string activity) => (string)render.Invoke(null, new object[] { g, recent, activity });
+                var g = new CielConversation.GoalState { v = 2, type = "goal.state", stream_id = "a", revision = 1,
+                    has_task = true, confirmed = true, valid_for_ms = 10000, receivedAt = Time.unscaledTime,
+                    task = new CielConversation.WorkInfo { session = "server", task_id = "task", revision = 1,
+                        title = "ツルハシを作る", state = "running", can_stop = true } };
+                void Receive() => receive.Invoke(c, new object[] { Encoding.UTF8.GetBytes(JsonUtility.ToJson(g)) });
+                Receive();
+                Check(c.Goal.HasGoal && c.Goal.task.state == "running", "v2 received");
+                Check(Render(c.Goal, false, "会話：話しています").Contains("ツルハシ") && Render(c.Goal, false, "会話：話しています").Contains("話しています"), "parallel output");
+                g.revision = 0; g.task.title = "古い通知"; Receive();
+                Check(c.Goal.protocolError, "invalid revision is unknown");
+                g.revision = 2; g.task.title = "ツルハシを作る"; Receive();
+                Check(!c.Goal.protocolError, "valid confirmation restores display");
+                g.revision = 1; g.task.title = "古い通知"; Receive();
+                Check(c.Goal.task.title == "ツルハシを作る", "out of order rejected");
+                g.stream_id = "b"; g.revision = 1; Receive();
+                Check(c.Goal.stream_id == "b", "new service stream");
+                g.stream_id = "a"; g.revision = 3; Receive();
+                Check(c.Goal.stream_id == "b", "retired stream rejected");
+                g.stream_id = "b"; g.revision = 2; g.task.state = "succeeded"; Receive();
+                Check(Render(c.Goal, true, "").Contains("できた"), "completion briefly visible");
+                Check(Render(c.Goal, false, "") == "", "completion expires");
+                Check(Render(null, false, "いま：<鉄>").Contains("＜鉄＞"), "rich text escaped");
+                g.v = 1; Receive();
+                Check(c.Goal.protocolError, "old wire version rejected");
+                Debug.Log("STREAM_STATUS_CHECK_OK " + checks);
             }
             finally { UnityEngine.Object.DestroyImmediate(go); }
         }
