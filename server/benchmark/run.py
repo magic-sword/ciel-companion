@@ -305,18 +305,28 @@ def parser():
     return ap
 
 
-def main():
+def main(*, native_exit=False):
     ap = parser()
     args = ap.parse_args()
     args.seed = args.seed or [11,29,47]
     if min(args.repeats,args.seconds,args.max_calls) <= 0 or min(args.max_llm,args.report_grace) < 0 or len(set(args.seed)) != len(args.seed):
         ap.error('Budgets and repeats must be positive, max-llm nonnegative, and seeds unique')
     try:
-        return asyncio.run(run(args))
+        code = asyncio.run(run(args))
     except (ValueError,RuntimeError,ConnectionError,OSError) as exc:
         print(f'Benchmark could not run: {type(exc).__name__}: {exc}',file=sys.stderr)
-        return 2
+        code = 2
+    if native_exit and args.mode == 'conversation':
+        # run() has already disconnected rooms, closed clients, released the
+        # world lease (or recorded its failure) and closed all report files.
+        # Avoid LiveKit's interpreter-finalization race after that cleanup:
+        # https://github.com/livekit/python-sdks/issues/833
+        # Keep the real result code, including task / infrastructure failures.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(code)
+    return code
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    raise SystemExit(main(native_exit=True))

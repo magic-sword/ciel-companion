@@ -16,6 +16,35 @@ from benchmark.report import metrics, summarize, write_reports
 from benchmark.world import MARKER, Rcon, World, achieved
 
 
+class CliExitTest(unittest.TestCase):
+    def test_conversation_cli_exits_after_cleanup_with_the_actual_result_code(self):
+        import benchmark.run as runner
+        class ProcessExit(Exception):
+            pass
+        for code in (0,1,2):
+            completed = []
+            async def finished(args):
+                completed.append('reports and cleanup finished')
+                return code
+            def exit_process(actual):
+                self.assertEqual(completed,['reports and cleanup finished'])
+                self.assertEqual(actual,code)
+                raise ProcessExit()
+            with self.subTest(code=code), patch.object(sys,'argv',['benchmark','--mode','conversation']), \
+                    patch.object(runner,'run',finished), patch.object(runner.os,'_exit',side_effect=exit_process), \
+                    self.assertRaises(ProcessExit):
+                runner.main(native_exit=True)
+
+    def test_conversation_cli_preserves_infrastructure_exception_exit(self):
+        import benchmark.run as runner
+        async def broken(args):
+            raise RuntimeError('cleanup failed')
+        with patch.object(sys,'argv',['benchmark','--mode','conversation']), \
+                patch.object(runner,'run',broken), patch.object(runner.os,'_exit') as exit_process:
+            self.assertEqual(runner.main(native_exit=True),2)
+        exit_process.assert_called_once_with(2)
+
+
 def state(count=0, x=0):
     return {'inventory':{'oak_log':count},'position':[x,64,0],'health':20}
 

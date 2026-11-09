@@ -16,6 +16,7 @@
 | 日常版と配信版の違いを知りたい | [アプリ構成・配信ウィンドウ](app-composition-ja.md) |
 | 変更を検証したい | [回帰テスト](regression-tests-ja.md)、[料金のかかる試験](paid-checks-ja.md) |
 | Minecraft をローカルモデルで試験・比較したい | [ローカル LLM](local-llm-ja.md)、[ベンチマーク・課題拡張・性能評価](minecraft-benchmark-ja.md)、[評価スキル](../.agents/skills/ciel-minecraft-benchmark/SKILL.md) |
+| Minecraft の現在の測定結果を知りたい | [2026-11-09の基準測定（各54試行）](minecraft-benchmark-baseline-2026-11-09-ja.md) |
 | 利用条件・外部依存を確認したい | [第三者依存関係](third-party-dependencies.md)、[READMEのライセンス説明](../README.md#公開とライセンス) |
 
 ## 会話と記憶

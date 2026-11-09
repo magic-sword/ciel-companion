@@ -13,6 +13,72 @@ import models
 
 
 class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
+    async def test_local_new_turn_without_notice_does_not_repeat_user_request(self):
+        import mind
+        ctx = llm.ChatContext()
+        ctx.add_message(role='user',content='原木を集めて')
+        ctx.add_message(role='assistant',content='確認します')
+        messages,_ = mind.local_context(ctx).to_provider_format('openai')
+        self.assertEqual([m['role'] for m in messages],['user','assistant','user'])
+        self.assertEqual(messages[-1]['content'],'')
+        self.assertEqual(ctx.items[-1].role,'assistant')
+
+    async def test_local_autonomous_reply_merges_assistant_history_in_sdk_request(self):
+        import mind
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system',content='instructions')
+        ctx.add_message(role='user',content='原木を8個集めて')
+        ctx.add_message(role='assistant',content='探します')
+        ctx.add_message(role='assistant',content='近くを確かめます')
+        ctx.add_message(role='system',content='[内部通知] 現在のタスクを確認する番')
+        before = ctx.to_dict()
+        requests = []
+
+        def respond(request):
+            body = json.loads(request.content)
+            requests.append(body)
+            messages = body['messages']
+            self.assertEqual([m['role'] for m in messages],['system','user','assistant','user'])
+            self.assertIn('[内部通知]',json.dumps(messages[-1]['content'],ensure_ascii=False))
+            self.assertNotIn('原木を8個集めて',json.dumps(messages[-1]['content'],ensure_ascii=False))
+            text = json.dumps(messages[-2]['content'],ensure_ascii=False)
+            self.assertLess(text.index('探します'),text.index('近くを確かめます'))
+            chunk = {'id':'test','object':'chat.completion.chunk','created':0,'model':'local',
+                     'choices':[{'index':0,'delta':{'role':'assistant','content':'確認中です'},'finish_reason':'stop'}]}
+            return httpx.Response(200,headers={'content-type':'text/event-stream'},
+                                  text='data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n')
+
+        client = openai.AsyncOpenAI(base_url=models.LOCAL_URL,api_key='local',
+                                   http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+        model = lk_openai.LLM(**models.reply_options('none'),client=client)
+        try:
+            async with model.chat(chat_ctx=mind.local_context(ctx),conn_options=APIConnectOptions(max_retry=0)) as stream:
+                chunks = [chunk async for chunk in stream]
+            self.assertTrue(chunks)
+            self.assertEqual(len(requests),1)
+            self.assertEqual(ctx.to_dict(),before)
+        finally:
+            await model.aclose()
+            await client.close()
+
+    async def test_local_assistant_merge_keeps_tool_boundaries(self):
+        import mind
+        ctx = llm.ChatContext()
+        ctx.add_message(role='user',content='原木を集めて')
+        ctx.add_message(role='assistant',content='確かめます')
+        call = llm.FunctionCall(call_id='call1',name='minecraft_status',arguments='{}')
+        result = llm.FunctionCallOutput(call_id='call1',name='minecraft_status',output='{}',is_error=False)
+        ctx.items.extend([call,result])
+        ctx.add_message(role='assistant',content='原木がありました')
+        ctx.add_message(role='assistant',content='集めます')
+        ctx.add_message(role='system',content='[内部通知] 続きを確認する番')
+        out = mind.local_context(ctx)
+        self.assertEqual(out.items[3:5],[call,result])
+        self.assertEqual(out.items[-1].role,'user')
+        self.assertEqual(out.items[-1].text_content,'[内部通知] 続きを確認する番')
+        self.assertEqual(len(out.items),7)
+        self.assertEqual(len(ctx.items),7)
+
     async def test_local_tool_continuation_recovers_unrecorded_text_request(self):
         import mind
         original = llm.ChatContext()

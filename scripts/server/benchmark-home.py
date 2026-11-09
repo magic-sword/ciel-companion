@@ -170,7 +170,7 @@ if __name__ == '__main__':
 from pathlib import Path
 import json
 root=Path.home()/'work/ciel-companion-benchmark/server/benchmark/data/results'
-reports=list(root.glob('*/report.json'))
+reports=list(root.rglob('report.json'))
 if reports:
     path=max(reports,key=lambda p:p.stat().st_mtime)
     report=json.loads(path.read_text())
@@ -189,6 +189,11 @@ if reports:
         process=subprocess.Popen(ssh_args()+['tar -cf - -C ~/work/ciel-companion-benchmark/server/benchmark/data results'],stdout=subprocess.PIPE)
         with tarfile.open(fileobj=process.stdout,mode='r|') as archive:
             archive.extractall(destination,filter='data')
+        # tarfile stops at the end marker; drain the remaining block padding so
+        # tar/ssh cannot block on a full pipe while we wait for their exit.
+        while process.stdout.read(65536):
+            pass
+        process.stdout.close()
         if process.wait():
             raise RuntimeError('Result download failed')
         print(destination)

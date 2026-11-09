@@ -509,7 +509,7 @@ def latest_user_text(chat_ctx) -> str:
 
 
 def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None) -> llm.ChatContext:
-    """Qwen のテンプレートは system を先頭の1件だけ受け付ける。元の会話と道具の順序は維持する。"""
+    """Qwen 用に system と連続する assistant の発言をまとめる。道具の順序と元の記録は変えない。"""
     out = llm.ChatContext()
     instructions = [i.text_content for i in ctx.items if isinstance(i,llm.ChatMessage) and i.role == 'system']
     if instructions:
@@ -521,6 +521,29 @@ def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None) -
         latest = next((i for i in reversed(source.items) if _is_user(i)),None)
         if latest is not None:
             out.items.insert(1 if instructions else 0,latest)
+    # 自分から話す番では、最近の返答が複数続いた末尾になることがある。
+    # Qwen は末尾の assistant が2件以上あると400を返す。内容を順に残し、
+    # 送信用の写しだけをまとめる。FunctionCall/Output の境界は越えない。
+    merged = []
+    for item in out.items:
+        if (isinstance(item,llm.ChatMessage) and item.role == 'assistant' and merged
+                and isinstance(merged[-1],llm.ChatMessage) and merged[-1].role == 'assistant'):
+            previous = merged[-1]
+            merged[-1] = previous.model_copy(update={'content': [*previous.content, '\n\n', *item.content]})
+        else:
+            merged.append(item)
+    out.items[:] = merged
+    if out.items and isinstance(out.items[-1],llm.ChatMessage) and out.items[-1].role == 'assistant':
+        # 自発的な返答も新しい生成。末尾が assistant のままだと Qwen は
+        # prefill（その発言の続き）として扱い、EOSだけを返すことがある。
+        # 現在の内部通知を user 形式のイベントとして末尾にも渡す。
+        # 実際のユーザー依頼は繰り返さず、tool output の続きにも足さない。
+        notices = []
+        for item in reversed(ctx.items):
+            if not (isinstance(item,llm.ChatMessage) and item.role == 'system'):
+                break
+            notices.append(item.text_content or '')
+        out.add_message(role='user',content='\n\n'.join(reversed(notices)))
     return out
 
 
