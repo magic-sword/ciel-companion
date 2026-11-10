@@ -1,0 +1,9 @@
+{
+  "stt_model": "vosk-model-small-ja-0.22; replace with model directory checksum/provenance",
+  "llm_model": "Qwen3.5-35B-A3B-Q4_K_M; record actual SHA256; shared API 8094",
+  "tts_model": "Irodori; record actual revision and voice configuration",
+  "hardware": "replace: CPU, RAM, GPU, container CPU/memory limits, client/network",
+  "shared_load": "replace: concurrent conversations, singing, GPU/CPU mode and competing requests",
+  "runtime_config": "replace: agent commit/image, STT/backend, endpoint settings, speaker verification, memory, prompts hash",
+  "notes": "Template only. Replace descriptions with actual measured conditions. No secrets."
+}

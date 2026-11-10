@@ -16,6 +16,10 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 ## エージェントからの入口
 
+再実行に必要なコードと設定はGitで管理する。対象は`scripts/server/benchmark-home.py`、`server/benchmark/`の実行器・採点器・`tasks.json`・`whitelist.json`・Dockerfile、`server/agent/benchmark_contract.py`と関連テスト、`server/compose.benchmark.yaml`・`server/.env.benchmark.example`、依存定義・ロックファイルと本手順書。結果を取得しただけのローカルファイルを実行の前提にしない。
+
+`server/benchmark/data/`の実行結果・ログ・ソーススナップショット、実際の`.env.benchmark`・認証情報・専用ワールド・モデル重みはGit対象外。過去の測定IDや当時の構成に固定された調査用スクリプトも、この結果領域にあるものは現行の再実行手順に含めない。繰り返し必要な実行・集計処理は`scripts/server/`または`server/benchmark/`へ組み込み、手順書と一緒に追跡する。モデル・Minecraftイメージ等は、ここで指定する版・取得元とライセンスに従い各環境で準備する。
+
 - リポジトリ直下の `AGENTS.md` が共通案内、`CLAUDE.md` がその参照口。
 - 共通手順の正本は `.claude/skills/ciel-minecraft-benchmark/SKILL.md`。Codexの `.agents/skills/ciel-minecraft-benchmark/SKILL.md` は正本を読む入口。作業手順は正本へ集約し、仕様やコマンドはこの文書で管理する。
 - 稼働中のワールド固有の不具合調査は `ciel-minecraft-debug`。再現課題の評価には本ベンチマークを使う。

@@ -66,6 +66,9 @@ __pycache__/
 # マイクラの体（server/minecraft）の依存と、マイクラのサーバーの世界
 /server/minecraft/node_modules/
 /server/minecraft/data/
+# Generated results, logs, private recordings and historical source snapshots only.
+# Reusable benchmark code belongs in scripts/server/ or server/benchmark/ (outside data/).
+# Track task definitions, tests, Dockerfiles, Compose and *.example templates normally.
 /server/benchmark/data/
 /server/benchmark/staged-provenance.json
 /server/.env.benchmark

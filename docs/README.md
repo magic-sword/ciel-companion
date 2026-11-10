@@ -62,6 +62,7 @@
 | 資料 | このファイルが所有する内容 |
 |---|---|
 | [testing/regression-tests-ja.md](testing/regression-tests-ja.md) | 変更に応じたテストの選び方、コマンド、終了コード。 |
+| [testing/voice-benchmark-ja.md](testing/voice-benchmark-ja.md) | 音声認識精度と応答時間の評価根拠、録音コーパス、再生・集計・比較の方法。 |
 | [testing/paid-checks-ja.md](testing/paid-checks-ja.md) | 外部APIを呼ぶ試験、費用と実行範囲の確認方法。 |
 | [testing/verification-status-ja.md](testing/verification-status-ja.md) | 直近の検証・性能の条件、ソース識別、生データの場所、未確認範囲。 |
 

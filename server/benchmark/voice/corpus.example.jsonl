@@ -1,0 +1,7 @@
+{"id":"greeting","audio":"audio/greeting.wav","reference":"おはよう、シエル。","speaker":"speaker-a","condition":"quiet","source":"human","speech_end_seconds":1.2}
+{"id":"name","audio":"audio/name.wav","reference":"シエルは何色が好き？","speaker":"speaker-a","condition":"quiet","source":"human","speech_end_seconds":2.0}
+{"id":"number","audio":"audio/number.wav","reference":"今日は三十分くらい散歩したよ。","speaker":"speaker-a","condition":"quiet","source":"human","speech_end_seconds":3.0}
+{"id":"negation","audio":"audio/negation.wav","reference":"今日は出かけないで家にいるよ。","speaker":"speaker-a","condition":"quiet","source":"human","speech_end_seconds":3.0}
+{"id":"pause","audio":"audio/pause.wav","reference":"明日はね、午前中は買い物で、午後は映画を見るよ。","speaker":"speaker-a","condition":"mid-turn-pause","source":"human","speech_end_seconds":6.0}
+{"id":"noise","audio":"audio/noise.wav","reference":"シエル、今日もお話ししよう。","speaker":"speaker-a","condition":"background-noise","source":"human","speech_end_seconds":3.0}
+{"id":"silence","audio":"audio/silence.wav","reference":"","speaker":"none","condition":"silence","source":"human","speech_end_seconds":2.0}
