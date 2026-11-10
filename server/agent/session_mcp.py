@@ -24,7 +24,7 @@ class SessionMCP:
         schema['parameters']['additionalProperties'] = False
 
         async def invoke(raw_arguments: dict, context: RunContext):
-            if original.id not in self.catalog.exposed:
+            if not self.catalog.can_execute(original.id):
                 raise ToolError('この発言では公開されていない道具です。')
             return await self.call(original, schema, raw_arguments, context)
 
@@ -33,7 +33,7 @@ class SessionMCP:
     async def call(self, original, schema, arguments, context):
         async def execute(arguments):
             # Authorization is checked in the server too; loading a schema is insufficient.
-            if original.id not in self.catalog.exposed:
+            if not self.catalog.can_execute(original.id):
                 raise ValueError('tool_not_exposed')
             args, kwargs = utils.prepare_function_arguments(
                 fnc=original, json_arguments=json.dumps(arguments), call_ctx=context)

@@ -488,7 +488,7 @@ def only_given(chunk, fns: list):
     return chunk.model_copy(update={'delta': delta.model_copy(update={'tool_calls': kept})}), dropped
 
 
-def one_body_call(chunk, taken: list, moving=frozenset()):
+def one_body_call(chunk, taken: list, moving=frozenset(), *, target=None):
     """1 つの返事で、体を動かす道具（体の道具・目的の道具）は 1 つだけ通す。体の技は一度に 1 つなので、同時に呼ぶと
     取り合いになって両方失敗した（集めると作るを同時に呼んだ。2026-11-07）。taken は、この返事ですでに通した呼び出しの名前。
     moving は 1 つだけ通す道具の名前（Mind.one_call_tools）。
@@ -498,10 +498,11 @@ def one_body_call(chunk, taken: list, moving=frozenset()):
         return chunk, []
     kept, dropped = [], []
     for c in delta.tool_calls:
-        if c.name in moving and any(n in moving for n in taken):
-            dropped.append(c.name)
+        name = target(c) if target is not None else c.name
+        if name in moving and any(n in moving for n in taken):
+            dropped.append(name)
             continue
-        taken.append(c.name)
+        taken.append(name)
         kept.append(c)
     if not dropped:
         return chunk, []

@@ -46,7 +46,9 @@ async def main():
         if len(captured) == 1:
             name, arguments = 'load_capabilities', '{"service_ids":["4"]}'
         else:
-            name, arguments = 'research_web', '{"question":"公式ページ"}'
+            definition = agent.capabilities.definition('research_web')
+            name, arguments = 'execute_capability', json.dumps({'tool_id':'research_web',
+                'version':definition['version'],'arguments':{'question':'公式ページ'}},ensure_ascii=False)
         yield llm.ChatChunk(id='fixture', delta=llm.ChoiceDelta(role='assistant', tool_calls=[
             llm.FunctionToolCall(name=name, arguments=arguments, call_id=f'fixture-{len(captured)}')]))
 
@@ -63,9 +65,11 @@ async def main():
         result = await functions[call.name](*args, **kwargs)
         chat.items.extend([call, llm.FunctionCallOutput(call_id=call.call_id, name=call.name, output=result, is_error=False)])
         outputs = [chunk async for chunk in agent._pipeline_llm(chat, agent.tools, {})]
-        assert outputs[0].delta.tool_calls[0].name == 'research_web'
+        assert outputs[0].delta.tool_calls[0].name == 'execute_capability'
         functions = {fn.id: fn for fn in captured[1][1]}
-        call = llm.FunctionCall(call_id='fixture-2', name='research_web', arguments='{"question":"公式ページ"}')
+        definition=agent.capabilities.definition('research_web')
+        call = llm.FunctionCall(call_id='fixture-2', name='execute_capability', arguments=json.dumps({
+            'tool_id':'research_web','version':definition['version'],'arguments':{'question':'公式ページ'}}))
         ctx = RunContext(session=session, speech_handle=speech, function_call=call)
         args, kwargs = utils.prepare_function_arguments(fnc=functions[call.name], json_arguments=call.arguments, call_ctx=ctx)
         result = await functions[call.name](*args, **kwargs)
@@ -73,7 +77,9 @@ async def main():
         researcher.search.assert_awaited_once_with('公式ページ', 'fixture-2', speech)
         assert chat.items[0].text_content == original
         assert agent.persona.research_voice_instructions not in captured[0][0].items[0].text_content
-        assert agent.persona.research_voice_instructions in captured[1][0].items[0].text_content
+        assert agent.persona.research_voice_instructions not in captured[1][0].items[0].text_content
+        assert captured[0][0].items[0].text_content == captured[1][0].items[0].text_content
+        assert {f.id for f in captured[0][1]} == {f.id for f in captured[1][1]}
 
     print(json.dumps({
         'status': 'passed', 'mode': 'offline_scripted_selection',

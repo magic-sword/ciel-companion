@@ -217,8 +217,19 @@ class Ciel(Agent):
             bridge = self.service_bridge = SessionMCP(self.capabilities)
             # Game work already uses the external game MCP; avoid a second transport.
             self.service_tools = [t if t in tools.goals.TOOLS or t in tools.clock.TOOLS else bridge.wrap(t)
-                                  for t in tools.TOOLS] + [self.capabilities.loader]
+                                  for t in tools.TOOLS] + [self.capabilities.loader, self.capabilities.executor]
             tools.ENV_FROM_COMMENTS[self.capabilities.loader.id] = True
+            tools.ENV_FROM_COMMENTS[self.capabilities.executor.id] = True
+            self.capabilities.instructions = {
+                'memory': persona.speaker_instructions,
+                'minutes': persona.minutes_voice_instructions,
+                'conversation': persona.conversation_instructions,
+                'research': persona.research_voice_instructions,
+                'thoughts': persona.inner_thoughts_voice_instructions,
+                'karaoke': persona.singing_voice_instructions,
+                'app': persona.app_instructions,
+                'game': '\n\n'.join(p for p in (persona.game_instructions, getattr(game, 'instructions', '')) if p),
+            }
             if game is not None:
                 self.capabilities.bind_external(game.tools, "game")
         self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
@@ -305,6 +316,7 @@ class Ciel(Agent):
                 ('minutes', state.minutes is not None), ('thoughts', state.initiative is not None),
                 ('conversation', state.history is not None)) if not ready}
             fns = self.capabilities.select(fns)
+            self.capabilities.moving = set(self.mind.one_call_tools())
             style = self.style
             index = next((i for i, item in enumerate(ctx.items) if getattr(item, 'role', None) == 'system'), None)
             instructions = llm.ChatMessage(role='system', content=[self.instructions_for(
@@ -345,7 +357,8 @@ class Ciel(Agent):
                     blocked += dropped
                 if chunk is None:
                     continue
-                chunk, dropped = mind.one_body_call(chunk, taken, self.mind.one_call_tools())
+                chunk, dropped = mind.one_body_call(chunk, taken, self.mind.one_call_tools(),
+                    target=self.capabilities.target if self.capabilities else None)
                 if dropped:
                     logger.info('心：体を動かす道具は 1 つだけ通した（止めた：%s）', dropped)
                     blocked += dropped
@@ -361,10 +374,10 @@ class Ciel(Agent):
                     text.append(delta)
                 elif delta is not None:
                     text.append(delta.content or '')
-                    calls += [c.name for c in delta.tool_calls or []]
+                    calls += [self.capabilities.target(c) if self.capabilities else c.name for c in delta.tool_calls or []]
                     if self.activity is not None:   # 結果が返るまで「呼んでいる」（function_tools_executed で消える）
                         for c in delta.tool_calls or []:
-                            self.activity.call_started(c.call_id, c.name)
+                            self.activity.call_started(c.call_id, self.capabilities.target(c) if self.capabilities else c.name)
                 yield chunk
             done = not expired
         except agents.APIError as exc:
@@ -419,7 +432,8 @@ class Ciel(Agent):
                  p.self_instructions,    # シエル自身の好み・苦手・こだわり（ciel_self.md）
                  self.grown,             # 出来事から育った好み（growth.py）
                  p.touch_instructions]   # 画面のタッチへの反応（touch.py）
-        loaded = (set(self.capabilities.loaded) - self.capabilities.disabled) if self.capabilities is not None else None
+        # Domain instructions travel in discovery results, never rewrite the fixed prefix.
+        loaded = set() if self.capabilities is not None else None
         if PIPELINE:
             parts.append(p.talker_instructions)
             if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':

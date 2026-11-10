@@ -2,7 +2,7 @@ import asyncio
 import json
 from types import SimpleNamespace as Obj
 import unittest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from livekit.agents import RunContext, ToolError, ToolResult, function_tool
 from livekit.agents.llm import FunctionCall, utils
@@ -23,14 +23,15 @@ def context(**userdata):
 class CatalogTests(unittest.TestCase):
     def setUp(self):
         self.catalog = CapabilityCatalog(tools.MODULES)
-        self.all = tools.TOOLS + [self.catalog.loader]
+        self.all = tools.TOOLS + [self.catalog.loader, self.catalog.executor]
 
     def ids(self, eligible=None):
         return {t.id for t in self.catalog.select(eligible or self.all)}
 
     def test_initial_catalog_has_summaries_without_domain_schemas(self):
         self.assertEqual(self.ids(), {'current_time', 'stop_game_task', 'game_task_status', 'load_capabilities',
-                                     'finish_minutes', 'get_minutes_status'})
+                                     'finish_minutes', 'get_minutes_status', 'execute_capability',
+                                     'register_participant_name', 'get_speaker_status'})
         summary = json.loads(self.catalog.summary())
         self.assertEqual(len(summary['services']), 7)  # app is not connected
         self.assertNotIn('remember_about_speaker', self.catalog.summary())
@@ -40,8 +41,10 @@ class CatalogTests(unittest.TestCase):
         self.ids()
         self.assertEqual(self.catalog.load(['3', '4'])['status'], 'loaded')
         visible = self.ids()
-        self.assertIn('remember_about_speaker', visible)
-        self.assertIn('research_web', visible)
+        self.assertNotIn('remember_about_speaker', visible)
+        self.assertNotIn('research_web', visible)
+        self.assertTrue(self.catalog.can_execute('remember_about_speaker'))
+        self.assertTrue(self.catalog.can_execute('research_web'))
         self.assertNotIn('start_listening_to_song', visible)
 
     def test_unknown_or_disconnected_selection_is_atomic(self):
@@ -63,7 +66,7 @@ class CatalogTests(unittest.TestCase):
         self.catalog.load(['3'])
         allowed = tools.for_comments(tools.TOOLS) + [self.catalog.loader]
         visible = self.ids(allowed)
-        self.assertIn('people_here', visible)
+        self.assertTrue(self.catalog.can_execute('people_here'))
         self.assertNotIn('remember_about_speaker', visible)
         self.assertNotIn('recall_about_speaker', visible)
         self.assertNotIn('stop_game_task', visible)
@@ -83,7 +86,7 @@ class CatalogTests(unittest.TestCase):
         eligible = self.all + [external]
         self.assertNotIn(external.id, self.ids(eligible))
         self.catalog.load(['1'])
-        self.assertIn(external.id, self.ids(eligible))
+        self.assertNotIn(external.id, self.ids(eligible))
         self.assertIn('stop_game_task', self.ids(eligible))
 
     def test_external_replacement_cannot_shadow_a_host_tool(self):
@@ -131,6 +134,80 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.output['status'], 'queued')
         notes.request.assert_called_once_with(42, '猫が好き')
         book.refresh.assert_awaited_once()
+
+    async def test_generic_executor_preserves_real_mcp_consent_and_no_reply_result(self):
+        wrapped = [self.bridge.wrap(t) for t in tools.TOOLS]
+        self.catalog.select(wrapped + [self.catalog.loader, self.catalog.executor])
+        result = self.catalog.load(['3'])
+        definition = next(t for s in result['definitions'] for t in s['tools'] if t['tool_id']=='remember_about_speaker')
+        self.assertIn('parameters', definition['schema'])
+        self.assertNotIn('person_id',definition['schema']['parameters']['properties'])
+        person=Obj(person_id=42,name='本人',notes_ok=True)
+        book=Obj(refresh=AsyncMock(),current_person=Mock(return_value=person))
+        notes=Obj(request=Mock())
+        arguments={'tool_id':definition['tool_id'],'version':definition['version'],'arguments':{'note':'猫が好き'}}
+        returned=await self.catalog.executor(arguments,context(book=book,notes=notes))
+        self.assertFalse(returned.reply_required)
+        self.assertEqual(returned.output['status'],'queued')
+        notes.request.assert_called_once_with(42,'猫が好き')
+        for invalid in ({**arguments,'version':'old'}, {**arguments,'arguments':{'note':123}},
+                        {**arguments,'arguments':{'note':'secret','person_id':99}}, {**arguments,'person_id':99}):
+            with self.assertRaises(ToolError):
+                await self.catalog.executor(invalid,context(book=book,notes=notes))
+        self.catalog.select(tools.for_comments(wrapped)+[self.catalog.loader,self.catalog.executor])
+        with self.assertRaises(ToolError):
+            await self.catalog.executor(arguments,context(book=book,notes=notes))
+        notes.request.assert_called_once()
+
+    async def test_definition_and_fixed_prefix_do_not_change_when_loading(self):
+        from agent import Ciel
+        with patch('agent.PIPELINE',True):
+            agent=Ciel()
+            catalog=agent.capabilities
+            before={f.id for f in catalog.select(agent.tools)}
+            instructions=agent.instructions_for('normal','solo')
+            summary=catalog.summary()
+            loaded=catalog.load(['3','6'])
+            self.assertTrue(loaded['definitions'][0]['instructions'])
+            self.assertEqual(before,{f.id for f in catalog.select(agent.tools)})
+            self.assertEqual(instructions,agent.instructions_for('normal','solo'))
+            self.assertEqual(summary,catalog.summary())
+
+    async def test_executor_refuses_definition_changed_after_discovery(self):
+        self.catalog.select(self.all)
+        self.catalog.load(['3'])
+        definition=self.catalog.definition('remember_about_speaker')
+        self.catalog.instructions['memory']='new instructions'
+        with self.assertRaises(ToolError):
+            await self.catalog.executor({'tool_id':definition['tool_id'],'version':definition['version'],
+                'arguments':{'note':'test'}},context())
+
+    async def test_executor_and_stream_guard_limit_body_operations(self):
+        calls=[]
+        @function_tool
+        async def body(context: RunContext):
+            """Move a fixture body."""
+            calls.append('moved')
+            return 'ok'
+        self.catalog.bind_external([body],'app')
+        self.catalog.select(self.all+[body,self.catalog.executor])
+        self.catalog.load(['8'])
+        definition=self.catalog.definition(body.id)
+        values={'tool_id':body.id,'version':definition['version'],'arguments':{}}
+        self.catalog.moving={body.id}
+        ctx=context()
+        self.assertEqual(await self.catalog.executor(values,ctx),'ok')
+        with self.assertRaises(ToolError):
+            await self.catalog.executor(values,ctx)
+        self.assertEqual(calls,['moved'])
+        chunk=mind.llm.ChatChunk(id='test',delta=mind.llm.ChoiceDelta(role='assistant',tool_calls=[
+            mind.llm.FunctionToolCall(name=self.catalog.executor.id,arguments=json.dumps(values),call_id='first'),
+            mind.llm.FunctionToolCall(name=self.catalog.executor.id,arguments=json.dumps(values),call_id='second')]))
+        kept,dropped=mind.one_body_call(chunk,[],{body.id},target=self.catalog.target)
+        self.assertEqual(len(kept.delta.tool_calls),1)
+        self.assertEqual(dropped,[body.id])
+        malformed=Obj(name=self.catalog.executor.id,arguments='{"tool_id":[]}')
+        self.assertEqual(self.catalog.target(malformed),self.catalog.executor.id)
 
     async def test_mcp_rejects_injected_actor_and_wrong_argument_types(self):
         fn = self.bridge.wrap(tools.memory.remember_about_speaker)

@@ -23,6 +23,12 @@ FILES += ['scripts/server/benchmark-voice-text.py', 'server/benchmark/voice/text
 FILES += ['server/agent/whisper_engine.py', 'server/agent/whisper_stt.py']
 FILES += ['server/agent/inference_activity.py']
 FILES += ['scripts/server/benchmark-conversation-tools.py']
+FILES += ['server/benchmark/voice/capability-selector.md']
+FILES += ['scripts/server/benchmark-capability-cache-home.py']
+FILES += ['scripts/server/benchmark-capability-bank.py']
+FILES += ['scripts/server/benchmark-tool-discovery.py', 'server/benchmark/voice/tool-discovery-comparison.md']
+FILES += ['server/benchmark/voice/tool-discovery-native.md', 'server/benchmark/voice/tool-discovery-fixed.md']
+FILES += ['server/benchmark/voice/tool-discovery-hybrid.md']
 FILES += ['scripts/server/benchmark-inference-cancel.py']
 
 

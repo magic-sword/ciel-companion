@@ -166,6 +166,60 @@ Gitのないコンテナでは`--source-provenance`に配置元のGit識別・di
 
 競合時の入場制御だけを検証する場合は、ワーカーの試験を終えてから`contention --variant baseline`と`contention --variant fast`を専用受信口の稼働中に実行する。各1回、背景2件×最大128トークンと前景1件×最大4トークンで、フィクスチャは`server/benchmark/voice/contention.json`。準備済みGPU・処理中要求なしを確認してから始める。これは短いLLM出力までの時間と入場待ちの比較で、音声会話の応答時間には混ぜない。
 
+## 能力追加時の入力計算を比較する
+
+音声全体とは別に、`benchmark-conversation-tools.py`で実pipelineから入力と許可済みツールを生成し、実モデルの選択まで測定する。実行する道具は`load_capabilities`だけで、登録・議事録開始などの副作用は実行しない。関数名に加え、元のJSON Schemaで引数の形式を検証する。これは引数の意味、実サービスでの完了、人格、本人確認の全条件を保証する試験ではない。
+
+`--variant baseline`は現在の入力、`compact`はツール説明の改行後を省略する探索候補（名前・型・制約は保持）、`prepared`は各要求の直前に固定指示と同一ツール定義を1tokenだけ準備する条件。`compact-prepared`は両者を組み合わせる。準備時は動的な状態・実際の発言・tool resultを含めず、出力は破棄する。`requests[].preparation.seconds`と本要求の`seconds`を分け、trial全体の`seconds`は準備も含む。準備費用を除いた値を現在の利用者の待ち時間とは呼ばない。この方式は常駐キャッシュ銀行や永続キャッシュの実装ではない。
+
+`specialist`は能力ロード後だけ、固定指示を評価用`server/benchmark/voice/capability-selector.md`へ置換する。動的system情報、会話、tool call/result、公開ツールと権限制限を保持する。通常サービスのプロンプトは変更しない。専門処理から会話へ結果を返す製品実装や、実操作後の音声応答はこの試験に含まない。
+
+専用の使い捨てコンテナで反復し、共有モデルの再起動・キャッシュ消去をせず、条件の順序を反復ごとに循環させる。準備で他条件のキャッシュが温まる影響も残るため、完全なcold比較とは扱わない。既存開発イメージを使い、接続先は共有8094。共有モード・処理中枠のサンプル、ソースアーカイブ、各要求の入力token/cache利用を保存する。
+
+```powershell
+.\.venv\Scripts\python.exe scripts/server/voice-home.py stage
+.\.venv\Scripts\python.exe scripts/server/benchmark-capability-cache-home.py --rounds 3
+.\.venv\Scripts\python.exe scripts/server/voice-home.py pull
+```
+
+既定は能力追加の4課題（議事録開始、自己紹介、保存状態、履歴検索）をbaseline/prepared/specialistで各3回。`--variants`と`--cases`で範囲を指定できる。結果は`results/capability-cache-<UTC>/`に作り、失敗・タイムアウトも残す。
+
+`--fresh-loaded-prefix`は能力追加後の固定指示の先頭に試行固有の評価IDを付け、未準備の固定入力を作る診断条件。準備要求と本要求には同じIDを付ける。既存利用者のキャッシュは消さない。ツール定義などIDより前の共通部分は再利用され得るため、完全なcold起動とは呼ばない。実利用者の会話で同じ失効頻度になる保証はない。準備状態の保存・復元や複数能力の組合せは、別途対応機能とチェックポイントの再利用を確認してから評価する。
+
+### 能力ごとの準備を依頼前にまとめる
+
+`benchmark-capability-bank.py`は、合成課題のpipeline入力を保存したcaptureから固定指示と公開ツールだけを抽出し、重複する記憶能力を統合して事前準備する。全準備が終わるまで利用者の依頼の再生を始めず、その後は再準備しない。準備には利用者の発言・動的状態・tool結果を渡さず、1tokenの出力は破棄する。保存・復元APIや重みの変更は使わない。
+
+評価コンテナ内の実行例（接続先は共有8094、出力先は毎回新規）：
+
+```sh
+python scripts/server/benchmark-conversation-tools.py --variant specialist --capture-requests --cases minutes name status history --output results/new-run/capture.json
+python scripts/server/benchmark-capability-bank.py --capture results/new-run/capture.json --rounds 3 --output results/new-run/bank.json
+```
+
+捕捉するのは評価器自身の合成入力だけとし、実利用者の会話ログをこの形式へ出力しない。能力順は議事録→記憶の仮登録→履歴検索→記憶の状態照会。準備なし／全能力を準備の順番を反復ごとに交代し、各条件に新しい固定入力IDを付ける。最初の能力選択も再生してから具体的な道具を選ぶ。元のcaptureと関数名・引数値が違えばその試行を失敗とし、古いtool結果へ進まない。道具を実行せず、固定された合成会話の再生に限定するため、実操作後の返答や任意の新しい会話へ一般化しない。
+
+`preparations`は開始前の時間・使用量、`trials`は依頼後の時間・cache利用・引数を記録する。準備費用をゼロ扱いせず、準備の途中失敗、他能力を使った後の失効、保存された出力の指紋も確認する。既知の3能力の準備であり、全能力の組合せ・別権限・接続端末の変更にも対応した製品のキャッシュ管理機構ではない。
+
+### 個別スキーマの段階的公開と固定入口を比較する
+
+`benchmark-tool-discovery.py`は、実pipelineの合成captureから記憶・議事録・履歴検索の正規スキーマを抽出し、次の2条件を同じ会話系列で比較する。通常サービスの処理は変更しない。
+
+- `native`：最初はdiscoverだけを公開し、選んだサービスの個別関数を完全なスキーマ付きで`tools`へ追加する。探索結果には公開した名前だけを返し、スキーマ本文の二重投入を避ける。
+- `fixed`：discoverとexecuteの2入口を固定し、探索結果のtoolメッセージへ完全なスキーマ・tool_id・版を返す。executeにはそのID・版・引数を渡す。実行器は正規スキーマ、既知ID、版、探索済みの公開範囲を検証する。名前や版を推測して拒否された要求は、後で修正できてもその試行を合格にしない。
+- `hybrid`：discover/executeに加え、register_participant_nameとget_speaker_statusだけを個別定義として常時公開する。計4定義は探索後も不変。個別入口の2操作だけ探索を省けるが、同じ記憶サービスの他の操作やexecute経由の未探索呼び出しは許可しない。常時公開する2つは今回の比較対象の候補であり、実利用の頻度分析から最適集合を確定したものではない。
+
+両条件に同じ短い道具選択指示を与え、呼び方だけ別ファイルで説明する。system本文は会話内で固定し、探索結果・呼び出し・検証結果・次の依頼は末尾へ追加する。記憶→履歴検索→記憶→履歴検索の再利用、議事録開始と否定、挨拶の計8ターンを各3回測り、条件順を交代する。初期の固定入力IDは試行ごとに変え、他の利用者のキャッシュは消去しない。
+
+```sh
+python scripts/server/benchmark-tool-discovery.py --capture results/capture-run/capture.json --rounds 3 --output results/new-run/comparison.json
+python scripts/server/benchmark-tool-discovery.py --capture results/capture-run/capture.json --modes native fixed hybrid --rounds 3 --output results/new-hybrid-run/comparison.json
+```
+
+`requests`に入力token/cache利用/ツール定義の指紋、`discoveries`に探索回数、`invalid`に拒否された生成、`calls`に検証済みの関数と引数を保存する。合格条件は期待した関数・引数値との一致、不正要求・通信エラーなし。挨拶と否定では探索も操作もしないことを要求する。速度は依頼から検証済みの呼び出し生成までで、実サービスの完了・音声・本来の本人確認を含まない。道具の結果は`validated_only/executed=false`であり、実操作済みの会話ではない。
+
+共有キャッシュ・モデル内のチェックポイントは別に影響する。固定入口で送信メッセージを追記だけにできても、モデルのcache再利用が常に完全になるとは判定しない。判定器のテストでは、個別公開時の定義変更、固定入口の定義不変と履歴のprefix不変、未知ID・未公開・古い版・欠けた/型違い/余分な引数の拒否を確認する。
+
 ## 結果の読み方と次の改善
 
 `report.json`はGitコミット・dirty状態、実行器/採点器/デコーダーのSHA-256、コーパス指紋、条件、反復ごとの結果を持つ。例外が起きても試行ごとに保存し、失敗を集計する。同一コーパス・端末・モデル・負荷・設定で前後各3回以上測り、一度にSTTモデル、発話区切り、LLM、TTSのいずれか一つを変更する。反復再生は独立した話者数を増やすものではない。

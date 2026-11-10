@@ -68,6 +68,6 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 
 音声の準備と最初の文には`voice_warmup_file`・`voice_first_sentence_file`を必須設定として読み込む。前者は準備時だけLLM/TTSへ渡し、会話の履歴へ保存しない。後者はローカルの高速音声設定で共通会話指示へ追加し、人物像や操作の確認を省略せずに最初の一文を短くする。どちらも人物設定の指紋へ含め、比較時には実際に適用した高速設定も記録する。
 
-`tool_discovery_instructions_file`を必須設定とし、会話開始時に読み込んで指紋へ含める。pipelineはサービスの使い方を能力ロード後に渡す。人物像、本人確認・保存同意・公開範囲は常時保持する。[能力カタログ](capability-runtime-ja.md)を参照する。
+`tool_discovery_instructions_file`を必須設定とし、会話開始時に読み込んで指紋へ含める。pipelineはサービスの詳細な使い方を能力ロードのtool結果へ返し、固定systemへ後から追加しない。名前の仮受付・保存状態照会と、取得した定義をexecute_capabilityで使う短い規則は常時保持する。人物像、本人確認・保存同意・公開範囲も維持する。[能力カタログ](capability-runtime-ja.md)を参照する。
 
 指示の内容・話し方の個別変更は本文のGit差分と評価に残す。過去の変更理由や試験の逐次追記はこのファイルへ置かない。結果の現状は[確認状況](../testing/verification-status-ja.md)を更新する。

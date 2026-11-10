@@ -1,0 +1,3 @@
+道具の呼び出しはexecute(tool_id,version,arguments)で行います。探索結果の完全なschemaに従ってargumentsを作ります。
+
+最初はどの道具のtool_idとversionも取得していません。システム指示に関数名が書いてあっても、必ず最初にdiscoverで対応するサービスを読みます。探索結果のtool_idとversionをそのままexecuteへ渡します。versionを推測したり、空文字・仮の値で試したりしません。既にそのサービスの定義が履歴にあれば再探索せず、取得済みの値を使って直接executeを呼びます。
