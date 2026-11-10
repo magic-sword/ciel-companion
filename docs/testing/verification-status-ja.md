@@ -10,7 +10,7 @@
 |---|---|---|
 | ドキュメント整合性 | 2026-11-10、現行44文書・リポジトリ内125 Markdownの目次・責務・ローカルリンク検査成功。検証器の自己テスト6項目、音声/WSP評価スキルの正本/入口の形式検証成功（`quick_validate.py`） | 外部URLの到達性は対象外 |
 | 会話ホストの通常回帰 | 併用方式の本体統合後unit714件合格（`server/benchmark/data/hybrid-runtime-release-unit/report.json`）。直前の同じ統合実装で使い捨てDB結合9件も合格（`hybrid-runtime-all/report.json`）。実行段階内の失敗・エラー・スキップ0 | 最終unitのDB段階は非選択。実アプリ端末・人のマイク・継続負荷 |
-| 本番・開発のbackend | Compose11条件と設定移行10項目の検証に加え、下記の.env.shared移行・両agent再作成・LiveKit登録、CPU Vosk・共有LLM・MCP疎通、開発側の文字入力から返答・音声受信を確認 | 人のマイク、聞き取り精度、実アプリでの表情・発話・割り込み、継続負荷 |
+| 本番・開発のbackend | `45c8d73`を両環境へ配布し全serverソース照合、LiveKit登録、開発の音声入力→返答、本番の文字入力→返答音声まで確認。Compose13条件も通過。本番Vosk・開発Whisper | 人のマイク、実アプリでの表情・発話・割り込み、継続負荷 |
 | 能力カタログ・サービス分離・反応 | unitとpipelineを通す各結合スクリプトの導入確認。現行の通常回帰に含む | 実モデルの選択精度、実機の表情・発話遅延と同時入力 |
 | Unity作業表示 | 実ソースを使う.NET検証35項目、C#本体・Editorビルド成功。Editorで状態表示11・カード57・構成42項目成功 | 現行Playerの実サービス接続、全画面・実機の品質 |
 | ローカル画像API | 常設APIに256px前処理とCPU画像エンコーダーを反映。本番・開発で画像能力を確認し、開発側で1024px画像添付→認識返答→音声受信、説明文生成まで成功。詳細は下記 | 写真・OCR・実ゲームの品質、Unity端末の画像選択UI、連続入力・同時会話の負荷 |
@@ -37,6 +37,16 @@ MCPの両側の許可検査、本人確認と同意、reply_required=false、結
 長い結合音声と無音を各1回追加した。本返答音声開始は3.269秒、CER8/65（12.3%）、pre_end_reply_audio候補1件、無音への返答0件。途中開始の候補は適切な割り込みか人の聴取が未完了であり、試験処理のfailures=0を音声品質の合格には読み替えない。STT・VADは今回変更していないが、以前の単発CER6.2%との差を非劣化確認済みとは扱わない。
 
 生データは自宅`~/work/ciel-voice-evaluation/results/hybrid-runtime-20261110T113600Z/`、回収先はGit対象外`server/benchmark/data/voice-home/results/hybrid-runtime-20261110T113600Z/`。`tools.json`は自己紹介失敗を含む初回、`tools-final.json`は修正後18試行、音声は`live-fast-integrated-final-settled-smoke`と`live-fast-integrated-long-settled`。各ソース指紋・隣接sourceアーカイブで測定実装を識別する。実モデル試験後に、tool_idが文字列以外の場合に診断処理で例外を起こさず入口で拒否させるガードを追加し、最終回帰で確認した。配布前に本番・開発の旧会話ソースと状態を`~/work/ciel-companion/server/data/deployments/hybrid-20261110T114047Z/`へ保存した。
+
+### 本番・開発への反映
+
+実装commit `45c8d73d009241d177fa632c313d676553d149b2`を標準`deploy-server.sh --dev`、続いて`deploy-server.sh`で配布した。両方の`DEPLOY_SERVER_DONE`、本番371・開発370のGit管理serverファイルの実バイト指紋一致、LiveKit登録、再起動回数0、Tracebackなしを確認した。開発イメージは`sha256:f5197ee75fd1f944cc56a3d36ee4d2ee811d57d1a4ae363c6396242116b5255f`、本番は`sha256:5fd56553a211c34f3f88549246cedc1ddbd2e814dc2dc2c7c3c1cdac7f2d6bc9`。main/devの記憶スコープを維持し、入力設定は本番Vosk、開発Whisperのまま引き継いだ。
+
+配布済み開発ワーカーに一時ルームから挨拶音声を送り、voice.ready、初回挨拶、認識一致と返答音声受信を確認した。本返答開始は単発3.608秒（`deployed-dev-smoke/report.json`）。本番の無名workerには通常の一時ルームで`smoke-livekit.py --default-agent`を使い、voice.ready、挨拶音声、文字入力から返答音声まで確認した（`prod-smoke.json`、文字送信から受信2.216秒）。起点・条件が異なる疎通確認なので両者を速度比較しない。試験ルームは削除済みで、人のマイクは未確認。
+
+共有LLM、singing、Minecraft3サービス、TTS、DBの7コンテナはID・イメージ・起動時刻・再起動回数を維持した。共有LLMは同じ推論世代のgpu/ready。標準デプロイは任意profileの共有LLMコンテナを再作成しておらず、過去に評価専用gatewayで測った取消改善を通常gatewayへ配布したことにはしない。資格情報・Webhook・モデル重みは維持した。
+
+配布の根拠はサーバー`~/work/ciel-companion/server/data/deployments/hybrid-20261110T114047Z/`の`before.json`・`after.json`・`verification.json`・`prod-smoke.json`。その限定JSONをGit対象外`server/benchmark/data/deploy-hybrid/`へ回収する。旧agentソースの復旧アーカイブと標準開発デプロイによるDBバックアップはサーバーに保持し、回収しない。配布後の記録と疎通確認スクリプトだけを追加コミットし、serverの配布ソースは`45c8d73`から変更しない。
 
 ## 個別定義2操作と固定入口の併用候補
 
@@ -202,9 +212,9 @@ MCPの両側の許可検査、本人確認と同意、reply_required=false、結
 
 ## 本番・開発のローカル推論への反映
 
-自宅サーバーの本番`~/work/ciel-companion/server`と開発`~/work/ciel-companion-dev/server`で、共有`.env.shared`と独立した`.env`・`.env.dev`を使用する。両環境とも`CIEL_LLM_BACKEND=local`、pipeline・voice・CPU Vosk、GPU解放制御8095を設定し、記憶スコープは本番main・開発dev。旧`CIEL_DEV_*`は使わない。資格情報・Webhookを保持し、設定ファイルの権限は0600。
+自宅サーバーの本番`~/work/ciel-companion/server`と開発`~/work/ciel-companion-dev/server`で、共有`.env.shared`と独立した`.env`・`.env.dev`を使用する。両環境とも`CIEL_LLM_BACKEND=local`、pipeline・voice、GPU解放制御8095を設定する。STTは本番CPU Vosk・開発CPU Whisper、記憶スコープは本番main・開発dev。旧`CIEL_DEV_*`は使わない。資格情報・Webhookを保持し、設定ファイルの権限は0600。
 
-現在の本番agentは`61ac247`のserverソースを標準デプロイで配布し、イメージ`sha256:9537587f4948e0df96e3bca5da7fc659ea022648be0d5170960734e936648ca0`で稼働する。開発agentは`f2028e830c275d9fd6b84bd2f6177323c1255351`を維持。共有APIは`1478703fe46b75829a58b5b7c8954827f740fc97`のsupervisor・gatewayを配布済み。共有APIはGPU・32k×2枠・health正常で、画像上限256pxを維持する。画像機能の実測・未確認範囲は下記の常設画像APIを参照する。
+現在の本番agentは`45c8d73`のserverソースを配布済み。開発agentも同じソースで稼働し、イメージと配布後確認は本文冒頭の併用方式反映節を参照する。共有APIの稼働イメージは`sha256:42e2f4875762c8c44087f0758c922071f74eb0936649da37d37afd44a00d9610`。GPU・32k×2枠・health正常で、画像上限256pxを維持する。今回、共有APIコンテナは再作成していない。画像機能の実測・未確認範囲は下記の常設画像APIを参照する。
 
 2026-11-10、利用者の共有API更新・短時間再起動への承認後、共有APIだけを再作成した。イメージは`sha256:40751d8718106ce5f0b67c27a972c245871c5ad6aa22ea31d0c71ad4b36c5b8d`。`generation_scope=inference_process`と世代識別、分類なし/foreground/backgroundの短い生成要求の200、入場待ちヘッダー、不正分類の400を実機で確認した。この共有API更新時には残る8サービスを維持した。後続の本番デプロイで会話worker側の準備処理・分類付与・文分割も反映した。開発workerは旧版で、未分類の要求は前景として扱う。通常会話の高速化は実際の音声計測で別に確認する。
 
