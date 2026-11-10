@@ -8,7 +8,7 @@
 
 Unityの画像選択からLiveKitの`ciel.image`へ送る。`CielConversation.Image.cs`が端末側の選択・縮小を行い、`eyes.py`がMIME・サイズを検証して会話内の画像IDを付ける。モデルの道具引数は`image_ref`を使い、任意のURLやbase64を受け取らない。
 
-受け取る画像は最大3MB、JPEG・PNG・WebP、直近3枚をメモリーに保持する。ファイルへ無断で永続化せず、デバッグログへ画像本体を出さない。保持外の参照は`not_retained`、ローカルモードでの認識は`unavailable`として扱う。正確な制限・公開範囲は`eyes.py`と画像サービスが正本。
+受け取る画像は最大3MB、JPEG・PNG・WebP、直近3枚をメモリーに保持する。ファイルへ無断で永続化せず、デバッグログへ画像本体を出さない。保持外の参照は`not_retained`、画像能力のない推論APIでの認識は`unavailable`として扱う。正確な制限・公開範囲は`eyes.py`と画像サービスが正本。
 
 ## 会話との対応
 
@@ -25,3 +25,13 @@ Windowsはファイル選択、Androidは標準の画像選択を使い、端末
 ## 確認
 
 `test_eyes.py`等で形式・保持・参照・利用不可を確認する。過去に画像を見せた一例を、現在の全端末・ローカル認識の成功へ読み替えない。料金・モデルの選択は[実行設定](../operations/local-runtime-ja.md)、実機の到達点は[確認状況](../testing/verification-status-ja.md)へ記録する。
+
+## ローカルモデルとAPI側の前処理
+
+localでも既存の受信・画像ID・心への添付・説明文生成を使う。会話開始時と添付画像の受信時に、ローカルAPIの`/props`が`modalities.vision=true`を返すことを確認する。画像能力を確認できなければ保持・推論へ進めず、unavailableを通知する。クラウドモデルへ自動で戻さない。
+
+モデルへ渡す直前の前処理は共有LLM APIが所有する。OpenAI互換の`/v1/chat/completions`受信口でインライン画像を復号し、向きの補正と縦横比を保つ縮小、メタデータ除去、透過の白背景化、PNG再符号化を行う。既定は256×256以内で、小さい画像は拡大せず、切り取りや正方形への引き延ばしをしない。アプリ・ゲーム・説明文生成からの呼び出しに同じ上限が適用される。
+
+設定`LOCAL_LLM_IMAGE_MAX_EDGE`と画像用重みは[共用API](../operations/shared-llm-api-ja.md#画像入力と縮小設定)が正本。外部URL・file URLをAPI側で取得せず、JPEG/PNG/WebPのbase64データURLだけを受け付ける。会話ホストの3MB受信制限・保持範囲に加え、API入口もリクエスト16MiB・単一画像8MiB・復号前24百万画素で制限する。利用者の元画像や縮小画像をログ・ディスクへ保存しない。
+
+実測と反映範囲は[確認状況](../testing/verification-status-ja.md#ローカルqwenの画像入力)で管理する。合成図形での成功を写真・日本語OCR・実ゲームの品質確認へ読み替えない。

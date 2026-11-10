@@ -13,6 +13,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 import signal
 import subprocess
 import threading
@@ -26,14 +27,19 @@ log = logging.getLogger('local-llm')
 MODEL = os.environ.get('LOCAL_LLM_MODEL', '/models/Qwen3.5-35B-A3B-Q4_K_M.gguf')
 HOST = os.environ.get('LOCAL_LLM_HOST', '127.0.0.1')
 LLM_PORT = int(os.environ.get('LOCAL_LLM_PORT', '8094'))
+INFERENCE_PORT = int(os.environ.get('LOCAL_LLM_INFERENCE_PORT', '18094'))
+MMPROJ = os.environ.get('LOCAL_LLM_MMPROJ', '').strip()
+IMAGE_MAX_EDGE = int(os.environ.get('LOCAL_LLM_IMAGE_MAX_EDGE', '256'))
 CONTROL_PORT = int(os.environ.get('LOCAL_LLM_CONTROL_PORT', '8095'))
 CTX = os.environ.get('LOCAL_LLM_CTX', '32768')
 PARALLEL = int(os.environ.get('LOCAL_LLM_PARALLEL', '2'))
 # With explicit --parallel, llama.cpp divides the total context among slots.
 # LOCAL_LLM_CTX describes capacity per request, not the sum across clients.
-COMMON = ['-m', MODEL, '--host', HOST, '--port', str(LLM_PORT), '-c', str(int(CTX)*PARALLEL), '-t', '8', '-tb', '16', '--jinja',
+COMMON = ['-m', MODEL, '--host', HOST, '--port', str(INFERENCE_PORT), '-c', str(int(CTX)*PARALLEL), '-t', '8', '-tb', '16', '--jinja',
           '--alias', os.environ.get('LOCAL_LLM_ALIAS', 'local')]
 COMMON += ['--parallel', str(PARALLEL)]
+if MMPROJ:
+    COMMON += ['--mmproj', MMPROJ, '--no-mmproj-offload', '--image-max-tokens', '1024']
 ARGS = {'gpu': ['-ngl', os.environ.get('LOCAL_LLM_GPU_LAYERS', '99'),
                 '--n-cpu-moe', os.environ.get('LOCAL_LLM_CPU_MOE_LAYERS', '99')],
         'cpu': ['-ngl', '0']}
@@ -47,7 +53,7 @@ _stopping = False
 
 def _healthy() -> bool:
     try:
-        with urllib.request.urlopen(f'http://{HOST}:{LLM_PORT}/health', timeout=2) as r:
+        with urllib.request.urlopen(f'http://127.0.0.1:{INFERENCE_PORT}/health', timeout=2) as r:
             return r.status == 200
     except Exception:
         return False
@@ -142,12 +148,19 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     global _stopping
+    from gateway import create_server
+    if MMPROJ and not Path(MMPROJ).is_file():
+        raise FileNotFoundError('Configured LOCAL_LLM_MMPROJ does not exist')
+    gateway = create_server(HOST, LLM_PORT, INFERENCE_PORT, max_edge=IMAGE_MAX_EDGE)
     _start(_mode)
+    threading.Thread(target=gateway.serve_forever, daemon=True).start()
     threading.Thread(target=watch, daemon=True).start()
 
     def bye(*_):
         global _stopping
         _stopping = True
+        gateway.shutdown()
+        gateway.server_close()
         _stop()
         raise SystemExit(0)
     signal.signal(signal.SIGTERM, bye)

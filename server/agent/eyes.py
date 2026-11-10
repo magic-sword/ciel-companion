@@ -81,12 +81,16 @@ class Eyes:
         self._clock = clock
         self._ids = itertools.count(1)
         self._tasks: set[asyncio.Task] = set()
+        self.available = not models.is_local('mind')
 
     @property
     def client(self):
         if self._client is None:
             self._client = models.create_client('eyes')
         return self._client
+
+    async def prepare(self):
+        self.available = await models.vision_available('mind')
 
     # ---- 受け取る ----
 
@@ -95,6 +99,7 @@ class Eyes:
         self._spawn(self._receive(reader))
 
     async def _receive(self, reader) -> None:
+        await self.prepare()
         chunks, size = [], 0
         try:
             async for chunk in reader:
@@ -111,7 +116,7 @@ class Eyes:
         self.receive(b''.join(chunks), name)
 
     def receive(self, data: bytes, name: str = '') -> Picture | None:
-        if models.LOCAL_TEST:
+        if not self.available:
             self._state('failed', reason='unavailable')
             return None
         mime = mime_of(data)
@@ -127,7 +132,7 @@ class Eyes:
 
     def see_game(self, data: bytes, note: str = '', place: str = '') -> Picture | None:
         """ゲームの体の目で撮った景色（game_env.py）。道具の返事の続きで心が見るので、口には頼まない"""
-        if models.LOCAL_TEST:
+        if not self.available:
             return None
         mime = mime_of(data)
         if mime is None:

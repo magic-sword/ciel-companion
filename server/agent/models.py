@@ -157,3 +157,20 @@ def record(role: str, model_name: str, usage) -> None:
              role, model_name, f'{inp:,}', f'{cached:,}', f'{out:,}', f'{reasoning:,}', usd)
     debug_log.record('model_usage', role=role, model=model_name, input_tokens=inp, cached_tokens=cached,
                      output_tokens=out, reasoning_tokens=reasoning, usd=round(usd, 6))
+
+
+async def vision_available(role='mind') -> bool:
+    """Discover local vision support; never silently route an image to a cloud model."""
+    if not is_local(role):
+        return True
+    import httpx
+    root = LOCAL_URL.rstrip('/')
+    if root.endswith('/v1'):
+        root = root[:-3]
+    try:
+        async with httpx.AsyncClient(timeout=3, trust_env=False) as client:
+            response = await client.get(root + '/props')
+            response.raise_for_status()
+            return response.json().get('modalities', {}).get('vision') is True
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return False

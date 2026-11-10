@@ -33,7 +33,7 @@ CIEL_VOSK_MODEL_PATH=/models/vosk-model-small-ja-0.22
 CIEL_MINUTES_DISCORD_WEBHOOK=
 ```
 
-`CIEL_LLM_BACKEND`は省略時openai。localの音声入力は共有LLM＋CPUのVosk＋Irodori、text入力なら音声認識を使わない。STT_BACKEND空はbackendに連動し、localからOpenAIへ自動で戻さない。画像認識・Web検索・OpenAI埋め込みによる振り分けもlocalでは使わない。外部LiveKit等への接続は残るため、完全なオフライン化ではない。
+`CIEL_LLM_BACKEND`は省略時openai。localの音声入力は共有LLM＋CPUのVosk＋Irodori、text入力なら音声認識を使わない。STT_BACKEND空はbackendに連動し、localからOpenAIへ自動で戻さない。画像認識は画像能力を確認したローカルAPIを使い、モデル送信前に既定256pxへ縮小する。[画像の契約](../services/vision-design-ja.md)を参照。Web検索・OpenAI埋め込みによる振り分けはlocalでは使わない。外部LiveKit等への接続は残るため、完全なオフライン化ではない。
 
 `CIEL_LOCAL_LLM_MODEL`はAPIに送るモデルIDの任意の上書き。既定`local`を公開する共有APIでは設定不要。実際の重みは共有API側の`LOCAL_LLM_FILE`が選ぶ。`CIEL_LOCAL_ROLES`は役目別のローカル利用、`CIEL_LOCAL_LLM_CONTROL`は歌唱中のGPU解放先で、既定は`http://127.0.0.1:8095`。モデルの役目別設定やWebhookも環境ごとのファイルで設定できる。
 

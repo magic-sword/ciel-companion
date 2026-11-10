@@ -8,3 +8,5 @@ numpy==1.26.4
 requests==2.32.4
 psycopg[binary]==3.2.9
 pgvector==0.4.1
+
+Pillow==13.0.0  # shared image API preprocessing tests

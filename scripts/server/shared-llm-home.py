@@ -40,9 +40,10 @@ if before['mode']!='gpu':
     raise SystemExit('Shared API is temporarily in CPU mode; retry after GPU use becomes available')
 out=root/'local-llm/data'/('shared-gpu-'+time.strftime('%Y%m%dT%H%M%SZ',time.gmtime()))
 out.mkdir(parents=True,exist_ok=False)
-files=['compose.yaml','.env','local-llm/supervisor.py','local-llm/Dockerfile']
-original={name:(root/name).read_bytes() for name in files}
+files=['compose.yaml','.env','local-llm/supervisor.py','local-llm/gateway.py','local-llm/Dockerfile']
+original={name:(root/name).read_bytes() if (root/name).exists() else None for name in files}
 for name,content in original.items():
+    if content is None:continue
     backup=out/'backup'/name
     backup.parent.mkdir(parents=True,exist_ok=True)
     backup.write_bytes(content)
@@ -70,6 +71,8 @@ try:
     for key,default in (('LOCAL_LLM_CTX','32768'),('LOCAL_LLM_PARALLEL','2'),('LOCAL_LLM_MODE','gpu')):
         if key+'=' not in text:
             text=text.replace(anchor,anchor+'\\n      - '+key+'=${'+key+':-'+default+'}')
+    for key,value in [('LOCAL_LLM_INFERENCE_PORT','18094'),('LOCAL_LLM_MMPROJ','${LOCAL_LLM_MMPROJ-/models/mmproj-F16-Qwen3.5-35B-A3B.gguf}'),('LOCAL_LLM_IMAGE_MAX_EDGE','${LOCAL_LLM_IMAGE_MAX_EDGE:-256}')]:
+        if key+'=' not in text:text=text.replace(anchor,anchor+'\\n      - '+key+'='+value)
     (root/'compose.yaml').write_text(text)
     settings={'LOCAL_LLM_CTX':str(CONTEXT),'LOCAL_LLM_PARALLEL':str(PARALLEL),'LOCAL_LLM_MODE':'gpu'}
     lines=(root/'.env').read_text().splitlines()
@@ -87,7 +90,8 @@ try:
     print(json.dumps(info))
 except BaseException:
     for name,content in original.items():
-        (root/name).write_bytes(content)
+        if content is None:(root/name).unlink(missing_ok=True)
+        else:(root/name).write_bytes(content)
     subprocess.run(['docker','tag',container['Image'],container['Config']['Image']],check=True)
     command('up','-d','--no-deps','--no-build','local-llm')
     restored=wait_ready(before['context'],before['parallel'],before['mode'])
@@ -174,7 +178,7 @@ def main():
     elif args.action=='probe':
         home.remote(COMMON+'\nLONG_REPEATS='+str(args.long_repeats)+'\n'+PROBE)
     else:
-        payload={name:(ROOT/'server'/name).read_text(encoding='utf-8') for name in ('local-llm/supervisor.py','local-llm/Dockerfile')}
+        payload={name:(ROOT/'server'/name).read_text(encoding='utf-8') for name in ('local-llm/supervisor.py','local-llm/gateway.py','local-llm/Dockerfile')}
         provenance={'git_commit':subprocess.check_output(['git','-c',f'safe.directory={ROOT.as_posix()}','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'working_tree':True}
         home.remote(COMMON+'\nPAYLOAD='+repr(payload)+'\nPROVENANCE='+repr(provenance)+'\nCONTEXT='+str(args.context)+'\nPARALLEL='+str(args.parallel)+'\n'+CONFIGURE)
 

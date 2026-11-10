@@ -60,3 +60,31 @@ CIEL_LOCAL_LLM_URL=http://127.0.0.1:18094/v1
 容量測定は`scripts/server/shared-llm-home.py probe`を使用し、冷間・キャッシュ済み、入力長、同時要求、モード、他サービス負荷を記録する。短いOKの生成で長い道具選択の品質を測定済みとはしない。歌唱によるCPU切替やIrodoriの作業メモリー増加を含む持続的な負荷は別に確認する。
 
 現在の確認済み容量・測定条件・限界は[確認状況](../testing/verification-status-ja.md)に集約する。実行方法と構成を変更した場合も、過去の別条件の値を新しい構成の性能へ置き換えない。
+
+## 画像入力と縮小設定
+
+Qwen3.5-35B-A3B用のmmprojを読み込み、画像エンコーダーは`--no-mmproj-offload`でCPUに置く。言語側のGPU/CPU切替・32k×2枠・共有範囲は同じ。`LOCAL_LLM_MMPROJ`はモデル領域に配置した対応重みのコンテナ内パスで、既定は`/models/mmproj-F16-Qwen3.5-35B-A3B.gguf`。明示的な空値は画像機能を無効化し、指定したファイルがなければ起動を失敗させる。
+
+公開するloopbackの8094は画像の検証・縮小を行う受信口。llama-server自体はloopbackの18094で動く。アプリ・ベンチマーク・他サーバーからは8094を使い、内部ポートへ直接送って前処理を迂回しない。制御は従来どおり8095。画像能力は8094の`/props`で確認する。画像以外の要求・SSEストリームも同じAPIを通し、切断時は上流の接続を閉じる。
+
+本番`server/.env`で共有APIの設定を行う。開発の`.env.dev`で個別に変える設定ではない。
+
+```dotenv
+LOCAL_LLM_IMAGE_MAX_EDGE=256
+# LOCAL_LLM_MMPROJ=/models/mmproj-F16-Qwen3.5-35B-A3B.gguf
+```
+
+画像上限は32～4096の整数で指定できる。既定は幅・高さとも256以内、縦横比維持、拡大なし。512等へ変更する場合も対象local-llmコンテナを再作成する。向き補正・入力制限・情報保持の契約は[画像サービス](../services/vision-design-ja.md#ローカルモデルとapi側の前処理)を参照する。応答ヘッダー`X-Ciel-Image-Max-Edge`が適用上限、`X-Ciel-Image-Count`が要求内の処理画像数を返す。画像内容は応答ヘッダーにもログにも出さない。
+
+## 画像APIを隔離して検証する
+
+常設の縮小処理を経由しないモデル単体の画像互換性・解像度別処理時間は、同じ重みと対応するmmprojを使う使い捨ての8098 APIで確認できる。事前に検証済みの`~/models/llm/mmproj-F16-Qwen3.5-35B-A3B.gguf`と取得元・SHA-256の隣接JSONを配置する。配布元、版、実測は[確認状況](../testing/verification-status-ja.md#ローカルqwenの画像入力)を参照する。
+
+```powershell
+.\.venv\Scripts\python.exe scripts/server/probe-local-vision.py cpu
+.\.venv\Scripts\python.exe scripts/server/probe-local-vision.py gpu --max-size 1024
+```
+
+cpuは共有APIを変更しない。gpuは開始時に共有APIがGPU・準備完了・処理中スロットなしであることを要求し、一時的に共有APIをCPUへ切り替えてGPUを空ける。試験中は通常の文字推論もCPUで遅くなる。終了・失敗時は試験コンテナを削除して元のGPUモードへ戻す。CPUモードを使用中の歌唱処理を強制解除して始めない。
+
+試験は合成画像の色・形・位置・白紙の正解と、最初のトークン・完了時間、キャッシュ、全GPUメモリー、コンテナのcgroup会計を保存する。GPU側の画像処理を無理に追加せず、画像エンコーダーはCPUに置く。256pxだけの結果を大きな添付画像の速度へ一般化しない。利用者の写真やゲーム操作は試験に含めない。共有APIや会話ホストの画像対応設定を恒久的に有効化する手順とは区別する。

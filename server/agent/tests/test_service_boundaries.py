@@ -114,12 +114,22 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await service.describe('picture-1'))['status'], 'not_retained')
         self.assertEqual(client.chat.completions.create.await_count, 1)
 
-    async def test_local_image_backend_is_explicitly_unavailable(self):
+    async def test_unsupported_image_backend_is_explicitly_unavailable(self):
         resolve = Mock()
-        with patch('models.LOCAL_TEST', True):
+        with patch('models.vision_available', AsyncMock(return_value=False)):
             result = await ImageAnalysis('instructions', resolve, Mock()).describe('image')
         self.assertEqual(result['status'], 'unavailable')
-        resolve.assert_not_called()
+        resolve.assert_called_once_with('image')
+
+    async def test_local_image_caption_uses_local_model_when_supported(self):
+        response = Obj(choices=[Obj(message=Obj(content='red circle'))])
+        create = AsyncMock(return_value=response)
+        client = Obj(chat=Obj(completions=Obj(create=create)))
+        with patch('models.vision_available',AsyncMock(return_value=True)), patch('models.is_local',return_value=True), patch('models.client_for',return_value=client):
+            result = await ImageAnalysis('describe',lambda ref:'data:image/png;base64,fixture',lambda:client).describe('1')
+        self.assertEqual(result['caption'],'red circle')
+        import models
+        self.assertEqual(create.call_args.kwargs['model'],models.LOCAL_MODEL)
 
     async def test_app_raw_schema_is_checked_before_sending_to_device(self):
         catalog = CapabilityCatalog(tools.MODULES)

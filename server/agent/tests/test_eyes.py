@@ -172,5 +172,26 @@ class MindTest(unittest.TestCase):
         self.assertTrue(any(isinstance(c, llm.ImageContent) for i in m.build(ctx).items for c in getattr(i, 'content', [])))
 
 
+class LocalVisionTest(unittest.IsolatedAsyncioTestCase):
+    async def test_local_images_and_game_views_require_confirmed_capability(self):
+        with mock.patch('models.is_local', return_value=True):
+            e = eyes.Eyes(Said())
+        self.assertIsNone(e.receive(JPEG))
+        with mock.patch('models.vision_available', mock.AsyncMock(return_value=True)):
+            await e.prepare()
+        self.assertIsNotNone(e.receive(JPEG))
+        self.assertIsNotNone(e.see_game(PNG, place='test'))
+        self.assertIsInstance(e.message_for_reply('').content[1], llm.ImageContent)
+
+    async def test_unavailable_local_api_does_not_keep_or_infer_an_image(self):
+        shown = []
+        with mock.patch('models.is_local', return_value=True):
+            e = eyes.Eyes(Said(), notify=shown.append)
+        with mock.patch('models.vision_available', mock.AsyncMock(return_value=False)):
+            await e._receive(Reader([JPEG]))
+        self.assertFalse(e.pictures)
+        self.assertEqual(shown[-1]['reason'], 'unavailable')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -8,13 +8,12 @@ class ImageAnalysis:
         self.instructions, self.resolve, self.client = instructions, resolve, client
 
     async def describe(self, image_ref, *, timeout=20, max_chars=240):
-        if models.LOCAL_TEST:
-            return {'status': 'unavailable', 'reason': 'local_backend'}
-
         async def execute(arguments):
             image = self.resolve(arguments['image_ref'])
             if image is None:
                 return {'status': 'not_retained'}
+            if not await models.vision_available('eyes'):
+                return {'status': 'unavailable', 'reason': 'vision_unavailable'}
             model = models.model('eyes')
             response = await models.client_for('eyes', self.client()).chat.completions.create(**models.options(
                 'eyes', model=model, timeout=timeout,

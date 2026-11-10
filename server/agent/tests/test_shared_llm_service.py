@@ -85,6 +85,21 @@ class SharedServiceTest(unittest.TestCase):
             supervisor._start('cpu')
             self.assertEqual(popen.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
 
+    def test_vision_keeps_projector_on_cpu_and_health_uses_backend_port(self):
+        with patch.dict(os.environ, {'LOCAL_LLM_MMPROJ':'/models/vision.gguf','LOCAL_LLM_INFERENCE_PORT':'18094'}):
+            supervisor=module('vision_supervisor','server/local-llm/supervisor.py')
+        with patch.object(supervisor.subprocess,'Popen') as popen:
+            for mode in ['gpu','cpu']:
+                supervisor._start(mode)
+                command=popen.call_args.args[0]
+                self.assertIn('--no-mmproj-offload',command)
+                self.assertEqual(command[command.index('--mmproj')+1],'/models/vision.gguf')
+                self.assertEqual(command[command.index('--port')+1],'18094')
+        with patch.object(supervisor.urllib.request,'urlopen') as get:
+            get.return_value.__enter__.return_value.status=200
+            self.assertTrue(supervisor._healthy())
+            self.assertEqual(get.call_args.args[0],'http://127.0.0.1:18094/health')
+
     def test_remote_management_scripts_compile(self):
         helper=module('shared_home','scripts/server/shared-llm-home.py')
         compile(helper.COMMON+helper.CONFIGURE,'configure','exec')
