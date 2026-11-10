@@ -7,8 +7,8 @@
 # - 覚えている人の記録は、本番と同じデータベース ciel を使う（docs/services/shared-memory-ja.md）。CIEL_MEMORY_SCOPE=dev で、見えるのは
 #   本番と共有している人（持ち主のハカセ）と、開発用で覚えた人だけ。開発用で覚えた人は本番から見えない。シエルの日記・好みは本番と 1 つ。
 #   開発用からは、共有している人を消す・呼び名を変える・端末の持ち主をやめることはできない（「忘れて」は効く）。
-# - 議事録の下書きは、開発用の Discord のチャンネルへ（server/.env.dev の CIEL_DEV_DISCORD_WEBHOOK。空ならサーバーに保存するだけ）。
-# 秘密情報は本番のものを読む：OpenAI・LiveKit のキーは本番の agent/.env、DB のパスワードは本番の server/.env（deploy-remote.sh が --env-file で渡す）。
+# - 議事録の下書きは、開発用の Discord のチャンネルへ（server/.env.dev の CIEL_MINUTES_DISCORD_WEBHOOK。空ならサーバーに保存するだけ）。
+# 資格情報は本番server/.env.sharedだけを共有する。本番の.envとagent/.envは読まない。
 name: ciel-dev
 
 services:
@@ -18,36 +18,38 @@ services:
       network: host
     image: ciel-dev-agent
     network_mode: host
-    env_file: ../../ciel-companion/server/agent/.env
+    env_file:
+      - ../../ciel-companion/server/.env.shared
+      - ./.env.dev
     environment:
       - CIEL_VOICE=irodori
       - CIEL_AGENT_NAME=ciel-dev
-      # 会話の組み立て（realtime・pipeline）。本番と同じ pipeline が既定。比べるときは、起動し直すシェルで CIEL_DEV_MODEL=realtime を付ける
-      - CIEL_MODEL=${CIEL_DEV_MODEL:-pipeline}
-      # local で推論は共有LLM、音声認識はCPUのVoskへ。文字試験はCIEL_DEV_INPUT=text。
-      - CIEL_LLM_BACKEND=${CIEL_DEV_LLM_BACKEND:-openai}
-      - CIEL_INPUT=${CIEL_DEV_INPUT:-}
-      - CIEL_STT_BACKEND=${CIEL_DEV_STT_BACKEND:-}
-      - CIEL_VOSK_MODEL_PATH=${CIEL_DEV_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
+      # 会話の組み立て（realtime・pipeline）。本番と同じ pipeline が既定。比べるときは、起動し直すシェルで CIEL_MODEL=realtime を付ける
+      - CIEL_MODEL=${CIEL_MODEL:-pipeline}
+      # local で推論は共有LLM、音声認識はCPUのVoskへ。文字試験はCIEL_INPUT=text。
+      - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-openai}
+      - CIEL_INPUT=${CIEL_INPUT:-}
+      - CIEL_STT_BACKEND=${CIEL_STT_BACKEND:-}
+      - CIEL_VOSK_MODEL_PATH=${CIEL_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
       # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
-      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
+      - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env.shared に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
       # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
       - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
       # 本番と共用するローカルLLM。localでは返答・道具選択も使う。歌唱中はCPUへ切り替える
-      - CIEL_LOCAL_LLM_URL=${CIEL_DEV_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
-      - CIEL_LOCAL_LLM_MODEL=${CIEL_DEV_LOCAL_LLM_MODEL:-local}
-      - CIEL_LOCAL_TIMEOUT=${CIEL_DEV_LOCAL_TIMEOUT:-90}
-      - CIEL_LOCAL_LLM_CONTROL=http://127.0.0.1:8095
-      - CIEL_LOCAL_ROLES=${CIEL_DEV_LOCAL_ROLES-thought,brief,notes,relationship,growth}
+      - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
+      - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
+      - CIEL_LOCAL_TIMEOUT=${CIEL_LOCAL_TIMEOUT:-90}
+      - CIEL_LOCAL_LLM_CONTROL=${CIEL_LOCAL_LLM_CONTROL:-http://127.0.0.1:8095}
+      - CIEL_LOCAL_ROLES=${CIEL_LOCAL_ROLES:-}
       # 本番の Webhook を使わないように、必ずここで上書きする
-      - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_DEV_DISCORD_WEBHOOK:-}
+      - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_MINUTES_DISCORD_WEBHOOK:-}
     volumes:
       - ./agent/config:/app/config:ro
-      - ${CIEL_DEV_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
+      - ${CIEL_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
       - ./agent/data/minutes:/app/data/minutes
       - ./agent/data/debug:/app/data/debug
     restart: unless-stopped

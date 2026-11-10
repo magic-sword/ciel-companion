@@ -56,7 +56,7 @@ for port in (25566,25576,8772,8773,3008,8092,8096,8097):
         ports[port]=s.connect_ex(('127.0.0.1',port))!=0
 names=subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines()
 print(json.dumps({'python':sys.version.split()[0],'existing_eula_consent':accepted,
-    'agent_credentials_present':(base/'agent/.env').is_file(),'benchmark_ports_free':ports,'containers':names},indent=2))
+    'agent_credentials_present':(base/'.env.shared').is_file(),'benchmark_ports_free':ports,'containers':names},indent=2))
 '''
 
 SETUP = '''
@@ -67,9 +67,11 @@ dest=Path.home()/'work/ciel-companion-benchmark/server'
 consent=base/'.env.minecraft'
 if not consent.is_file() or not any(s.strip().upper()=='MINECRAFT_EULA=TRUE' for s in consent.read_text().splitlines()):
     raise SystemExit('Existing home-server EULA consent was not found; benchmark server was not started')
-credentials=dest/'agent/.env'
+credentials=dest/'.env.shared'
+if not (base/'.env.shared').is_file():
+    raise SystemExit('Shared credentials missing; run environment.py migration on the home server first')
 if not credentials.exists():
-    credentials.symlink_to(base/'agent/.env')
+    credentials.symlink_to(base/'.env.shared')
 settings=dest/'.env.benchmark'
 if not settings.exists():
     model='unspecified'

@@ -265,7 +265,7 @@ async def run(args, *, clock=time.monotonic):
     from dotenv import load_dotenv
     load_dotenv(ROOT/'server'/'.env.benchmark')
     if args.mode == 'conversation':
-        load_dotenv(ROOT/'server'/'agent'/'.env')
+        load_dotenv(ROOT/'server'/'.env.shared')
         args.model_id = args.model_id or os.environ.get('CIEL_BENCH_MODEL_ID')
         if not args.model_id:
             raise ValueError('Set CIEL_BENCH_MODEL_ID or pass --model-id for conversation evaluation')

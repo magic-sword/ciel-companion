@@ -141,7 +141,7 @@ Docker で Linux コンテナが使える場合の DB 結合テスト：
 | Git に含まれないもの | 確認する相手・場所 |
 |---|---|
 | SSH 接続先・アクセス権・自分の秘密鍵 | 管理者。決まったら `scripts/server/.env.local` に書く（見本は `scripts/server/.env.example`、書き方は [前提](build-ja.md#前提)） |
-| OpenAI / LiveKit の資格情報 | 実行先の `server/agent/.env`。見本は `server/agent/.env.example` |
+| OpenAI / LiveKit の資格情報 | Composeは実行先の `server/.env.shared`。見本は `server/.env.shared.example`。Python直接起動は `server/agent/.env` |
 | DB パスワード | 実行先の `server/.env`。見本は `server/.env.example` |
 | Irodori の参照音声 | 実行先の `server/tts-irodori/data/samples/*.wav`。通常のクローンでは取得されない |
 | GPU・NVIDIA コンテナ環境とモデルキャッシュ | 自宅サーバー。`server/compose.yaml` と TTS の Dockerfile を参照 |

@@ -62,7 +62,7 @@ services:
       network: host
     network_mode: host
     env_file:
-      - ./agent/.env
+      - ./.env.shared
       - ./.env.benchmark
     environment:
       CIEL_DB_URL: ''
@@ -101,7 +101,7 @@ services:
       context: ./agent
       network: host
     network_mode: host
-    env_file: ./agent/.env
+    env_file: ./.env.shared
     environment:
       CIEL_AGENT_NAME: ciel-task-bench
       CIEL_AGENT_PORT: '8092'

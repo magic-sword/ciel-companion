@@ -47,7 +47,7 @@ for name,content in original.items():
     backup.parent.mkdir(parents=True,exist_ok=True)
     backup.write_bytes(content)
     backup.chmod(0o600)
-compose=['docker','compose','--profile','local-llm']
+compose=['docker','compose','--env-file','.env.shared','--env-file','.env','--profile','local-llm']
 def command(*args):
     subprocess.run(compose+list(args),cwd=root,check=True,timeout=300)
 def wait_ready(context,parallel,mode='gpu'):

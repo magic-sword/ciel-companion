@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """会議の議事録の始めと終わりを、会話サーバーへ知らせる（minutes.py）。自宅サーバーで、会話サーバーのコンテナの中から使う。
 
-  docker compose exec agent python minutes_admin.py rooms            シエルがいる部屋の一覧
-  docker compose exec agent python minutes_admin.py start [部屋]     議事録をとり始める
-  docker compose exec agent python minutes_admin.py finish [部屋]    議事録をまとめて、下書きを Discord へ送る
+  docker compose --env-file .env.shared --env-file .env exec agent python minutes_admin.py rooms            シエルがいる部屋の一覧
+  docker compose --env-file .env.shared --env-file .env exec agent python minutes_admin.py start [部屋]     議事録をとり始める
+  docker compose --env-file .env.shared --env-file .env exec agent python minutes_admin.py finish [部屋]    議事録をまとめて、下書きを Discord へ送る
 
 部屋を省くと、シエルがいる部屋が 1 つだけのときはそこへ送る。
 LiveKit のサーバーの API（LIVEKIT_URL・LIVEKIT_API_KEY・LIVEKIT_API_SECRET）で、会話サーバーへだけ

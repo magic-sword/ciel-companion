@@ -132,9 +132,9 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
 
 - **名前を覚えてもらう**：シエルに「シエル、私は田中です」と名乗る。シエルが「声を覚えてもいいですか？」と聞くので、覚えてよければ「いいよ」と答える。覚えた人は、次の会議でも名前で分かる。
 - **覚えてもらわない**：断れば、その会議の間だけ名前で呼ばれ、声は保存されない。名乗らない人は「知らない人」として区別されるだけで、保存されない。
-- **呼び名を直してもらう**：本人が「ハカセじゃなくて、ハカセイです」「これからは○○って呼んで」と言う（声を覚えている人なら、次の会議からもその呼び名）。直せるのは本人の呼び名だけ。管理用には `docker compose exec agent python speaker_admin.py rename <番号> <新しい呼び名>`。
+- **呼び名を直してもらう**：本人が「ハカセじゃなくて、ハカセイです」「これからは○○って呼んで」と言う（声を覚えている人なら、次の会議からもその呼び名）。直せるのは本人の呼び名だけ。管理用には `docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py rename <番号> <新しい呼び名>`。
 - **人違いを直してもらう**：声が似た人と間違えられたら、「私はハカセじゃないよ、田中です」と言う。シエルはその人を別の人として区別し直し、その会議の間は田中さんとして見本を集める。覚えてよいか聞かれたら答える。
-- **忘れてもらう**：本人が「シエル、私の声を忘れて」と言う。うまくいかないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose exec agent python speaker_admin.py list` で番号を確かめ、`docker compose exec agent python speaker_admin.py delete <番号>` で消す。
+- **忘れてもらう**：本人が「シエル、私の声を忘れて」と言う。うまくいかないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py list` で番号を確かめ、`docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py delete <番号>` で消す。
 - 名乗る前の数回の発言や、1 秒未満の短い発言は、うまく判定できないことがある。
 
 ## 議事録をとる
@@ -145,7 +145,7 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
 - 終わるとき：もう一度ボタンを押すか、「シエル、議事録まとめて」と頼む。シエルが一言告げ、少しあとに下書きが届く。
 - 開始を忘れたとき：「ここまでを議事録にして送って」「直近30分を議事録にして送って」と頼む。今の接続で保持中の会話から下書きを作って送る（今後の記録は始めない）。記録中の場合は、進行中の議事録を終了して送るか確認する。
 - 遅れて開始するとき：「10分前から議事録をとって」と頼む。保持中の過去分も対象にして記録を続け、終わりは通常どおり頼む。接続前や保持上限で失われた会話は対象にできない。すでに記録中の開始範囲は変更しない。
-- アプリを使えないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose exec agent python minutes_admin.py start`／`finish`。
+- アプリを使えないときは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose --env-file .env.shared --env-file .env exec agent python minutes_admin.py start`／`finish`。
 - 送り先を切り替えるとき：設定画面の「議事録」タブで押して選ぶか、「シエル、議事録は仕事用に送って」と頼む（登録済みの名前から選ぶ）。
 - Discord の下書きを確かめて直してから、共有先へ貼る。
 
@@ -161,7 +161,7 @@ LiveKit の部屋に入るのは、今までどおり Unity のアプリ（CIEL 
 | 呼んでも答えない・呼んでいないのに答える | 会話サーバーのログで「多人数の会話：シエルは黙った」「会話のしかた：quiet・public」が出ているか。判断の決まりは `config/prompts/talk_quiet.md` |
 | アプリを前面から外すと止まる | 古いビルドを使っていないか（Run In Background はビルドの設定で入れてある） |
 
-会話サーバーのログは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose logs --tail 50 agent` で見る。
+会話サーバーのログは、自宅サーバーの `~/work/ciel-companion/server` で `docker compose --env-file .env.shared --env-file .env logs --tail 50 agent` で見る。
 
 ## 今の制限（試作）
 

@@ -67,12 +67,12 @@
 声でうまく直せないときは、自宅サーバーの `~/work/ciel-companion/server` で：
 
 ```sh
-docker compose exec agent python speaker_admin.py list                     # 覚えている人の一覧（番号・見本の数・メモの数）
-docker compose exec agent python speaker_admin.py notes <番号>             # その人のメモを見る
-docker compose exec agent python speaker_admin.py relation <番号>          # シエルとの仲（段階・気持ち・気分）を見る
-docker compose exec agent python speaker_admin.py rename <番号> <呼び名>   # 呼び名を直す
-docker compose exec agent python speaker_admin.py delete <番号>            # 声もメモも仲も消す
-docker compose exec agent python speaker_admin.py delete-all               # すべて消す
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py list                     # 覚えている人の一覧（番号・見本の数・メモの数）
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py notes <番号>             # その人のメモを見る
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py relation <番号>          # シエルとの仲（段階・気持ち・気分）を見る
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py rename <番号> <呼び名>   # 呼び名を直す
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py delete <番号>            # 声もメモも仲も消す
+docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py delete-all               # すべて消す
 ```
 
 メモとシエルの気持ちは本人に関わる情報なので、見るのは管理が必要なときだけにする。
@@ -96,7 +96,7 @@ docker compose exec agent python speaker_admin.py delete-all               # す
 
 | 症状 | 考えられること・対策 |
 |---|---|
-| 覚えたはずなのに、名前で呼ばれない | 発言が短い（1 秒未満）。少し長めに話す。続くなら、会話サーバーのログ（`docker compose logs agent`）の「話者：覚えている人 #番号（類似度）」を見る。基準は `CIEL_SPK_MATCH`（既定 0.45） |
+| 覚えたはずなのに、名前で呼ばれない | 発言が短い（1 秒未満）。少し長めに話す。続くなら、会話サーバーのログ（`docker compose --env-file .env.shared --env-file .env logs agent`）の「話者：覚えている人 #番号（類似度）」を見る。基準は `CIEL_SPK_MATCH`（既定 0.45） |
 | 似た声の人と間違えられる | 「私は○○じゃないよ」で直す。ほとんど同じ声の 2 人は、声だけでは区別しきれない（シエルは「たぶん」として断定しない） |
 | 名前やメモの言葉がおかしい（「シエル」が「CL」など） | 音声認識の聞き間違い。認識器・モデルによって精度と対策が異なる。メモは「それは忘れて」か管理で消す |
 | ほかの人の話を、自分のことのように言われる | 「それは別の人の話だよ、忘れて」で消える。ひかえめのときも、発言ごとに声で話者を決めて、本人の発言だけをメモにしている（2026-10-18）。似た声の人の発言は「たぶん」になり、メモにはならない |

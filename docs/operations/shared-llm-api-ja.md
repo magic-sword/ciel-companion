@@ -46,7 +46,7 @@ CIEL_LOCAL_LLM_URL=http://127.0.0.1:18094/v1
 
 `configure` は通常サービスのComposeのLLM容量項目と `.env` の `LOCAL_LLM_CTX`・`LOCAL_LLM_PARALLEL`・`LOCAL_LLM_MODE`、LLMのsupervisor/imageだけを更新する。会話エージェントは再配布しない。APIの短い再起動が発生する。起動失敗・実容量不一致なら元ファイルとイメージへ戻す。バックアップは自宅サーバーの `~/work/ciel-companion/server/local-llm/data/shared-gpu-*/backup/`。秘密を含むバックアップは `pull` の対象外。
 
-以後は通常の `docker compose --profile local-llm up -d --build local-llm` でも、保存した容量を使う。デフォルトはGPU併用。層の割り当てを検討する場合はsupervisorの `LOCAL_LLM_GPU_LAYERS`・`LOCAL_LLM_CPU_MOE_LAYERS` も使えるが、現時点の確認済み値は99・99。32k/2枠より大きい構成や追加の専門家GPU配置は未確認。
+以後は通常の `docker compose --env-file .env.shared --env-file .env --profile local-llm up -d --build local-llm` でも、保存した容量を使う。デフォルトはGPU併用。層の割り当てを検討する場合はsupervisorの `LOCAL_LLM_GPU_LAYERS`・`LOCAL_LLM_CPU_MOE_LAYERS` も使えるが、現時点の確認済み値は99・99。32k/2枠より大きい構成や追加の専門家GPU配置は未確認。
 
 ## ベンチマークとシエルの接続
 

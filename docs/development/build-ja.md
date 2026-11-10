@@ -148,7 +148,7 @@ tail -n 50 Logs/build-android.log
 
   同じ名前の環境変数があればそちらを、スクリプトの引数で接続先を渡せば引数を使う。どれも無いと、何もせずに止まる。
 - 初めてつなぐサーバーの鍵は自動で覚え（`~/.ssh/known_hosts`）、2 回目からは鍵が変わっていたら止まる。サーバーを入れ直したなどで止まった場合は、`ssh-keygen -R <サーバーのアドレス>` で古い鍵を消してから実行し直す。
-- サーバーに Docker Compose と NVIDIA GPU の実行環境があり、`~/work/ciel-companion/server/agent/.env` に API キーなどを設定済みであること。必要なモデル・参照音声はサーバーの `data/` に別途用意する。
+- サーバーに Docker Compose と NVIDIA GPU の実行環境があり、`~/work/ciel-companion/server/.env.shared` に API キーなどを設定済みであること。必要なモデル・参照音声はサーバーの `data/` に別途用意する。
 
 ### 手元から送って起動する
 
@@ -164,10 +164,10 @@ Git Bash で実行する（PowerShell 版は無い）。その回だけ別の接
 bash scripts/server/deploy-server.sh <ユーザー>@<サーバーのアドレス>
 ```
 
-このコマンドは手元の `server/` 一式を `~/work/ciel-companion/server` へ送り、サーバーで `docker compose up -d --build` を実行する。コミット前の変更も送られるので、配布したい内容を確認してから実行する。
+このコマンドは手元の `server/` 一式を `~/work/ciel-companion/server` へ送り、サーバーで `docker compose --env-file .env.shared --env-file .env up -d --build` を実行する。コミット前の変更も送られるので、配布したい内容を確認してから実行する。
 
 - 通常起動するもの：会話サーバー（`agent`）、読み上げ（`tts`）、歌を聴く（`singing`）、DB（`db`）。声質変換（`vc`）は任意。
-- `.env` と `data/` は送信・上書きしない。DB のデータは Docker ボリュームに保持する。サーバーの `server/.env` が無い場合は DB のパスワードを自動生成する。
+- `.env.shared`・`.env`・`.env.dev` と `data/` は送信・上書きしない。DBデータはDockerボリュームに保持する。起動前に`environment.py`で[設定の分離・移行](../operations/local-runtime-ja.md#既存設定からの移行)を行い、DBパスワードがなければ共有ファイルに生成する。
 - 転送は既存ファイルへの上書きで、手元で削除したファイルをサーバーから消す処理はない。
 - 最後に `DEPLOY_SERVER_DONE` が出たら、続けて下の手順で起動状態を確認する。
 
@@ -187,25 +187,25 @@ ssh -i <秘密鍵> <ユーザー>@<サーバーのアドレス>
 cd ~/work/ciel-companion/server
 
 # 起動状態と直近のログ
-docker compose ps
-docker compose logs --tail 50 agent tts
+docker compose --env-file .env.shared --env-file .env ps
+docker compose --env-file .env.shared --env-file .env logs --tail 50 agent tts
 
 # 会話サーバーのログを追う（Ctrl+C で表示を終了）
-docker compose logs -f agent
+docker compose --env-file .env.shared --env-file .env logs -f agent
 ```
 
 必要な操作だけを選んで実行する：
 
 ```sh
 # 会話サーバーを再起動する
-docker compose restart agent
+docker compose --env-file .env.shared --env-file .env restart agent
 
-# サーバー上の agent/.env を変更したあと、その設定を反映する
-docker compose up -d agent
+# サーバー上の.env.shared・.envを変更したあと、コンテナを再作成する
+docker compose --env-file .env.shared --env-file .env up -d agent
 
 # 声質変換を使うときだけ起動する / 使い終わったら止める
-docker compose --profile vc up -d vc
-docker compose stop vc
+docker compose --env-file .env.shared --env-file .env --profile vc up -d vc
+docker compose --env-file .env.shared --env-file .env stop vc
 
 # SSH 接続を終了して手元へ戻る
 exit
@@ -227,7 +227,7 @@ bash scripts/server/deploy-server.sh --dev
 bash scripts/server/debug-log.sh pull --dev
 ```
 
-開発用で議事録をとると、下書きは開発用の Discord のチャンネルへ送る。Webhook の URL は、サーバーの `~/work/ciel-companion-dev/server/.env.dev` の `CIEL_DEV_DISCORD_WEBHOOK=` に自分で書き、`deploy-server.sh --dev` で反映する（空のあいだはサーバーに保存するだけ）。
+開発用で議事録をとると、下書きは開発用の Discord のチャンネルへ送る。Webhook の URL は、サーバーの `~/work/ciel-companion-dev/server/.env.dev` の `CIEL_MINUTES_DISCORD_WEBHOOK=` に自分で書き、`deploy-server.sh --dev` で反映する（空のあいだはサーバーに保存するだけ）。
 
 ### デバッグ用の会話ログ
 

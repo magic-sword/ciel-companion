@@ -17,21 +17,21 @@ Unityから受け取る音声を、会話ホストのVosk STTアダプターがC
 | 起動方法 | 設定ファイル | 変数 |
 |---|---|---|
 | 本番Docker Compose | 自宅の`~/work/ciel-companion/server/.env` | `CIEL_LLM_BACKEND=local` |
-| 開発用Docker Compose | 自宅の`~/work/ciel-companion-dev/server/.env.dev` | `CIEL_DEV_LLM_BACKEND=local` |
+| 開発用Docker Compose | 自宅の`~/work/ciel-companion-dev/server/.env.dev` | `CIEL_LLM_BACKEND=local` |
 | Pythonの会話サーバーを直接起動 | `server/agent/.env` | `CIEL_LLM_BACKEND=local` |
 
-`CIEL_DEV_*`はComposeがコンテナの`CIEL_*`へ変換する。`server/agent/.env`に`CIEL_DEV_LLM_BACKEND`を書くだけでは切り替わらない。コンテナのenvironmentはenv_fileの同名設定より優先される。
+本番と開発は同じ変数名を使い、設定ファイルを分ける。共有資格情報は`.env.shared`に置き、開発は本番の動作設定を読み込まない。
 
 本番・開発の切替・反映単位は[共通の実行設定](../operations/local-runtime-ja.md)を参照する。本番にも同じVoskアダプターとモデルマウントを使える。
 
 開発用の見本は[server/.env.dev.example](../../server/.env.dev.example)。既存.env.devを上書きせず必要な行を編集する。
 
 ```dotenv
-CIEL_DEV_LLM_BACKEND=local
-CIEL_DEV_INPUT=voice
+CIEL_LLM_BACKEND=local
+CIEL_INPUT=voice
 # 通常は空。LLM_BACKEND=localなら自動でvoskになる。
-CIEL_DEV_STT_BACKEND=
-CIEL_DEV_VOSK_MODELS_DIR=${HOME}/models/vosk
+CIEL_STT_BACKEND=
+CIEL_VOSK_MODELS_DIR=${HOME}/models/vosk
 ```
 
 モデルはホスト側`~/models/vosk/vosk-model-small-ja-0.22`に置く。Composeは親ディレクトリを`/models`へ読み取り専用でマウントする。モデルはGitへ含めない。直接Pythonで動かす場合は`CIEL_MODEL=pipeline`、`CIEL_VOICE=irodori`、`CIEL_VOSK_MODEL_PATH`に実際のモデルディレクトリを指定する。
@@ -39,7 +39,7 @@ CIEL_DEV_VOSK_MODELS_DIR=${HOME}/models/vosk
 コードの開発用反映後、開発用serverディレクトリで再ビルド・再作成する。設定を編集しただけや単なるrestartでは既存コンテナへ反映されない。
 
 ```sh
-docker compose --env-file ../../ciel-companion/server/.env --env-file .env.dev \
+docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .env.dev \
   -f compose.dev.yaml up -d --build agent-dev
 ```
 

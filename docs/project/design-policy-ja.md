@@ -87,4 +87,4 @@ LLMに公開する操作と、基盤専用の操作を分けます。対象人�
 
 ## 推論方式は本番・開発で選択する
 
-ローカル推論を開発専用の実装にしない。同じ会話基盤で本番・開発のbackendを独立に指定し、共有LLM APIとCPUの音声認識を利用する。本番はserver/.env、開発はserver/.env.devで設定し、本番のlocal指定を開発へ暗黙に継承しない。[共通の実行設定](../operations/local-runtime-ja.md)が設定・移行・反映の正本。現在は構成対応とCompose検証を実施済みで、本番の稼働切替・品質確認は別に行う。
+ローカル推論を開発専用の実装にしない。同じ会話基盤で本番・開発のbackendを独立に指定し、共有LLM APIとCPUの音声認識を利用する。本番はserver/.env、開発はserver/.env.devで設定し、変数名はCIEL_LLM_BACKEND等に統一する。資格情報とDBパスワードだけをserver/.env.sharedで共有し、動作設定・Webhookは環境ごとに独立させる。開発で本番の.envやagent/.envを読み込まず、本番のlocal指定を開発へ暗黙に継承しない。[共通の実行設定](../operations/local-runtime-ja.md)が設定・移行・反映の正本。構成の実装・検証と稼働中サービスへの反映は区別し、現行の配布範囲は確認状況を参照する。

@@ -2,76 +2,83 @@
 
 > 責務：本番・開発の推論設定、設定ファイルの優先順位、切替・反映単位。
 
-2026-11-10。本番Compose・開発用Composeの両方で、LLMとCPU音声認識を設定から選べる。構成対応をソースに実装し、LinuxサーバーのDocker Composeで設定の解決を確認した。稼働中の本番・開発サービスの設定変更、配布、再起動はこの整備では行っていない。
+同じ会話ホストを本番・開発で使い、環境の違いは設定ファイルで表す。変数名に環境名を付けない。配布コミット・稼働設定と確認範囲は[確認状況](../testing/verification-status-ja.md)で管理する。
 
-## 同じ処理を使い、設定を分離する
+## 設定ファイルの責務
 
-環境ごとに推論実装を分岐させない。同じ会話ホストで以下を切り替える。
-
-| 設定 | LLM | 音声認識 | 読み上げ |
-|---|---|---|---|
-| backend=openai、音声入力 | OpenAI | 既定OpenAI | Irodori |
-| backend=local、音声入力 | 共有ローカルAPI | 既定CPUのVosk | Irodori |
-| backend=local、文字入力 | 共有ローカルAPI | 使用しない | Irodori |
-
-本番は`CIEL_LLM_BACKEND`、開発は`CIEL_DEV_LLM_BACKEND`を使う。両方とも省略時の既定はopenaiであり、本番をlocalにしても開発側を自動で変えない。localではOpenAIへの自動フォールバックをせず、画像認識・Web検索・OpenAI埋め込みによる振り分けは既存のローカルモードと同じ制限を維持する。LiveKit・DB・ゲームサービスは既存の接続を使うため、完全なオフライン化とは異なる。
-
-## 設定ファイル
-
-| 用途 | 自宅サーバーのファイル | 変更する変数 |
+| ファイル | 内容 | 読む環境 |
 |---|---|---|
-| 本番Docker Compose | `~/work/ciel-companion/server/.env` | `CIEL_LLM_BACKEND=local` |
-| 開発Docker Compose | `~/work/ciel-companion-dev/server/.env.dev` | `CIEL_DEV_LLM_BACKEND=local` |
-| Pythonを直接起動 | 各コードの`server/agent/.env` | `CIEL_LLM_BACKEND=local` |
+| 本番`server/.env.shared` | LiveKit・OpenAI・YouTubeの資格情報、DBパスワード | 本番・開発・専用ベンチマーク |
+| 本番`server/.env` | 本番の推論、入力、モデル、Webhook、共有LLMサービスの配置・容量 | 本番だけ |
+| 開発`server/.env.dev` | 開発の推論、入力、モデル、Webhook | 開発だけ |
+| 各端末の`server/agent/.env` | Pythonを直接起動する場合の資格情報と動作設定 | その直接起動だけ。Composeは読まない |
 
-本番の見本は[server/.env.example](../../server/.env.example)、開発用は[server/.env.dev.example](../../server/.env.dev.example)。既存ファイル全体を置き換えず、既存のDBパスワード・Webhookなどを維持して必要な設定を編集する。
+本番は`~/work/ciel-companion/server`、開発は`~/work/ciel-companion-dev/server`。共有ファイルは本番側に一つ置く。`.env.shared`に置ける名前は`LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`OPENAI_API_KEY`、`YOUTUBE_API_KEY`、`CIEL_DB_PASSWORD`だけ。backend・モデル・Webhook・記憶スコープは共有しない。モデル・DB・LiveKitを共用することと、本番の動作設定を開発へ継承することを区別する。
 
-本番で将来切り替えるときの設定：
+見本は[共通資格情報](../../server/.env.shared.example)、[本番](../../server/.env.example)、[開発](../../server/.env.dev.example)。既存の設定へ見本を丸ごと上書きしない。ベンチマークは`.env.benchmark`を独立して読み、資格情報だけ共有する。`CIEL_BENCH_*`は評価器の制御用であり、本番・開発の変数名の別名ではない。
+
+## 本番・開発で共通の変数名
+
+両方の設定ファイルで次の名前を使う。
 
 ```dotenv
 CIEL_LLM_BACKEND=local
+CIEL_MODEL=pipeline
 CIEL_INPUT=voice
 CIEL_STT_BACKEND=
 CIEL_LOCAL_LLM_URL=http://127.0.0.1:8094/v1
-CIEL_LOCAL_LLM_MODEL=local
 CIEL_LOCAL_TIMEOUT=90
 CIEL_VOSK_MODELS_DIR=${HOME}/models/vosk
 CIEL_VOSK_MODEL_PATH=/models/vosk-model-small-ja-0.22
+CIEL_MINUTES_DISCORD_WEBHOOK=
 ```
 
-STT_BACKENDが空ならLLM_BACKENDに連動する。localの音声ではvoskのみを受け付け、OpenAIへ戻さない。文字だけなら`CIEL_INPUT=text`。Voskモデルの親ディレクトリを読み取り専用で`/models`へマウントし、MODEL_PATHはそのコンテナ内のパス。別の日本語モデルを評価する場合もこのパスを指定できる。開発側には対応する`CIEL_DEV_*`があり、独立したモデルも選べる。
+`CIEL_LLM_BACKEND`は省略時openai。localの音声入力は共有LLM＋CPUのVosk＋Irodori、text入力なら音声認識を使わない。STT_BACKEND空はbackendに連動し、localからOpenAIへ自動で戻さない。画像認識・Web検索・OpenAI埋め込みによる振り分けもlocalでは使わない。外部LiveKit等への接続は残るため、完全なオフライン化ではない。
 
-Dockerの`environment`は`agent/.env`の同名設定より優先される。以前`agent/.env`に置いた本番のbackend/input/STT/Voskパス/local URL/model/timeoutを使い続ける場合は、本番の`server/.env`へ同じ値を移す。LiveKit・OpenAI等の資格情報、その他の会話設定は従来の`agent/.env`を使う。役目別の`CIEL_LOCAL_ROLES`と歌唱時の`CIEL_LOCAL_LLM_CONTROL`も従来の設定を維持し、この変更で上書きしない。
+`CIEL_LOCAL_LLM_MODEL`はAPIに送るモデルIDの任意の上書き。既定`local`を公開する共有APIでは設定不要。実際の重みは共有API側の`LOCAL_LLM_FILE`が選ぶ。`CIEL_LOCAL_ROLES`は役目別のローカル利用、`CIEL_LOCAL_LLM_CONTROL`は歌唱中のGPU解放先で、既定は`http://127.0.0.1:8095`。モデルの役目別設定やWebhookも環境ごとのファイルで設定できる。
 
-## 本番へ切り替える前と反映の単位
+Voskはホストのモデル親ディレクトリをコンテナの`/models`へ読み取り専用でマウントする。モデルの実行時取得・OpenAIへの代替接続で欠落を隠さない。人のマイク・停止・返答の品質は設定解決や起動確認とは別に測定する。[音声認識](../services/local-stt-ja.md)を参照する。
 
-1. 開発環境で人のマイク・会話の返答・停止依頼・道具の呼び出しを確認する。[Voskの初期測定](../services/local-stt-ja.md)では小型日本語モデルの精度に課題があり、現時点で本番の品質を保証しない。
-2. [共有LLM API](shared-llm-api-ja.md)のモデル・準備状態と容量を確認する。既存の8094を共用し、backendの変更だけで新たなモデルサービスを増やさない。サービスが未起動なら先に既存のlocal-llmプロファイルのサービスを起動する。環境ごとに別のモデルを無条件に立ち上げない。
-3. Voskモデルが指定先にあることを確認する。モデルの実行時ダウンロード・OpenAIへの代替接続で欠落を隠さない。パス不在は音声pipelineの組み立て時にエラーとなる。
-4. 歌唱時のGPU解放も使う場合は、会話サーバーの`CIEL_LOCAL_LLM_CONTROL=http://127.0.0.1:8095`が従来どおり設定されていることを確認する。LLM、Irodori、歌の共有容量・CPUへの切替条件を維持する。Vosk自体はCPUで動く。
-5. 確認済みGitコミットを配布し、対象のagentコンテナだけを再ビルド・再作成する。起動済みの会話は再接続し、新しい設定・コードを使う。設定編集や単なるrestartだけでは反映済みとしない。
+## 読み込みと優先順位
 
-本番コードの反映後、本番serverディレクトリでの対象を限定したコマンド：
+本番は`--env-file .env.shared --env-file .env`、開発は`--env-file ../../ciel-companion/server/.env.shared --env-file .env.dev`を使う。開発で本番の`.env`を重ねない。Composeの`env_file`も資格情報と対象環境のファイルだけを読み、その他の環境設定をコンテナへ渡さない。
+
+明示的なシェル環境変数はComposeの補間値より優先される。コンテナの固定environment（agent名・ポート・記憶スコープなど）と、補間した推論設定はenv_fileの同名値より優先される。本番はmain、開発はdevの記憶スコープを固定し、設定ファイルの変更で共有人物のアクセス範囲を変えない。
+
+## 既存設定からの移行
+
+サーバー上で更新版の[移行ツール](../../server/environment.py)を使う。本番serverディレクトリから、本番と既存の開発設定をまとめて移行する例：
 
 ```sh
-docker compose --env-file .env -f compose.yaml up -d --build --no-deps agent
+python3 environment.py --prod-dir "$PWD" --dev-dir ../../ciel-companion-dev/server --check
+python3 environment.py --prod-dir "$PWD" --dev-dir ../../ciel-companion-dev/server
 ```
 
-開発は開発serverディレクトリで：
+初回は旧`agent/.env`と本番`.env`から資格情報を分離し、既存の本番動作設定を維持する。旧`CIEL_DEV_*`は開発ファイル内で同じ意味の`CIEL_*`へ変換する。旧`CIEL_DEV_DISCORD_WEBHOOK`だけは`CIEL_MINUTES_DISCORD_WEBHOOK`に対応する。本番backendやWebhookを開発の初期値に使わない。変換前後の名前が異なる値で併存する場合や、共有資格情報が競合する場合は値を表示せず停止する。
+
+変更前の設定は本番`data/config-backups/environment-*/`へ権限を制限して保存する。書き込み途中で失敗した場合は元に戻す。移行後の再実行では旧`agent/.env`を再取り込みせず、環境ごとのファイルを正本とする。旧ファイルは直接Python起動用として残すがComposeは使わない。`--check`は変更・バックアップ作成を行わない。移行だけでは稼働中コンテナへ反映されない。
+
+新規導入では見本から`.env.shared`と環境別ファイルを作り、資格情報を設定する。既存環境は先に移行し、見本で秘密を置き換えない。`deploy-remote.sh`も起動前に移行を実行する。転送スクリプトは実際の`.env.shared`・`.env`・`.env.dev`とdataを送らない。
+
+## 反映の単位
+
+共有LLM API・TTS・DBとVoskモデルが配置済みであることを確認し、確認済みGitコミットを配布する。通常の[デプロイ](../development/build-ja.md)は環境に合うファイルを読み込む。対象agentだけを反映する場合、本番serverで：
 
 ```sh
-docker compose --env-file ../../ciel-companion/server/.env --env-file .env.dev \
+docker compose --env-file .env.shared --env-file .env -f compose.yaml up -d --build --no-deps agent
+```
+
+開発serverで：
+
+```sh
+docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .env.dev \
   -f compose.dev.yaml up -d --build --no-deps agent-dev
 ```
 
-これらは将来の反映手順であり、今回実行したコマンドではない。モデル・DB・TTS等の依存先は事前に稼働していることが前提。OpenAIへ戻す場合は対象のLLM_BACKENDをopenaiへ戻し、STT_BACKENDが空であることを確認して対象agentを再作成する。
+環境変数の編集後は対象コンテナを再作成する。単なるrestartや設定移行だけを反映済みとしない。ゲーム契約が変わる更新ではMCPの版も揃えるが、Minecraft本体・ワールドの再作成はbackend切替に含めない。共有LLMを環境ごとに追加起動しない。
 
-## 文字入力で確認する
+## 文字入力と検証
 
-`CIEL_DEV_INPUT=text`を指定して開発用agentを再作成し、LiveKit設定のある`server/agent`で`python local_chat.py --agent ciel-dev --game minecraft`を実行する。端末は試験用の別の部屋を作るため、Unityの既存の会話へそのまま入力するものではない。返答と操作の完了を待って次を送り、`/quit`で終了する。接続先の推論設定は端末自身では変更しない。
+開発`.env.dev`の`CIEL_INPUT=text`でagentを再作成し、LiveKit資格情報のある`server/agent`から`python local_chat.py --agent ciel-dev --game minecraft`を実行できる。端末は別の試験用の部屋を作る。通常の開発用DB・同意範囲を使い、永続記憶を無効化した[専用ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md)とは区別する。
 
-通常の開発用DB・同意範囲を使うことと、永続記憶を無効にした専用ベンチマークを区別する。手順・採点を伴う評価は[ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md)を使う。
-
-## 設定の検証
-
-`scripts/server/check-compose-backends.py`は手元の本番・開発Composeを自宅サーバーのComposeで読み取り専用検証する。秘密を含む解決結果は表示・保存せず、サービスを起動・再作成しない。確認済みの構成と未確認範囲は[確認状況](../testing/verification-status-ja.md)に集約する。
+`scripts/server/check-compose-backends.py`は自宅サーバーのComposeで、架空の資格情報と一時ディレクトリだけを使って設定を検証する。本番から開発へのbackend・モデル・Webhookの漏れ、任意設定、readonlyマウントを確認し、サービスは起動・変更しない。移行・競合・復元のテストは通常回帰に含む。[回帰テスト](../testing/regression-tests-ja.md)と[確認状況](../testing/verification-status-ja.md)を参照する。

@@ -25,6 +25,7 @@
 .env.*
 !.env.example
 !.env.dev.example
+!.env.shared.example
 !.env.minecraft.example
 !.env.benchmark.example
 *.keystore
@@ -56,6 +57,8 @@ __pycache__/
 
 # 会話サーバーが自宅サーバーで書くもの（議事録の下書きなど）
 /server/agent/data/
+# Private environment migration backups
+/server/data/
 
 # Claude Code の個人の設定（許可など）。共有の設定は .claude/settings.json
 /.claude/settings.local.json

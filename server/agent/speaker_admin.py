@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """覚えている人の記録の管理（一覧・メモを見る・呼び名を直す・削除・共有）。自宅サーバーで、会話サーバーのコンテナの中から使う。
 
-  docker compose exec agent python speaker_admin.py list
-  docker compose exec agent python speaker_admin.py notes <番号>
-  docker compose exec agent python speaker_admin.py relation <番号>
-  docker compose exec agent python speaker_admin.py rename <番号> <新しい呼び名>
-  docker compose exec agent python speaker_admin.py delete <番号>
-  docker compose exec agent python speaker_admin.py delete-all
-  docker compose exec agent python speaker_admin.py share <番号>            開発用の会話サーバーとも共有する（本番からだけ）
-  docker compose exec agent python speaker_admin.py unshare <番号>          共有をやめる（本番からだけ）
-  docker compose exec agent python speaker_admin.py drop-dev-notes <番号>   開発用の会話で書いたメモだけを消す
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py list
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py notes <番号>
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py relation <番号>
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py rename <番号> <新しい呼び名>
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py delete <番号>
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py delete-all
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py share <番号>            開発用の会話サーバーとも共有する（本番からだけ）
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py unshare <番号>          共有をやめる（本番からだけ）
+  docker compose --env-file .env.shared --env-file .env exec agent python speaker_admin.py drop-dev-notes <番号>   開発用の会話で書いたメモだけを消す
 
 声の特徴そのものは表示しない。メモとシエルの気持ちは本人に関わる情報なので、見るのは管理のときだけにする。
 本番と開発用は同じ DB を使う（docs/services/shared-memory-ja.md）。見えるのは、CIEL_MEMORY_SCOPE の会話サーバーから見える人だけ。

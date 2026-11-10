@@ -1,6 +1,6 @@
 """ローカル試験用の文字入力端末。LiveKit の開発用会話サーバーへ接続する。
 
-CIEL_DEV_LLM_BACKEND=local で agent-dev を起動してから python local_chat.py。
+開発.env.devのCIEL_LLM_BACKEND=local で agent-dev を起動してから python local_chat.py。
 OpenAI は呼ばないが、接続先の会話サーバーの設定と LiveKit の利用料は別。
 """
 import argparse

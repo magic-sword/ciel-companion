@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """シエル自身の記録の管理（出来事・育った好みを見る・取り消す）。自宅サーバーで、会話サーバーのコンテナの中から使う。
 
-  docker compose exec agent python self_admin.py likes             … 育った好みと、根拠の出来事
-  docker compose exec agent python self_admin.py history           … 好みを足した・変えた・外した記録
-  docker compose exec agent python self_admin.py events [数]        … 最近の出来事（既定 20）
-  docker compose exec agent python self_admin.py remove-like <番号>  … 育った好みを外す（記録にも残す）
-  docker compose exec agent python self_admin.py remove-event <番号> … 出来事を消す
+  docker compose --env-file .env.shared --env-file .env exec agent python self_admin.py likes             … 育った好みと、根拠の出来事
+  docker compose --env-file .env.shared --env-file .env exec agent python self_admin.py history           … 好みを足した・変えた・外した記録
+  docker compose --env-file .env.shared --env-file .env exec agent python self_admin.py events [数]        … 最近の出来事（既定 20）
+  docker compose --env-file .env.shared --env-file .env exec agent python self_admin.py remove-like <番号>  … 育った好みを外す（記録にも残す）
+  docker compose --env-file .env.shared --env-file .env exec agent python self_admin.py remove-event <番号> … 出来事を消す
 
 人の名前・事情は、出来事にも好みにも書いていない（diary.py・growth.py）。育ち方の決まりは growth.py。
 """
