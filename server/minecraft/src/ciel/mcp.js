@@ -79,9 +79,9 @@ export function makeServer(hub, sessionId) {
   });
 
   // ---- 体の技（以前の tools/minecraft.py） ----
-  server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'マイクラで、持ち主についていく（止めるまで続く）。', inputSchema: {},
+  server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'マイクラで、持ち主についていく（止めるまで続く）。相手が遠い・見失ったときは、方向表示の手掛かりがあれば最大60秒探す。', inputSchema: {},
     ...ACT('minecraft_follow_me', { 'ciel/long_running': true }) }, () => body((l) => l.do('follow')));
-  server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。', inputSchema: {},
+  server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。相手が遠いときは、方向表示の手掛かりがあれば最大60秒探してから近づく。', inputSchema: {},
     ...ACT('minecraft_come_here', { 'ciel/long_running': true }) }, () => body((l) => l.do('come')));
   server.registerTool('minecraft_go_to_place', { title: '場所へ行く', description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
     inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true }) },

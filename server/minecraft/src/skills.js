@@ -124,6 +124,59 @@ function playerEntity(bot, args, owner) {
   return entity;
 }
 
+// 方角しかない間は短い経路を繰り返す。手掛かりの到着はプレイヤーへの到着ではない。
+async function findPlayer(bot, args, token, { owner, guard }) {
+  const name = args.player ?? owner;
+  if (!name) throw new Failed('no_owner');
+  const end = Date.now() + 60000;
+  while (!token.cancelled) {
+    const entity = bot.players[name]?.entity;
+    if (entity && bot.entities[entity.id]) return entity;
+    if (Date.now() >= end) throw new Failed('player_search_timeout');
+    const hint = bot.playerLocator?.hint(name);
+    if (!hint) throw new Failed('player_not_visible');
+    await guarded(guard, token, async () => {
+      if (Date.now() >= end) throw new Failed('player_search_timeout');
+      const visible = bot.players[name]?.entity;
+      if (visible && bot.entities[visible.id]) return;
+      // 防御待ちの後で、取り消された方向や古い行き先を再利用しない。
+      const current = bot.playerLocator?.hint(name);
+      if (!current) throw new Failed('player_not_visible');
+      const p = bot.entity.position;
+      const distance = Math.hypot(current.x - p.x, current.z - p.z);
+      if (distance < 3) {
+        await bot.waitForTicks(5); // チャンク中心等で位置の精度が上がるのを待つ。
+        return;
+      }
+      const step = Math.min(16, distance);
+      const x = Math.floor(p.x + (current.x - p.x) / distance * step);
+      const z = Math.floor(p.z + (current.z - p.z) / distance * step);
+      bot.pathfinder.setMovements(playerMovements(bot));
+      let changed = false;
+      const timer = setInterval(() => {
+        if (token.cancelled || guard?.active) return;
+        const target = bot.players[name]?.entity;
+        const next = bot.playerLocator?.hint(name);
+        const newDirection = next && (next.source !== current.source
+          || (next.source === 'azimuth' ? Math.cos(next.angle - current.angle) < 0.98
+            : Math.hypot(next.x - current.x, next.z - current.z) > 8));
+        if ((target && bot.entities[target.id]) || !next || Date.now() >= end || newDirection) {
+          changed = true;
+          bot.pathfinder.setGoal(null);
+        }
+      }, 200);
+      try {
+        await watched(bot, () => bot.pathfinder.goto(new goals.GoalNearXZ(x, z, 2)));
+      } catch (err) {
+        if (!changed || !PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+      } finally {
+        clearInterval(timer);
+      }
+    });
+  }
+  return null;
+}
+
 function counts(bot) {
   const c = {};
   for (const item of bot.inventory.items()) c[item.name] = (c[item.name] ?? 0) + item.count;
@@ -284,7 +337,8 @@ const GIVE_WAIT_MS = 6000;   // 相手が拾うのを待つ（拾えるまで 2 
 
 const SKILL_RUN = {
   async follow(bot, args, token, { owner, guard }) {
-    const target = playerEntity(bot, args, owner);
+    let target = await findPlayer(bot, args, token, { owner, guard });
+    if (token.cancelled) return;
     const follow = (movements = playerMovements) => {
       bot.pathfinder.setMovements(movements(bot));
       bot.pathfinder.setGoal(new goals.GoalFollow(target, FOLLOW_RANGE), true);
@@ -306,7 +360,14 @@ const SKILL_RUN = {
         mark = reset();
         continue;
       }
-      if (!bot.entities[target.id]) throw new Failed('player_not_visible');
+      if (!bot.entities[target.id]) {
+        bot.pathfinder.setGoal(null);
+        target = await findPlayer(bot, args, token, { owner, guard });
+        if (token.cancelled) break;
+        follow();
+        mark = reset();
+        continue;
+      }
       if (guard && guard.generation !== generation) {
         generation = guard.generation;
         follow(tries ? escapeMovements : playerMovements);
@@ -334,6 +395,8 @@ const SKILL_RUN = {
   },
 
   async come(bot, args, token, { owner, guard }) {
+    await findPlayer(bot, args, token, { owner, guard });
+    if (token.cancelled) return;
     await walk(bot, guard, token, () => {
       const p = playerEntity(bot, args, owner).position;
       return new goals.GoalNear(p.x, p.y, p.z, COME_RANGE);
@@ -341,6 +404,10 @@ const SKILL_RUN = {
   },
 
   async go_to(bot, args, token, { owner, guard }) {
+    if (args.x === undefined) {
+      await findPlayer(bot, args, token, { owner, guard });
+      if (token.cancelled) return;
+    }
     await walk(bot, guard, token, () => {
       if (args.x === undefined) {
         const p = playerEntity(bot, args, owner).position;

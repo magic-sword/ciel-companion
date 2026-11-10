@@ -20,6 +20,7 @@ import { Guard } from './guard.js';
 import { carefulMovements } from './movements.js';
 import { knows } from './sight.js';
 import { Runner } from './skills.js';
+import { PlayerLocator } from './player-locator.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
@@ -168,6 +169,7 @@ let retry = RETRY_MIN_MS;
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
   const b = mineflayer.createBot(MC);
+  b.playerLocator = new PlayerLocator(b);
   bot = b;
   b.loadPlugin(pathfinderPkg.pathfinder);
   b.loadPlugin(collectBlock.plugin);
