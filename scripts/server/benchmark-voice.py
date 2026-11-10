@@ -23,6 +23,20 @@ sys.path.insert(0, str(ROOT / 'server/agent'))
 from voice_benchmark import NORMALIZATION, corpus, grouped, score, sha256, summarize
 
 
+def source_identity(provenance):
+    if provenance is None:
+        def git(*command):
+            return subprocess.check_output(['git', *command], cwd=ROOT, text=True).strip()
+        return dict(git_commit=git('rev-parse', 'HEAD'), git_dirty=bool(git('status', '--porcelain')))
+    data = json.loads(Path(provenance).read_text(encoding='utf-8'))
+    for name in ('scripts/server/benchmark-voice.py', 'server/agent/voice_benchmark.py', 'server/agent/vosk_engine.py'):
+        if data.get('source_sha256', {}).get(name) != sha256(ROOT/name):
+            raise ValueError(f'Staged source hash mismatch: {name}')
+    if not isinstance(data.get('git_commit'), str) or not isinstance(data.get('git_dirty'), bool):
+        raise ValueError('Source provenance requires git_commit and git_dirty')
+    return dict(git_commit=data['git_commit'], git_dirty=data['git_dirty'], source_provenance=data)
+
+
 def stt_trial(row, args):
     from vosk_engine import Decoder
     decoder = Decoder(args.model)
@@ -78,16 +92,18 @@ async def live_trial(row, args):
     transcripts = {}
     origin = None
     closing = False
+    warmup = dict(seen=False, last_loud=0.0)
 
     async def listen(track, track_name):
         loud = False
         async for event in rtc.AudioStream(track, sample_rate=16000, num_channels=1):
-            if origin is None:
-                continue
-            samples = struct.unpack('<' + 'h' * (len(event.frame.data)//2), event.frame.data)
+            pcm = event.frame.data.tobytes()
+            samples = struct.unpack('<' + 'h' * (len(pcm)//2), pcm)
             rms = math.sqrt(sum(x*x for x in samples) / max(1, len(samples))) / 32768
             active = rms >= args.rms_threshold
-            if active and not loud:
+            if active:
+                warmup.update(seen=True, last_loud=time.perf_counter())
+            if origin is not None and active and not loud:
                 observations.append((time.perf_counter(), track_name))
             loud = active
 
@@ -116,6 +132,12 @@ async def live_trial(row, args):
             await asyncio.sleep(.05)
         # Greeting is outside the scored window. Require a configured settling interval.
         await asyncio.sleep(args.settle_seconds)
+        if args.greeting_timeout:
+            deadline = time.perf_counter() + args.greeting_timeout
+            while not warmup['seen'] or time.perf_counter()-warmup['last_loud'] < 2.5:
+                if time.perf_counter() >= deadline:
+                    raise TimeoutError('Initial greeting did not settle before input')
+                await asyncio.sleep(.05)
         source = rtc.AudioSource(16000, 1, queue_size_ms=100)
         try:
             track = rtc.LocalAudioTrack.create_audio_track('voice-bench-mic', source)
@@ -177,11 +199,13 @@ def main():
     parser.add_argument('--unpaced', action='store_true', help='Throughput only; endpoint latency is null')
     parser.add_argument('--timeout', type=float, default=30, help='Post-input observation window / track wait')
     parser.add_argument('--settle-seconds', type=float, default=10)
+    parser.add_argument('--greeting-timeout', type=float, default=0, help='After settling, require greeting audio then 2.5s quiet within this limit; 0 disables')
     parser.add_argument('--rms-threshold', type=float, default=.01)
+    parser.add_argument('--source-provenance', type=Path, help='Hash-checked source identity for containers without Git')
     args = parser.parse_args()
-    if (not all(math.isfinite(v) for v in (args.tail_seconds, args.timeout, args.settle_seconds, args.rms_threshold))
+    if (not all(math.isfinite(v) for v in (args.tail_seconds, args.timeout, args.settle_seconds, args.rms_threshold, args.greeting_timeout))
             or args.rounds < 1 or args.chunk_ms < 1 or args.tail_seconds < 0 or args.timeout <= 0
-            or args.settle_seconds < 0 or not 0 < args.rms_threshold < 1):
+            or args.settle_seconds < 0 or args.greeting_timeout < 0 or not 0 < args.rms_threshold < 1):
         parser.error('Invalid trial count or timing/threshold setting')
     if args.mode == 'stt' and (not args.model or not Path(args.model).is_dir()):
         parser.error('stt requires an existing --model directory')
@@ -192,12 +216,11 @@ def main():
     required = ('stt_model', 'llm_model', 'tts_model', 'hardware', 'shared_load', 'runtime_config')
     if not isinstance(conditions, dict) or any(not conditions.get(k) for k in required):
         parser.error('conditions requires: ' + ', '.join(required))
+    identity = source_identity(args.source_provenance)
     args.output.mkdir(parents=True, exist_ok=False)
-    def git(*command):
-        return subprocess.check_output(['git', *command], cwd=ROOT, text=True).strip()
     report = dict(schema='ciel-voice-benchmark-v1', normalization=NORMALIZATION,
                   mode=args.mode, created_utc=datetime.now(timezone.utc).isoformat(),
-                  git_commit=git('rev-parse', 'HEAD'), git_dirty=bool(git('status', '--porcelain')),
+                  **identity,
                   runner_sha256=sha256(__file__), scorer_sha256=sha256(ROOT/'server/agent/voice_benchmark.py'),
                   corpus_sha256=sha256(args.corpus), conditions=conditions,
                   platform=platform.platform(), python=sys.version, options={k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},

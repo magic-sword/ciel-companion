@@ -80,9 +80,30 @@ JSONLの`audio`はmanifestのあるディレクトリから解決する。各音
   --agent ciel-voice-bench --output .local/voice-results/baseline-live --rounds 3
 ```
 
-既定は音声トラックを30秒待ち、挨拶待ち10秒後に再生、追加無音を含む入力完了後30秒間を観測する。挨拶が長い構成は`--settle-seconds`を増やす。毎試行後、接続と部屋を閉じる。終了コードは全試行が観測完了なら0、エラー・本返答タイムアウトがあれば1。認識品質の合否閾値はまだ設定していない。
+既定は音声トラックを30秒待ち、挨拶待ち10秒後に再生、追加無音を含む入力完了後30秒間を観測する。挨拶が長い構成では`--greeting-timeout 60`を指定すると、最小待機後に挨拶の音声を観測し、2.5秒間の静音を確認してから入力する。60秒以内に条件が成立しなければ試行エラーとなり、返答の観測期限は延長しない。毎試行後、接続と部屋を閉じる。終了コードは全試行が観測完了なら0、エラー・本返答タイムアウトがあれば1。認識品質の合否閾値はまだ設定していない。
 
 LiveKitの利用環境やworkerのbackend次第では課金されるため、[外部API試験](paid-checks-ja.md)の対象を確認する。スクリプトはクラウドへ自動切替せず、TTS合成の追加要求も出さない。OpenAIのワーカーを指定した場合の料金は別に発生する。
+
+### 自宅サーバーでの合成音声による基準測定
+
+`scripts/server/voice-home.py`はSSH設定を既存の`benchmark-home.py`から読み、自宅の`~/work/ciel-voice-evaluation`だけに測定コードを配置する。稼働中の`ciel-dev`がlocal・pipeline・voice・Irodori・devスコープであることを確認し、本番・開発ワーカーの再配置は行わない。試験クライアントとSTTは既存の開発イメージを使う一時コンテナ（2CPU・3GiB）で動かし、モデルを読み取り専用でマウントする。専用のLLMは起動しない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py stage
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py prepare
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py stt --smoke --rounds 1
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py live --settled --smoke --rounds 1
+# 単発の保存・認識・音声受信を確認してから反復する
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py stt --rounds 3
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py live --settled --rounds 3
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py pull
+```
+
+`prepare`はローカルIrodoriで中立な合成4発話（短文・数字・否定・途中の0.6秒の間）と3秒の無音を作る。合成要求文を参照文字列にし、発話末尾はRMS 0.005以上の最後の20msフレームで自動推定する。人による正解・末尾の注釈を用いたコーパスとは区別し、CERには合成自体の読み違いも含み得ると明示する。通常のゲームや道具への指示は送らない。
+
+結果はサーバーの`results/<実行ID>/`、回収先はGit対象外の`server/benchmark/data/voice-home/results/<実行ID>/`。各実行のソースアーカイブ、モデル・イメージ・コード指紋、前後のサービス状態、2秒ごとのGPU/CPUモード・処理中枠数・負荷、該当部屋のデバッグログを保持する。既存サービスの同時要求やキャッシュは制御しない。`prepare`で毎回新しい実行IDを作り、既存結果は上書きしない。
+
+Gitのないコンテナでは`--source-provenance`に配置元のGit識別・dirty状態・ソースSHA-256を持つJSONを指定する。実行器・採点器・デコーダーの実ファイルとの一致を検証し、偽のクリーンなGit状態を作って代用しない。helperは配置時にこのJSONを生成し、測定ごとのソースアーカイブにも含める。
 
 ## 結果の読み方と次の改善
 

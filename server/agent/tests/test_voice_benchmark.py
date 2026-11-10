@@ -18,6 +18,19 @@ spec.loader.exec_module(runner)
 
 
 class VoiceBenchmarkTest(unittest.TestCase):
+    def test_staged_provenance_checks_the_actual_sources(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'source.json'
+            files = ('scripts/server/benchmark-voice.py', 'server/agent/voice_benchmark.py', 'server/agent/vosk_engine.py')
+            data = dict(git_commit='a'*40, git_dirty=True,
+                        source_sha256={name: runner.sha256(ROOT/name) for name in files})
+            path.write_text(json.dumps(data), encoding='utf-8')
+            self.assertEqual(runner.source_identity(path)['git_commit'], 'a'*40)
+            data['source_sha256'][files[0]] = '0'*64
+            path.write_text(json.dumps(data), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+                runner.source_identity(path)
+
     def test_japanese_normalization_and_errors(self):
         self.assertEqual(normalize(' ＡＢＣ、シエル。 '), 'abcシエル')
         self.assertEqual(score('あいう', 'あえう')['cer'], 1/3)
@@ -115,6 +128,38 @@ class VoiceBenchmarkTest(unittest.TestCase):
         deleted = client.room.delete_room.call_args.args[0]
         self.assertEqual(created.name, deleted.room)
         self.assertEqual(created.agents[0].agent_name, 'ciel-voice-bench')
+
+    def test_live_requires_greeting_before_publishing_input_when_requested(self):
+        from livekit import api, rtc
+        handlers = {}
+        room = MagicMock()
+        room.on.side_effect = lambda name: lambda callback: handlers.setdefault(name, callback)
+        async def connect(*args):
+            handlers['track_subscribed'](SimpleNamespace(kind=rtc.TrackKind.KIND_AUDIO),
+                                         SimpleNamespace(name='agent'), None)
+        room.connect = AsyncMock(side_effect=connect)
+        room.disconnect = AsyncMock()
+        client = MagicMock()
+        client.room.create_room = AsyncMock()
+        client.room.delete_room = AsyncMock()
+        client.aclose = AsyncMock()
+        token = MagicMock()
+        token.with_identity.return_value = token
+        token.with_name.return_value = token
+        token.with_grants.return_value = token
+        async def silence(*args, **kwargs):
+            # Actual SDK data uses int16 memoryview, not a byte-oriented view.
+            yield SimpleNamespace(frame=rtc.AudioFrame(bytes(640), 16000, 1, 320))
+        args = SimpleNamespace(agent='test', timeout=.01, settle_seconds=0,
+                               greeting_timeout=.001, rms_threshold=.01)
+        with patch.object(api, 'LiveKitAPI', return_value=client), patch.object(api, 'AccessToken', return_value=token), \
+             patch.object(rtc, 'Room', return_value=room), patch.object(rtc, 'AudioStream', side_effect=silence), \
+             patch.object(rtc, 'AudioSource') as source, patch.dict(runner.os.environ, {'LIVEKIT_URL': 'ws://invalid'}):
+            with self.assertRaisesRegex(TimeoutError, 'greeting'):
+                asyncio.run(runner.live_trial({}, args))
+            source.assert_not_called()
+        client.room.delete_room.assert_awaited_once()
+        client.aclose.assert_awaited_once()
 
 
 if __name__ == '__main__':
