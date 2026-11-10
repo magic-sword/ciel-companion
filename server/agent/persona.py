@@ -59,6 +59,8 @@ class Persona:
     comment_instructions: str
     # シエル自身の姿の絵（data URL。無ければ空）。心と小脳へ、会話の最初にいつも置く（mind.py の build）
     self_image: str = ''
+    voice_warmup: str = ''
+    voice_first_sentence: str = ''
 
     @property
     def fingerprint(self) -> str:
@@ -76,7 +78,7 @@ class Persona:
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
              self.mind_brief_instructions, self.listener_instructions, self.game_intake_instructions, self.tool_discovery_instructions, self.tasks_instructions,
              self.initiative_open_nudge, self.research_found_nudge, self.game_instructions, self.app_instructions,
-             self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions,
+             self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions, self.voice_warmup, self.voice_first_sentence,
              hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
             ensure_ascii=False,
         )
@@ -106,7 +108,7 @@ def load_persona() -> Persona:
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
                 'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'game_intake_instructions', 'tool_discovery_instructions', 'tasks_instructions',
                 'initiative_open_nudge', 'research_found_nudge', 'game_instructions', 'app_instructions',
-                'image_voice_instructions', 'image_caption_instructions', 'comment_instructions'):
+                'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'voice_warmup', 'voice_first_sentence'):
         file_key = f'{key}_file'
         value = config.get(file_key)
         if not isinstance(value, str) or not value.strip():

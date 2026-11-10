@@ -43,11 +43,11 @@ def snapshot():
     runtime = inspect(DEV)
     env = dict(v.split('=', 1) for v in runtime['Config']['Env'] if '=' in v)
     assert env.get('CIEL_LLM_BACKEND') == 'local' and env.get('CIEL_INPUT') == 'voice'
-    assert env.get('CIEL_AGENT_NAME') == 'ciel-dev' and env.get('CIEL_MEMORY_SCOPE') == 'dev'
+    assert env.get('CIEL_AGENT_NAME') in ('ciel-dev', 'ciel-voice-bench') and env.get('CIEL_MEMORY_SCOPE') == 'dev'
     assert env.get('CIEL_MODEL') == 'pipeline' and env.get('CIEL_VOICE') == 'irodori'
     assert env.get('CIEL_STT_BACKEND', '') in ('', 'vosk')
     safe_keys = ['CIEL_MODEL', 'CIEL_INPUT', 'CIEL_LLM_BACKEND', 'CIEL_STT_BACKEND', 'CIEL_VOICE',
-                 'CIEL_AGENT_NAME', 'CIEL_MEMORY_SCOPE', 'CIEL_VOSK_MODEL_PATH', 'CIEL_LOCAL_LLM_URL']
+                 'CIEL_AGENT_NAME', 'CIEL_MEMORY_SCOPE', 'CIEL_VOSK_MODEL_PATH', 'CIEL_LOCAL_LLM_URL', 'CIEL_VOICE_FAST']
     code = "import hashlib,json; from pathlib import Path; print(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('/app').glob('*.py')}))"
     hashes = json.loads(subprocess.check_output(['docker', 'exec', DEV, 'python', '-c', code], text=True))
     return dict(worker=DEV, image=runtime['Image'], environment={k: env.get(k) for k in safe_keys},
@@ -108,9 +108,11 @@ def prepare():
     print('RESULTS', folder, flush=True)
 
 
-def run(mode, rounds, smoke, settled=False):
+def run(mode, rounds, smoke, settled=False, variant=None, tag=None):
     folder = Path((ROOT/'latest.txt').read_text())
-    label = mode+('-settled' if settled else '')+('-smoke' if smoke else '')
+    if tag and (not tag.isascii() or not tag.replace('-','').isalnum()):
+        raise ValueError('Invalid measurement tag')
+    label = mode+('-'+variant if variant else '')+('-'+tag if tag else '')+('-settled' if settled else '')+('-smoke' if smoke else '')
     output = folder/label
     if output.exists():
         raise FileExistsError(output)
@@ -124,6 +126,11 @@ def run(mode, rounds, smoke, settled=False):
             archive.add(path, arcname=name)
     worker = inspect(DEV)
     env = dict(v.split('=', 1) for v in worker['Config']['Env'] if '=' in v)
+    conditions = json.loads((folder/'conditions.json').read_text())
+    conditions['runtime_config'] = snapshot()
+    conditions['variant'] = variant or 'existing-development'
+    conditions_path = folder/(label+'-conditions.json')
+    dump(conditions_path, conditions)
     command = ['docker', 'run', '--rm', '--name', 'ciel-voice-eval-'+str(time.time_ns()), '--network', 'host',
                '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', '2', '--memory', '3g',
                '-v', str(ROOT)+':/eval', '-v', str(MODEL.parent)+':/models:ro', '--workdir', '/eval',
@@ -136,10 +143,12 @@ def run(mode, rounds, smoke, settled=False):
             command += ['-e', key]
     command += [worker['Image'], '-B', '/eval/scripts/server/benchmark-voice.py', mode,
                 '--corpus', '/eval/'+str((folder/('smoke.jsonl' if smoke else 'corpus.jsonl')).relative_to(ROOT)),
-                '--conditions', '/eval/'+str((folder/'conditions.json').relative_to(ROOT)),
+                '--conditions', '/eval/'+str(conditions_path.relative_to(ROOT)),
                 '--source-provenance', '/eval/source-provenance.json',
                 '--output', '/eval/'+str(output.relative_to(ROOT)), '--rounds', str(rounds)]
-    command += ['--model', '/models/'+MODEL.name] if mode == 'stt' else ['--agent', 'ciel-dev']
+    command += ['--model', '/models/'+MODEL.name] if mode == 'stt' else ['--agent', env['CIEL_AGENT_NAME']]
+    if mode == 'live' and variant == 'fast':
+        command += ['--require-ready']
     if mode == 'live' and settled:
         command += ['--greeting-timeout', '60']
     stop = __import__('threading').Event()
@@ -164,17 +173,8 @@ def run(mode, rounds, smoke, settled=False):
             debug = output/'debug'
             debug.mkdir(exist_ok=True)
             report = json.loads((output/'report.json').read_text())
-            logs = Path.home()/'work/ciel-companion-dev/server/agent/data/debug'
-            for row in report['trials']:
-                room = row.get('room')
-                if room and room.startswith('voice-bench-'):
-                    for path in logs.glob('*-'+room+'.jsonl'):
-                        shutil.copy2(path, debug/path.name)
-        if mode == 'live' and (output/'report.json').exists():
-            debug = output/'debug'
-            debug.mkdir(exist_ok=True)
-            report = json.loads((output/'report.json').read_text())
-            logs = Path.home()/'work/ciel-companion-dev/server/agent/data/debug'
+            mounts = {m['Destination']:Path(m['Source']) for m in worker['Mounts']}
+            logs = mounts.get('/app/data/debug') or (mounts['/app/data']/'debug')
             for row in report['trials']:
                 room = row.get('room')
                 if room and room.startswith('voice-bench-'):

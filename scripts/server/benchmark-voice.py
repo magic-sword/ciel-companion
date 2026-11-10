@@ -93,6 +93,25 @@ async def live_trial(row, args):
     origin = None
     closing = False
     warmup = dict(seen=False, last_loud=0.0)
+    ready_event = asyncio.Event()
+    ready_info = None
+    connected_at = time.perf_counter()
+    ready_at = None
+
+    @room.on('data_received')
+    def on_ready(packet):
+        nonlocal ready_info, ready_at
+        if packet.topic != 'ciel.event':
+            return
+        try:
+            value = json.loads(packet.data)
+        except (ValueError, UnicodeError):
+            return
+        if isinstance(value, dict) and value.get('type') == 'voice.ready':
+            ready_info = value
+            if ready_at is None and value.get('ready') is True:
+                ready_at = time.perf_counter()
+            ready_event.set()
 
     async def listen(track, track_name):
         loud = False
@@ -125,7 +144,13 @@ async def live_trial(row, args):
         token = (api.AccessToken().with_identity(identity).with_name('voice benchmark')
                  .with_grants(api.VideoGrants(room_join=True, room=name)).to_jwt())
         await room.connect(os.environ['LIVEKIT_URL'], token)
-        deadline = time.perf_counter() + args.timeout
+        if args.require_ready:
+            await room.local_participant.publish_data(json.dumps({'v':1,'type':'voice.ready_request'}),
+                                                      reliable=True, topic='ciel.event')
+            await asyncio.wait_for(ready_event.wait(), args.connect_timeout)
+            if ready_info.get('v') != 1 or ready_info.get('ready') is not True:
+                raise ValueError('Invalid or failed voice readiness')
+        deadline = time.perf_counter() + args.connect_timeout
         while not tasks:
             if time.perf_counter() > deadline:
                 raise TimeoutError('No agent audio track')
@@ -164,6 +189,7 @@ async def live_trial(row, args):
         hypothesis = ''.join(transcripts.values()) if transcripts else None
         expected_reply = bool(row['reference'])
         return dict(status='timeout' if expected_reply and reply is None else 'ok',
+                    readiness=ready_info, startup_ready_ms=(ready_at-connected_at)*1000 if ready_at else None,
                     hypothesis=hypothesis,
                     **(score(row['reference'], hypothesis) if hypothesis is not None else {}),
                     transcript_available=hypothesis is not None,
@@ -198,14 +224,16 @@ def main():
     parser.add_argument('--tail-seconds', type=float, default=2)
     parser.add_argument('--unpaced', action='store_true', help='Throughput only; endpoint latency is null')
     parser.add_argument('--timeout', type=float, default=30, help='Post-input observation window / track wait')
+    parser.add_argument('--connect-timeout', type=float, default=180, help='Separate startup/track deadline')
+    parser.add_argument('--require-ready', action='store_true', help='Require voice.ready v1 before audio input')
     parser.add_argument('--settle-seconds', type=float, default=10)
     parser.add_argument('--greeting-timeout', type=float, default=0, help='After settling, require greeting audio then 2.5s quiet within this limit; 0 disables')
     parser.add_argument('--rms-threshold', type=float, default=.01)
     parser.add_argument('--source-provenance', type=Path, help='Hash-checked source identity for containers without Git')
     args = parser.parse_args()
-    if (not all(math.isfinite(v) for v in (args.tail_seconds, args.timeout, args.settle_seconds, args.rms_threshold, args.greeting_timeout))
+    if (not all(math.isfinite(v) for v in (args.tail_seconds, args.timeout, args.connect_timeout, args.settle_seconds, args.rms_threshold, args.greeting_timeout))
             or args.rounds < 1 or args.chunk_ms < 1 or args.tail_seconds < 0 or args.timeout <= 0
-            or args.settle_seconds < 0 or args.greeting_timeout < 0 or not 0 < args.rms_threshold < 1):
+            or args.connect_timeout <= 0 or args.settle_seconds < 0 or args.greeting_timeout < 0 or not 0 < args.rms_threshold < 1):
         parser.error('Invalid trial count or timing/threshold setting')
     if args.mode == 'stt' and (not args.model or not Path(args.model).is_dir()):
         parser.error('stt requires an existing --model directory')

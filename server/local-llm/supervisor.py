@@ -19,6 +19,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -49,6 +50,7 @@ _lock = threading.Lock()
 _proc: subprocess.Popen | None = None
 _mode = os.environ.get('LOCAL_LLM_MODE', 'gpu')
 _stopping = False
+_generation = None
 
 
 def _healthy() -> bool:
@@ -60,11 +62,12 @@ def _healthy() -> bool:
 
 
 def _start(mode: str) -> None:
-    global _proc
+    global _proc, _generation
     env = dict(os.environ)
     if mode == 'cpu':
         env['CUDA_VISIBLE_DEVICES'] = ''   # GPU を見せない（読み込みの手伝いも含めて、GPU のメモリーを使わない）
     _proc = subprocess.Popen(['/app/llama-server', *COMMON, *ARGS[mode]], env=env)
+    _generation = uuid.uuid4().hex
     log.info('llama-server を %s の形で起こした（pid %d）', mode, _proc.pid)
 
 
@@ -128,7 +131,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/mode':
             return self._send(404, {'error': 'not_found'})
         self._send(200, {'mode': _mode, 'ready': _healthy(), 'model': os.path.basename(MODEL),
-                         'context': int(CTX), 'parallel': PARALLEL})
+                         'context': int(CTX), 'parallel': PARALLEL, 'generation': _generation,
+                         'generation_scope': 'inference_process'})
 
     def do_POST(self):
         if self.path != '/mode':
@@ -151,7 +155,7 @@ def main() -> None:
     from gateway import create_server
     if MMPROJ and not Path(MMPROJ).is_file():
         raise FileNotFoundError('Configured LOCAL_LLM_MMPROJ does not exist')
-    gateway = create_server(HOST, LLM_PORT, INFERENCE_PORT, max_edge=IMAGE_MAX_EDGE)
+    gateway = create_server(HOST, LLM_PORT, INFERENCE_PORT, max_edge=IMAGE_MAX_EDGE, parallel=PARALLEL)
     _start(_mode)
     threading.Thread(target=gateway.serve_forever, daemon=True).start()
     threading.Thread(target=watch, daemon=True).start()

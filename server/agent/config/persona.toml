@@ -2,6 +2,8 @@
 # 以下の相対パスは、この TOML ファイルのあるディレクトリを基準にします。
 # 変更は次に開始する会話から反映されます。
 instructions_file = "prompts/character.md"
+voice_warmup_file = "prompts/voice_warmup.md"
+voice_first_sentence_file = "prompts/voice_first_sentence.md"
 # シエル自身のこと（好み・苦手・こだわり）。会話モデルと内なる考えの両方に渡す
 self_instructions_file = "prompts/ciel_self.md"
 # 出来事から好みが育つかを、会話の終わりに決める係への指示（growth.py）

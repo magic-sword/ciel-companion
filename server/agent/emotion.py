@@ -13,6 +13,7 @@
 """
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import AsyncIterable
@@ -23,6 +24,8 @@ from livekit import rtc
 from livekit.agents import get_job_context
 
 import irodori_tts
+import debug_log
+import models
 import latency
 
 log = logging.getLogger('ciel-agent.emotion')
@@ -128,9 +131,17 @@ def read_tags(sentence: str) -> tuple[str | None, str]:
     return emotion, strip_tags(sentence).strip()
 
 
-def split_sentences(buf: str) -> tuple[list[str], str]:
+def split_sentences(buf: str, *, early=False) -> tuple[list[str], str]:
     """buf から、終わりの記号まで揃った文を取り出す。（文のリスト, 残り）"""
     out, start = [], 0
+    if early:
+        # Only a grammatical clause boundary; never split digits, names or tags by length.
+        boundary = re.search(r'(?:けれど|けど|ので|から|ですが|ますが|ですし|ますし|だし|よ|ね)、', buf)
+        hard = SENTENCE_END.search(buf)
+        if (boundary and (hard is None or boundary.end() < hard.start())
+                and len(strip_tags(buf[:boundary.end()]).strip()) >= 12):
+            out.append(buf[:boundary.end()])
+            start = boundary.end()
     for m in SENTENCE_END.finditer(buf):
         piece = buf[start:m.end()]
         if len(strip_tags(piece).strip()) >= MIN_SENTENCE:
@@ -182,7 +193,7 @@ class PreambleCut:
         return speech_id is not None and speech_id == self._speech_id and spoken >= self._keep
 
 
-async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None, stop=None):
+async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchannel=None, stop=None, speech_id=None):
     """1 文ずつ：印を読み取り、その感情の声で読み上げ、声を流し始めるときに表情を送る。
     すぐ前に相づち（aizuchi.py）を流していたら、最初の文の頭の相づちを外す。
     stop(読んだ文の数) が True になったら、次の文からは読まない（残りの文字は受け取って捨てる。PreambleCut）"""
@@ -206,12 +217,16 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
             return
         t0 = time.perf_counter()
         latency.mark('最初の文')
+        debug_log.record('voice_sentence', speech_id=speech_id, chars=len(body), first=spoken <= 1)
         pcm, sr = await synthesize(http, with_emoji(body, emotion), CAPTIONS[emotion], style=STYLE)
+        debug_log.record('voice_pcm', speech_id=speech_id, elapsed_ms=round((time.perf_counter()-t0)*1000, 2))
         latency.mark('最初の声')
         dur_ms = int(len(pcm) / 2 / sr * 1000)
         log.info('[%s] 合成 %.2f 秒', emotion, time.perf_counter() - t0)
         if backchannel is not None:
+            waiting = time.perf_counter()
             await backchannel.wait()   # 相づちが鳴り終わってから話す
+            debug_log.record('voice_backchannel_wait', speech_id=speech_id, ms=round((time.perf_counter()-waiting)*1000, 2))
         await events.send(emotion, ttl_ms=dur_ms + 1500)
         for f in frames(pcm, sr):
             yield f
@@ -220,7 +235,7 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
         async for chunk in text:
             latency.mark('最初の文字')
             buf += chunk
-            done, buf = split_sentences(buf)
+            done, buf = split_sentences(buf, early=spoken == 0 and models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1')
             for s in done:
                 if stopped():
                     dropped += len(strip_tags(s))

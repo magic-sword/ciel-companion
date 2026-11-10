@@ -268,6 +268,8 @@ class Initiative:
         return self._review_at is not None
 
     def _should_think(self, now: float) -> bool:
+        if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1' and (self._user_busy or self._agent_busy):
+            return False
         if not self.instructions or (self._thinking is not None and not self._thinking.done()):
             return False
         if (self.reviewing(now) and not self._user_busy and not self._agent_busy

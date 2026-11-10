@@ -118,6 +118,20 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(error.exception.code,400)
         self.assertEqual(self.received,[])
 
+    def test_work_class_is_validated_and_admission_time_is_reported(self):
+        for kind in ('background','foreground'):
+            request = urllib.request.Request(self.url+'/v1/chat/completions',data=b'{"messages":[]}',
+                                             headers={'X-Ciel-Work-Class':kind})
+            with self.opener.open(request,timeout=5) as response:
+                self.assertGreaterEqual(float(response.headers['X-Ciel-Admission-Ms']),0)
+                self.assertTrue(json.load(response)['ok'])
+        request = urllib.request.Request(self.url+'/v1/chat/completions',data=b'{"messages":[]}',
+                                         headers={'X-Ciel-Work-Class':'unsupported'})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.opener.open(request,timeout=5)
+        self.assertEqual(error.exception.code,400)
+        self.assertEqual(len(self.received),2)
+
     def test_unavailable_backend_is_reported(self):
         self.backend.shutdown();self.backend.server_close()
         with self.assertRaises(urllib.error.HTTPError) as error:

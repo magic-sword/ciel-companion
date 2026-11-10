@@ -14,6 +14,7 @@ import uuid
 import aiohttp
 from livekit.agents import APIConnectionError, APIConnectOptions, get_job_context, tokenize, tts
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS
+import debug_log
 
 URL = os.environ.get('CIEL_TTS_URL', 'http://127.0.0.1:8766/synthesize')
 SESSION_ID = uuid.uuid4().hex  # A job process belongs to one conversation; no personal identifiers.
@@ -33,6 +34,8 @@ async def request_audio(http: aiohttp.ClientSession, body: dict, *, session_id=N
             r.raise_for_status()
             pcm = await r.read()
             complete = True
+            debug_log.record('voice_tts', request_id=request_id, queue_ms=r.headers.get('X-Queue-Ms'),
+                             total_ms=round((time.monotonic()-started)*1000, 2))
             log.info('tts session=%s request=%s queue_ms=%s total_ms=%.0f', session_id, request_id,
                      r.headers.get('X-Queue-Ms', 'unknown'), (time.monotonic() - started) * 1000)
             return pcm, int(r.headers.get('X-Sample-Rate', '48000'))

@@ -117,6 +117,11 @@ def options(role: str, **kwargs) -> dict:
     extra = dict(kwargs.get('extra_body') or {})
     extra['chat_template_kwargs'] = {'enable_thinking': False}
     kwargs['extra_body'] = extra
+    background = role in {'thought', 'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
+    headers = dict(kwargs.get('extra_headers') or {})
+    headers['X-Ciel-Work-Class'] = ('background' if background and os.environ.get('CIEL_VOICE_FAST', '1') == '1'
+                                    else 'foreground')
+    kwargs['extra_headers'] = headers
     return kwargs
 
 

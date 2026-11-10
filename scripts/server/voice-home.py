@@ -21,13 +21,20 @@ FILES = ['scripts/server/benchmark-voice.py', 'server/agent/voice_benchmark.py',
 
 def stage():
     import io
+    sources = subprocess.check_output(['git', 'ls-files', '-z', 'server/agent'], cwd=ROOT).decode().split('\0')
+    files = sorted(set(FILES + [p for p in sources if p and '/tests/' not in p
+                                and not Path(p).name.startswith('.env')]
+                       + ['server/agent/voice_preparation.py', 'server/agent/config/prompts/voice_warmup.md',
+                          'server/agent/config/prompts/voice_first_sentence.md',
+                          'server/stt/voice_fast_home.py', 'server/local-llm/gateway.py',
+                          'server/local-llm/evaluation_gateway.py','server/benchmark/voice/contention.json']))
     metadata = dict(git_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                     git_dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
-                    source_sha256={p: sha256(ROOT/p) for p in FILES})
+                    source_sha256={p: sha256(ROOT/p) for p in files})
     process = subprocess.Popen(home.ssh_args()+['mkdir -p ~/work/ciel-voice-evaluation && tar -xf - -C ~/work/ciel-voice-evaluation'], stdin=subprocess.PIPE)
     try:
         with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
-            for name in FILES:
+            for name in files:
                 archive.add(ROOT/name, arcname=name)
             content = json.dumps(metadata).encode()
             item = tarfile.TarInfo('source-provenance.json')

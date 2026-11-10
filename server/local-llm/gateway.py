@@ -3,6 +3,9 @@ import base64
 import binascii
 import io
 import json
+import collections
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +18,48 @@ MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 24_000_000
 HOP_HEADERS = {'connection', 'transfer-encoding', 'keep-alive', 'te', 'trailer',
                'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length'}
+
+class Admission:
+    """Bounded foreground FIFO; at most one background request uses inference."""
+    def __init__(self, parallel=2, capacity=64):
+        self.parallel, self.capacity = parallel, capacity
+        self.condition = threading.Condition()
+        self.waiting = collections.deque()
+        self.active = self.background = 0
+
+    def acquire(self, work, timeout=30):
+        if work not in ('foreground', 'background'):
+            raise ValueError('Invalid X-Ciel-Work-Class')
+        start = time.monotonic()
+        ticket = object()
+        with self.condition:
+            if len(self.waiting) + self.active >= self.capacity:
+                raise TimeoutError('Inference admission capacity exceeded')
+            self.waiting.append((ticket, work))
+            try:
+                while True:
+                    foreground = [t for t, kind in self.waiting if kind == 'foreground']
+                    first = foreground[0] if foreground else self.waiting[0][0]
+                    background_limit = 1
+                    if (ticket is first and self.active < self.parallel and
+                            (work == 'foreground' or self.background < background_limit)):
+                        self.active += 1
+                        self.background += work == 'background'
+                        return time.monotonic() - start
+                    remaining = timeout - (time.monotonic() - start)
+                    if remaining <= 0:
+                        raise TimeoutError('Inference admission expired')
+                    self.condition.wait(remaining)
+            finally:
+                self.waiting.remove((ticket, work))
+                self.condition.notify_all()
+
+    def release(self, work):
+        with self.condition:
+            self.active -= 1
+            self.background -= work == 'background'
+            self.condition.notify_all()
+
 
 class InvalidImage(ValueError):
     pass
@@ -66,11 +111,12 @@ def prepare(body, max_edge):
             count += 1
     return count
 
-def create_server(host, port, upstream_port, *, max_edge=256):
+def create_server(host, port, upstream_port, *, max_edge=256, parallel=2):
     if not 32 <= max_edge <= 4096:
         raise ValueError('LOCAL_LLM_IMAGE_MAX_EDGE must be between 32 and 4096')
     upstream = f'http://127.0.0.1:{upstream_port}'
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    admission = Admission(parallel)
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
@@ -91,6 +137,9 @@ def create_server(host, port, upstream_port, *, max_edge=256):
 
         def forward(self):
             response_started = False
+            admitted = False
+            work = self.headers.get('X-Ciel-Work-Class', 'foreground')
+            queued = 0.0
             try:
                 path = urllib.parse.urlsplit(self.path)
                 if path.scheme or path.netloc or not self.path.startswith('/'):
@@ -108,6 +157,8 @@ def create_server(host, port, upstream_port, *, max_edge=256):
                     body = json.loads(data or b'{}')
                     images = prepare(body, max_edge)
                     data = json.dumps(body, ensure_ascii=False).encode('utf-8')
+                    queued = admission.acquire(work)
+                    admitted = True
                 headers = {key: value for key, value in self.headers.items() if key.lower() not in HOP_HEADERS}
                 if data is not None:
                     headers['Content-Length'] = str(len(data))
@@ -123,6 +174,7 @@ def create_server(host, port, upstream_port, *, max_edge=256):
                             self.send_header(key, value)
                     self.send_header('X-Ciel-Image-Max-Edge', str(max_edge))
                     self.send_header('X-Ciel-Image-Count', str(images))
+                    self.send_header('X-Ciel-Admission-Ms', str(round(queued * 1000, 2)))
                     self.send_header('Connection', 'close')
                     self.end_headers()
                     response_started = True
@@ -136,6 +188,11 @@ def create_server(host, port, upstream_port, *, max_edge=256):
             except InvalidImage as error:
                 if not response_started:
                     self.error(400, str(error), 'invalid_image')
+            except TimeoutError:
+                if not response_started:
+                    self.error(503 if admitted else 429,
+                               'Inference timed out' if admitted else 'Inference admission expired',
+                               'inference_unavailable' if admitted else 'inference_busy')
             except (ValueError, UnicodeError):
                 if not response_started:
                     self.error(400, 'Invalid JSON request')
@@ -144,6 +201,9 @@ def create_server(host, port, upstream_port, *, max_edge=256):
             except (OSError, urllib.error.URLError):
                 if not response_started:
                     self.error(503, 'Local inference is temporarily unavailable', 'inference_unavailable')
+            finally:
+                if admitted:
+                    admission.release(work)
 
         do_GET = do_POST = do_DELETE = do_OPTIONS = forward
 

@@ -76,6 +76,7 @@ import touch
 import turns
 import usage
 import voice_conversion
+import voice_preparation
 import volume
 import youtube_chat
 from conversation import Conversation
@@ -251,9 +252,23 @@ class Ciel(Agent):
 
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
         """pipeline：誰が話したかを決め、心と小脳のどちらが返すかをコードで決めて（mind.py の route）、返事を流す"""
+        readiness = getattr(self, 'voice_readiness', None)
+        validated = await voice_preparation.validate(readiness)
+        if validated is not readiness:
+            self.voice_readiness = validated
+            debug_log.record('voice_ready_invalidated', reason=validated['reason'])
+            ctx = agents.get_job_context(required=False)
+            if ctx is not None:
+                await ctx.room.local_participant.publish_data(json.dumps(validated), reliable=True, topic='ciel.event')
+        turn_started = time.monotonic()
         turn = await self.replies.pipeline_turn() if self.replies is not None else {}
+        debug_log.record('voice_turn_prepare', speech_id=getattr(self.session.current_speech, 'id', None),
+                         ms=round((time.monotonic()-turn_started)*1000, 2))
+        prepared_at = time.monotonic()
         if self.ear is not None:
             await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
+        debug_log.record('voice_listener_wait', speech_id=getattr(self.session.current_speech, 'id', None),
+                         ms=round((time.monotonic()-prepared_at)*1000, 2))
         who = self.mind.route(chat_ctx, turn)
         work = self.mind.goals
         speech_id = getattr(self.session.current_speech, 'id', None)
@@ -328,6 +343,7 @@ class Ciel(Agent):
         taken: list[str] = []   # この返事で通した道具（体を動かす道具は 1 つだけ。mind.one_body_call）
         request_id, generation_started = uuid.uuid4().hex, time.monotonic()
         expired = False
+        first_delta = True
         debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'),
                          reaction_id=reaction.key[-1] if reaction else None, speech_id=speech)
         try:
@@ -349,6 +365,11 @@ class Ciel(Agent):
                 if chunk is None:
                     continue
                 delta = chunk if isinstance(chunk, str) else getattr(chunk, 'delta', None)
+                content = delta if isinstance(delta, str) else getattr(delta, 'content', None)
+                if content and first_delta:
+                    first_delta = False
+                    debug_log.record('voice_first_delta', id=request_id, speech_id=speech,
+                                     ms=round((time.monotonic()-generation_started)*1000, 2))
                 if isinstance(delta, str):
                     text.append(delta)
                 elif delta is not None:
@@ -381,6 +402,8 @@ class Ciel(Agent):
                  p.tasks_instructions, self._presence_text(presence), self._talk_text(talk),
                  self._game_text(),
                  p.image_voice_instructions if PIPELINE else '']
+        if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+            parts.append(p.voice_first_sentence)
         return '\n\n'.join(part.strip('\n') for part in parts if part)
 
     def _game_text(self) -> str:
@@ -448,7 +471,7 @@ class Ciel(Agent):
             speech = self.session.current_speech
             speech_id = speech.id if speech is not None else None
             return self._reaction_audio(self.volume.apply(emotion.tts_node(mode.drop_silent(text), self.events, self.aizuchi,
-                                                      stop=lambda spoken: self.preamble.stop(speech_id, spoken))), speech_id)
+                                                      stop=lambda spoken: self.preamble.stop(speech_id, spoken), speech_id=speech_id)), speech_id)
         return self.volume.apply(Agent.default.tts_node(self, text, model_settings))
 
     async def _reaction_audio(self, stream, speech_id):
@@ -728,8 +751,9 @@ async def entrypoint(ctx: JobContext) -> None:
         session.on('conversation_item_added', replies.on_item)   # 多人数で、シエルの質問への答えを待つ
     elif PIPELINE:
         session.on('user_state_changed', replies.on_user_state)   # 話者の区間・話している途中の相づち
+    encoder_task = None
     if SPEAKERS:
-        asyncio.create_task(replies.load_encoder())
+        encoder_task = asyncio.create_task(replies.load_encoder())
 
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions, history) if book is not None and store else None
@@ -804,8 +828,25 @@ async def entrypoint(ctx: JobContext) -> None:
     if book is not None:
         ctx.room.on('data_received', book.on_data)
     # 会話の録音・文字起こしを LiveKit Cloud に残さない（仕様書 8 章：ユーザーの音声と会話を保存しない）
+    readiness = None
+    if PIPELINE and not TEXT_ONLY and models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+        readiness = await voice_preparation.prepare(agent, replies, encoder_task)
+        agent.voice_readiness = readiness
+        debug_log.record('voice_ready', **{k: v for k, v in readiness.items() if k != 'type'})
+        def ready_request(packet):
+            if packet.topic != 'ciel.event':
+                return
+            try:
+                request = json.loads(packet.data)
+            except (ValueError, UnicodeError):
+                return
+            if isinstance(request, dict) and request.get('v') == 1 and request.get('type') == 'voice.ready_request':
+                asyncio.create_task(send('ciel.event', agent.voice_readiness))
+        ctx.room.on('data_received', ready_request)
     await session.start(room=ctx.room, agent=agent, record=False,
                         **({'room_options': agents.room_io.RoomOptions(audio_input=False)} if TEXT_ONLY else {}))
+    if readiness is not None:
+        await send('ciel.event', readiness)
     # アプリの「まとめをとる」で選べるテンプレート（minutes.py）
     await send('ciel.event', minute_taker.templates_event())
     # Unity で相手がシエルに触れたら、反応を話す（touch.py）。誰が触ったかは、声（話していた人）から推し量る

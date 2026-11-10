@@ -80,7 +80,7 @@ JSONLの`audio`はmanifestのあるディレクトリから解決する。各音
   --agent ciel-voice-bench --output .local/voice-results/baseline-live --rounds 3
 ```
 
-既定は音声トラックを30秒待ち、挨拶待ち10秒後に再生、追加無音を含む入力完了後30秒間を観測する。挨拶が長い構成では`--greeting-timeout 60`を指定すると、最小待機後に挨拶の音声を観測し、2.5秒間の静音を確認してから入力する。60秒以内に条件が成立しなければ試行エラーとなり、返答の観測期限は延長しない。毎試行後、接続と部屋を閉じる。終了コードは全試行が観測完了なら0、エラー・本返答タイムアウトがあれば1。認識品質の合否閾値はまだ設定していない。
+既定は準備・音声トラックを180秒の接続期限で待ち、挨拶待ち10秒後に再生、追加無音を含む入力完了後30秒間を観測する。挨拶が長い構成では`--greeting-timeout 60`を指定すると、最小待機後に挨拶の音声を観測し、2.5秒間の静音を確認してから入力する。60秒以内に条件が成立しなければ試行エラーとなり、返答の観測期限は延長しない。毎試行後、接続と部屋を閉じる。終了コードは全試行が観測完了なら0、エラー・本返答タイムアウトがあれば1。認識品質の合否閾値はまだ設定していない。
 
 LiveKitの利用環境やworkerのbackend次第では課金されるため、[外部API試験](paid-checks-ja.md)の対象を確認する。スクリプトはクラウドへ自動切替せず、TTS合成の追加要求も出さない。OpenAIのワーカーを指定した場合の料金は別に発生する。
 
@@ -106,6 +106,32 @@ LiveKitの利用環境やworkerのbackend次第では課金されるため、[�
 結果はサーバーの`results/<実行ID>/`、回収先はGit対象外の`server/benchmark/data/voice-home/results/<実行ID>/`。各実行のソースアーカイブ、モデル・イメージ・コード指紋、前後のサービス状態、2秒ごとのGPU/CPUモード・処理中枠数・負荷、該当部屋のデバッグログを保持する。既存サービスの同時要求やキャッシュは制御しない。`prepare`で毎回新しい実行IDを作り、既存結果は上書きしない。
 
 Gitのないコンテナでは`--source-provenance`に配置元のGit識別・dirty状態・ソースSHA-256を持つJSONを指定する。実行器・採点器・デコーダーの実ファイルとの一致を検証し、偽のクリーンなGit状態を作って代用しない。helperは配置時にこのJSONを生成し、測定ごとのソースアーカイブにも含める。
+
+### 高速化の専用比較環境
+
+`voice-fast-home.py`は通常ワーカーを変更せず、起動中の開発イメージに評価用のソース・設定を読み取り専用でマウントする。`baseline`は`CIEL_VOICE_FAST=0`、`fast`は`1`。モデル重み・Vosk・音声・観測時間は共通にする。`reuse`は以前の実行IDの録音と注釈を複製し、TTSで作り直さない。
+
+専用受信口は8097、制御先は8096。既存8094/8095を参照するだけで、通常の共有APIを再起動せず、追加モデルもロードしない。推論世代は専用受信口を指すため、ネイティブモデルの再起動を検証したとは説明しない。この経路を通らない既存クライアントの背景処理まで優先制御できたという保証もない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py stage
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py reuse --corpus-run 20261110T020907Z
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py proxy-start
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py start --variant baseline
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py live --variant baseline --rounds 3
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py stop --variant baseline
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py start --variant fast
+# 単発を確認してから反復。tagを変えると既存結果を残して別の実行を保存できる
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py live --variant fast --tag final --smoke --rounds 1
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py live --variant fast --tag final --rounds 3
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py stop --variant fast
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-fast-home.py proxy-stop
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/voice-home.py pull
+```
+
+改修版では`--require-ready`相当が自動で有効になる。`voice.ready` v1を要求・検証し、未配信・異なる版・失敗を準備完了へ変換しない。準備済み通知の到着は`startup_ready_ms`、準備そのものは`readiness.elapsed_ms`に保存する。接続/初期化は180秒の別期限、発話入力後の観測は30秒のまま。最初の挨拶と2.5秒の静音も確認する。現行の測定器は試料ごとに部屋を作るため、長時間の同一部屋での品質・履歴増加は別の確認が必要。
+
+競合時の入場制御だけを検証する場合は、ワーカーの試験を終えてから`contention --variant baseline`と`contention --variant fast`を専用受信口の稼働中に実行する。各1回、背景2件×最大128トークンと前景1件×最大4トークンで、フィクスチャは`server/benchmark/voice/contention.json`。準備済みGPU・処理中要求なしを確認してから始める。これは短いLLM出力までの時間と入場待ちの比較で、音声会話の応答時間には混ぜない。
 
 ## 結果の読み方と次の改善
 

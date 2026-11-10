@@ -1,0 +1,4 @@
+{
+  "background": {"model":"local","messages":[{"role":"user","content":"春の公園を歩く場面を、具体的な情景を含めて八百文字くらいで書いてください。"}],"max_tokens":128,"stream":true,"chat_template_kwargs":{"enable_thinking":false}},
+  "foreground": {"model":"local","messages":[{"role":"user","content":"OKとだけ答えてください。"}],"max_tokens":4,"stream":true,"chat_template_kwargs":{"enable_thinking":false}}
+}

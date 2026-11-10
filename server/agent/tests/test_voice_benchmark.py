@@ -150,7 +150,7 @@ class VoiceBenchmarkTest(unittest.TestCase):
         async def silence(*args, **kwargs):
             # Actual SDK data uses int16 memoryview, not a byte-oriented view.
             yield SimpleNamespace(frame=rtc.AudioFrame(bytes(640), 16000, 1, 320))
-        args = SimpleNamespace(agent='test', timeout=.01, settle_seconds=0,
+        args = SimpleNamespace(agent='test', timeout=.01, connect_timeout=.01, require_ready=False, settle_seconds=0,
                                greeting_timeout=.001, rms_threshold=.01)
         with patch.object(api, 'LiveKitAPI', return_value=client), patch.object(api, 'AccessToken', return_value=token), \
              patch.object(rtc, 'Room', return_value=room), patch.object(rtc, 'AudioStream', side_effect=silence), \
@@ -160,6 +160,35 @@ class VoiceBenchmarkTest(unittest.TestCase):
             source.assert_not_called()
         client.room.delete_room.assert_awaited_once()
         client.aclose.assert_awaited_once()
+
+
+    def test_live_refuses_unsupported_ready_version_before_input(self):
+        from livekit import api, rtc
+        handlers = {}
+        room = MagicMock()
+        room.on.side_effect = lambda name: lambda callback: handlers.setdefault(name, callback)
+        async def connect(*args):
+            handlers['data_received'](SimpleNamespace(topic='ciel.event',
+                data=json.dumps({'v':2,'type':'voice.ready','ready':True}).encode()))
+        room.connect = AsyncMock(side_effect=connect)
+        room.disconnect = AsyncMock()
+        room.local_participant.publish_data = AsyncMock()
+        client = MagicMock()
+        client.room.create_room = AsyncMock()
+        client.room.delete_room = AsyncMock()
+        client.aclose = AsyncMock()
+        token = MagicMock()
+        token.with_identity.return_value = token
+        token.with_name.return_value = token
+        token.with_grants.return_value = token
+        args = SimpleNamespace(agent='test', require_ready=True, connect_timeout=.1)
+        with patch.object(api,'LiveKitAPI',return_value=client), patch.object(api,'AccessToken',return_value=token), \
+             patch.object(rtc,'Room',return_value=room), patch.object(rtc,'AudioSource') as source, \
+             patch.dict(runner.os.environ,{'LIVEKIT_URL':'ws://invalid'}):
+            with self.assertRaisesRegex(ValueError,'readiness'):
+                asyncio.run(runner.live_trial({},args))
+            source.assert_not_called()
+        client.room.delete_room.assert_awaited_once()
 
 
 if __name__ == '__main__':
