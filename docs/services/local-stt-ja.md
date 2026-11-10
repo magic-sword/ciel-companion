@@ -1,8 +1,8 @@
-# CPUで動くローカル音声認識（Vosk）
+# CPUで動くローカル音声認識
 
 > 責務：CPU音声認識のアダプター、途中/確定結果、モデル配置と評価方法。
 
-Vosk 0.3.45と日本語小型モデル`vosk-model-small-ja-0.22`を自宅サーバーへ配置し、CPUだけの逐次認識と、実LiveKitを通す開発ワーカーの合成音声への返答受信を測定した。通常の開発用・本番会話サービスは測定のために再配置・再起動していない。現在の条件・性能値・生データは[確認状況](../testing/verification-status-ja.md)を参照する。人のマイク音声による会話全体の性能は未測定。
+Voskの逐次認識と、faster-whisperのCPU int8認識を選択できる。現在の採用・配布範囲、条件・性能値・生データは[確認状況](../testing/verification-status-ja.md)を参照する。合成音声の比較と、人のマイクでの品質は区別する。
 
 ## 責務と入力の扱い
 
@@ -12,7 +12,15 @@ Unityから受け取る音声を、会話ホストのVosk STTアダプターがC
 
 途中結果はLiveKitのINTERIM_TRANSCRIPT、認識区間の確定結果はFINAL_TRANSCRIPTへ渡す。入力終了時には残りを確定し、途中結果を勝手に確定へ昇格させない。会話ホストの発話区切り・割り込み・話者識別・確定した依頼の受付は既存処理を使う。日本語トークン間の空白を整理し、停止の依頼が分断されないようにする。ASCII語句内の空白は保持する。
 
-`CIEL_LLM_BACKEND=local`の音声入力はVoskが既定。OpenAI STTへ自動で戻さず、モデル未配置・不正設定は明示的なエラー。`CIEL_INPUT=text`なら音声モデルをロードしない。OpenAIのLLMとVoskの併用も可能だが、LLMの課金は別に発生する。Voskはpipeline＋Irodoriでのみ利用でき、Realtimeモードへの指定は起動時に拒否する。
+`CIEL_LLM_BACKEND=local`でSTT_BACKENDが空ならVosk。`CIEL_STT_BACKEND=whisper`でCPU Whisperを選ぶ。OpenAI STTへ自動で戻さず、モデル未配置・不正設定は明示的なエラー。`CIEL_INPUT=text`なら音声モデルをロードしない。ローカルSTTはpipeline＋Irodoriでのみ利用でき、Realtimeモードへの指定は起動時に拒否する。
+
+### Whisperの発話認識
+
+`whisper_engine.py`がfaster-whisper 1.2.1のsmallモデルをCPU int8、4スレッド、beam_size=1、日本語固定で処理する。モデルはプロセス内で共有し、ロードと推論は会話イベントループ外で行う。実行時のモデル取得・GPU利用はしない。モデルは`Systran/faster-whisper-small`から事前配置し、重み指紋を記録する。[公式実装](https://github.com/SYSTRAN/faster-whisper)のCPU推論とinitial_promptを使用する。
+
+会話では既存のVADとLiveKitの`StreamAdapter`で発話区間を選び、Whisperへ渡す。短い発話が二重に除去されないよう、認識器内のVADは無効にする。途中文字列は配信せず、確定結果だけを渡す。単体録音評価では外側のVADがないのでWhisper内のVADを有効にし、会話全体の確定遅延とは分けて測る。無音・短い発話・途中の間の実経路は別途確認する。
+
+語彙ヒントは`persona.toml`の`stt_vocabulary_file`（既定`prompts/stt_vocabulary.md`）と、ホストが取得した名前を使う。認識後の「シール→シエル」の文字置換は行わない。返答側の`voice_first_sentence.md`では、呼びかけの表記揺れを理由に名前の訂正を始めず、判断に必要な数字・否定・操作対象が曖昧なら確認する。
 
 ## 設定する.envを区別する
 
@@ -34,6 +42,14 @@ CIEL_INPUT=voice
 # 通常は空。LLM_BACKEND=localなら自動でvoskになる。
 CIEL_STT_BACKEND=
 CIEL_VOSK_MODELS_DIR=${HOME}/models/vosk
+```
+
+Whisperを選ぶ環境の設定は次のとおり。ホストの`~/models/faster-whisper/small`に`model.bin`、`config.json`、`tokenizer.json`、`vocabulary.txt`を事前配置する。Composeは親を`/models-whisper`へ読み取り専用でマウントする。モデルを含むディレクトリ全体と取得元の版・SHA-256を保持する。
+
+```dotenv
+CIEL_STT_BACKEND=whisper
+CIEL_WHISPER_MODELS_DIR=${HOME}/models/faster-whisper
+CIEL_WHISPER_MODEL_PATH=/models-whisper/small
 ```
 
 モデルはホスト側`~/models/vosk/vosk-model-small-ja-0.22`に置く。Composeは親ディレクトリを`/models`へ読み取り専用でマウントする。モデルはGitへ含めない。直接Pythonで動かす場合は`CIEL_MODEL=pipeline`、`CIEL_VOICE=irodori`、`CIEL_VOSK_MODEL_PATH`に実際のモデルディレクトリを指定する。

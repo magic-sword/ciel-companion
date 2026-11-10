@@ -39,7 +39,7 @@ CIEL_MINUTES_DISCORD_WEBHOOK=
 
 `CIEL_LOCAL_LLM_MODEL`はAPIに送るモデルIDの任意の上書き。既定`local`を公開する共有APIでは設定不要。実際の重みは共有API側の`LOCAL_LLM_FILE`が選ぶ。`CIEL_LOCAL_ROLES`は役目別のローカル利用、`CIEL_LOCAL_LLM_CONTROL`は歌唱中のGPU解放先で、既定は`http://127.0.0.1:8095`。モデルの役目別設定やWebhookも環境ごとのファイルで設定できる。
 
-Voskはホストのモデル親ディレクトリをコンテナの`/models`へ読み取り専用でマウントする。モデルの実行時取得・OpenAIへの代替接続で欠落を隠さない。人のマイク・停止・返答の品質は設定解決や起動確認とは別に測定する。[音声認識](../services/local-stt-ja.md)を参照する。
+Voskはホストのモデル親ディレクトリをコンテナの`/models`へ読み取り専用でマウントする。CPU Whisperを使う環境は`CIEL_STT_BACKEND=whisper`、`CIEL_WHISPER_MODELS_DIR=${HOME}/models/faster-whisper`、`CIEL_WHISPER_MODEL_PATH=/models-whisper/small`を指定する。STT_BACKEND空の既定は変えず、環境ごとに明示選択する。モデルの実行時取得・OpenAIへの代替接続で欠落を隠さない。人のマイク・停止・返答の品質は設定解決や起動確認とは別に測定する。[音声認識](../services/local-stt-ja.md)を参照する。
 
 ## 読み込みと優先順位
 

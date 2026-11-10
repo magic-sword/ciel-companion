@@ -29,6 +29,7 @@ services:
       - CIEL_INPUT=${CIEL_INPUT:-}
       - CIEL_STT_BACKEND=${CIEL_STT_BACKEND:-}
       - CIEL_VOSK_MODEL_PATH=${CIEL_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
+      - CIEL_WHISPER_MODEL_PATH=${CIEL_WHISPER_MODEL_PATH:-/models-whisper/small}
       - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
       - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
       - CIEL_LOCAL_TIMEOUT=${CIEL_LOCAL_TIMEOUT:-90}
@@ -45,6 +46,7 @@ services:
       # 編集した設定を、新しい会話から反映する（イメージの再ビルドは不要）。
       - ./agent/config:/app/config:ro
       - ${CIEL_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
+      - ${CIEL_WHISPER_MODELS_DIR:-${HOME}/models/faster-whisper}:/models-whisper:ro
       # 議事録の下書きを Discord へ送れなかったときの保存先（Git・デプロイの外）
       - ./agent/data/minutes:/app/data/minutes
       # デバッグ用の会話ログ（debug_log.py。ふだんは残さない。scripts/server/debug-log.sh で入れる・取り出す）
@@ -90,6 +92,7 @@ services:
       - LOCAL_LLM_IMAGE_MAX_EDGE=${LOCAL_LLM_IMAGE_MAX_EDGE:-256}
       - LOCAL_LLM_CTX=${LOCAL_LLM_CTX:-32768}
       - LOCAL_LLM_PARALLEL=${LOCAL_LLM_PARALLEL:-2}
+      - LOCAL_LLM_UBATCH=${LOCAL_LLM_UBATCH:-512}
       - LOCAL_LLM_MODE=${LOCAL_LLM_MODE:-gpu}
     volumes:
       - ${LOCAL_LLM_DIR:-${HOME}/models/llm}:/models:ro

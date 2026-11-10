@@ -38,7 +38,7 @@ def reuse(identity):
     print(folder)
 
 
-def start(variant):
+def start(variant, stt_backend=None, image=None):
     (ROOT/'server/agent/data').mkdir(exist_ok=True)
     name = 'ciel-voice-'+variant
     port = 8098 if variant == 'baseline' else 8099
@@ -51,17 +51,21 @@ def start(variant):
                CIEL_VOICE_FAST='1' if variant == 'fast' else '0',
                CIEL_DEBUG_LOG='1', CIEL_MINUTES_DISCORD_WEBHOOK='',
                CIEL_LOCAL_LLM_URL='http://127.0.0.1:8097/v1', CIEL_LOCAL_LLM_CONTROL='http://127.0.0.1:8096')
+    if stt_backend:
+        env['CIEL_STT_BACKEND'] = stt_backend
+    env['CIEL_WHISPER_MODEL_PATH'] = '/models-whisper/small'
     folder = Path((ROOT/'latest.txt').read_text())/'workers'/variant
     folder.mkdir(parents=True, exist_ok=True)
     child_env = dict(os.environ, **env)
     command = ['docker','run','-d','--name',name,'--label','ciel.voice-evaluation=1','--network','host',
                '-v',str(ROOT/'server/agent')+':/app:ro','-v',str(folder)+':/app/data',
-               '-v',str(measure.MODEL.parent)+':/models:ro']
+               '-v',str(measure.MODEL.parent)+':/models:ro',
+               '-v',str(Path.home()/'models/faster-whisper')+':/models-whisper:ro']
     if existing['Config'].get('User'):
         command += ['--user',existing['Config']['User']]
     for key in env:
         command += ['-e',key]
-    command.append(existing['Image'])
+    command.append(image or existing['Image'])
     subprocess.run(command,env=child_env,check=True,timeout=60)
     for _ in range(60):
         with socket.socket() as sock:
@@ -162,12 +166,14 @@ if __name__ == '__main__':
     parser.add_argument('--rounds',type=int,default=3)
     parser.add_argument('--smoke',action='store_true')
     parser.add_argument('--tag')
+    parser.add_argument('--stt-backend', choices=['vosk','whisper'])
+    parser.add_argument('--image', help='Evaluation image override for new dependencies')
     args=parser.parse_args()
     if args.action=='reuse':reuse(args.corpus_run)
     elif args.action=='proxy-start':proxy_start()
     elif args.action=='proxy-stop':proxy_stop()
     elif args.action=='contention':contention(args.variant)
-    elif args.action=='start':start(args.variant)
+    elif args.action=='start':start(args.variant,args.stt_backend,args.image)
     elif args.action=='stop':stop(args.variant)
     else:
         measure.DEV='ciel-voice-'+args.variant

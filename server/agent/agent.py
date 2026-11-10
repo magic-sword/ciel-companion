@@ -105,8 +105,8 @@ INPUT, STT_BACKEND = speech_input.settings(models.LOCAL_TEST)
 if INPUT not in ('text', 'voice'):
     raise ValueError('CIEL_INPUT must be text or voice')
 TEXT_ONLY = INPUT == 'text'
-if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY or STT_BACKEND == 'vosk') and not PIPELINE:
-    raise ValueError('Local LLM / Vosk / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
+if (models.LOCAL_TEST or models.is_local('mind') or TEXT_ONLY or STT_BACKEND in ('vosk', 'whisper')) and not PIPELINE:
+    raise ValueError('Local LLM / local STT / text input requires CIEL_MODEL=pipeline and CIEL_VOICE=irodori')
 BENCHMARK = os.environ.get('CIEL_BENCHMARK') == '1'
 if BENCHMARK and (not PIPELINE or not TEXT_ONLY or os.environ.get('CIEL_DB_URL')
                   or os.environ.get('CIEL_MINUTES_DISCORD_WEBHOOK')
@@ -182,8 +182,8 @@ def make_pipeline(names: list[str]) -> dict:
     if TEXT_ONLY:
         return {'turn_detection': 'manual'}
     vad = inference.VAD()
-    if STT_BACKEND == 'vosk':
-        stt = speech_input.local_stt()
+    if STT_BACKEND in ('vosk', 'whisper'):
+        stt = speech_input.local_stt(vad=vad, names=names)
     else:
         hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
         model = models.model('stt')

@@ -11,6 +11,7 @@
 | ファイル | 責務 |
 |---|---|
 | `server/agent/config/persona.toml` | 本文ファイルの選択 |
+| `server/agent/config/prompts/stt_vocabulary.md` | CPU Whisperへ渡す固有名詞の語彙ヒント。会話本文や認識後の置換規則ではない |
 | `server/agent/config/prompts/character.md` | 人物像・話し方・会話上のルール |
 | `server/agent/config/prompts/ciel_self.md` | シエル自身の好み・苦手・こだわり（企画の設定資料から、好みと癖だけを選んだもの。物語の人や場所は入れない）。会話モデル（心・小脳）と内なる考えの両方に渡す。[内なる考え](conversation-pipeline-ja.md) |
 | `server/agent/config/prompts/ciel_growth.md` | 会話の終わりに、本当にあった出来事からシエルの好みが育つかを決める係への指示。処理は `growth.py`。[好みの育ち方](../services/shared-memory-ja.md) |

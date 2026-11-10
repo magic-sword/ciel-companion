@@ -18,9 +18,13 @@ if __name__=='__main__':
     parser.add_argument('--rounds',type=int,default=3)
     parser.add_argument('--smoke',action='store_true')
     parser.add_argument('--tag')
+    parser.add_argument('--stt-backend', choices=['vosk','whisper'])
+    parser.add_argument('--image')
     args=parser.parse_args()
     command=['python3','work/ciel-voice-evaluation/server/stt/voice_fast_home.py',args.action,
              '--variant',args.variant,'--corpus-run',args.corpus_run,'--rounds',str(args.rounds)]
     if args.smoke:command.append('--smoke')
     if args.tag:command += ['--tag',args.tag]
+    if args.stt_backend:command += ['--stt-backend',args.stt_backend]
+    if args.image:command += ['--image',args.image]
     raise SystemExit(subprocess.run(home.ssh_args()+[shlex.join(command)]).returncode)

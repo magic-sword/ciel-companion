@@ -85,6 +85,8 @@ def reply_options(reasoning_effort: str) -> dict:
 def model(role: str) -> str:
     if role == 'stt':
         import speech_input
+        if speech_input.settings(LOCAL_TEST)[1] == 'whisper':
+            return 'faster-whisper:' + os.environ.get('CIEL_WHISPER_MODEL_PATH', '/models-whisper/small').rstrip('/').rsplit('/', 1)[-1]
         if speech_input.settings(LOCAL_TEST)[1] == 'vosk':
             return 'vosk:' + os.environ.get('CIEL_VOSK_MODEL_PATH', '/models/vosk-model-small-ja-0.22').rstrip('/').rsplit('/', 1)[-1]
     if is_local(role):

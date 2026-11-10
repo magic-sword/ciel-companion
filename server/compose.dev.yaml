@@ -31,6 +31,7 @@ services:
       - CIEL_INPUT=${CIEL_INPUT:-}
       - CIEL_STT_BACKEND=${CIEL_STT_BACKEND:-}
       - CIEL_VOSK_MODEL_PATH=${CIEL_VOSK_MODEL_PATH:-/models/vosk-model-small-ja-0.22}
+      - CIEL_WHISPER_MODEL_PATH=${CIEL_WHISPER_MODEL_PATH:-/models-whisper/small}
       # 状態確認の HTTP の口（本番は 8081）
       - CIEL_AGENT_PORT=8091
       - CIEL_DEBUG_LOG=1
@@ -50,6 +51,7 @@ services:
     volumes:
       - ./agent/config:/app/config:ro
       - ${CIEL_VOSK_MODELS_DIR:-${HOME}/models/vosk}:/models:ro
+      - ${CIEL_WHISPER_MODELS_DIR:-${HOME}/models/faster-whisper}:/models-whisper:ro
       - ./agent/data/minutes:/app/data/minutes
       - ./agent/data/debug:/app/data/debug
     restart: unless-stopped

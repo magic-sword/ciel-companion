@@ -6,6 +6,27 @@
 
 エージェントの作業手順は[共有評価スキル](../../.claude/skills/ciel-voice-benchmark/SKILL.md)。Codexは[参照用入口](../../.agents/skills/ciel-voice-benchmark/SKILL.md)から同じ正本を読む。コマンド・採点仕様はこの文書で管理する。
 
+## 認識モデルと呼びかけの比較
+
+`server/benchmark/voice/conversation-corpus.json`は「シエル」と一般語の「シール」「シェル」、数字・否定・訂正・途中の間を含む合成用台本。準備時に一度生成したWAVと注釈を固定し、全モデルで再利用する。人の発音や雑音の評価には別の正解付き録音が必要。
+
+```powershell
+python scripts/server/voice-home.py stage
+python scripts/server/voice-home.py prepare --corpus-spec server/benchmark/voice/conversation-corpus.json
+python scripts/server/voice-home.py stt --stt-model vosk-model-small-ja-0.22 --smoke
+python scripts/server/voice-home.py stt --stt-model vosk-model-small-ja-0.22 --rounds 3
+python scripts/server/voice-home.py stt --stt-model vosk-model-ja-0.22 --smoke
+python scripts/server/voice-home.py stt --stt-model vosk-model-ja-0.22 --rounds 3
+```
+
+Whisper単体は配置済みモデルと同じコーパスを`benchmark-whisper.py --model <モデルdir> --corpus <corpus.jsonl> --prompt <stt_vocabulary.md> --output <新規JSON> --rounds 3`へ渡す。最初は`--smoke --rounds 1`。faster-whisperを含む会話イメージでCPU4・RAM4GiBに制限して実行する。認識処理時間は録音全体が揃った後の処理であり、逐次Voskの発話確定時間やLiveKit往復時間とは直接比較しない。単体ではWhisper内VAD、会話ではホストVADを使用する。CERの正規化は既存定義のままで、漢数字と算用数字の差も誤りとして残す。
+
+`voice-fast-home.py start --variant fast --stt-backend whisper --image <評価用イメージ>`で新しい依存関係を含む分離ワーカーを指定できる。`live --variant fast --smoke --rounds 3 --tag <識別子>`は同じWAV、準備完了と初回挨拶終了、既定の観測期限で比較する。使用前に`reuse --corpus-run <保存済みrun>`で比較元を明示する。評価後は`stop --variant fast`と、起動した評価受信口の`proxy-stop`を実施する。
+
+返答側の名前訂正は`benchmark-voice-text.py`と`server/benchmark/voice/text-cases.json`で別に検証する。`--prompt-dir`、`--voice-prompt`、`--cases`、`--output`、`--rounds`を指定し、同じ共有8094へ文字を送る。変更前後の本文指紋と返答を保存し、各rubricを確認する。これはASR精度でも音声遅延でもなく、自動の合格判定も行わない。
+
+`benchmark-prefix-cache.py`は固定promptと変化する末尾で入力キャッシュを診断する。1枠を明示指定する診断なので通常会話の遅延値にはしない。キャッシュが使えない原因を推測だけでモデル設定へ反映しない。
+
 ## 評価の根拠
 
 ローカルLLMの重み変更を比べる場合は[人格・身体性・ツール・一般性能の評価](weight-space-benchmark-ja.md)も併用する。正解テキストとSTT認識文を分けてLLMへ入力し、CERの変化と意味の保持、推論遅延と本返答音声遅延を区別する。

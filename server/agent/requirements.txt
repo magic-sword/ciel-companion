@@ -13,3 +13,7 @@ psycopg[binary]==3.2.9
 pgvector==0.4.1
 
 vosk==0.3.45   # CPU streaming Japanese STT; no external API
+faster-whisper==1.2.1  # CPU int8, offline model files; VAD-delimited recognition
+ctranslate2==4.8.5
+onnxruntime==1.31.1
+av==18.1.0

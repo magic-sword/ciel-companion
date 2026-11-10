@@ -39,8 +39,8 @@ async def prepare(agent, replies, encoder_task=None):
         await stage('speaker', speaker)
 
     async def decoder():
-        from vosk_engine import load_model
-        await asyncio.to_thread(load_model, os.environ.get('CIEL_VOSK_MODEL_PATH', '/models/vosk-model-small-ja-0.22'))
+        import speech_input
+        await asyncio.to_thread(speech_input.prepare)
     await stage('stt', decoder)
     text = agent.persona.voice_warmup.strip()
     if not text:

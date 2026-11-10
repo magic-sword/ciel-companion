@@ -11,6 +11,7 @@ SHARED_KEYS = frozenset({'LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET',
                          'OPENAI_API_KEY', 'YOUTUBE_API_KEY', 'CIEL_DB_PASSWORD'})
 COMPOSE_KEYS = frozenset({'CIEL_MODEL', 'CIEL_LLM_BACKEND', 'CIEL_INPUT',
                          'CIEL_STT_BACKEND', 'CIEL_VOSK_MODEL_PATH',
+                         'CIEL_WHISPER_MODEL_PATH',
                          'CIEL_LOCAL_LLM_URL', 'CIEL_LOCAL_LLM_MODEL', 'CIEL_LOCAL_TIMEOUT'})
 
 def read(path):

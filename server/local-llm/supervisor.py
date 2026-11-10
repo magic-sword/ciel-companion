@@ -34,11 +34,15 @@ IMAGE_MAX_EDGE = int(os.environ.get('LOCAL_LLM_IMAGE_MAX_EDGE', '256'))
 CONTROL_PORT = int(os.environ.get('LOCAL_LLM_CONTROL_PORT', '8095'))
 CTX = os.environ.get('LOCAL_LLM_CTX', '32768')
 PARALLEL = int(os.environ.get('LOCAL_LLM_PARALLEL', '2'))
+UBATCH = int(os.environ.get('LOCAL_LLM_UBATCH', '512'))
+if UBATCH not in (128, 256, 512):
+    raise ValueError('LOCAL_LLM_UBATCH must be 128, 256 or 512')
 # With explicit --parallel, llama.cpp divides the total context among slots.
 # LOCAL_LLM_CTX describes capacity per request, not the sum across clients.
 COMMON = ['-m', MODEL, '--host', HOST, '--port', str(INFERENCE_PORT), '-c', str(int(CTX)*PARALLEL), '-t', '8', '-tb', '16', '--jinja',
           '--alias', os.environ.get('LOCAL_LLM_ALIAS', 'local')]
 COMMON += ['--parallel', str(PARALLEL)]
+COMMON += ['--ubatch-size', str(UBATCH)]
 if MMPROJ:
     COMMON += ['--mmproj', MMPROJ, '--no-mmproj-offload', '--image-max-tokens', '1024']
 ARGS = {'gpu': ['-ngl', os.environ.get('LOCAL_LLM_GPU_LAYERS', '99'),
@@ -131,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/mode':
             return self._send(404, {'error': 'not_found'})
         self._send(200, {'mode': _mode, 'ready': _healthy(), 'model': os.path.basename(MODEL),
-                         'context': int(CTX), 'parallel': PARALLEL, 'generation': _generation,
+                         'context': int(CTX), 'parallel': PARALLEL, 'ubatch': UBATCH, 'generation': _generation,
                          'generation_scope': 'inference_process'})
 
     def do_POST(self):

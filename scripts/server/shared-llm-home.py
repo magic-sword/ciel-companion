@@ -68,13 +68,13 @@ try:
     text=text.replace('LOCAL_LLM_CTX=${LOCAL_LLM_CTX:-12288}','LOCAL_LLM_CTX=${LOCAL_LLM_CTX:-32768}')
     anchor='      - LOCAL_LLM_CONTROL_PORT=8095'
     assert text.count(anchor)==1, 'Unexpected local-llm service definition'
-    for key,default in (('LOCAL_LLM_CTX','32768'),('LOCAL_LLM_PARALLEL','2'),('LOCAL_LLM_MODE','gpu')):
+    for key,default in (('LOCAL_LLM_CTX','32768'),('LOCAL_LLM_PARALLEL','2'),('LOCAL_LLM_MODE','gpu'),('LOCAL_LLM_UBATCH','512')):
         if key+'=' not in text:
             text=text.replace(anchor,anchor+'\\n      - '+key+'=${'+key+':-'+default+'}')
     for key,value in [('LOCAL_LLM_INFERENCE_PORT','18094'),('LOCAL_LLM_MMPROJ','${LOCAL_LLM_MMPROJ-/models/mmproj-F16-Qwen3.5-35B-A3B.gguf}'),('LOCAL_LLM_IMAGE_MAX_EDGE','${LOCAL_LLM_IMAGE_MAX_EDGE:-256}')]:
         if key+'=' not in text:text=text.replace(anchor,anchor+'\\n      - '+key+'='+value)
     (root/'compose.yaml').write_text(text)
-    settings={'LOCAL_LLM_CTX':str(CONTEXT),'LOCAL_LLM_PARALLEL':str(PARALLEL),'LOCAL_LLM_MODE':'gpu'}
+    settings={'LOCAL_LLM_CTX':str(CONTEXT),'LOCAL_LLM_PARALLEL':str(PARALLEL),'LOCAL_LLM_MODE':'gpu','LOCAL_LLM_UBATCH':str(UBATCH)}
     lines=(root/'.env').read_text().splitlines()
     lines=[line for line in lines if line.split('=',1)[0].strip() not in settings]
     lines += [key+'='+value for key,value in settings.items()]
@@ -84,6 +84,7 @@ try:
     command('build','local-llm')
     command('up','-d','--no-deps','local-llm')
     after=wait_ready(CONTEXT,PARALLEL)
+    assert after.get('ubatch') == UBATCH, 'Inference microbatch setting was not applied'
     info={'directory':str(out),'before':before,'after':after,'source':PROVENANCE,
           'source_sha256':{name:hashlib.sha256(content.encode()).hexdigest() for name,content in PAYLOAD.items()}}
     (out/'configuration.json').write_text(json.dumps(info,indent=2))
@@ -159,6 +160,7 @@ def main():
     ap.add_argument('action',choices=['status','configure','probe','pull'])
     ap.add_argument('--context',type=int,default=32768,choices=[16384,32768])
     ap.add_argument('--parallel',type=int,default=2,choices=[1,2,4])
+    ap.add_argument('--ubatch',type=int,default=512,choices=[128,256,512])
     ap.add_argument('--long-repeats',type=int,default=1400,choices=[700,1400],help='Synthetic input size: about 14.7k or 29.4k tokens')
     args=ap.parse_args()
     if args.action=='pull':
@@ -180,7 +182,7 @@ def main():
     else:
         payload={name:(ROOT/'server'/name).read_text(encoding='utf-8') for name in ('local-llm/supervisor.py','local-llm/gateway.py','local-llm/Dockerfile')}
         provenance={'git_commit':subprocess.check_output(['git','-c',f'safe.directory={ROOT.as_posix()}','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'working_tree':True}
-        home.remote(COMMON+'\nPAYLOAD='+repr(payload)+'\nPROVENANCE='+repr(provenance)+'\nCONTEXT='+str(args.context)+'\nPARALLEL='+str(args.parallel)+'\n'+CONFIGURE)
+        home.remote(COMMON+'\nPAYLOAD='+repr(payload)+'\nPROVENANCE='+repr(provenance)+'\nCONTEXT='+str(args.context)+'\nPARALLEL='+str(args.parallel)+'\nUBATCH='+str(args.ubatch)+'\n'+CONFIGURE)
 
 if __name__=='__main__':
     main()

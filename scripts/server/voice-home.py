@@ -16,7 +16,11 @@ sys.path.insert(0, str(ROOT/'server/agent'))
 from voice_benchmark import sha256
 
 FILES = ['scripts/server/benchmark-voice.py', 'server/agent/voice_benchmark.py',
-         'server/agent/vosk_engine.py', 'server/stt/voice_measure_home.py']
+         'server/agent/vosk_engine.py', 'server/stt/voice_measure_home.py',
+         'server/benchmark/voice/conversation-corpus.json', 'scripts/server/benchmark-prefix-cache.py']
+FILES += ['scripts/server/benchmark-whisper.py', 'server/agent/config/prompts/stt_vocabulary.md']
+FILES += ['scripts/server/benchmark-voice-text.py', 'server/benchmark/voice/text-cases.json']
+FILES += ['server/agent/whisper_engine.py', 'server/agent/whisper_stt.py']
 
 
 def stage():
@@ -52,6 +56,8 @@ def main():
     parser.add_argument('--rounds', type=int, default=1)
     parser.add_argument('--smoke', action='store_true', help='Use only the greeting')
     parser.add_argument('--settled', action='store_true', help='Require initial greeting to finish before live input')
+    parser.add_argument('--corpus-spec', help='prepare: staged synthesis specification, relative to evaluation root')
+    parser.add_argument('--stt-model', choices=['vosk-model-small-ja-0.22', 'vosk-model-ja-0.22'])
     args = parser.parse_args()
     if args.action == 'stage':
         stage()
@@ -74,6 +80,14 @@ def main():
             command.append('--smoke')
         if args.settled:
             command.append('--settled')
+        if args.stt_model:
+            if args.action != 'stt':
+                parser.error('stt-model applies only to stt')
+            command += ['--stt-model', args.stt_model]
+        if args.corpus_spec:
+            if args.action != 'prepare' or Path(args.corpus_spec).is_absolute() or '..' in Path(args.corpus_spec).parts:
+                parser.error('corpus-spec is a relative staged path for prepare only')
+            command += ['--corpus-spec', 'work/ciel-voice-evaluation/'+args.corpus_spec]
         import shlex
         process = subprocess.run(home.ssh_args()+[shlex.join(command)])
         sys.exit(process.returncode)

@@ -45,9 +45,9 @@ def snapshot():
     assert env.get('CIEL_LLM_BACKEND') == 'local' and env.get('CIEL_INPUT') == 'voice'
     assert env.get('CIEL_AGENT_NAME') in ('ciel-dev', 'ciel-voice-bench') and env.get('CIEL_MEMORY_SCOPE') == 'dev'
     assert env.get('CIEL_MODEL') == 'pipeline' and env.get('CIEL_VOICE') == 'irodori'
-    assert env.get('CIEL_STT_BACKEND', '') in ('', 'vosk')
+    assert env.get('CIEL_STT_BACKEND', '') in ('', 'vosk', 'whisper')
     safe_keys = ['CIEL_MODEL', 'CIEL_INPUT', 'CIEL_LLM_BACKEND', 'CIEL_STT_BACKEND', 'CIEL_VOICE',
-                 'CIEL_AGENT_NAME', 'CIEL_MEMORY_SCOPE', 'CIEL_VOSK_MODEL_PATH', 'CIEL_LOCAL_LLM_URL', 'CIEL_VOICE_FAST']
+                   'CIEL_AGENT_NAME', 'CIEL_MEMORY_SCOPE', 'CIEL_VOSK_MODEL_PATH', 'CIEL_WHISPER_MODEL_PATH', 'CIEL_LOCAL_LLM_URL', 'CIEL_VOICE_FAST']
     code = "import hashlib,json; from pathlib import Path; print(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('/app').glob('*.py')}))"
     hashes = json.loads(subprocess.check_output(['docker', 'exec', DEV, 'python', '-c', code], text=True))
     return dict(worker=DEV, image=runtime['Image'], environment={k: env.get(k) for k in safe_keys},
@@ -58,16 +58,26 @@ def snapshot():
                             for name in ['ciel-agent-1', DEV, 'ciel-local-llm-1', 'ciel-tts-1'] for c in [inspect(name)]})
 
 
-def prepare():
+def prepare(spec_path=None):
+    specification = json.loads(Path(spec_path).read_text()) if spec_path else None
+    phrases = specification['phrases'] if specification else PHRASES
+    caption = specification['caption'] if specification else CAPTION
+    if not phrases or any(not isinstance(parts, list) or not parts or
+                          any(not isinstance(text, str) or not text.strip() for text in parts)
+                          or not identity.isascii() or not identity.replace('-', '').isalnum()
+                          for identity, parts in phrases):
+        raise ValueError('Invalid synthesis corpus specification')
+    if len({identity for identity, _ in phrases}) != len(phrases) or any(identity == 'silence' for identity, _ in phrases):
+        raise ValueError('Duplicate/reserved corpus identity')
     folder = ROOT/'results'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     folder.mkdir(parents=True, exist_ok=False)
     (ROOT/'latest.txt').write_text(str(folder))
     rows = []
-    for identity, parts in PHRASES:
+    for identity, parts in phrases:
         chunks = []
         for part in parts:
             request = urllib.request.Request('http://127.0.0.1:8766/synthesize',
-                data=json.dumps(dict(text=part, caption=CAPTION)).encode(), headers={'Content-Type': 'application/json'})
+                data=json.dumps(dict(text=part, caption=caption)).encode(), headers={'Content-Type': 'application/json'})
             with urllib.request.urlopen(request, timeout=120) as response:
                 pcm = response.read()
                 rate = int(response.headers.get('X-Sample-Rate', '48000'))
@@ -100,7 +110,7 @@ def prepare():
     state = snapshot()
     dump(folder/'before.json', state)
     dump(folder/'conditions.json', dict(stt_model='vosk-model-small-ja-0.22; per-file hashes in STT report',
-         llm_model=state['shared_api'], tts_model=dict(image=state['containers']['ciel-tts-1']['image'], caption=CAPTION),
+         llm_model=state['shared_api'], tts_model=dict(image=state['containers']['ciel-tts-1']['image'], caption=caption),
          hardware='i7-13700 / 24 logical CPUs; client/STT container limited to 2 CPUs and 3GiB; existing worker unlimited',
          shared_load='Existing services retained; no cache reset or controlled competing load; before/after snapshots saved',
          runtime_config=state,
@@ -108,11 +118,12 @@ def prepare():
     print('RESULTS', folder, flush=True)
 
 
-def run(mode, rounds, smoke, settled=False, variant=None, tag=None):
+def run(mode, rounds, smoke, settled=False, variant=None, tag=None, model_name=None):
     folder = Path((ROOT/'latest.txt').read_text())
     if tag and (not tag.isascii() or not tag.replace('-','').isalnum()):
         raise ValueError('Invalid measurement tag')
-    label = mode+('-'+variant if variant else '')+('-'+tag if tag else '')+('-settled' if settled else '')+('-smoke' if smoke else '')
+    model = MODEL.parent/model_name if model_name else MODEL
+    label = mode+('-'+model.name if model_name else '')+('-'+variant if variant else '')+('-'+tag if tag else '')+('-settled' if settled else '')+('-smoke' if smoke else '')
     output = folder/label
     if output.exists():
         raise FileExistsError(output)
@@ -129,10 +140,17 @@ def run(mode, rounds, smoke, settled=False, variant=None, tag=None):
     conditions = json.loads((folder/'conditions.json').read_text())
     conditions['runtime_config'] = snapshot()
     conditions['variant'] = variant or 'existing-development'
+    if mode == 'stt':
+        conditions['stt_model'] = model.name
+        conditions['hardware'] = 'i7-13700; STT container limited to 2 CPUs and 8GiB; same limits for both model sizes'
+    else:
+        conditions['stt_model'] = {'backend':env.get('CIEL_STT_BACKEND') or 'vosk',
+                                  'vosk_path':env.get('CIEL_VOSK_MODEL_PATH'),
+                                  'whisper_path':env.get('CIEL_WHISPER_MODEL_PATH')}
     conditions_path = folder/(label+'-conditions.json')
     dump(conditions_path, conditions)
     command = ['docker', 'run', '--rm', '--name', 'ciel-voice-eval-'+str(time.time_ns()), '--network', 'host',
-               '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', '2', '--memory', '3g',
+               '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', '2', '--memory', '8g' if mode == 'stt' else '3g',
                '-v', str(ROOT)+':/eval', '-v', str(MODEL.parent)+':/models:ro', '--workdir', '/eval',
                '--entrypoint', 'python']
     child_env = os.environ.copy()
@@ -146,7 +164,7 @@ def run(mode, rounds, smoke, settled=False, variant=None, tag=None):
                 '--conditions', '/eval/'+str(conditions_path.relative_to(ROOT)),
                 '--source-provenance', '/eval/source-provenance.json',
                 '--output', '/eval/'+str(output.relative_to(ROOT)), '--rounds', str(rounds)]
-    command += ['--model', '/models/'+MODEL.name] if mode == 'stt' else ['--agent', env['CIEL_AGENT_NAME']]
+    command += ['--model', '/models/'+model.name] if mode == 'stt' else ['--agent', env['CIEL_AGENT_NAME']]
     if mode == 'live' and variant == 'fast':
         command += ['--require-ready']
     if mode == 'live' and settled:
@@ -190,10 +208,12 @@ if __name__ == '__main__':
     parser.add_argument('--rounds', type=int, default=1)
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--settled', action='store_true')
+    parser.add_argument('--corpus-spec', type=Path)
+    parser.add_argument('--stt-model', choices=['vosk-model-small-ja-0.22', 'vosk-model-ja-0.22'])
     args = parser.parse_args()
     if args.action == 'prepare':
-        prepare()
+        prepare(args.corpus_spec)
     elif args.action == 'status':
         print(json.dumps(snapshot(), indent=2))
     else:
-        raise SystemExit(run(args.action, args.rounds, args.smoke, args.settled))
+        raise SystemExit(run(args.action, args.rounds, args.smoke, args.settled, model_name=args.stt_model))

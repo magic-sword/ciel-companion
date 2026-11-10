@@ -96,7 +96,7 @@ python scripts/server/run-regression.py --suite all
 | 能力公開・MCP・サービス境界 | `scripts/server/check-capability-runtime.py` |
 | サービス入力・反応・割り込み | `scripts/server/check-reaction-runtime.py`と`test_reactions.py` |
 | 本番・開発の推論設定 | `test_environment.py`と`scripts/server/check-compose-backends.py`（架空資格情報・一時ディレクトリで自宅Composeを読み取り検証） |
-| ローカル音声 | `test_vosk_stt.py`、`test_voice_benchmark.py`、`test_voice_fast.py`（準備・世代失効・役目の分類・入場制御・文分割）、`test_vision_gateway.py`（HTTP/SSE）、[音声会話ベンチマーク](voice-benchmark-ja.md)の録音再生と[CPU音声認識](../services/local-stt-ja.md)の専用実測 |
+| ローカル音声 | `test_vosk_stt.py`、`test_whisper_stt.py`（CPU固定・オフライン・リサンプリング・二重VAD防止）、`test_voice_benchmark.py`、`test_voice_fast.py`（準備・世代失効・役目の分類・入場制御・文分割）、`test_vision_gateway.py`（HTTP/SSE）、[音声会話ベンチマーク](voice-benchmark-ja.md)の録音再生と[CPU音声認識](../services/local-stt-ja.md)の専用実測 |
 | Minecraftの技・作業 | Nodeのテスト、PythonのGameEnv/Goal、[専用ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md) |
 | Unity作業表示 | `dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`、本体・Editorのコンパイル |
 

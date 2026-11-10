@@ -33,7 +33,9 @@ with tempfile.TemporaryDirectory(prefix='ciel-compose-check-') as folder:
       ('dev-webhook','dev',{'CIEL_MINUTES_DISCORD_WEBHOOK':'https://dev.invalid'},'openai',''),
       ('prod-webhook','prod',{'CIEL_MINUTES_DISCORD_WEBHOOK':'https://own.invalid'},'openai',''),
       ('dev-custom-notes','dev',{'CIEL_NOTES_MODEL':'dev-notes'},'openai',''),
-      ('dev-empty-roles','dev',{'CIEL_LOCAL_ROLES':''},'openai','')]
+      ('dev-empty-roles','dev',{'CIEL_LOCAL_ROLES':''},'openai',''),
+      ('dev-whisper','dev',{'CIEL_LLM_BACKEND':'local','CIEL_INPUT':'voice','CIEL_STT_BACKEND':'whisper','CIEL_WHISPER_MODEL_PATH':'/models-whisper/small'},'local','voice'),
+      ('prod-whisper','prod',{'CIEL_LLM_BACKEND':'local','CIEL_INPUT':'voice','CIEL_STT_BACKEND':'whisper','CIEL_WHISPER_MODEL_PATH':'/models-whisper/small'},'local','voice')]
     env={k:v for k,v in os.environ.items() if not k.startswith(('CIEL_','LOCAL_LLM_','COMPOSE_','LIVEKIT_','OPENAI_','YOUTUBE_'))}
     for name,kind,settings,backend,mode in cases:
         if kind=='dev':
@@ -58,6 +60,10 @@ with tempfile.TemporaryDirectory(prefix='ciel-compose-check-') as folder:
         assert not any(k.startswith('CIEL_DEV_') for k in values),name
         mount=next(v for v in service['volumes'] if v['target']=='/models')
         assert mount['read_only'],name
+        whisper=next(v for v in service['volumes'] if v['target']=='/models-whisper')
+        assert whisper['read_only'],name
+        assert values['CIEL_WHISPER_MODEL_PATH']==settings.get('CIEL_WHISPER_MODEL_PATH','/models-whisper/small'),name
+        assert values['CIEL_STT_BACKEND']==settings.get('CIEL_STT_BACKEND',''),name
         results.append({'case':name,'backend':backend,'input':mode or 'voice (default)','isolated':True})
 print(json.dumps({'status':'passed','checks':results,'services_restarted':False},ensure_ascii=False))
 """
