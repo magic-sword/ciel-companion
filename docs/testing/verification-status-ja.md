@@ -135,6 +135,14 @@ Whisperは1.2.1、CTranslate2 4.8.5、ONNX Runtime 1.31.1、beam_size=1、4ス�
 
 生データは`~/work/ciel-voice-evaluation/results/`の`20261110T062331Z`（大型Vosk・Whisper・キャッシュ診断）、`20261110T063130Z-refactor`（小型Vosk）、`20261110T061742Z-refactor`（無効条件）、`20261110T063413Z-refactor`（有効条件・Whisper結合）。各liveディレクトリの`report.json`、debug、条件、`*-source.tar.gz`に根拠を保持する。Git基点は`e9f14f5`＋候補差分。人のマイク、雑音、長い履歴、同じ部屋での連続会話、歌唱・複数会話の負荷、実MCP操作の性能は今回未測定。
 
+最終共通エンジンを通常の会話イメージで、ネットワークなし・CPU4/RAM4GiBで再実行した`whisper-shared-engine.json`も30試行・CER12/369・無音誤認識0/3だった。最終データは手元の`server/benchmark/data/voice-home/results/`へ回収済み。
+
+コミット`3cf27fc`を開発用だけへ反映し、`CIEL_STT_BACKEND=whisper`、`CIEL_VOICE_FAST=1`を明示した。配布したserver360ファイルの指紋一致、worker登録、再起動回数0を確認。開発イメージは`sha256:579475ea238a12812653a211fada6aef4e8fe1448df714bce7edebc131fcdce0`。この開発デプロイでは本番agent・共有LLM・TTS・DBのコンテナを維持した。共有LLMは直前の入力単位比較で再作成済みであり、作業全体で未変更とは扱わない。本番agentのSTT設定はVoskのまま。
+
+配布後の実開発workerへ同じ挨拶を1回入力し、認識「おはよう、シエル」、本返答音声3.595秒を確認した。`voice.ready`の内部準備14.026秒、接続から通知15.984秒は入力前の別指標。推論世代は`inference_process`の`8d35a0a4bd5648c0a0542b8a5eebc05c`、人物指紋は`990a7c4da5c8f4f13a7491d2332e06ffb8df6881882485e941bdd95456184702`。`live-settled-smoke/`と`server/benchmark/data/voice-deployment/verification.json`が根拠。退室直後のLiveKit data channel閉鎖ERRORが3行あるため「ログエラー0」とはしない。Tracebackはなく、退室処理後もworkerは稼働・再起動0。評価用コンテナは全て削除済み。
+
+旧開発ソース・設定・イメージ識別子は`~/work/ciel-companion-dev/server/data/deployments/3cf27fc-voice-20261110T071320Z/`、DBは標準配布手順の`~/work/ciel-db-backups/ciel-20261110-161327.sql.gz`へ退避した。復旧が必要ならこの旧設定とソース・旧イメージを組にして開発agentだけを再作成する。秘密を含むバックアップはGitへ入れていない。
+
 ### 準備処理・前景優先の実装と再測定
 
 2026-11-10、実行ID`20261110T031347Z-refactor`。実際の会話ジョブで話者エンコーダー・Vosk・talker用LLM入力・Irodoriを準備してから入力を購読し、`voice.ready` v1で準備状態を通知する。背景推論の同時数を1に制限する有界の入場制御、会話中の新しい内なる考えの保留、短い最初の一文の指示と保守的な文分割、段階別ログを実装した。[会話pipeline](../conversation/conversation-pipeline-ja.md#音声会話の低遅延化)と[共有API](../operations/shared-llm-api-ja.md#会話を優先する入場制御の設計)が実装範囲の正本。
