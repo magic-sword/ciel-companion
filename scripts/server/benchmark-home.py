@@ -113,7 +113,8 @@ def stage():
     remote(SETUP)
 
 
-def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared', all_tasks=False, failure_streak=3):
+def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared', all_tasks=False, failure_streak=3,
+          distractors=0, distractor_surface='both'):
     # Use a new result directory, and only the dedicated compose project/services.
     code = '''
 from pathlib import Path
@@ -121,6 +122,7 @@ import subprocess, time, urllib.request, os, json
 root=Path.home()/'work/ciel-companion-benchmark/server'
 compose=['docker','compose','--env-file','.env.benchmark','-f','compose.benchmark.yaml','--profile','runner','--profile','conversation','--profile','local']
 os.environ.update(CIEL_BENCH_LLM_SERVICE='SERVICE_VALUE',
+    CIEL_BENCH_DISTRACTORS='DISTRACTOR_COUNT_VALUE', CIEL_BENCH_DISTRACTOR_SURFACE='DISTRACTOR_SURFACE_VALUE',
     CIEL_BENCH_LLM_URL='http://127.0.0.1:PORT_VALUE/v1',
     CIEL_BENCH_LLM_CONTROL='http://127.0.0.1:CONTROL_VALUE')
 def run(*args):
@@ -166,8 +168,10 @@ if not status.get('ready') or status.get('mode')!='gpu' or props['default_genera
 print('Shared inference API:',json.dumps(status))
 ''' if mode=='conversation' else ''))
     code=code.replace('SERVICE_VALUE',llm_service).replace('PORT_VALUE','8094' if llm_service=='shared' else '8096').replace('CONTROL_VALUE','8095' if llm_service=='shared' else '8097')
+    code=code.replace('DISTRACTOR_COUNT_VALUE',str(distractors)).replace('DISTRACTOR_SURFACE_VALUE',distractor_surface)
     time_args = "'--seconds',"+repr(str(seconds))+"," if seconds is not None else ''
-    task_args = '' if all_tasks else "'--task',"+repr(task_id)+','
+    selected_tasks = [task_id] if isinstance(task_id, str) else task_id
+    task_args = '' if all_tasks else ''.join("'--task',"+repr(name)+',' for name in selected_tasks)
     code=code.replace('TASK_ARGS',task_args).replace('FAILURE_STREAK',str(failure_streak))
     if all_tasks: code=code.replace('smoke-MODE_VALUE-', 'suite-MODE_VALUE-')
     remote(code.replace('MODE_VALUE',mode).replace('TIME_ARGS',time_args))
@@ -176,15 +180,19 @@ print('Shared inference API:',json.dumps(status))
 if __name__ == '__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('action',choices=['inspect','stage','body','conversation','logs','status','pull','recover','stop'])
-    ap.add_argument('--task',choices=[t['id'] for t in load_tasks()],default='gather_logs')
+    ap.add_argument('--task',choices=[t['id'] for t in load_tasks()],action='append',help='May repeat; default gather_logs')
     ap.add_argument('--run',action='append',default=[],help='Pull only this result directory name; may repeat')
     ap.add_argument('--all',action='store_true',help='Measure every supported task once, seed 11, whole-run budget 600s')
     ap.add_argument('--failure-streak',type=int,default=3,help='Consecutive task failure guard; 0 explicitly measures all failures')
     ap.add_argument('--seconds',type=int,help='Optional stricter cap on the practical task budget')
+    ap.add_argument('--distractors',type=int,default=0,choices=range(101),metavar='0..100')
+    ap.add_argument('--distractor-surface',choices=['work','catalog','both'],default='both')
     ap.add_argument('--llm-service',choices=['shared','dedicated'],default='shared',
                     help='Reuse the Ciel GPU API, or explicitly start the isolated CPU model')
     ap.add_argument('--service',choices=['minecraft-bench','body-bench','owner-bench','agent-bench','llm-bench'],default='minecraft-bench')
     args=ap.parse_args()
+    if args.distractors and args.action != 'conversation':
+        ap.error('--distractors requires conversation')
     if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,150}',name) for name in args.run):
         ap.error('--run must be a single result directory name')
     if args.failure_streak < 0:
@@ -258,4 +266,5 @@ subprocess.run(['docker','compose','--env-file','.env.benchmark','-f','compose.b
     '--profile','runner','--profile','conversation','--profile','local','down'],cwd=root,check=True)
 ''')
     else:
-        smoke(args.action,args.task,args.seconds,args.llm_service,args.all,args.failure_streak)
+        smoke(args.action,args.task or ['gather_logs'],args.seconds,args.llm_service,args.all,args.failure_streak,
+              args.distractors,args.distractor_surface)

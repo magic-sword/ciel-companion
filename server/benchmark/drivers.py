@@ -181,6 +181,11 @@ class ConversationDriver:
             raise RuntimeError('Agent did not attest benchmark isolation / requested backend / text input')
         if not any(e.get('kind') == 'settings' and e.get('persona_sha256') for e in records):
             raise RuntimeError('Missing persona fingerprint')
+        from .distractors import configuration
+        expected = configuration()
+        if not any(e.get('kind') == 'benchmark_distractors' and
+                   all(e.get(k) == v for k, v in expected.items()) for e in records):
+            raise RuntimeError('Agent distractor configuration does not match runner')
         for record in records:
             self.trace('agent_event', event=record)
         await self.room.local_participant.publish_data(

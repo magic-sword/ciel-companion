@@ -10,7 +10,12 @@ from game_intake import GameIntake, STOP
 class IntakeTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.runner = types.SimpleNamespace(env=types.SimpleNamespace(playing=lambda: True,
-            profile={'work': {'capabilities': [{'name': 'puzzle.solve'}]}}), work=None,
+            _connection_epoch=1, meta={}, tools=[], use=AsyncMock(return_value={'status': 'started'}),
+            profile={'work': {'capabilities': [{'name': 'puzzle.solve', 'description': 'Solve a puzzle',
+                'arguments': {'type': 'object', 'properties': {'board': {'type': 'string'}},
+                              'required': ['board'], 'additionalProperties': False},
+                'constraints': {'type': 'object', 'properties': {'moves': {'type': 'integer'}},
+                                'required': ['moves'], 'additionalProperties': False}}]}}), work=None,
             status=lambda: {}, body_step=lambda: None, start=AsyncMock(return_value={'task_id': 't'}),
             stop=AsyncMock(return_value={'state': 'cancelled', 'message': 'Stopped'}), answer=AsyncMock())
         self.create = AsyncMock()
@@ -20,9 +25,20 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
     def respond(self, value):
         self.create.return_value = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(value)))])
 
+    def sequence(self, *values):
+        self.create.side_effect = [types.SimpleNamespace(choices=[types.SimpleNamespace(
+            message=types.SimpleNamespace(content=json.dumps(value)))]) for value in values]
+
+    def tool(self):
+        self.runner.env.tools = [types.SimpleNamespace(id='puzzle_move', info=types.SimpleNamespace(raw_schema={
+            'name': 'puzzle_move', 'description': 'Move to a coordinate', 'parameters': {
+                'type': 'object', 'properties': {'x': {'type': 'integer'}}, 'required': ['x']}}))]
+        self.runner.env.meta['puzzle_move'] = {'ciel/role': 'act'}
+
     async def test_one_accepted_user_item_submits_once_and_preserves_opaque_arguments(self):
-        self.respond({'operation': 'submit', 'capability': 'puzzle.solve', 'arguments': {'board': 'abc'},
-                      'constraints': {'moves': 7}, 'seconds': 90, 'title': 'Puzzle'})
+        self.sequence({'operation': 'select', 'capability': '1'},
+            {'operation': 'submit', 'capability': '1', 'arguments': {'board': 'abc'},
+             'constraints': {'moves': 7}, 'seconds': 90, 'title': 'Puzzle'})
         item = llm.ChatMessage(role='user', content=['Solve it'])
         await self.intake.handle(item)
         await self.intake.handle(item)
@@ -30,6 +46,11 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runner.start.await_args.args, ('puzzle.solve', {'board': 'abc'}))
         self.assertEqual(self.runner.start.await_args.kwargs['request_id'], item.id)
         self.assertLessEqual(self.runner.start.await_args.kwargs['seconds'], 90)
+        first = json.loads(self.create.await_args_list[0].kwargs['messages'][1]['content'])
+        second = json.loads(self.create.await_args_list[1].kwargs['messages'][1]['content'])
+        self.assertEqual(first['capabilities'], [{'id': '1', 'description': 'Solve a puzzle'}])
+        self.assertNotIn('arguments', first['capabilities'][0])
+        self.assertEqual(second['capability']['name'], 'puzzle.solve')
 
     async def test_chat_does_not_submit_and_pseudo_tool_text_is_rejected(self):
         self.respond({'operation': 'none'})
@@ -40,7 +61,7 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_stop_during_inference_prevents_delayed_submission(self):
         entered, release = asyncio.Event(), asyncio.Event()
-        self.respond({'operation': 'submit', 'capability': 'puzzle.solve', 'arguments': {}, 'constraints': {}})
+        self.respond({'operation': 'select', 'capability': '1'})
         response = self.create.return_value
         async def generate(**kw):
             entered.set()
@@ -61,15 +82,81 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(STOP.fullmatch('今の作業をやめて、その場で待ってください。こちらが頼むまで再開しないでください。'))
 
     async def test_invalid_schema_gets_one_correction_within_original_budget(self):
-        self.respond({'operation': 'submit', 'capability': 'puzzle.solve', 'arguments': {}, 'constraints': {}, 'seconds': 90})
-        self.runner.start.side_effect = [{'reason': 'invalid_request', 'status': 'error'}, {'task_id': 't'}]
+        self.sequence({'operation': 'select', 'capability': '1'},
+                      {'operation': 'submit', 'capability': '1', 'arguments': {}, 'constraints': {}, 'seconds': 90},
+                      {'operation': 'submit', 'capability': '1', 'arguments': {'board': 'abc'},
+                       'constraints': {'moves': 7}, 'seconds': 90})
         item = llm.ChatMessage(role='user', content=['Do it'])
         await self.intake.handle(item)
-        self.assertEqual(self.create.await_count, 2)
-        calls = self.runner.start.await_args_list
-        self.assertEqual(calls[0].kwargs['request_id'], calls[1].kwargs['request_id'])
-        self.assertLessEqual(calls[1].kwargs['seconds'], calls[0].kwargs['seconds'])
-        self.runner.start.reset_mock(side_effect=True)
-        self.runner.start.return_value = {'reason': 'invalid_request', 'status': 'error'}
+        self.assertEqual(self.create.await_count, 3)
+        self.runner.start.assert_awaited_once()
+        self.assertEqual(self.runner.start.await_args.kwargs['request_id'], item.id)
+        self.runner.start.reset_mock()
+        self.sequence({'operation': 'select', 'capability': '1'},
+                      {'operation': 'submit', 'capability': '1', 'arguments': {}, 'constraints': {}},
+                      {'operation': 'submit', 'capability': '1', 'arguments': {}, 'constraints': {}})
         await self.intake.handle(llm.ChatMessage(role='user', content=['New request']))
-        self.assertEqual(self.runner.start.await_count, 2)
+        self.runner.start.assert_not_awaited()
+
+    async def test_body_action_uses_real_guarded_entry_once(self):
+        self.tool()
+        self.sequence({'operation': 'select', 'capability': '2'},
+                      {'operation': 'execute', 'capability': '2', 'arguments': {'x': 12}})
+        item = llm.ChatMessage(role='user', content=['Move there'])
+        await self.intake.handle(item)
+        await self.intake.handle(item)
+        self.runner.env.use.assert_awaited_once_with('puzzle_move', {'x': 12})
+        self.runner.start.assert_not_awaited()
+
+    async def test_unselected_or_unknown_tool_never_executes(self):
+        self.tool()
+        for action in ({'operation': 'execute', 'capability': '2', 'arguments': {'x': 12}},
+                       {'operation': 'select', 'capability': 'invented'}):
+            self.respond(action)
+            await self.intake.handle(llm.ChatMessage(role='user', content=['Do it']))
+        self.runner.env.use.assert_not_awaited()
+
+    async def test_changed_connection_definition_and_extra_arguments_are_rejected(self):
+        self.tool()
+        for change in ('connection', 'definition', 'arguments'):
+            self.runner.env._connection_epoch = 1
+            self.runner.env.tools[0].info.raw_schema['description'] = 'Move to a coordinate'
+            calls = 0
+            async def generate(**kw):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    value = {'operation': 'select', 'capability': '2'}
+                else:
+                    if change == 'connection': self.runner.env._connection_epoch += 1
+                    if change == 'definition': self.runner.env.tools[0].info.raw_schema['description'] = 'Changed'
+                    value = {'operation': 'execute', 'capability': '2', 'arguments': {'x': 12}}
+                    if change == 'arguments': value['arguments']['unexpected'] = True
+                return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(value)))])
+            self.create.side_effect = generate
+            await self.intake.handle(llm.ChatMessage(role='user', content=['Move']))
+        self.runner.env.use.assert_not_awaited()
+
+    async def test_direct_follow_stop_does_not_claim_early_completion(self):
+        self.runner.env.profile['stop_tool'] = 'puzzle_stop'
+        self.runner.env.meta['puzzle_stop'] = {'ciel/role': 'act', 'ciel/stops': True}
+        self.runner.env.use.return_value = {'status': 'stopping'}
+        reply = await self.intake.handle(llm.ChatMessage(role='user', content=['やめて']))
+        self.runner.env.use.assert_awaited_once_with('puzzle_stop', {})
+        self.assertNotIn('停止しました', reply)
+        self.create.assert_not_awaited()
+
+    async def test_owner_permission_lost_while_generating_blocks_body(self):
+        self.tool()
+        count = 0
+        async def generate(**kw):
+            nonlocal count
+            count += 1
+            value = {'operation': 'select', 'capability': '2'} if count == 1 else {
+                'operation': 'execute', 'capability': '2', 'arguments': {'x': 12}}
+            if count == 2:
+                self.intake.authorized = lambda: False
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(value)))])
+        self.create.side_effect = generate
+        await self.intake.handle(llm.ChatMessage(role='user', content=['Move']))
+        self.runner.env.use.assert_not_awaited()

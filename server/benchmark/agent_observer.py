@@ -2,6 +2,9 @@
 import asyncio
 import debug_log
 from agent import server, entrypoint
+from benchmark.distractors import install
+
+install()
 
 
 

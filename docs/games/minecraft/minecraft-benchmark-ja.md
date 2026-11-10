@@ -54,7 +54,21 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 `benchmark/body-observer.js`は同じRunnerの状態と相手entity・方向の手掛かりを200msごとに読み取り、別の移動ロジックは持たない。採点はRCONの位置・距離と、今回の命令の開始後に確定したbody状態を突き合わせる。古い完了、返答だけの約束、探索の目安への到着では合格しない。初期化の位置通知が体へ届くまで最大5秒待ち、届かない場合や方向探索の前提が成立しない場合は環境障害として停止する。
 
-`benchmark/agent_observer.py`は元の会話エントリポイントを呼び、起動が5秒以上待つときだけタスクの関数名・行番号を記録する。依頼解釈・能力選択・実行結果は変更しない。
+`benchmark/agent_observer.py`は元の会話エントリポイントを呼び、起動が5秒以上待つときだけタスクの関数名・行番号を記録する。依頼解釈のロジックは変更しない。以下の能力増加条件では、試験用の能力だけを追加する。
+
+### 能力数の増加による選択性能
+
+`conversation --distractors 0..100 --distractor-surface work|catalog|both`で、通常環境へ登録せずにダミー能力を追加できる。既定は0個。`work`は依頼受付に渡すwork能力、`catalog`はゲームサービスをロードした後の直接操作、`both`は両方に同数を追加する。100個・bothなら各面100個であり、合わせて100個ではない。
+
+`benchmark/distractors.py`は精錬、農業、動物誘導、収納、建設、巡回など20種類×5対象の100定義を固定順で生成する。小さい条件は同じ一覧の先頭部分を使う。連番だけの無意味な道具名や「ダミー」と書いた説明は選択候補に見せない。通常の権限フィルター・段階的ロードを通し、選択された操作はワールドへ送信せず`benchmark_distractor`エラーにする。後で本来の目的を達成しても、ダミー操作を呼んだ試行は`distractor_selected`として失敗を記録する。
+
+runnerのmanifestと会話側ログに個数、公開面、定義版、定義SHA256を記録し、一致しない場合は環境障害として拒否する。実際のwork能力数・直接操作数もログに残す。0個と100個の予備比較後、必要に応じ10・50個を測る。各条件で成功数、誤選択数、最初の操作までの時間、入力トークン、推論回数、RCONでの達成を比較する。同一モデル・課題・予算を保ち、採集と移動を別集計する。追加前から失敗する課題だけでは増加による劣化を評価できない。
+
+```powershell
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --task gather_logs --distractors 100 --distractor-surface both
+```
+
+この試験は合成能力による競合の評価であり、追加機能の実行性能や将来の全ツール集合を保証しない。実装済みの課題文に加え、言い換え・否定・引用・質問・類似能力との境界、提示順、反復、長い会話での保持を別条件として評価する必要がある。参考PDF『Agent Skills』の21〜27ページが扱うトリガー・実行・回帰・共存時の評価を区別し、本資料の合格率へ他システムの数値を転用しない。
 
 ## 自宅サーバーでの準備と小さな確認
 
@@ -69,6 +83,8 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --llm-service dedicated
 # 別の課題を1回試す
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --task stone_pickaxe
+# 比較する課題だけを選ぶ。--taskは繰り返し指定できる
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --task gather_logs --task come_here --task follow_owner --failure-streak 0
 # 現行の全課題を配置11・各1回、モードごとに600秒以内で測る
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --all --failure-streak 0
 .\.venv\Scripts\python.exe scripts/server/benchmark-home.py conversation --all --failure-streak 0

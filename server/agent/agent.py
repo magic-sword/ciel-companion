@@ -705,7 +705,8 @@ async def entrypoint(ctx: JobContext) -> None:
         if body is not None:
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
-            agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions)
+            agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions,
+                authorized=lambda: agent.mind.is_owner() and not agent.mind.from_comment)
             session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
             ctx.add_shutdown_callback(agent.game_intake.close)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る

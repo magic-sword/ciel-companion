@@ -1,27 +1,62 @@
 """One work decision per user item; independent of the voice pipeline and game planner."""
 import asyncio
+import copy
+import hashlib
 import json
 import re
 import time
 import uuid
 import debug_log
 import models
+import jsonschema
 
 STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*(?:(?:その場で待ってください|こちらが頼むまで再開しないでください)[。\s、]*)*$')
 
 
 class GameIntake:
-    def __init__(self, runner, instructions, *, client=None):
+    def __init__(self, runner, instructions, *, client=None, authorized=lambda: True):
         self.runner, self.instructions, self._client = runner, instructions, client
+        self.authorized = authorized
         self._items = {}
         self._lock = asyncio.Lock()
         self._fast_stop = None
         self._generation = 0
 
+    def _capabilities(self):
+        """Only owner-invoked work and body actions; schemas stay out of the selection prompt."""
+        env = self.runner.env
+        definitions = [dict(kind='work', name=d['name'], description=d.get('description', ''),
+                            arguments=copy.deepcopy(d.get('arguments', {})),
+                            constraints=copy.deepcopy(d.get('constraints', {})),
+                            interpretation=d.get('interpretation', ''))
+                       for d in (env.profile.get('work') or {}).get('capabilities', [])]
+        for fn in getattr(env, 'tools', []):
+            if getattr(env, 'meta', {}).get(fn.id, {}).get('ciel/role') != 'act':
+                continue
+            schema = copy.deepcopy(fn.info.raw_schema)
+            schema['parameters']['additionalProperties'] = False
+            definitions.append(dict(kind='tool', name=fn.id, description=schema.get('description', ''),
+                                    arguments=schema['parameters'],
+                                    examples=copy.deepcopy(env.meta[fn.id].get('ciel/triggers', [])[:3])))
+        return {str(i): d for i, d in enumerate(definitions, 1)}
+
+    async def _stop(self):
+        if self.runner.body_step():
+            return await self.runner.stop()
+        env = self.runner.env
+        name = env.profile.get('stop_tool')
+        if env.playing() and name and getattr(env, 'meta', {}).get(name, {}).get('ciel/stops'):
+            result = await env.use(name, {})
+            if not result.get('message') and result.get('status') in ('stopped', 'stopping'):
+                result = {**result, 'message': '停止しました。' if result['status'] == 'stopped'
+                          else '停止を依頼しました。停止の確認を待っています。'}
+            return result
+        return await self.runner.stop()
+
     def on_transcribed(self, event, owner=True):
         if owner and getattr(event, 'is_final', False) and STOP.fullmatch(event.transcript.strip()):
             self._generation += 1
-            self._fast_stop = asyncio.create_task(self.runner.stop())
+            self._fast_stop = asyncio.create_task(self._stop())
 
     async def handle(self, item):
         async with self._lock:
@@ -34,41 +69,67 @@ class GameIntake:
                 del self._items[next(iter(self._items))]
             return result
 
-    async def _handle(self, text, request_id, *, repair=None, began=None, generation=None):
-        generation = self._generation if generation is None else generation
+    async def _infer(self, payload, started):
+        request = uuid.uuid4().hex
+        began = time.monotonic()
+        remaining = max(.1, 20 - (began - started))
+        content = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+        debug_log.record('work_inference', id=request, model=models.model('mind'),
+                         stage=payload['stage'], input_chars=len(content))
+        try:
+            options = models.options('mind', model=models.model('mind'), max_completion_tokens=600, timeout=remaining,
+                messages=[{'role': 'system', 'content': self.instructions}, {'role': 'user', 'content': content}])
+            response = await asyncio.wait_for(self._client.chat.completions.create(**options), remaining)
+            models.record('mind', models.model('mind'), getattr(response, 'usage', None))
+            action = json.loads(response.choices[0].message.content or '')
+            if not isinstance(action, dict):
+                raise ValueError('Expected object')
+            debug_log.record('work_decision', stage=payload['stage'], operation=action.get('operation'),
+                             capability=action.get('capability'))
+            return action
+        finally:
+            debug_log.record('model_response', role='game_intake', stage=payload['stage'], id=request,
+                             seconds=round(time.monotonic()-began, 3))
+
+    async def _handle(self, text, request_id):
+        generation = self._generation
+        if not self.authorized():
+            return None
         if STOP.fullmatch(text.strip()):
             fast, self._fast_stop = self._fast_stop, None
-            r = await fast if fast is not None else await self.runner.stop()
+            r = await fast if fast is not None else await self._stop()
             return r.get('message') or '停止を確認できません。'
         env = self.runner.env
         if not env.playing():
             return None
         if self._client is None:
             self._client = models.create_client('mind')
-        started = time.monotonic() if began is None else began
-        request = uuid.uuid4().hex
-        generation_started = time.monotonic()
-        debug_log.record('work_inference', id=request, model=models.model('mind'))
+        started = time.monotonic()
+        definitions = self._capabilities()
+        epoch = getattr(env, '_connection_epoch', None)
         try:
-            options = models.options('mind', model=models.model('mind'), max_completion_tokens=600, timeout=20,
-                messages=[{'role': 'system', 'content': self.instructions}, {'role': 'user', 'content': json.dumps({
-                    'input': text, 'capabilities': (env.profile.get('work') or {}).get('capabilities', []),
-                    'current': self.runner.status(), 'correction': repair}, ensure_ascii=False)}])
-            response = await asyncio.wait_for(self._client.chat.completions.create(**options), max(.1, 20 - (time.monotonic() - started)))
-            models.record('mind', models.model('mind'), getattr(response, 'usage', None))
-            action = json.loads(response.choices[0].message.content or '')
-            if not isinstance(action, dict):
-                raise ValueError('Expected object')
+            action = await self._infer({'stage': 'select', 'input': text,
+                'capabilities': [{'id': i, 'description': d['description'],
+                                  **({'examples': d['examples']} if d.get('examples') else {})}
+                                 for i, d in definitions.items()],
+                'current': self.runner.status(), 'body': getattr(env, '_body', {})}, started)
+            selected = None
+            if action.get('operation') == 'select':
+                selected = action.get('capability')
+                if not isinstance(selected, str) or selected not in definitions:
+                    raise ValueError('Unknown capability')
+                definition = definitions[selected]
+                debug_log.record('work_capability_selected', capability=definition['name'], capability_kind=definition['kind'],
+                    version=hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest()[:12])
+                action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
+                    'capability': definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {})}, started)
         except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
-            return '作業の依頼を確認できませんでした。対象と数を教えてください。'
+            return '依頼の操作を確認できませんでした。'
         except Exception as e:
             debug_log.record('game_intake_error', error=type(e).__name__)
             return '作業の依頼を確認できませんでした。'
-        finally:
-            debug_log.record('model_response', role='game_intake', id=request, seconds=round(time.monotonic()-generation_started, 3))
         op = action.get('operation')
-        debug_log.record('work_decision', operation=op, capability=action.get('capability'))
-        if generation != self._generation:
+        if generation != self._generation or not self.authorized():
             return '依頼の確認中に中止の指示があったため、作業を開始しませんでした。'
         if op == 'none':
             return None
@@ -77,25 +138,54 @@ class GameIntake:
         if op == 'status':
             return self.runner.status().get('message') or '今は作業中です。' if self.runner.work else '今は作業していません。'
         if op == 'cancel':
-            r = await self.runner.stop()
+            r = await self._stop()
         elif op == 'answer' and action.get('action') in ('retry', 'cancel'):
             r = await self.runner.answer(action.get('decision_id'), action['action'])
-        elif op == 'submit':
-            seconds = action.get('seconds', 90)
-            if type(seconds) is not int or not 1 <= seconds <= 120 or not isinstance(action.get('arguments'), dict) or not isinstance(action.get('constraints'), dict):
-                return '作業の条件を確認できませんでした。'
-            remaining = seconds - (time.monotonic() - started)
-            if remaining < 5:
-                return '依頼の確認に時間がかかったため、作業を開始しませんでした。'
-            r = await self.runner.start(action.get('capability'), action['arguments'], constraints=action['constraints'],
-                title=str(action.get('title') or '')[:100], seconds=remaining, request_id=request_id)
-            if r.get('reason') == 'invalid_request' and repair is None and time.monotonic() - started < 15:
-                return await self._handle(text, request_id, repair={'previous': action,
-                    'error': 'invalid_request: 能力の引数と制約のschemaを確認し、必須項目をすべて指定して修正する。'},
-                    began=started, generation=generation)
+        elif op in ('submit', 'execute') and selected is not None:
+            # A delayed model response cannot acquire a new connection or changed definition.
+            current = self._capabilities()
+            if (not env.playing() or epoch != getattr(env, '_connection_epoch', None)
+                    or current.get(selected) != definition):
+                return '能力の状態が変わったため、操作を開始しませんでした。'
+            if self.runner.body_step():
+                return '今の作業を中止してから、新しい操作を依頼してください。'
+            expected = 'submit' if definition['kind'] == 'work' else 'execute'
+            for attempt in range(2):
+                try:
+                    if (action.get('operation') != expected
+                            or action.get('capability', selected) not in (selected, definition['name'])):
+                        raise ValueError('Wrong operation')
+                    jsonschema.validate(action.get('arguments'), definition['arguments'])
+                    if expected == 'submit':
+                        jsonschema.validate(action.get('constraints'), definition['constraints'])
+                    break
+                except (ValueError, jsonschema.ValidationError):
+                    if attempt or time.monotonic() - started >= 15:
+                        return '操作の引数を確認できませんでした。'
+                    try:
+                        action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
+                            'capability': definition, 'current': self.runner.status(),
+                            'correction': '引数と制約のschemaに従い、必須項目をすべて指定する。'}, started)
+                    except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
+                        return '操作の引数を確認できませんでした。'
+            if (generation != self._generation or not self.authorized() or not env.playing() or self.runner.body_step()
+                    or epoch != getattr(env, '_connection_epoch', None) or self._capabilities().get(selected) != definition):
+                return '操作の確認中に状態が変わったため、開始しませんでした。'
+            if expected == 'execute':
+                r = await env.use(definition['name'], action['arguments'])
+            else:
+                seconds = action.get('seconds', 90)
+                if type(seconds) is not int or not 1 <= seconds <= 120:
+                    return '作業の条件を確認できませんでした。'
+                remaining = seconds - (time.monotonic() - started)
+                if remaining < 5:
+                    return '依頼の確認に時間がかかったため、作業を開始しませんでした。'
+                r = await self.runner.start(definition['name'], action['arguments'], constraints=action['constraints'],
+                    title=str(action.get('title') or '')[:100], seconds=remaining, request_id=request_id)
         else:
             return '作業の依頼を確認できませんでした。'
-        return r.get('message') or ('作業を受け付けました。' if r.get('task_id') else '作業を受け付けられませんでした。')
+        return r.get('message') or ('操作を受け付けました。' if r.get('task_id') or r.get('status') in ('started', 'accepted')
+                                   else '操作を受け付けられませんでした。')
 
     async def close(self):
         if self._client is not None:

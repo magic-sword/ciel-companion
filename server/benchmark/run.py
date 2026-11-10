@@ -20,6 +20,7 @@ from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
 from .policy import VERSION as POLICY_VERSION, Progress, budget
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
+from .distractors import configuration as distractor_configuration
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -301,6 +302,7 @@ async def run(args, *, clock=time.monotonic):
                 'model_id':args.model_id if args.mode == 'conversation' else None,
                 'minecraft_version':'1.21.11', 'seeds':args.seed, 'repeats':args.repeats,
                 'planned_trials':len(plan),
+                'distractors':distractor_configuration() if args.mode == 'conversation' else None,
                 'limits':{'seconds_cap':args.seconds,'run_seconds':args.run_seconds,'failure_streak':args.failure_streak,
                           'setup_seconds':args.setup_seconds,'llm_calls':args.max_llm,'game_calls':args.max_calls,'report_grace':args.report_grace,
                           'tasks':{t['id']:budget(t,args.seconds) for t in tasks}},
@@ -378,6 +380,11 @@ async def run(args, *, clock=time.monotonic):
                                 safe_release = True
                             except Exception as exc:
                                 result.update(status='infrastructure_error',reason='cleanup_'+type(exc).__name__)
+                    dummy_calls = [e['event'] for e in trace.execution() if e['kind'] == 'agent_event'
+                                   and e['event'].get('kind') == 'benchmark_distractor_call']
+                    result['distractor_calls'] = len(dummy_calls)
+                    if dummy_calls and result['status'] not in ('infrastructure_error', 'skipped'):
+                        result.update(status='failed', reason='distractor_selected', outcome='failed')
                     rows.append(result)
                     (trial/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
                     write_reports(directory,manifest,rows)
