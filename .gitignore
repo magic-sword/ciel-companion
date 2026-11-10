@@ -77,3 +77,6 @@ __pycache__/
 
 # Offline Unity work-display checks (outputs stay in server/benchmark/data).
 !scripts/unity/work-display-check/WorkDisplayCheck.csproj
+
+# 参考論文など
+reference/
