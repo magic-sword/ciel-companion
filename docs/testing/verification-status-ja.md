@@ -25,7 +25,11 @@
 
 自宅サーバーの本番`~/work/ciel-companion/server`と開発`~/work/ciel-companion-dev/server`で、共有`.env.shared`と独立した`.env`・`.env.dev`を使用する。両環境とも`CIEL_LLM_BACKEND=local`、pipeline・voice・CPU Vosk、GPU解放制御8095を設定し、記憶スコープは本番main・開発dev。旧`CIEL_DEV_*`は使わない。資格情報・Webhookを保持し、設定ファイルの権限は0600。
 
-現在のagentは`f2028e830c275d9fd6b84bd2f6177323c1255351`、共有画像APIは`cd179834a33f97d873e079b047fc09e6554e1cf9`の実装を配布した。後者のAPIコードは前者のコミットでも同一。両workerのLiveKit登録と稼働・再起動回数0、共有APIのGPU・32k×2枠・vision=true・health正常を確認した。DB・TTS・歌・Minecraftの各コンテナは維持した。画像機能の実測・バックアップ・未確認範囲は下記の常設画像APIを参照する。
+現在のagentは`f2028e830c275d9fd6b84bd2f6177323c1255351`、共有APIは`1478703fe46b75829a58b5b7c8954827f740fc97`のsupervisor・gatewayを配布した。両workerのLiveKit登録と稼働・再起動回数0を確認済み。共有APIはGPU・32k×2枠・health正常で、画像上限256pxを維持する。画像機能の実測・未確認範囲は下記の常設画像APIを参照する。
+
+2026-11-10、利用者の共有API更新・短時間再起動への承認後、共有APIだけを再作成した。イメージは`sha256:40751d8718106ce5f0b67c27a972c245871c5ad6aa22ea31d0c71ad4b36c5b8d`。`generation_scope=inference_process`と世代識別、分類なし/foreground/backgroundの短い生成要求の200、入場待ちヘッダー、不正分類の400を実機で確認した。本番・開発agent・DB・TTS・歌・Minecraft等の残る8サービスのコンテナID・イメージ・起動時刻・再起動回数は前後同一。会話worker側の準備処理・分類付与・文分割は未配布で、未分類の既存要求は前景として扱う。この更新だけで通常会話の高速化が完了したとはしない。
+
+反映と復帰確認の根拠はサーバー`~/work/ciel-companion/server/local-llm/data/shared-gpu-20261110T041641Z/`の`configuration.json`・`rollout-verification.json`。回収先は`server/benchmark/data/shared-api-import-1794284236239377600/data/shared-gpu-20261110T041641Z/`。秘密を含む復旧用backupはサーバーに保持し回収しない。今回の短文3要求は疎通確認で、音声ベンチマークの再測定ではない。
 
 ## ローカルQwenの画像入力
 
@@ -86,7 +90,7 @@
 
 別の競合試験では、上限128トークンの背景相当要求2本に短い前景要求を重ねた。分類なしと分類ありを各1回比較し、前景の入場待ちは5.680秒→0秒、最初の本文は6.003秒→0.163秒だった。背景の同時実行を1に制限して前景を通す動作は確認できたが、キャッシュ未固定の単発LLM試験であり、音声会話全体の速度や改善率へ換算しない。
 
-通常の共有APIの再起動は自動承認レビューで拒否されたため、通常サービスは更新せず、専用受信口から既存8094へ転送して評価した。検証した世代は`evaluation_ingress`であり、上流モデルの再起動を識別する`inference_process`世代の実機検証ではない。専用口を通らない通常クライアントの負荷は制御していない。実行中の背景生成の取消、要約の統合、真のTTSストリーミング、長い履歴・複数会話・歌のCPU切替・同一部屋での連続会話は未検証または未実装。
+測定当時は通常の共有APIの再起動が自動承認レビューで拒否されたため、通常サービスは更新せず、専用受信口から既存8094へ転送して評価した。ベンチマークで検証した世代は`evaluation_ingress`であり、上流モデルの再起動を識別する`inference_process`世代の実機検証ではない。後の承認済みAPI反映は上記の別の復帰確認で、下表の音声結果を常設APIでの測定へ読み替えない。専用口を通らない通常クライアントの負荷は制御していない。実行中の背景生成の取消、要約の統合、真のTTSストリーミング、長い履歴・複数会話・歌のCPU切替・同一部屋での連続会話は未検証または未実装。
 
 生データはサーバー`~/work/ciel-voice-evaluation/results/20261110T031347Z-refactor/`、回収先は`server/benchmark/data/voice-home/results/20261110T031347Z-refactor/`。`live-baseline-settled/report.json`と`live-fast-final-settled/report.json`、`contention-{baseline,fast}.json`が根拠。初期smokeと指示調整前の試行は別条件で保持し、上表へ混ぜていない。Git基点は`40ea252`＋本改修。各測定の`*-source.tar.gz`に実行ソースとSHA-256を保持し、全指紋を照合した。
 
