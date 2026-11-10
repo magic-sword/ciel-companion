@@ -84,6 +84,8 @@ JSONLの`audio`はmanifestのあるディレクトリから解決する。各音
 
 LiveKitの利用環境やworkerのbackend次第では課金されるため、[外部API試験](paid-checks-ja.md)の対象を確認する。スクリプトはクラウドへ自動切替せず、TTS合成の追加要求も出さない。OpenAIのワーカーを指定した場合の料金は別に発生する。
 
+起動中に準備を済ませる[低遅延化の設計](../conversation/conversation-pipeline-ja.md#音声会話の低遅延化)では、準備時間・成功率と、準備後の会話遅延を別に評価する。現行の`--greeting-timeout`は挨拶音声の終了確認であり、モデル・音声経路すべての準備完了を通知する仕組みではない。準備世代や同一部屋での連続ターンの評価は今後の拡張で、現在の`live`は1試料ごとに新しい部屋を作る。準備後に再起動やCPU切替が起きた試行も残し、遅い結果だけを除外しない。
+
 ### 自宅サーバーでの合成音声による基準測定
 
 `scripts/server/voice-home.py`はSSH設定を既存の`benchmark-home.py`から読み、自宅の`~/work/ciel-voice-evaluation`だけに測定コードを配置する。稼働中の`ciel-dev`がlocal・pipeline・voice・Irodori・devスコープであることを確認し、本番・開発ワーカーの再配置は行わない。試験クライアントとSTTは既存の開発イメージを使う一時コンテナ（2CPU・3GiB）で動かし、モデルを読み取り専用でマウントする。専用のLLMは起動しない。
