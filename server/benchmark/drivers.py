@@ -57,11 +57,17 @@ class BodyDriver:
         self.env.goals = self.runner
 
     async def submit(self, task):
+        if task.get('navigation'):
+            self.task = asyncio.create_task(self.env._call(task['body_call']['name'], task['body_call']['arguments']))
+            return
         self.task = asyncio.create_task(self.runner.start('minecraft.obtain_item',
             {'item': task['item'], 'quantity': task['count'], 'quantity_mode': 'gain' if task.get('action') else 'inventory_target'},
             constraints={'resource_scope': 'search', 'failure_policy': 'ask'}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
     async def stop(self, task):
+        if task.get('navigation'):
+            await self.env._call('minecraft_stop_moving', {})
+            return
         await self.runner.stop()
 
     def events(self):

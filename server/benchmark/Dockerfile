@@ -11,5 +11,5 @@ COPY minecraft/src/ ./minecraft/src/
 COPY minecraft/package.json minecraft/package-lock.json ./minecraft/
 COPY local-llm/supervisor.py ./local-llm/
 COPY compose*.yaml ./
-COPY benchmark/*.py benchmark/*.json ./benchmark/
+COPY benchmark/*.py benchmark/*.json benchmark/*.js ./benchmark/
 ENTRYPOINT ["python", "-m", "benchmark.run"]

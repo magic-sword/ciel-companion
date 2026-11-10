@@ -143,6 +143,14 @@ class World:
         self.guard()
         if not self.lease:
             raise RuntimeError('Fixture reset requires the world lease')
+        self.navigation = task.get('navigation')
+        if self.navigation:
+            if not self.scalar('execute if entity Bench_Owner', success=True):
+                raise RuntimeError('Benchmark fixture owner is not online')
+            self._write('gamemode creative Bench_Owner')
+            self._write('tp Bench_Owner 0.5 85 0.5')
+        elif self.scalar('execute if entity Bench_Owner', success=True):
+            self._write('tp Bench_Owner 0.5 128 400.5')
         if not self.scalar(f'execute if entity {self.player}', success=True):
             raise RuntimeError('Benchmark bot is not online')
         # Teleport above the arena before replacing it. Each fill stays under 32768 blocks.
@@ -158,6 +166,15 @@ class World:
         # Contain exploration, so changes outside the arena cannot affect later trials.
         for x1, z1, x2, z2 in [(-48,-48,48,-48),(-48,48,48,48),(-48,-48,-48,48),(48,-48,48,48)]:
             self._write(f'fill {x1} 60 {z1} {x2} 81 {z2} minecraft:bedrock')
+        if self.navigation and self.navigation.get('locator_only'):
+            end = 416 if self.navigation['targets'][0][0] > 270 else 288
+            self._write(f'forceload add 32 -16 {end} 16')
+            for y in range(60, 82):
+                block = 'bedrock' if y == 60 else 'stone' if y < 63 else 'grass_block' if y == 63 else 'air'
+                self._write(f'fill 32 {y} -16 {end} {y} 16 minecraft:{block}')
+            for z in (-16, 16):
+                self._write(f'fill 32 60 {z} {end} 81 {z} minecraft:bedrock')
+            self._write(f'fill {end} 60 -16 {end} 81 16 minecraft:bedrock')
         rng = random.Random(seed)
         if task['forest'] == 'none':
             trees = []
@@ -185,7 +202,18 @@ class World:
         for x, z in trees:
             if not self.scalar(f'execute if block {x} 64 {z} minecraft:oak_log', success=True):
                 raise RuntimeError('Fixture resource placement failed')
+        if self.navigation:
+            self.move_target(self.navigation['targets'][0])
         return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48]}
+
+    def move_target(self, position):
+        self.guard()
+        if not self.lease:
+            raise RuntimeError('Moving the fixture owner requires the world lease')
+        x,y,z = position
+        if not (-40 <= x <= 400 and y == 64 and -40 <= z <= 40):
+            raise ValueError('Target outside the navigation fixture')
+        self._write(f'tp Bench_Owner {x} {y} {z}')
 
     def snapshot(self, items):
         if not self.scalar(f'execute if entity {self.player}', success=True):
@@ -198,7 +226,12 @@ class World:
         position = [self.scalar(f'data get entity {self.player} Pos[{i}] 1000') / 1000 for i in range(3)]
         health = self.scalar(f'data get entity {self.player} Health 1000') / 1000
         deaths = self.scalar(f'scoreboard players get {self.player} cieldeaths')
-        return {'inventory': inventory, 'position': position, 'health': health, 'deaths': deaths}
+        result = {'inventory': inventory, 'position': position, 'health': health, 'deaths': deaths}
+        if getattr(self, 'navigation', None):
+            if not self.scalar('execute if entity Bench_Owner', success=True):
+                raise RuntimeError('Fixture owner disconnected')
+            result['target_position'] = [self.scalar(f'data get entity Bench_Owner Pos[{i}] 1000') / 1000 for i in range(3)]
+        return result
 
 
 def achieved(task, initial, current):

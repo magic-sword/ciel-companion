@@ -113,7 +113,7 @@ def stage():
     remote(SETUP)
 
 
-def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared'):
+def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared', all_tasks=False, failure_streak=3):
     # Use a new result directory, and only the dedicated compose project/services.
     code = '''
 from pathlib import Path
@@ -127,22 +127,26 @@ def run(*args):
     result=subprocess.run(compose+list(args),cwd=root)
     if result.returncode:
         raise SystemExit(result.returncode)
-run('build','body-bench','benchmark-runner' MODE_BUILD)
+run('build','body-bench','owner-bench','benchmark-runner' MODE_BUILD)
+run('run','--rm','--no-deps','-T','--user','0','--entrypoint','node','body-bench','-e',
+    "require('fs').chmodSync('/app/benchmark-data',0o777)")
 LLM_START
-run('up','-d','minecraft-bench','body-bench' MODE_UP)
+run('up','-d','minecraft-bench')
+run('up','-d','--force-recreate','body-bench','owner-bench')
+MODE_UP
 # Wait for the bot to join before asking the scorer to reset the arena.
 for attempt in range(90):
     output=subprocess.check_output(compose+['exec','-T','minecraft-bench','rcon-cli','list'],cwd=root,text=True)
-    if 'Ciel_Debug' in output:
+    if 'Ciel_Debug' in output and 'Bench_Owner' in output:
         break
     time.sleep(1)
 else:
     raise SystemExit('Benchmark bot did not join')
-run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE','--task','TASK_ID',
+run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE',TASK_ARGS'--failure-streak','FAILURE_STREAK',
     '--seed','11','--repeats','1',TIME_ARGS'--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
 '''
     code=code.replace('MODE_BUILD',(", 'agent-bench'" + (", 'llm-bench'" if llm_service=='dedicated' else '')) if mode=='conversation' else '')
-    code=code.replace('MODE_UP',",'agent-bench'" if mode=='conversation' else '')
+    code=code.replace('MODE_UP',"run('up','-d','--force-recreate','agent-bench')" if mode=='conversation' else '')
     code=code.replace('LLM_START', '''run('up','-d','llm-bench')
 for attempt in range(180):
     try:
@@ -163,18 +167,28 @@ print('Shared inference API:',json.dumps(status))
 ''' if mode=='conversation' else ''))
     code=code.replace('SERVICE_VALUE',llm_service).replace('PORT_VALUE','8094' if llm_service=='shared' else '8096').replace('CONTROL_VALUE','8095' if llm_service=='shared' else '8097')
     time_args = "'--seconds',"+repr(str(seconds))+"," if seconds is not None else ''
-    remote(code.replace('MODE_VALUE',mode).replace('TASK_ID',task_id).replace('TIME_ARGS',time_args))
+    task_args = '' if all_tasks else "'--task',"+repr(task_id)+','
+    code=code.replace('TASK_ARGS',task_args).replace('FAILURE_STREAK',str(failure_streak))
+    if all_tasks: code=code.replace('smoke-MODE_VALUE-', 'suite-MODE_VALUE-')
+    remote(code.replace('MODE_VALUE',mode).replace('TIME_ARGS',time_args))
 
 
 if __name__ == '__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('action',choices=['inspect','stage','body','conversation','logs','status','pull','recover','stop'])
     ap.add_argument('--task',choices=[t['id'] for t in load_tasks()],default='gather_logs')
+    ap.add_argument('--run',action='append',default=[],help='Pull only this result directory name; may repeat')
+    ap.add_argument('--all',action='store_true',help='Measure every supported task once, seed 11, whole-run budget 600s')
+    ap.add_argument('--failure-streak',type=int,default=3,help='Consecutive task failure guard; 0 explicitly measures all failures')
     ap.add_argument('--seconds',type=int,help='Optional stricter cap on the practical task budget')
     ap.add_argument('--llm-service',choices=['shared','dedicated'],default='shared',
                     help='Reuse the Ciel GPU API, or explicitly start the isolated CPU model')
-    ap.add_argument('--service',choices=['minecraft-bench','body-bench','agent-bench','llm-bench'],default='minecraft-bench')
+    ap.add_argument('--service',choices=['minecraft-bench','body-bench','owner-bench','agent-bench','llm-bench'],default='minecraft-bench')
     args=ap.parse_args()
+    if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,150}',name) for name in args.run):
+        ap.error('--run must be a single result directory name')
+    if args.failure_streak < 0:
+        ap.error('--failure-streak must be nonnegative')
     if args.seconds is not None and not 1 <= args.seconds <= 3600:
         ap.error('--seconds must be between 1 and 3600')
     if args.action=='inspect':
@@ -204,7 +218,10 @@ if reports:
         import time
         destination=ROOT/'server/benchmark/data'/('home-import-'+str(time.time_ns()))
         destination.mkdir(parents=True)
-        process=subprocess.Popen(ssh_args()+['tar -cf - -C ~/work/ciel-companion-benchmark/server/benchmark/data results'],stdout=subprocess.PIPE)
+        import shlex
+        selected=['results/'+name for name in args.run] if args.run else ['results']
+        command='tar -cf - -C ~/work/ciel-companion-benchmark/server/benchmark/data '+ ' '.join(shlex.quote(name) for name in selected)
+        process=subprocess.Popen(ssh_args()+[command],stdout=subprocess.PIPE)
         with tarfile.open(fileobj=process.stdout,mode='r|') as archive:
             archive.extractall(destination,filter='data')
         # tarfile stops at the end marker; drain the remaining block padding so
@@ -241,4 +258,4 @@ subprocess.run(['docker','compose','--env-file','.env.benchmark','-f','compose.b
     '--profile','runner','--profile','conversation','--profile','local','down'],cwd=root,check=True)
 ''')
     else:
-        smoke(args.action,args.task,args.seconds,args.llm_service)
+        smoke(args.action,args.task,args.seconds,args.llm_service,args.all,args.failure_streak)

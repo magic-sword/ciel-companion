@@ -19,6 +19,7 @@ from .drivers import BodyDriver, ConversationDriver, wait_body_released
 from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
 from .policy import VERSION as POLICY_VERSION, Progress, budget
+from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -49,6 +50,8 @@ def load_tasks(path=SUITE):
         raise ValueError('Invalid task suite version or duplicate ids')
     for task in suite['tasks']:
         budget(task)
+        if task.get('navigation'):
+            validate_navigation(task)
         if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand'):
             raise ValueError('Unknown fixture layout')
         if task.get('expected_outcome','achieve') not in ('achieve','report_unavailable'):
@@ -132,6 +135,10 @@ def restarted(events):
 
 async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max_calls,
                    poll=0.5, stop_grace=None, stable_seconds=5, report_grace=5, clock=time.monotonic, sleep=asyncio.sleep):
+    if task.get('navigation'):
+        return await evaluate_navigation(task, world, driver, trace, initial, seconds=seconds,
+            max_llm=max_llm, max_calls=max_calls, poll=poll, stable_seconds=stable_seconds,
+            clock=clock, sleep=sleep)
     limits = budget(task,seconds)
     seconds = limits['seconds']
     stop_grace = limits['stop_grace'] if stop_grace is None else stop_grace
@@ -331,7 +338,7 @@ async def run(args, *, clock=time.monotonic):
                         safe_release = False
                         async with asyncio.timeout(min(args.setup_seconds,available)):
                             fixture = await asyncio.to_thread(world.reset, task, seed)
-                            items = task['milestones'] + [task['item']]
+                            items = task_items(task)
                             initial = await asyncio.to_thread(world.snapshot, items)
                             expected = {item:task['inventory'].get(item,0) for item in initial['inventory']}
                             if initial['inventory'] != expected:
@@ -341,6 +348,8 @@ async def run(args, *, clock=time.monotonic):
                             driver = driver_type(url=args.url,agent=args.agent,backend=args.backend,model_id=args.model_id,
                                                  debug_dir=args.debug_dir,trace=trace)
                             await driver.open()
+                            if task.get('navigation'):
+                                await prepare_navigation(task, initial)
                         result.update(fixture=fixture,initial=initial)
                         available = max(0.01,deadline-clock()-20)
                         limit = min(budget(task,args.seconds)['seconds'],available)

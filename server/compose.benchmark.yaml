@@ -77,19 +77,35 @@ services:
       context: ./minecraft
       network: host
     network_mode: host
+    command: [node, benchmark/body-observer.js]
     environment:
       MC_HOST: 127.0.0.1
       MC_PORT: '25566'
       MC_VERSION: 1.21.11
       MC_USERNAME: Ciel_Debug
-      MC_OWNER: ''
+      MC_OWNER: Bench_Owner
       BODY_HOST: 127.0.0.1
       BODY_PORT: '8772'
       CIEL_PORT: '8773'
       EYE_PORT: '3008'
       KNOWLEDGE_DATA: /app/knowledge-data
     volumes:
+      - ./benchmark:/app/benchmark:ro
+      - ./benchmark/data/observations:/app/benchmark-data
       - ${CIEL_BENCH_KNOWLEDGE_DIR:-../../ciel-companion/server/minecraft/knowledge/data}:/app/knowledge-data:ro
+    depends_on:
+      minecraft-bench:
+        condition: service_healthy
+    restart: 'no'
+
+  owner-bench:
+    build:
+      context: ./minecraft
+      network: host
+    network_mode: host
+    command: [node, benchmark/owner.js]
+    volumes:
+      - ./benchmark:/app/benchmark:ro
     depends_on:
       minecraft-bench:
         condition: service_healthy
@@ -101,6 +117,7 @@ services:
       context: ./agent
       network: host
     network_mode: host
+    command: [python, -m, livekit.agents, start, benchmark/agent_observer.py]
     env_file: ./.env.shared
     environment:
       CIEL_AGENT_NAME: ciel-task-bench
@@ -123,6 +140,7 @@ services:
       CIEL_NOD: '0'
     volumes:
       - ./agent/config:/app/config:ro
+      - ./benchmark:/app/benchmark:ro
       - ./benchmark/data/debug:/app/data/debug
       - ./benchmark/data/minutes:/app/data/minutes
     depends_on:
