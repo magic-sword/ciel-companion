@@ -230,11 +230,18 @@ def provenance():
         return {'commit': None, 'dirty': None}
 
 
-def compare(base, candidate):
+def compare(base, candidate, *, change='weights'):
+    if change not in ('weights', 'prompt'):
+        raise ValueError('Unknown comparison change')
     if any(r.get('schema') != SCHEMA or r.get('completion') != 'complete' for r in (base, candidate)):
         return {'decision': 'incomplete'}
     fields = ('suite_sha256', 'runner_sha256', 'prompt_sha256', 'split', 'sampling', 'case_ids', 'rounds', 'prompt_mode')
     mismatches = [k for k in fields if base.get(k) != candidate.get(k)]
+    if change == 'prompt':
+        mismatches = [k for k in mismatches if k != 'prompt_sha256']
+        for key in ('model_id', 'weights_sha256'):
+            if base['conditions'].get(key) != candidate['conditions'].get(key):
+                mismatches.append('conditions.' + key)
     for key in ('hardware', 'runtime', 'shared_load'):
         if base['conditions'].get(key) != candidate['conditions'].get(key):
             mismatches.append('conditions.' + key)
@@ -254,6 +261,7 @@ def compare(base, candidate):
     regressions = [list(k) for k in a if a[k]['automatic_pass'] and not b[k]['automatic_pass']]
     errors = sum(r['status'] != 'ok' for r in b.values())
     return {'decision': 'reject' if regressions or errors else 'review_required',
+            'change': change,
             'automatic_regressions': regressions, 'candidate_errors': errors,
             'baseline': summary(list(a.values())), 'candidate': summary(list(b.values())),
             'note': 'Human persona, statistical non-inferiority, live voice and real MCP/body checks remain required.'}
@@ -270,6 +278,8 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--baseline', type=Path)
     parser.add_argument('--candidate', type=Path)
+    parser.add_argument('--change', choices=('weights', 'prompt'), default='weights')
+    parser.add_argument('--prompt-dir', type=Path, default=ROOT / 'server/agent/config/prompts')
     parser.add_argument('--split', choices=('dev', 'holdout'), default='dev')
     parser.add_argument('--prompt-mode', choices=('deployed', 'minimal'), default='deployed')
     parser.add_argument('--rounds', type=int, default=3)
@@ -287,7 +297,7 @@ def main():
     if args.mode == 'compare':
         if not args.baseline or not args.candidate:
             parser.error('compare requires --baseline and --candidate report.json')
-        result = compare(read(args.baseline), read(args.candidate))
+        result = compare(read(args.baseline), read(args.candidate), change=args.change)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result['decision'] == 'review_required' else 1
     suite = load_suite(args.suite)
@@ -320,13 +330,14 @@ def main():
         cases = [c for c in cases if c['id'] in args.selected]
     if args.limit:
         cases = cases[:args.limit]
-    prompt_files = [ROOT / 'server/agent/config/prompts' / (p + '.md') for p in PROMPTS]
+    prompt_files = [args.prompt_dir / (p + '.md') for p in PROMPTS]
     system = ('\n'.join(p.read_text(encoding='utf-8') for p in prompt_files)
               if args.prompt_mode == 'deployed' else 'あなたはシエルです。日本語で答えてください。')
     args.output.mkdir(parents=True, exist_ok=False)
     report = dict(schema=SCHEMA, created_utc=datetime.now(timezone.utc).isoformat(),
         **provenance(), suite_sha256=digest(args.suite), runner_sha256=digest(__file__),
         prompt_sha256=hashlib.sha256(system.encode()).hexdigest(), prompt_mode=args.prompt_mode,
+        prompt_chars=len(system),
         split=args.split, sampling=dict(temperature=args.temperature, max_tokens=args.max_tokens,
             timeout=args.timeout, seed=args.seed, thinking=args.thinking), rounds=args.rounds, case_ids=[c['id'] for c in cases],
         conditions=conditions, before=state, completion='running', trials=[])

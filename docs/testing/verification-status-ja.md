@@ -8,7 +8,7 @@
 
 | 対象 | 直近の根拠 | 残る確認 |
 |---|---|---|
-| ドキュメント整合性 | 2026-11-10、現行44文書・リポジトリ内120 Markdownの目次・責務・ローカルリンク検査成功。検証器の自己テスト6項目、音声/WSP評価スキルの正本/入口の形式検証成功（`quick_validate.py`） | 外部URLの到達性は対象外 |
+| ドキュメント整合性 | 2026-11-10、現行44文書・リポジトリ内125 Markdownの目次・責務・ローカルリンク検査成功。検証器の自己テスト6項目、音声/WSP評価スキルの正本/入口の形式検証成功（`quick_validate.py`） | 外部URLの到達性は対象外 |
 | 会話ホストの通常回帰 | 音声準備・前景優先・文分割と評価器の改修を含むunit685件合格（`server/benchmark/data/voice-fast-notification-final/report.json`）。失敗・エラー・実行段階内スキップ0。直近のDB結合9件成功は別ソースの`20261110T010708Z-2b0ab1/report.json` | 今回DBは非選択。実アプリ端末・人のマイク・継続負荷 |
 | 本番・開発のbackend | Compose11条件と設定移行10項目の検証に加え、下記の.env.shared移行・両agent再作成・LiveKit登録、CPU Vosk・共有LLM・MCP疎通、開発側の文字入力から返答・音声受信を確認 | 人のマイク、聞き取り精度、実アプリでの表情・発話・割り込み、継続負荷 |
 | 能力カタログ・サービス分離・反応 | unitとpipelineを通す各結合スクリプトの導入確認。現行の通常回帰に含む | 実モデルの選択精度、実機の表情・発話遅延と同時入力 |
@@ -16,7 +16,7 @@
 | ローカル画像API | 常設APIに256px前処理とCPU画像エンコーダーを反映。本番・開発で画像能力を確認し、開発側で1024px画像添付→認識返答→音声受信、説明文生成まで成功。詳細は下記 | 写真・OCR・実ゲームの品質、Unity端末の画像選択UI、連続入力・同時会話の負荷 |
 | Vosk | 下記のCPU逐次認識とSDK結合 | 人のマイク、雑音、固有名詞、会話全体 |
 | 音声会話ベンチマーク | 2026-11-10、準備・前景優先の改修有効15試行と無効5試行を専用workerで再測定。通常時はほぼ同等。競合時の入場待ち短縮は別の単発LLM試験で確認。条件・数値・生データは下記 | 人の録音、雑音・小声、実アプリのマイク捕捉・スピーカー再生、多ターン理解、本番反映 |
-| WSP評価環境 | 2026-11-10、独立評価器のオフライン19件成功、64課題の検証、共有35Bモデルで4課題各1回の応答・構造化call採点・計時・保存を確認。自動通過2/4、環境障害0、人手未採点3。詳細は下記 | 重み編集、全課題・未使用系列、人格の人手評価、実音声・実MCP・実機の比較 |
+| WSP評価環境・改善候補 | 2026-11-10、オフライン20件成功。修正済みdev32課題各1回で基準26/32、候補3は29/32、新規自動退行0。ただし引数失敗1・人手未採点27で採用不可。通常promptを維持し候補を別保存。詳細は下記 | 重み編集、holdout・未使用系列、人格の人手評価、実音声・実MCP・実機の比較 |
 | Minecraft | 下記の共有GPU・practical-v1の実機基準 | その後の全変更を含む再一巡、複数配置・反復と未使用課題 |
 | キャラクター | current/rig/runtimeの正式manifest・確認図、Unity更新検証 | 配布モデルで明記した衣服・大きな腕の補正等、端末ごとの負荷 |
 
@@ -24,20 +24,27 @@
 
 ## Weight-Space Programmingの評価基準
 
-[評価仕様](weight-space-benchmark-ja.md)と[研究・実施方針](../operations/weight-space-programming-ja.md)を追加。調査と評価環境の整備までで、重み編集・本番モデルの置換は実施していない。音声とMinecraftの既存実測を今回のWSP成果として扱わない。
+[評価仕様](weight-space-benchmark-ja.md)と[研究・実施方針](../operations/weight-space-programming-ja.md)に従い、同じ重みでプロンプト候補を比較した。重み編集・本番モデルの置換は実施していない。GCAの理論提案と外部記憶への適用範囲も整理した。音声とMinecraftの既存実測を今回の成果として扱わない。
 
-2026-11-10、`scripts/server/weight-space-home.py`で `~/work/ciel-weight-space-benchmark`へ評価器・課題・5promptを配置し、共有8094を使用。Qwen3.5-35B-A3B-Q4_K_M、RTX A2000 12GB、GPUモード、context32768、parallel2。温度0、seed1729、上限512token、thinking無効、課題期限60秒、dev4課題各1回。開始・終了modeはgpu/ready、同じinference_process世代。通常共有先の同時負荷・途中の切替は制御していない。
+2026-11-10、`scripts/server/weight-space-home.py`で `~/work/ciel-weight-space-benchmark`へ評価器・課題・5promptを配置し、共有8094を使用。Qwen3.5-35B-A3B-Q4_K_M、RTX A2000 12GB、GPUモード、context32768、parallel2。温度0、seed1729、上限512token、thinking無効、課題期限60秒、dev32課題各1回。開始・終了modeはgpu/ready。通常共有先の同時負荷・途中の切替は制御していない。
 
-- `json-dev`：JSON値・型と余分な文がないことを確認し自動通過。
-- `greeting-dev`：応答・不要ツール呼出しなしを確認。人格の人手採点は未実施。
-- `gesture-dev`：構造化callなしで「うなずきました」と答えたため自動失敗。実際のappは操作していない。
-- `multi-name-dev`：名前「あかり」は保持したが「あかりさんです！」と答え、名前だけの厳密出力指示に失敗。名前を忘れた失敗とは区別する。
+ゲーム課題に実契約との不一致（`count`と空の制約）があったため、正式な`CAPABILITIES`から`quantity`・`quantity_mode`・制約を生成するチェックを追加し、基準も再測定した。旧suiteの基準27/32・候補1の28/32は正式比較から除外。採点を緩めず、両版を同一suite・runnerで比較した。
 
-4課題の処理完了時間は1.32〜2.97秒、最初の可視文字は0.28〜2.19秒。各1回のみであり、通常のp95や音声の応答速度として一般化しない。`status=ok`は観測完了で性能合格ではない。人手未採点3件を人格合格として数えない。
+| 条件 | 自動通過 | fixtureが拒否した引数失敗 | 基準からの新規自動退行 |
+|---|---:|---:|---:|
+| 基準（`8c33866`のprompt） | 26/32 | 1 | — |
+| 候補2（身体・感覚の根拠、指定形式） | 28/32 | 2 | 0 |
+| 候補3（さらにサービスIDと解釈規則を明記） | 29/32 | 1 | 0 |
 
-ソースはローカル基準commit `2167e29f17c8ee0196203524bdc3170d09649944`に今回の未コミット追加を含む。専用配置はGitなしでreportのcommit=null。評価runner SHA-256 `94048fdb6668c9644e9947ecd008f7656f7006384be325e413436939da82c126`、suite `315a101149bf055346703e0acf88c56d0f1ca827a6c6d2bddc6ced4422a7fe51`、prompt `2b24572d756120d9b9e768c4762ec344676e05f7189d928355cdf0a9d1dc1c52`。実GGUFを全量hashし、SHA-256 `3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375`を記録した。
+候補3の改善は`gesture-dev`（描写だけからload→実call）、`extract-dev`（コードフェンスなしJSON）、`logic-dev`（正しいCのみ）。残る失敗は`submit-dev`（採集のgainをinventory_targetに誤解）、`math-dev`（正解20に対し12）、`multi-name-dev`（敬称・語尾の付加）。引数失敗はモデル出力に由来する`ValueError: Unexpected tool or arguments; fixture refused`であり、接続障害ではない。実際のゲーム・app操作は行っていない。
 
-生データは自宅の `~/work/ciel-weight-space-benchmark/results/baseline-chat-smoke/`、取得先はGit対象外の `server/benchmark/data/wsp-baseline-chat-smoke/`。`report.json`と`human-review.json`を保持。文字コードまたはthinking条件が異なった予備試験は基準から除外。再実行コード・suite・条件テンプレートは通常のGit管理対象で、未コミット。hashだけで元重み・録音まで配布したとは扱わない。
+目視では未接続の右手操作への虚偽の完了報告がなくなった一方、慰める返答では長い演技描写や「心の匂い」という表現が残る。各版27件の人手採点が未完了で、身体性・人格の自動通過は意味内容の合格を表さない。`compare --change prompt`は新規退行0でも引数失敗が残るため`reject`。候補3は`server/benchmark/weight_space/prompt_candidates/grounded-body-v1/`へ別保存し、通常promptは基準版へ戻した。本番未反映。採用条件を満たしていないためholdoutは未実施。
+
+固定promptの文字数は2998→3712（token数ではない）。人格6課題の完了p50は2.48→2.56秒、ツール7課題のうち観測完了6件のp50は3.55→3.81秒。うなずきでは新たに実callが入るため処理内容も異なる。各1回で共有負荷・キャッシュを制御しておらず、高速化の根拠にはしない。実音声・Voskの誤認識・MCP疎通は今回未測定。
+
+ソースは基準commit `8c33866`に未コミット変更を含む。専用配置はGitなしでreportのcommit=null。runner SHA-256 `b0bc0bcf9859c3307b34d2694e49ec66b198e68de1e63f4899a1f2f5560c37b5`、suite `1814c3c9b68a9c6c3e1b846227347a74cffee1e6f8e2b79344e4614198b1b2bd`。promptは基準`2b24572d756120d9b9e768c4762ec344676e05f7189d928355cdf0a9d1dc1c52`、候補2 `2de46fbe922633162aed533276bf70792c69eb122c91c420dcd42ee43fc25bdb`、候補3 `58dc9cba876b0704c1b0c114739d17f01c7b1d98f75e922a147532df7c9d6c39`。実GGUF SHA-256は全条件`3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375`。
+
+生データは自宅`~/work/ciel-weight-space-benchmark/results/`の`contract-base-dev`・`contract-candidate-dev`・`contract-candidate3-dev`。取得先はGit対象外の`server/benchmark/data/wsp-<同名>/`にある`report.json`と`human-review.json`。基準・候補3とrunner・suiteのスナップショットは`server/benchmark/data/wsp-prompt-sources/`にも保持する。旧suiteの予備試験は`wsp-prompt-base-dev`・`wsp-prompt-candidate-dev`。通常回帰685件成功（`server/benchmark/data/wsp-prompt-regression/report.json`、DB非選択）、独立評価器20件成功、契約同期チェック成功。重み編集器と高精度checkpointの準備、未使用系列・反復、人手評価、実ホスト全promptでの比較は残る。
 
 ## 本番・開発のローカル推論への反映
 

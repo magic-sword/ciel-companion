@@ -155,6 +155,15 @@ class HarnessTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 w.load_suite(path)
 
+    def test_prompt_comparison_keeps_weights_fixed(self):
+        a = self.report()
+        b = copy.deepcopy(a)
+        a['prompt_sha256'], b['prompt_sha256'] = 'before', 'after'
+        self.assertEqual(w.compare(a,b)['decision'], 'incomparable')
+        self.assertEqual(w.compare(a,b,change='prompt')['decision'], 'review_required')
+        b['conditions']['weights_sha256'] = 'different-weights'
+        self.assertEqual(w.compare(a,b,change='prompt')['decision'], 'incomparable')
+
     def test_encoding_loss_not_accepted(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d)/'corrupted.json'

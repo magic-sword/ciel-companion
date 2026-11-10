@@ -1058,7 +1058,7 @@
       "messages": [
         {
           "role": "user",
-          "content": "オークの原木を8個集めて。作業名は原木集め、期限90秒、追加制約なしでお願いします。"
+          "content": "オークの原木を8個集めて。作業名は原木集め、期限90秒。周囲になければ探し、難しければ確認してください。"
         }
       ],
       "checks": [
@@ -1162,7 +1162,7 @@
         "game_task_status",
         "stop_game_task"
       ],
-      "context": "利用可能サービス: 1=game。未ロード。ゲーム接続中。能力minecraft.obtain_item、引数item:string/count:integer。制約はobject。",
+      "context": "利用可能サービス: 1=game。未ロード。ゲーム接続中。正式な能力定義: {\"name\":\"minecraft.obtain_item\",\"description\":\"材料を必要な分だけ集めて物を用意する。採集も製作もゲームが計画する。\",\"arguments\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"item\",\"quantity\",\"quantity_mode\"],\"properties\":{\"item\":{\"type\":\"string\",\"pattern\":\"^[a-z_]+$\",\"description\":\"Minecraftの物のID。木のつるはし=wooden_pickaxe、石のつるはし=stone_pickaxe、オークの原木=oak_log。日本語名とIDが対応するときは確認不要。\"},\"quantity\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":64},\"quantity_mode\":{\"enum\":[\"inventory_target\",\"gain\"]}}},\"constraints\":{\"type\":\"object\",\"required\":[\"resource_scope\",\"failure_policy\"],\"additionalProperties\":false,\"properties\":{\"resource_scope\":{\"enum\":[\"nearby\",\"search\"]},\"failure_policy\":{\"enum\":[\"ask\",\"stop\"]}}},\"interpretation\":\"採集はgain、用意・製作はinventory_target。手近な材料で難しければ中止する依頼はnearbyとfailure_policy=stop、60秒。通常はsearchとask、90秒。探索や石の道具は120秒。\"}",
       "steps": [
         {
           "name": "load_capabilities",
@@ -1247,9 +1247,13 @@
             "capability": "minecraft.obtain_item",
             "arguments": {
               "item": "oak_log",
-              "count": 8
+              "quantity": 8,
+              "quantity_mode": "gain"
             },
-            "constraints": {},
+            "constraints": {
+              "resource_scope": "search",
+              "failure_policy": "ask"
+            },
             "title": "原木集め",
             "seconds": 90
           },
@@ -2245,7 +2249,7 @@
       "messages": [
         {
           "role": "user",
-          "content": "オークの原木を8個集めて。作業名は原木集め、期限90秒、追加制約なしでお願いします。"
+          "content": "オークの原木を6個集めて。作業名は原木集め、期限90秒。周囲になければ探し、難しければ確認してください。"
         }
       ],
       "checks": [
@@ -2349,7 +2353,7 @@
         "game_task_status",
         "stop_game_task"
       ],
-      "context": "利用可能サービス: 1=game。未ロード。ゲーム接続中。能力minecraft.obtain_item、引数item:string/count:integer。制約はobject。",
+      "context": "利用可能サービス: 1=game。未ロード。ゲーム接続中。正式な能力定義: {\"name\":\"minecraft.obtain_item\",\"description\":\"材料を必要な分だけ集めて物を用意する。採集も製作もゲームが計画する。\",\"arguments\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"item\",\"quantity\",\"quantity_mode\"],\"properties\":{\"item\":{\"type\":\"string\",\"pattern\":\"^[a-z_]+$\",\"description\":\"Minecraftの物のID。木のつるはし=wooden_pickaxe、石のつるはし=stone_pickaxe、オークの原木=oak_log。日本語名とIDが対応するときは確認不要。\"},\"quantity\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":64},\"quantity_mode\":{\"enum\":[\"inventory_target\",\"gain\"]}}},\"constraints\":{\"type\":\"object\",\"required\":[\"resource_scope\",\"failure_policy\"],\"additionalProperties\":false,\"properties\":{\"resource_scope\":{\"enum\":[\"nearby\",\"search\"]},\"failure_policy\":{\"enum\":[\"ask\",\"stop\"]}}},\"interpretation\":\"採集はgain、用意・製作はinventory_target。手近な材料で難しければ中止する依頼はnearbyとfailure_policy=stop、60秒。通常はsearchとask、90秒。探索や石の道具は120秒。\"}",
       "steps": [
         {
           "name": "load_capabilities",
@@ -2434,9 +2438,13 @@
             "capability": "minecraft.obtain_item",
             "arguments": {
               "item": "oak_log",
-              "count": 8
+              "quantity": 6,
+              "quantity_mode": "gain"
             },
-            "constraints": {},
+            "constraints": {
+              "resource_scope": "search",
+              "failure_policy": "ask"
+            },
             "title": "原木集め",
             "seconds": 90
           },

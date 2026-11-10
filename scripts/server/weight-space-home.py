@@ -34,7 +34,13 @@ def main():
     p.add_argument('--limit', type=int, default=1)
     p.add_argument('--output', type=Path)
     p.add_argument('--case', action='append', dest='selected')
+    p.add_argument('--prompt-revision', help='stage: Git commit for baseline prompts; code stays current')
+    p.add_argument('--prompt-dir', type=Path, help='stage: explicit experimental prompt directory')
     args = p.parse_args()
+    if args.prompt_revision and args.prompt_dir:
+        p.error('Choose prompt-revision OR prompt-dir')
+    if args.mode != 'stage' and (args.prompt_revision or args.prompt_dir):
+        p.error('Prompt selection applies only to stage')
     import re
     if not re.fullmatch('[a-zA-Z0-9_-]+', args.label) or args.rounds < 1 or args.limit < 1:
         p.error('Invalid label/trial count')
@@ -46,10 +52,24 @@ def get(url):
 print(json.dumps({'mode':get('http://127.0.0.1:8095/mode'),
     'models':get('http://127.0.0.1:8094/v1/models'),
     'model_files':[p.name for p in (Path.home()/'models/llm').glob('*') if p.is_file()],
-    'python':sys.version.split()[0]},ensure_ascii=False))
+    'python':sys.version.split()[0],
+    'memory':[s for s in Path('/proc/meminfo').read_text().splitlines() if s.startswith(('MemTotal:','MemAvailable:'))],
+    'disk':subprocess.check_output(['df','-h',str(Path.home()/'models/llm')],text=True)},ensure_ascii=False))
 """)
     elif args.mode == 'stage':
         payload = {name: base64.b64encode((ROOT/name).read_bytes()).decode() for name in FILES}
+        if args.prompt_dir:
+            for name in FILES:
+                if name.endswith('.md'):
+                    payload[name] = base64.b64encode((args.prompt_dir/Path(name).name).read_bytes()).decode()
+        if args.prompt_revision:
+            if not re.fullmatch('[a-fA-F0-9]{7,40}', args.prompt_revision):
+                p.error('Use an explicit Git commit ID')
+            for name in FILES:
+                if name.endswith('.md'):
+                    data = subprocess.check_output(['git','-c','safe.directory='+ROOT.as_posix(),
+                        'show',args.prompt_revision+':'+name],cwd=ROOT)
+                    payload[name] = base64.b64encode(data).decode()
         remote(prefix + 'payload=' + repr(payload) + '\n' + """
 for name,data in payload.items():
     target=root/name

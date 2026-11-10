@@ -38,7 +38,9 @@
 
 ## 課題と分割
 
-初期suiteは64課題、dev32・holdout32。人格、身体性、ツール、指示、推論、音声意味保持を含む軽量の疎通・回帰セットであり、これだけで一般性能の非劣化を証明しない。ツールのschemaは `capabilities.py`、`tools/goals.py`、Unityの `CielConversation.App.cs` に照合したfixture。実装から自動生成していないため、契約変更時は同時更新する。
+初期suiteは64課題、dev32・holdout32。人格、身体性、ツール、指示、推論、音声意味保持を含む軽量の疎通・回帰セットであり、これだけで一般性能の非劣化を証明しない。ホストの道具schemaは `capabilities.py`、`tools/goals.py`、Unityの `CielConversation.App.cs` に照合したfixture。
+
+ゲーム作業の2課題は、`scripts/server/sync-weight-space-contracts.py`でゲーム実装 `server/minecraft/src/ciel/tasks.js` のexportされた能力定義と照合する（開発端末にNode.jsが必要）。`--write`で能力本文・正式引数・制約を更新する。`quantity`・`quantity_mode`、英語item ID、`resource_scope`・`failure_policy`を省略しない。更新後は両版を同じsuiteで測り直す。通常の評価実行は引き続きPython標準ライブラリのみ。
 
 holdoutは公開された初期評価用の言い換えセットで、秘密のテストではない。同じ課題系列が両側にあるため近い言い換えへの汎化までが測定範囲。最終採用には、編集担当が選定に使わない新しい場面・会話系列と未使用の録音・Minecraft配置を追加し、質問系列単位で分割する。編集用の対照例にsuiteの質問を転用しない。
 
@@ -77,6 +79,8 @@ ssh -N -L 18094:127.0.0.1:8094 -L 18095:127.0.0.1:8095 <自宅サーバーのSSH
 
 ### 自宅サーバーで直接測る
 
+不採用の改善候補は`server/benchmark/weight_space/prompt_candidates/grounded-body-v1/`に固定5promptのスナップショットとして保存する。通常の会話設定からは参照しない。再試験にはrunnerの`--prompt-dir`、またはhome helperの`stage --prompt-dir server/benchmark/weight_space/prompt_candidates/grounded-body-v1`を明示する。`--prompt-revision`とは併用不可。基準と同じsuite・runnerで測定し、`compare --change prompt`で比較する。候補は既定へ自動採用されず、人手・実音声・実MCPの合格も意味しない。
+
 既存の `scripts/server/.env.local` のSSH設定だけを利用し、`~/work/ciel-weight-space-benchmark`へ評価器とfixtureだけを配置するhelperを用意している。モデルの新規起動・GPU切替・本番サービス更新は行わない。
 
 ```powershell
@@ -97,6 +101,10 @@ runの終了コード0は自動check通過、1は自動失敗、引数エラー�
 ## 比較条件と採用基準
 
 比較は同一suite/runner/prompt/sampling/seed/反復/課題/timeout/hardware/runtime/shared_loadを要求。開始・終了modeが不一致なら比較不能とする。途中の歌唱CPU切替・共有競合までは自動監視しないため、発生時は混合条件とし、時系列ログを追加して両版を取り直す。キャッシュ・warm/cold・起動準備は区別し、A→BだけでなくA/B順序を入れ替えて測る。
+
+上記は既定の`compare --change weights`。システムのプロンプト改修は`compare --change prompt`を明示し、prompt hashの違いを許容する代わりにモデル識別と重みhashの一致を要求する。他の条件は緩めない。`run --prompt-dir <ディレクトリ>`で固定した本文一式を選べる。home helperの`stage --prompt-revision <GitコミットID>`は5promptだけを指定commitから取り出し、評価器は現在のソースを置く。これにより両版を同じ採点器で測り直せる。実行中にstageで本文を入れ替えず、各runの終了後に切り替える。
+
+`prompt_chars`はsystem本文の文字数で、token数ではない。APIが返す`measurements[].usage`の入力・出力tokenと、カテゴリ別の要求単位first_content_msも保存する。形式修正で出力が短くなった効果と、操作が実際に発行されて継続推論が増えた時間を分けて読む。未実行の短い完了文を高速な操作として評価しない。
 
 採用の基準は研究論文の閾値ではなく、このプロジェクトでの事前登録案。開発基準を見て次の値を確定し、holdout結果を見て緩めない。
 
