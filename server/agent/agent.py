@@ -320,12 +320,14 @@ class Ciel(Agent):
             style = self.style
             index = next((i for i, item in enumerate(ctx.items) if getattr(item, 'role', None) == 'system'), None)
             instructions = llm.ChatMessage(role='system', content=[self.instructions_for(
-                style.talk if style else 'normal', style.presence if style else 'solo')])
+                style.talk if style else 'normal', style.presence if style else 'solo')
+                + '\n\n' + self.capabilities.summary()])
             if index is None:
                 ctx.items.insert(0, instructions)
             else:
                 ctx.items[index] = instructions
-            ctx.add_message(role='system', content=self.capabilities.summary())
+            # Keep the catalog before changing turn notes. Startup preparation
+            # now includes this same authorized catalog as the real request.
             debug_log.record('capability_exposure', loaded=list(self.capabilities.loaded),
                              eligible=len(self.capabilities.allowed), exposed=len(fns))
         if (self.mind.reply_origin == 'greeting' and not self._conversation_prefix_prepared

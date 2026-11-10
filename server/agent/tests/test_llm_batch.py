@@ -6,6 +6,18 @@ from unittest.mock import patch
 
 
 class BatchConfigurationTest(unittest.TestCase):
+    def test_cache_tuning_preserves_model_capacity(self):
+        script=Path(__file__).parents[2]/'local-llm/supervisor.py'
+        with patch.dict(os.environ, {'LOCAL_LLM_CACHE_RAM':'32768','LOCAL_LLM_CHECKPOINT_STEP':'512'},clear=True):
+            config=runpy.run_path(str(script),run_name='cache_test')
+        args=config['COMMON']
+        self.assertEqual(args[args.index('--cache-ram')+1],'32768')
+        self.assertEqual(args[args.index('--checkpoint-min-step')+1],'512')
+        self.assertEqual(args[args.index('-c')+1],'65536')
+        for key in ('LOCAL_LLM_CACHE_RAM','LOCAL_LLM_CHECKPOINT_STEP'):
+            with patch.dict(os.environ,{key:'-1'},clear=True),self.assertRaises(ValueError):
+                runpy.run_path(str(script),run_name='invalid_cache_test')
+
     def test_smaller_microbatch_preserves_context_and_parallelism(self):
         script=Path(__file__).parents[2]/'local-llm/supervisor.py'
         for size in ('128','256','512'):

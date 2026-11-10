@@ -173,6 +173,37 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(instructions,agent.instructions_for('normal','solo'))
             self.assertEqual(summary,catalog.summary())
 
+    async def test_pipeline_places_catalog_before_changing_turn_notes(self):
+        from agent import Ciel
+        from conversation import Conversation
+        from livekit.agents import Agent, llm
+        from tools import State
+        with patch('agent.PIPELINE',True):
+            agent=Ciel()
+        history=Conversation()
+        agent.mind=mind.Mind(history)
+        agent.style=Obj(talk='normal',presence='solo')
+        state=State(history=history)
+        session=Obj(userdata=state,current_speech=Obj(id='test',num_steps=1),_global_run_state=None)
+        seen=[]
+        async def capture(owner,ctx,functions,settings):
+            seen.append(ctx)
+            yield llm.ChatChunk(id='test',delta=llm.ChoiceDelta(role='assistant',content='ok'))
+        with patch.object(agent,'_get_activity_or_raise',return_value=Obj(session=session)), \
+                patch.object(Agent.default,'llm_node',capture),patch('agent.models.is_local',return_value=True):
+            for suffix in ('state-A','state-B'):
+                chat=llm.ChatContext()
+                chat.add_message(role='system',content=agent.instructions)
+                chat.add_message(role='user',content='hello')
+                chat.add_message(role='system',content=suffix)
+                _=[c async for c in agent._pipeline_llm(chat,agent.tools,{})]
+                self.assertEqual(chat.items[-1].text_content,suffix)
+        prefix=agent.instructions_for('normal','solo')+'\n\n'+agent.capabilities.summary()
+        for ctx,suffix in zip(seen,('state-A','state-B')):
+            self.assertTrue(ctx.items[0].text_content.startswith(prefix))
+            self.assertIn(suffix,ctx.items[0].text_content[len(prefix):])
+            self.assertEqual(ctx.items[0].text_content.count(agent.capabilities.summary()),1)
+
     async def test_executor_refuses_definition_changed_after_discovery(self):
         self.catalog.select(self.all)
         self.catalog.load(['3'])

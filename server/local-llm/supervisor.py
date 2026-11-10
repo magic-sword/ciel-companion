@@ -35,6 +35,10 @@ CONTROL_PORT = int(os.environ.get('LOCAL_LLM_CONTROL_PORT', '8095'))
 CTX = os.environ.get('LOCAL_LLM_CTX', '32768')
 PARALLEL = int(os.environ.get('LOCAL_LLM_PARALLEL', '2'))
 UBATCH = int(os.environ.get('LOCAL_LLM_UBATCH', '512'))
+CACHE_RAM = int(os.environ.get('LOCAL_LLM_CACHE_RAM', '8192'))
+CHECKPOINT_STEP = int(os.environ.get('LOCAL_LLM_CHECKPOINT_STEP', '8192'))
+if CACHE_RAM < 0 or CHECKPOINT_STEP < 0:
+    raise ValueError('Cache size and checkpoint spacing must be non-negative')
 if UBATCH not in (128, 256, 512):
     raise ValueError('LOCAL_LLM_UBATCH must be 128, 256 or 512')
 # With explicit --parallel, llama.cpp divides the total context among slots.
@@ -43,6 +47,7 @@ COMMON = ['-m', MODEL, '--host', HOST, '--port', str(INFERENCE_PORT), '-c', str(
           '--alias', os.environ.get('LOCAL_LLM_ALIAS', 'local')]
 COMMON += ['--parallel', str(PARALLEL)]
 COMMON += ['--ubatch-size', str(UBATCH)]
+COMMON += ['--cache-ram', str(CACHE_RAM), '--checkpoint-min-step', str(CHECKPOINT_STEP)]
 if MMPROJ:
     COMMON += ['--mmproj', MMPROJ, '--no-mmproj-offload', '--image-max-tokens', '1024']
 ARGS = {'gpu': ['-ngl', os.environ.get('LOCAL_LLM_GPU_LAYERS', '99'),
@@ -135,7 +140,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/mode':
             return self._send(404, {'error': 'not_found'})
         self._send(200, {'mode': _mode, 'ready': _healthy(), 'model': os.path.basename(MODEL),
-                         'context': int(CTX), 'parallel': PARALLEL, 'ubatch': UBATCH, 'generation': _generation,
+                         'context': int(CTX), 'parallel': PARALLEL, 'ubatch': UBATCH,
+                         'cache_ram_mib': CACHE_RAM, 'checkpoint_step': CHECKPOINT_STEP, 'generation': _generation,
                          'generation_scope': 'inference_process'})
 
     def do_POST(self):

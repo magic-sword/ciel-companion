@@ -58,7 +58,8 @@ async def run(args):
     result = {'scope':'Actual pipeline and real model; capability loading only, other tools not executed',
               'runner_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'source':json.loads(provenance.read_text()) if provenance.exists() else None,
-              'variant': args.variant, 'fresh_loaded_prefix':args.fresh_loaded_prefix, 'trials':[]}
+              'variant': args.variant, 'catalog_position':getattr(args,'catalog_position','fixed'),
+              'fresh_loaded_prefix':args.fresh_loaded_prefix, 'trials':[]}
     selector = ROOT/'server/benchmark/voice/capability-selector.md'
     if 'specialist' in args.variant:
         result['selector_sha256'] = hashlib.sha256(selector.read_bytes()).hexdigest()
@@ -95,6 +96,14 @@ async def run(args):
                     fixed = agent.instructions_for('chatty', 'close')
                     if not messages[0]['content'].startswith(fixed):
                         raise ValueError('Fixed prefix does not match actual pipeline')
+                    if getattr(args,'catalog_position','fixed') == 'trailing':
+                        # Reconstruct the prior pipeline ordering, with identical
+                        # text, schemas and dynamic context for an A/B comparison.
+                        summary = agent.capabilities.summary()
+                        prefix = fixed+'\n\n'+summary
+                        if not messages[0]['content'].startswith(prefix):
+                            raise ValueError('Catalog is not in the fixed prefix')
+                        messages[0]['content'] = fixed+messages[0]['content'][len(prefix):]+'\n\n'+summary
                     if 'specialist' in args.variant and agent.capabilities.loaded:
                         # Experimental selector only; retain all dynamic context and
                         # original tools/permission filters, replace fixed prose only.
@@ -193,6 +202,8 @@ if __name__ == '__main__':
     parser.add_argument('--cases', nargs='+', choices=[c[0] for c in CASES])
     parser.add_argument('--fresh-loaded-prefix', action='store_true')
     parser.add_argument('--capture-requests', action='store_true', help='Save synthetic fixture requests for cache-bank replay')
+    parser.add_argument('--catalog-position', choices=['fixed','trailing'], default='fixed',
+                        help='Compare current fixed catalog with its previous position after changing notes')
     parser.add_argument('--variant', choices=['baseline','compact','prepared','compact-prepared',
                                             'specialist','specialist-prepared'], default='baseline')
     asyncio.run(run(parser.parse_args()))
