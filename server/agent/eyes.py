@@ -82,6 +82,7 @@ class Eyes:
         self._ids = itertools.count(1)
         self._tasks: set[asyncio.Task] = set()
         self.available = not models.is_local('mind')
+        self._pending_captions: dict[int, Picture] = {}
 
     @property
     def client(self):
@@ -152,6 +153,7 @@ class Eyes:
                       name, len(data), self._clock(), source=source, note=note)
         same = [p for p in self.pictures if p.source == source][-(KEEP - 1):] if KEEP > 1 else []
         self.pictures = [p for p in self.pictures if p.source != source or p in same] + [pic]
+        self._pending_captions = {key: value for key, value in self._pending_captions.items() if value in self.pictures}
         return pic
 
     # ---- 心へ ----
@@ -176,10 +178,21 @@ class Eyes:
             return None
         pic.seen = True
         if pic.caption is None and self.caption_instructions:
-            self._spawn(self._caption(pic))
+            if models.is_local('eyes'):
+                self._pending_captions[pic.id] = pic
+            else:
+                self._spawn(self._caption(pic))
         debug_log.record('image_shown', id=pic.id)
         return llm.ChatMessage(role='user', content=[pic.label(),
                                                      llm.ImageContent(image=pic.data_url, inference_detail='auto')])
+
+    def reply_finished(self):
+        # The caption shares the local model/CPU with the visible reply.
+        # Start background description only once that reply has finished.
+        pending, self._pending_captions = self._pending_captions, {}
+        for pic in pending.values():
+            if pic in self.pictures and pic.caption is None:
+                self._spawn(self._caption(pic))
 
     def context(self) -> str | None:
         """心と小脳へ渡す「[見せてもらった画像]」「[わたしの目で見た景色（マイクラ）]」（説明文のあるものだけ。無ければ None）"""

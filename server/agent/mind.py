@@ -213,6 +213,8 @@ class Mind:
 
     def after_reply(self, chat_ctx: llm.ChatContext, who: str, text: str, calls: list[str], done: bool) -> None:
         """返事のあと：振り分けの例文を育て、小脳が体の動きを約束だけしたら心に続きをさせる"""
+        if done and self.eyes is not None:
+            self.eyes.reply_finished()
         if self.router is None or not self.playing() or not done:
             return
         if who == 'mind' and not calls and self.on_stalled is not None and time.monotonic() - self._nudged_at >= STALL_GAP:
@@ -521,6 +523,13 @@ def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None) -
         latest = next((i for i in reversed(source.items) if _is_user(i)),None)
         if latest is not None:
             out.items.insert(1 if instructions else 0,latest)
+    if not any(_is_user(i) for i in out.items):
+        # A greeting or service notice can precede the first human utterance.
+        # Preserve the real internal notice as the query required by Qwen.
+        notice = next((i.text_content for i in reversed(ctx.items)
+                       if isinstance(i,llm.ChatMessage) and i.role == 'system' and i.text_content), None)
+        if notice:
+            out.add_message(role='user', content=notice)
     # 自分から話す番では、最近の返答が複数続いた末尾になることがある。
     # Qwen は末尾の assistant が2件以上あると400を返す。内容を順に残し、
     # 送信用の写しだけをまとめる。FunctionCall/Output の境界は越えない。

@@ -193,5 +193,21 @@ class LocalVisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(shown[-1]['reason'], 'unavailable')
 
 
+class LocalCaptionOrderTest(unittest.IsolatedAsyncioTestCase):
+    async def test_background_caption_waits_for_the_visible_reply(self):
+        e = eyes.Eyes(Said(), caption_instructions='caption')
+        e.receive(JPEG)
+        with mock.patch('models.is_local',return_value=True), mock.patch.object(e,'_caption',mock.AsyncMock()) as caption:
+            e.message_for_reply('')
+            await asyncio.sleep(0)
+            caption.assert_not_awaited()
+            e.reply_finished()
+            await asyncio.sleep(0)
+            caption.assert_awaited_once()
+            e.reply_finished()
+            await asyncio.sleep(0)
+            self.assertEqual(caption.await_count,1)
+
+
 if __name__ == '__main__':
     unittest.main()

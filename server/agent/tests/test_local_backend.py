@@ -61,6 +61,17 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
             await model.aclose()
             await client.close()
 
+    async def test_notice_before_first_user_utterance_has_a_nonempty_query(self):
+        import mind
+        ctx = llm.ChatContext()
+        ctx.add_message(role='system',content='persona')
+        ctx.add_message(role='system',content='[internal notice] greet the newly connected person')
+        before = ctx.to_dict()
+        out = mind.local_context(ctx, source=ctx)
+        self.assertEqual(out.items[-1].role,'user')
+        self.assertEqual(out.items[-1].text_content,'[internal notice] greet the newly connected person')
+        self.assertEqual(ctx.to_dict(),before)
+
     async def test_local_assistant_merge_keeps_tool_boundaries(self):
         import mind
         ctx = llm.ChatContext()
