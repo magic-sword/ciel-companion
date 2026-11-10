@@ -57,7 +57,7 @@ class BodyDriver:
         self.env.goals = self.runner
 
     async def submit(self, task):
-        if task.get('navigation'):
+        if task.get('navigation') or task.get('spatial'):
             self.task = asyncio.create_task(self.env._call(task['body_call']['name'], task['body_call']['arguments']))
             return
         self.task = asyncio.create_task(self.runner.start('minecraft.obtain_item',
@@ -65,7 +65,7 @@ class BodyDriver:
             constraints={'resource_scope': 'search', 'failure_policy': 'ask'}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
     async def stop(self, task):
-        if task.get('navigation'):
+        if task.get('navigation') or task.get('spatial'):
             await self.env._call('minecraft_stop_moving', {})
             return
         await self.runner.stop()

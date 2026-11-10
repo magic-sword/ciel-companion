@@ -1,4 +1,5 @@
 import { BodyCommands, commandBot } from './body-command.js';
+import { editRegion } from './spatial.js';
 // 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 技は一度に 1 つ。新しい技を受けたら、今の技を止めてから始める。終わったら（止めたときも）必ず done を 1 回送る。
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
@@ -336,6 +337,8 @@ const GIVE_SEARCH = 6;       // 投げた物を探す距離
 const GIVE_WAIT_MS = 6000;   // 相手が拾うのを待つ（拾えるまで 2 秒かかる）
 
 const SKILL_RUN = {
+  clear_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, false),
+  build_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, true),
   async follow(bot, args, token, { owner, guard }) {
     let target = await findPlayer(bot, args, token, { owner, guard });
     if (token.cancelled) return;

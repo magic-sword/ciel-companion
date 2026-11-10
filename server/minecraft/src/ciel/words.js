@@ -3,6 +3,14 @@
 
 // うまくいかなかった理由（体の done・error の reason）。（ ）の前が付箋の短いひとこと
 export const WHY_FAILED = {
+  region_too_far: '指定範囲が遠すぎる（32ブロック以内で頼んでほしい）',
+  unloaded_region: '指定範囲のブロック情報を取得できない',
+  protected_block: '指定範囲に建物などの壊せないブロックがある',
+  occupied_region: '建築する位置に別のブロックがある',
+  no_support: 'ブロックを置くための支えがない',
+  unsafe_stance: '自分の足元を崩すので止めた',
+  objective_unverified: '指定したブロックの状態を確認できない',
+  region_timeout: '指定範囲の作業が時間内に終わらなかった',
   stop_timeout: '前の作業の停止を確認できない（次の作業は開始していない）',
   player_not_visible: '相手が見えない（遠い・別の場所にいる）',
   player_search_timeout: '方向の手掛かりを頼りに探したが、時間内に相手を見つけられない（座標や集合場所を教えてほしい）',
@@ -43,6 +51,7 @@ export const NEXT_STEP = {
   not_found: 'minecraft_find_blocks で探せる（地中の物は how=dig、地面の上の物は how=walk）',
 };
 export const SKILL_NAMES = {
+  clear_region: '範囲を整地する', build_region: '床や壁を建築する',
   follow: 'ついていく', come: 'そばへ行く', go_to: '場所へ行く', collect: '集める', give: '渡す',
   dig_down: '足元を掘って降りる', craft: '作る', find: '探す',
 };
@@ -75,6 +84,8 @@ export const facingJa = (f) => FACING[f] ?? '';
 export function title(skill, args = {}) {
   const who = args.player ?? '持ち主';
   switch (skill) {
+    case 'clear_region': return '指定範囲を整地する';
+    case 'build_region': return `${ja(args.block)}で指定範囲を建築する`;
     case 'follow': return `${who}についていく`;
     case 'come': return `${who}のそばへ行く`;
     case 'go_to': return args.player !== undefined ? `${who}のところへ行く` : `（${args.x}, ${args.z}）へ行く`;

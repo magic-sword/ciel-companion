@@ -50,7 +50,7 @@ class PracticalTest(unittest.IsolatedAsyncioTestCase):
                                   max_llm=100,max_calls=100,poll=1,clock=lambda:now[0],sleep=sleep,**options)
 
     async def test_no_action_stops_in_30_seconds_including_stop_task(self):
-        for task in (load_tasks()[0],load_tasks()[-1]):
+        for task in (load_tasks()[0],next(t for t in load_tasks() if t['id']=='stop_collecting')):
             result=await self.evaluate(task)
             self.assertEqual((result['reason'],result['elapsed_seconds']),('first_action_timeout',30))
 
@@ -99,7 +99,7 @@ class PracticalTest(unittest.IsolatedAsyncioTestCase):
             def stopped(self):
                 self.calls+=1
                 return self.calls>=3
-        result=await self.evaluate(load_tasks()[-1],Ack(),states=[state(1)])
+        result=await self.evaluate(next(t for t in load_tasks() if t['id']=='stop_collecting'),Ack(),states=[state(1)])
         self.assertEqual(result['reason'],'stopped_and_stayed')
         self.assertEqual(result['stop_latency_seconds'],3)
         self.assertEqual(result['elapsed_seconds'],8)

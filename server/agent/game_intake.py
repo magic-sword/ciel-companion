@@ -70,6 +70,11 @@ class GameIntake:
             return result
 
     async def _infer(self, payload, started):
+        if 'body' in payload:
+            # Completed command arguments are not the destination of a new request.
+            payload = {**payload, 'body': {k: v for k, v in payload['body'].items() if k != 'last'}}
+        if payload['stage'] == 'arguments':
+            payload = {**payload, 'required_operation': 'submit' if payload['capability']['kind'] == 'work' else 'execute'}
         request = uuid.uuid4().hex
         began = time.monotonic()
         remaining = max(.1, 20 - (began - started))

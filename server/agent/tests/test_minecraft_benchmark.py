@@ -153,7 +153,7 @@ class EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['reason'],'time_budget')
 
     async def test_stop_requires_ack_and_independent_stability(self):
-        task = load_tasks()[-1]
+        task = next(t for t in load_tasks() if t['id']=='stop_collecting')
         driver = FakeDriver(stopped=True)
         result,_ = await self.evaluate(FakeWorld(state(1)),driver,task)
         self.assertEqual(result['status'],'passed')
@@ -162,12 +162,12 @@ class EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['reason'],'did_not_stop')
 
     async def test_resume_after_stop_fails(self):
-        result,_ = await self.evaluate(FakeWorld(state(1),state(1),state(2)),FakeDriver(stopped=True),load_tasks()[-1])
+        result,_ = await self.evaluate(FakeWorld(state(1),state(1),state(2)),FakeDriver(stopped=True),next(t for t in load_tasks() if t['id']=='stop_collecting'))
         self.assertEqual(result['reason'],'resumed_after_stop')
 
     async def test_missed_stop_trigger_is_not_a_success(self):
         with self.assertRaisesRegex(RuntimeError,'trigger missed'):
-            await self.evaluate(FakeWorld(state(64)),FakeDriver(stopped=True),load_tasks()[-1])
+            await self.evaluate(FakeWorld(state(64)),FakeDriver(stopped=True),next(t for t in load_tasks() if t['id']=='stop_collecting'))
 
     async def test_disconnection_is_not_scored_as_zero_inventory(self):
         class BrokenWorld:

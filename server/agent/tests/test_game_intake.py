@@ -51,6 +51,7 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first['capabilities'], [{'id': '1', 'description': 'Solve a puzzle'}])
         self.assertNotIn('arguments', first['capabilities'][0])
         self.assertEqual(second['capability']['name'], 'puzzle.solve')
+        self.assertEqual(second['required_operation'], 'submit')
 
     async def test_chat_does_not_submit_and_pseudo_tool_text_is_rejected(self):
         self.respond({'operation': 'none'})
@@ -100,12 +101,32 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_body_action_uses_real_guarded_entry_once(self):
         self.tool()
+        self.runner.env._body={'current':None,'pending':None,'blocked':False,
+                               'last':{'phase':'succeeded','args':{'x':999}}}
         self.sequence({'operation': 'select', 'capability': '2'},
                       {'operation': 'execute', 'capability': '2', 'arguments': {'x': 12}})
         item = llm.ChatMessage(role='user', content=['Move there'])
         await self.intake.handle(item)
         await self.intake.handle(item)
         self.runner.env.use.assert_awaited_once_with('puzzle_move', {'x': 12})
+        self.runner.start.assert_not_awaited()
+        detail=json.loads(self.create.await_args_list[1].kwargs['messages'][1]['content'])
+        self.assertEqual(detail['required_operation'], 'execute')
+        for call in self.create.await_args_list:
+            body=json.loads(call.kwargs['messages'][1]['content'])['body']
+            self.assertNotIn('last',body)
+            self.assertIn('current',body)
+            self.assertIn('blocked',body)
+
+    async def test_wrong_operation_is_repaired_with_bound_kind_not_executed_as_work(self):
+        self.tool()
+        self.sequence({'operation':'select','capability':'2'},
+                      {'operation':'submit','arguments':{'x':12}},
+                      {'operation':'execute','arguments':{'x':12}})
+        await self.intake.handle(llm.ChatMessage(role='user',content=['Build there']))
+        for call in self.create.await_args_list[1:]:
+            self.assertEqual(json.loads(call.kwargs['messages'][1]['content'])['required_operation'],'execute')
+        self.runner.env.use.assert_awaited_once_with('puzzle_move',{'x':12})
         self.runner.start.assert_not_awaited()
 
     async def test_unselected_or_unknown_tool_never_executes(self):

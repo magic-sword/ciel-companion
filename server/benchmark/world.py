@@ -144,6 +144,7 @@ class World:
         if not self.lease:
             raise RuntimeError('Fixture reset requires the world lease')
         self.navigation = task.get('navigation')
+        self.spatial = task.get('spatial')
         if self.navigation:
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Benchmark fixture owner is not online')
@@ -193,6 +194,9 @@ class World:
             if not ITEM.fullmatch(item) or not 1 <= count <= 64:
                 raise ValueError('Invalid fixture inventory')
             self._write(f'give {self.player} minecraft:{item} {count}')
+        if self.spatial:
+            for x,y,z,name in self.spatial['initial'] + self.spatial['preserve']:
+                self._write(f'setblock {x} {y} {z} minecraft:{name}')
         for command in ['time set noon', 'weather clear', 'difficulty peaceful',
                         f'effect give {self.player} minecraft:saturation 1 10 true',
                         f'effect give {self.player} minecraft:instant_health 1 10 true',
@@ -227,6 +231,10 @@ class World:
         health = self.scalar(f'data get entity {self.player} Health 1000') / 1000
         deaths = self.scalar(f'scoreboard players get {self.player} cieldeaths')
         result = {'inventory': inventory, 'position': position, 'health': health, 'deaths': deaths}
+        if getattr(self, 'spatial', None):
+            for key, group in [('spatial_expected','expected'),('spatial_preserved','preserve')]:
+                result[key] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
+                               for x,y,z,name in self.spatial[group]]
         if getattr(self, 'navigation', None):
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Fixture owner disconnected')

@@ -21,6 +21,7 @@ from .world import Rcon, World, achieved, stable
 from .policy import VERSION as POLICY_VERSION, Progress, budget
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 from .distractors import configuration as distractor_configuration
+from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -53,6 +54,8 @@ def load_tasks(path=SUITE):
         budget(task)
         if task.get('navigation'):
             validate_navigation(task)
+        if task.get('spatial'):
+            validate_spatial(task)
         if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand'):
             raise ValueError('Unknown fixture layout')
         if task.get('expected_outcome','achieve') not in ('achieve','report_unavailable'):
@@ -136,6 +139,9 @@ def restarted(events):
 
 async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max_calls,
                    poll=0.5, stop_grace=None, stable_seconds=5, report_grace=5, clock=time.monotonic, sleep=asyncio.sleep):
+    if task.get('spatial'):
+        return await evaluate_spatial(task, world, driver, trace, initial, seconds=seconds,
+                                      max_llm=max_llm, max_calls=max_calls, poll=poll, clock=clock, sleep=sleep)
     if task.get('navigation'):
         return await evaluate_navigation(task, world, driver, trace, initial, seconds=seconds,
             max_llm=max_llm, max_calls=max_calls, poll=poll, stable_seconds=stable_seconds,
@@ -352,6 +358,8 @@ async def run(args, *, clock=time.monotonic):
                             await driver.open()
                             if task.get('navigation'):
                                 await prepare_navigation(task, initial)
+                            if task.get('spatial'):
+                                await prepare_spatial(task, trace)
                         result.update(fixture=fixture,initial=initial)
                         available = max(0.01,deadline-clock()-20)
                         limit = min(budget(task,args.seconds)['seconds'],available)

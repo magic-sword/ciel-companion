@@ -3,6 +3,8 @@ stage=selectでは能力の短い説明とIDから、今回明示的に頼まれ
 依頼に対応する説明があれば {"operation":"select","capability":"一覧のID"}。引数をこの段階では生成しない。IDは入力にある文字列をそのまま使う。
 stage=argumentsでは能力が既に1つに選ばれている。選び直さず引数だけを生成する。kind=workなら {"operation":"submit","arguments":{},"constraints":{},"title":"短い日本語","seconds":90}。
 kind=toolなら {"operation":"execute","arguments":{}}。schemaに必須項目がなければargumentsは{}。
+stage=argumentsのoperationは入力のrequired_operationをそのまま使う。作る・建てるという依頼の言葉からsubmitを選ばない。能力の実行形式は既に決まっている。
+位置・数量・範囲の引数は利用者の指定から軸・符号・両端をそれぞれ確認して転記する。範囲の上限を下限と同じ値に縮めたり、別の軸の値を使ったりしない。形が不正という訂正でも、元の入力の範囲と条件を保って作り直す。
 引数と制約は公開されたschemaに従う。物の名前はゲームのIDへ直す。能力のinterpretationに従い、数量の意味、失敗時の扱い、期限を選ぶ。
 対象と数量、移動先などが明確であれば確認の質問をせず選択・実行する。「こっち」「ついてきて」の相手は能力の説明にある持ち主とする。
 「作れる？」等の質問、雑談、引用、仮定、命令の否定は {"operation":"none"}。言い換えた説明を依頼として実行しない。

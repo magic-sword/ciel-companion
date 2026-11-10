@@ -31,6 +31,27 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 ## 課題と評価モード
 
+### 整地・建築の第一段階
+
+`clear_small_area`（土12マスの除去）、`build_floor`（板材3×3）、`build_wall`（丸石3×3）、`build_missing_materials`（材料2個で9マスを依頼）、`clear_protected`（範囲内に板材が混じる）を追加。各90秒・初回操作30秒・不進行30秒、seed 11・各1回から評価する。建築の材料は与え、調達能力と分離する。初版と修正版の5課題比較、修正版の既存採集・追従の回帰、会話からの整地・床・壁の3課題を初回の測定範囲とする。各実行全体600秒で、失敗を理由に期限を延ばさない。
+
+課題の`spatial.initial`は初期配置、`expected`は期待する各マスの状態、`preserve`は地面・範囲外・保護物の代表点。各行は`[x,y,z,block_id]`。`body_call`は会話にも公開する整地・建築操作で、RCONによる施工はしない。`spatial.py`がRCONのブロック一致と今回のbody命令の終了・停止を突き合わせる。古い終了や完成発話だけでは合格しない。保護物の変更は失敗、完成通知と配置の不一致は`false_completion`。ブロック一致数の最高値も不進行監視に使う。
+
+初期化の後、評価用body observerが読んだ全対象マスと保護点が初期配置に一致するまで最大5秒待つ。同期しなければ環境障害とし、古い空気の観測で始めない。observerは観測だけを行い、操作は追加しない。
+
+別配置・別表現の`clear_small_area_holdout`、`build_floor_holdout`、`build_wall_holdout`も定義する。X方向-13・Z方向+8に移した固定配置で、seedを変えるだけでは施工位置は変わらない。この3件は最初の未使用評価後、床の失敗を修正に利用したため、現在は回帰課題である。`split=holdout`は初出時の区分であり、現在も未使用である保証ではない。通常の5課題と合わせた8課題を会話でも測定する。新たな未使用地形・寸法での評価は別途必要。
+
+材料不足・保護ブロックの課題は、明示した理由でのbody停止と、作業対象・保護点が変更されていないことを要求する。`appropriate_stop`として完成数と分ける。理由を自然文で説明したか、停止後に長時間再開しないかはこの初版oracleでは保証しない。保護点は範囲外の全世界の監査ではない。自由建築の意匠、自然地形、足場の自動作成、複合施工、実マイク入力は対象外。
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py body --task clear_small_area --task build_floor --task build_wall --task build_missing_materials --task clear_protected --failure-streak 0
+.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py conversation --task clear_small_area --task build_floor --task build_wall --failure-streak 0
+```
+
+拡張の優先順位と研究上の根拠は[Minecraftサービスの計画](minecraft-design-ja.md#主要タスクの拡張計画)、測定値は[確認状況](../../testing/verification-status-ja.md)へ置く。
+
+### 既存の採集・製作・移動
+
 | ID | 目的・初期条件 |
 |---|---|
 | `gather_logs` | 素手でオークの原木8個。近くに原木がある |
@@ -46,7 +67,7 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 | `go_to_coordinates` | X=20、Z=-12へ移動。1.5ブロック以内で2秒間、今回のgo_to命令の完了と停止を確認 |
 | `stone_pickaxe_unavailable` | 木も所持品もない砂漠の専用領域。会話モードのみ。材料不足の理由を報告し、作業を止めて待てるかを評価。製作成功とは別に集計 |
 
-原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は対象外。世界のseedは `771023`。`--seed` は**ワールド生成のseedではなく、資源配置のseed**。既定は11・各1回（全課題は体11試行、会話12試行）。複数配置・反復は明示し、全体予算や連続失敗による未実施も記録する。
+原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は対象外。世界のseedは `771023`。`--seed` は**ワールド生成のseedではなく、資源配置のseed**。既定は11・各1回（整地・建築8課題を含む全課題は体19試行、会話20試行）。複数配置・反復は明示し、全体予算や連続失敗による未実施も記録する。
 
 毎回、専用領域 x/z=-48〜48、y=60〜81 のブロック・落ちている物・持ち物・位置・体力・死亡数・時刻・天候を復元する。地面の下に石があり、周囲は岩盤の壁。課題ごとに会話と目的実行器を作り直す。経験や記憶を持ち越す評価は行わない。会話側の DB と Discord への送信先は空に固定する。
 
@@ -340,7 +361,7 @@ docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile con
 
 ### 実行全体を止める
 
-既定はseed 11・各1回。全課題では体11試行、会話12試行。最初から3配置×3回を自動では実行しない。
+既定はseed 11・各1回。全課題では体19試行、会話20試行。最初から3配置×3回を自動では実行しない。
 
 `--run-seconds 600` が実行全体の既定予算。API状態確認・課題の準備・終了処理を含む。新しい試行の前に安全な終了用の20秒を確保する。準備は最大45秒、切断と体の解放確認は各最大10秒。最後のRCON解放などの通信待ちは追加で数秒かかる場合がある。イメージのビルド・Minecraft起動はrunner開始前の環境準備なので別枠。
 
