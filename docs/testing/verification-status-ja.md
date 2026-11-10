@@ -15,7 +15,7 @@
 | Unity作業表示 | 実ソースを使う.NET検証35項目、C#本体・Editorビルド成功。Editorで状態表示11・カード57・構成42項目成功 | 現行Playerの実サービス接続、全画面・実機の品質 |
 | ローカル画像API | 常設APIに256px前処理とCPU画像エンコーダーを反映。本番・開発で画像能力を確認し、開発側で1024px画像添付→認識返答→音声受信、説明文生成まで成功。詳細は下記 | 写真・OCR・実ゲームの品質、Unity端末の画像選択UI、連続入力・同時会話の負荷 |
 | Vosk | 下記のCPU逐次認識とSDK結合 | 人のマイク、雑音、固有名詞、会話全体 |
-| 音声会話ベンチマーク | 2026-11-10、準備・前景優先の改修有効15試行と無効5試行を専用workerで再測定。通常時はほぼ同等。競合時の入場待ち短縮は別の単発LLM試験で確認。条件・数値・生データは下記 | 人の録音、雑音・小声、実アプリのマイク捕捉・スピーカー再生、多ターン理解、本番反映 |
+| 音声会話ベンチマーク | 2026-11-10、準備・前景優先の改修有効15試行と無効5試行を専用workerで再測定。通常時はほぼ同等。競合時の入場待ち短縮は別の単発LLM試験で確認。その後の本番配布とvoice.ready・文字入力→応答/音声の疎通は下記 | 人の録音、雑音・小声、実アプリのマイク捕捉・スピーカー再生、多ターン理解、本番での性能比較 |
 | WSP評価環境・改善候補 | 2026-11-10、オフライン20件成功。修正済みdev32課題各1回で基準26/32、候補3は29/32、新規自動退行0。ただし引数失敗1・人手未採点27で採用不可。通常promptを維持し候補を別保存。詳細は下記 | 重み編集、holdout・未使用系列、人格の人手評価、実音声・実MCP・実機の比較 |
 | Minecraft | 下記の共有GPU・practical-v1の実機基準 | その後の全変更を含む再一巡、複数配置・反復と未使用課題 |
 | キャラクター | current/rig/runtimeの正式manifest・確認図、Unity更新検証 | 配布モデルで明記した衣服・大きな腕の補正等、端末ごとの負荷 |
@@ -42,7 +42,7 @@
 
 固定promptの文字数は2998→3712（token数ではない）。人格6課題の完了p50は2.48→2.56秒、ツール7課題のうち観測完了6件のp50は3.55→3.81秒。うなずきでは新たに実callが入るため処理内容も異なる。各1回で共有負荷・キャッシュを制御しておらず、高速化の根拠にはしない。実音声・Voskの誤認識・MCP疎通は今回未測定。
 
-ソースは基準commit `8c33866`に未コミット変更を含む。専用配置はGitなしでreportのcommit=null。runner SHA-256 `b0bc0bcf9859c3307b34d2694e49ec66b198e68de1e63f4899a1f2f5560c37b5`、suite `1814c3c9b68a9c6c3e1b846227347a74cffee1e6f8e2b79344e4614198b1b2bd`。promptは基準`2b24572d756120d9b9e768c4762ec344676e05f7189d928355cdf0a9d1dc1c52`、候補2 `2de46fbe922633162aed533276bf70792c69eb122c91c420dcd42ee43fc25bdb`、候補3 `58dc9cba876b0704c1b0c114739d17f01c7b1d98f75e922a147532df7c9d6c39`。実GGUF SHA-256は全条件`3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375`。
+測定時のソースは基準commit `8c33866`に未コミット変更を含み、再実行コード・suite・候補3は`61ac247`でコミットした。専用配置はGitなしでreportのcommit=null。runner SHA-256 `b0bc0bcf9859c3307b34d2694e49ec66b198e68de1e63f4899a1f2f5560c37b5`、suite `1814c3c9b68a9c6c3e1b846227347a74cffee1e6f8e2b79344e4614198b1b2bd`。promptは基準`2b24572d756120d9b9e768c4762ec344676e05f7189d928355cdf0a9d1dc1c52`、候補2 `2de46fbe922633162aed533276bf70792c69eb122c91c420dcd42ee43fc25bdb`、候補3 `58dc9cba876b0704c1b0c114739d17f01c7b1d98f75e922a147532df7c9d6c39`。実GGUF SHA-256は全条件`3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375`。
 
 生データは自宅`~/work/ciel-weight-space-benchmark/results/`の`contract-base-dev`・`contract-candidate-dev`・`contract-candidate3-dev`。取得先はGit対象外の`server/benchmark/data/wsp-<同名>/`にある`report.json`と`human-review.json`。基準・候補3とrunner・suiteのスナップショットは`server/benchmark/data/wsp-prompt-sources/`にも保持する。旧suiteの予備試験は`wsp-prompt-base-dev`・`wsp-prompt-candidate-dev`。通常回帰685件成功（`server/benchmark/data/wsp-prompt-regression/report.json`、DB非選択）、独立評価器20件成功、契約同期チェック成功。重み編集器と高精度checkpointの準備、未使用系列・反復、人手評価、実ホスト全promptでの比較は残る。
 
@@ -50,11 +50,17 @@
 
 自宅サーバーの本番`~/work/ciel-companion/server`と開発`~/work/ciel-companion-dev/server`で、共有`.env.shared`と独立した`.env`・`.env.dev`を使用する。両環境とも`CIEL_LLM_BACKEND=local`、pipeline・voice・CPU Vosk、GPU解放制御8095を設定し、記憶スコープは本番main・開発dev。旧`CIEL_DEV_*`は使わない。資格情報・Webhookを保持し、設定ファイルの権限は0600。
 
-現在のagentは`f2028e830c275d9fd6b84bd2f6177323c1255351`、共有APIは`1478703fe46b75829a58b5b7c8954827f740fc97`のsupervisor・gatewayを配布した。両workerのLiveKit登録と稼働・再起動回数0を確認済み。共有APIはGPU・32k×2枠・health正常で、画像上限256pxを維持する。画像機能の実測・未確認範囲は下記の常設画像APIを参照する。
+現在の本番agentは`61ac247`のserverソースを標準デプロイで配布し、イメージ`sha256:9537587f4948e0df96e3bca5da7fc659ea022648be0d5170960734e936648ca0`で稼働する。開発agentは`f2028e830c275d9fd6b84bd2f6177323c1255351`を維持。共有APIは`1478703fe46b75829a58b5b7c8954827f740fc97`のsupervisor・gatewayを配布済み。共有APIはGPU・32k×2枠・health正常で、画像上限256pxを維持する。画像機能の実測・未確認範囲は下記の常設画像APIを参照する。
 
-2026-11-10、利用者の共有API更新・短時間再起動への承認後、共有APIだけを再作成した。イメージは`sha256:40751d8718106ce5f0b67c27a972c245871c5ad6aa22ea31d0c71ad4b36c5b8d`。`generation_scope=inference_process`と世代識別、分類なし/foreground/backgroundの短い生成要求の200、入場待ちヘッダー、不正分類の400を実機で確認した。本番・開発agent・DB・TTS・歌・Minecraft等の残る8サービスのコンテナID・イメージ・起動時刻・再起動回数は前後同一。会話worker側の準備処理・分類付与・文分割は未配布で、未分類の既存要求は前景として扱う。この更新だけで通常会話の高速化が完了したとはしない。
+2026-11-10、利用者の共有API更新・短時間再起動への承認後、共有APIだけを再作成した。イメージは`sha256:40751d8718106ce5f0b67c27a972c245871c5ad6aa22ea31d0c71ad4b36c5b8d`。`generation_scope=inference_process`と世代識別、分類なし/foreground/backgroundの短い生成要求の200、入場待ちヘッダー、不正分類の400を実機で確認した。この共有API更新時には残る8サービスを維持した。後続の本番デプロイで会話worker側の準備処理・分類付与・文分割も反映した。開発workerは旧版で、未分類の要求は前景として扱う。通常会話の高速化は実際の音声計測で別に確認する。
 
 反映と復帰確認の根拠はサーバー`~/work/ciel-companion/server/local-llm/data/shared-gpu-20261110T041641Z/`の`configuration.json`・`rollout-verification.json`。回収先は`server/benchmark/data/shared-api-import-1794284236239377600/data/shared-gpu-20261110T041641Z/`。秘密を含む復旧用backupはサーバーに保持し回収しない。今回の短文3要求は疎通確認で、音声ベンチマークの再測定ではない。
+
+同日の利用者のコミット・デプロイ依頼により、`61ac247`を`deploy-server.sh`で本番へ配置した。Git管理のserver354ファイルの作業ツリーとの指紋一致、workerのLiveKit登録、起動ログのTracebackなし、再起動回数0を確認。標準Compose処理でagentとsingingを再作成し、共有LLM・TTS・DB・Minecraft3サービス・開発agentの7コンテナはID・イメージ・起動時刻を維持した。不採用のプロンプト候補は評価用ディレクトリのみで、通常promptとLLM重みは基準を維持する。
+
+デプロイ前後の状態とソース照合はGit対象外`server/benchmark/data/deploy-wsp-preflight/before.json`・`after.json`。復旧用の旧agentソースとDBはサーバー`~/work/ciel-companion/server/data/deployments/61ac247-20261110T055626Z/`内に権限制限して保持する。初回の起動処理は既存スクリプトのCRLFにより停止したが、`.gitattributes`指定のLFへ作業ツリーを修復し、再実行の`DEPLOY_SERVER_DONE`を確認した。
+
+本番workerに一時LiveKitルームを作り、voice.ready、初回挨拶の文字/音声、文字入力後の応答文字/音声受信を確認した。最初の数字37指定では期待する文字列が60秒以内に確認できず（`smoke.json`）、次の挨拶による疎通試験は応答84文字と音声受信で成功（`smoke-greeting.json`）。音声は保存せず、各ルームは削除済み。準備通知は初回13.49秒、次回3.12秒で、キャッシュや共有負荷を揃えていない単発値のため速度改善率にはしない。人格指紋は`19fc8c7672656f6bc76040ee338924bf5b2773fdc29d1d03741164761a3f55c7`、LLM世代は前後同じ`5c3ff24d8e4543b68a36b40576fb05a9`。人のマイク・実アプリ・STT精度の検証は含まない。
 
 ## ローカルQwenの画像入力
 
