@@ -276,8 +276,10 @@ class Mind:
         付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
         道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
         text = _user_text(_tail(list(chat_ctx.items)))
-        if text and not MINUTES_ASK.search(self._strip(text)):
+        if not text or not MINUTES_ASK.search(self._strip(text)):
             tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
+            if not getattr(self.minutes, 'recording', False):
+                tools = [t for t in tools if getattr(t, 'id', None) != 'get_minutes_status']
         # ゲームの体を受け持っていなければ、ゲームの道具（体・見る・知識）と目的の道具は渡さない
         if not self._body_linked():
             hidden = set(self._ids('act', 'look', 'know')) | set(GOAL_TOOLS)
@@ -419,6 +421,10 @@ class Mind:
                 log.exception('心：今のまとめの見回りに失敗')
 
     def step(self, now: float) -> None:
+        if models.LOCAL_TEST:
+            import inference_activity
+            if not inference_activity.activity.available():
+                return
         if self.history is None or not self.brief_instructions:
             return
         if self._briefing is not None and not self._briefing.done():

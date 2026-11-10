@@ -21,9 +21,12 @@ FILES = ['scripts/server/benchmark-voice.py', 'server/agent/voice_benchmark.py',
 FILES += ['scripts/server/benchmark-whisper.py', 'server/agent/config/prompts/stt_vocabulary.md']
 FILES += ['scripts/server/benchmark-voice-text.py', 'server/benchmark/voice/text-cases.json']
 FILES += ['server/agent/whisper_engine.py', 'server/agent/whisper_stt.py']
+FILES += ['server/agent/inference_activity.py']
+FILES += ['scripts/server/benchmark-conversation-tools.py']
+FILES += ['scripts/server/benchmark-inference-cancel.py']
 
 
-def stage():
+def stage(agent_revision=None):
     import io
     sources = subprocess.check_output(['git', 'ls-files', '-z', 'server/agent'], cwd=ROOT).decode().split('\0')
     files = sorted(set(FILES + [p for p in sources if p and '/tests/' not in p
@@ -32,14 +35,25 @@ def stage():
                           'server/agent/config/prompts/voice_first_sentence.md',
                           'server/stt/voice_fast_home.py', 'server/local-llm/gateway.py',
                           'server/local-llm/evaluation_gateway.py','server/benchmark/voice/contention.json']))
+    contents = {p: (ROOT/p).read_bytes() for p in files}
+    if agent_revision:
+        revision = subprocess.check_output(['git', 'rev-parse', '--verify', agent_revision+'^{commit}'], cwd=ROOT, text=True).strip()
+        for p in files:
+            if p.startswith('server/agent/') and p != 'server/agent/voice_benchmark.py':
+                old = subprocess.run(['git', 'show', revision+':'+p], cwd=ROOT, capture_output=True)
+                if old.returncode == 0:
+                    contents[p] = old.stdout
     metadata = dict(git_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+                    agent_revision=agent_revision,
                     git_dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
-                    source_sha256={p: sha256(ROOT/p) for p in files})
+                    source_sha256={p: __import__('hashlib').sha256(contents[p]).hexdigest() for p in files})
     process = subprocess.Popen(home.ssh_args()+['mkdir -p ~/work/ciel-voice-evaluation && tar -xf - -C ~/work/ciel-voice-evaluation'], stdin=subprocess.PIPE)
     try:
         with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
             for name in files:
-                archive.add(ROOT/name, arcname=name)
+                item = tarfile.TarInfo(name)
+                item.size = len(contents[name])
+                archive.addfile(item, io.BytesIO(contents[name]))
             content = json.dumps(metadata).encode()
             item = tarfile.TarInfo('source-provenance.json')
             item.size = len(content)
@@ -54,13 +68,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['stage', 'prepare', 'stt', 'live', 'status', 'pull'])
     parser.add_argument('--rounds', type=int, default=1)
+    parser.add_argument('--agent-revision', help='stage: compare an existing agent commit using the same measurement runner')
     parser.add_argument('--smoke', action='store_true', help='Use only the greeting')
     parser.add_argument('--settled', action='store_true', help='Require initial greeting to finish before live input')
     parser.add_argument('--corpus-spec', help='prepare: staged synthesis specification, relative to evaluation root')
     parser.add_argument('--stt-model', choices=['vosk-model-small-ja-0.22', 'vosk-model-ja-0.22'])
     args = parser.parse_args()
     if args.action == 'stage':
-        stage()
+        stage(args.agent_revision)
     elif args.action == 'pull':
         result = subprocess.run(home.ssh_args()+['tar -cf - -C ~/work/ciel-voice-evaluation results'], capture_output=True, check=True)
         output = ROOT/'server/benchmark/data/voice-home'

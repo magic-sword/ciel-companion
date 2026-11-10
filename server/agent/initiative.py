@@ -59,6 +59,7 @@ from livekit.agents import AgentSession
 import board
 import debug_log
 import models
+import inference_activity
 import mouth
 from jst import JST
 
@@ -178,6 +179,7 @@ class Initiative:
         # 呼ぶと、遊んでいるゲームの様子と今の目的（文字列）。遊んでいなければ None（agent.py がつなぐ）。
         # 考える係に渡し、体でやりたいこと（act）を考えさせる。遊んでいるあいだは静かでも考える（PLAY_THINK_SECONDS）
         self.game = None
+        self._observed_game = None
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -254,6 +256,9 @@ class Initiative:
             return
         through = self.history.settled_through()
         if through > self._seen_id and self._new_at is None:
+            if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+                if not any(t.role == 'user' and t.text for t in self.history.between(self._seen_id, through)):
+                    return  # Her own greeting is not a new reason to start background inference.
             self._new_at = now
 
     def learn(self, question: str, summary: str, now: float | None = None) -> None:
@@ -268,6 +273,9 @@ class Initiative:
         return self._review_at is not None
 
     def _should_think(self, now: float) -> bool:
+        if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+            if not inference_activity.activity.available():
+                return False
         if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1' and (self._user_busy or self._agent_busy):
             return False
         if not self.instructions or (self._thinking is not None and not self._thinking.done()):
@@ -286,6 +294,12 @@ class Initiative:
             return True
         if self._busy_quiet():
             return False
+        if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+            # New conversation, research results and changed world state are
+            # reasons to think. Time passing alone is not a new stimulus.
+            game = self._game()
+            return (game is not None and game != self._observed_game
+                    and now - self._last >= THINK_SETTLE_SECONDS)
         # ゲームで遊んでいるあいだは、ふだん・おしゃべりのどちらでも、静かでも一定の間で考える（返事が無くても倍にしない）
         if self._game() is not None:
             return now - self._last >= PLAY_THINK_SECONDS and now - self._thought_at >= PLAY_THINK_SECONDS
@@ -616,6 +630,7 @@ class Initiative:
 
     async def _think_once(self, now: float) -> None:
         started = time.monotonic()
+        previous_seen = self._seen_id
         if self.history is not None:
             self._seen_id = self.history.settled_through()
         self._new_at = None
@@ -642,6 +657,7 @@ class Initiative:
             **({'ciel_since_shown': self._ciel_since(min(t.shown_id for t in sent if t.offered))}
                if any(t.offered for t in sent) else {}),
         }
+        deferred = False
         try:
             r = await models.client_for('thought', self.client).chat.completions.create(**models.options(
                 'thought', model=MODEL, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=THINK_TIMEOUT,
@@ -649,12 +665,18 @@ class Initiative:
                           {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
             models.record('thought', models.LOCAL_MODEL if models.is_local('thought') else MODEL, getattr(r, 'usage', None))
             result = json.loads(r.choices[0].message.content or '{}')
+        except inference_activity.Deferred:
+            deferred = True
+            self._seen_id = previous_seen
+            self._new_at = time.monotonic()
+            return
         except Exception as e:   # 考えられなくても、会話は続ける
             log.warning('内なる考え：考えられない：%s', type(e).__name__)
             return
         finally:
-            if self._review_at is not None and started >= self._review_at:
+            if not deferred and self._review_at is not None and started >= self._review_at:
                 self._review_at = None   # 分かったことを渡して考えた（考えられなくても、付箋は戻す）
+        self._observed_game = game
         self.apply(result, time.monotonic(), reviewed={t.id for t in sent})
 
     def apply(self, result, now: float, reviewed: set[str] | None = None) -> None:

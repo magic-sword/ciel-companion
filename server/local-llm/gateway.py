@@ -6,6 +6,9 @@ import json
 import collections
 import threading
 import time
+import http.client
+import select
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,7 +30,7 @@ class Admission:
         self.waiting = collections.deque()
         self.active = self.background = 0
 
-    def acquire(self, work, timeout=30):
+    def acquire(self, work, timeout=30, cancelled=None):
         if work not in ('foreground', 'background'):
             raise ValueError('Invalid X-Ciel-Work-Class')
         start = time.monotonic()
@@ -38,6 +41,8 @@ class Admission:
             self.waiting.append((ticket, work))
             try:
                 while True:
+                    if cancelled is not None and cancelled.is_set():
+                        raise ConnectionResetError('Request cancelled while queued')
                     foreground = [t for t, kind in self.waiting if kind == 'foreground']
                     first = foreground[0] if foreground else self.waiting[0][0]
                     background_limit = 1
@@ -49,7 +54,7 @@ class Admission:
                     remaining = timeout - (time.monotonic() - start)
                     if remaining <= 0:
                         raise TimeoutError('Inference admission expired')
-                    self.condition.wait(remaining)
+                    self.condition.wait(min(remaining, 0.1) if cancelled is not None else remaining)
             finally:
                 self.waiting.remove((ticket, work))
                 self.condition.notify_all()
@@ -114,8 +119,6 @@ def prepare(body, max_edge):
 def create_server(host, port, upstream_port, *, max_edge=256, parallel=2):
     if not 32 <= max_edge <= 4096:
         raise ValueError('LOCAL_LLM_IMAGE_MAX_EDGE must be between 32 and 4096')
-    upstream = f'http://127.0.0.1:{upstream_port}'
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     admission = Admission(parallel)
 
     class Handler(BaseHTTPRequestHandler):
@@ -140,6 +143,29 @@ def create_server(host, port, upstream_port, *, max_edge=256, parallel=2):
             admitted = False
             work = self.headers.get('X-Ciel-Work-Class', 'foreground')
             queued = 0.0
+            cancelled = threading.Event()
+            finished = threading.Event()
+            upstream = http.client.HTTPConnection('127.0.0.1', upstream_port, timeout=180)
+            upstream_socket = None
+            watcher = None
+
+            def watch_disconnect():
+                # Detect cancellation even before the upstream sends headers or tokens.
+                # Keep the socket reference: HTTPConnection may detach it on response.
+                while not finished.wait(0.05):
+                    try:
+                        readable, _, _ = select.select([self.connection], [], [], 0)
+                        if not readable or self.connection.recv(1, socket.MSG_PEEK):
+                            continue
+                    except OSError:
+                        pass
+                    cancelled.set()
+                    if upstream_socket is not None:
+                        try:
+                            upstream_socket.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
+                    return
             try:
                 path = urllib.parse.urlsplit(self.path)
                 if path.scheme or path.netloc or not self.path.startswith('/'):
@@ -152,21 +178,28 @@ def create_server(host, port, upstream_port, *, max_edge=256, parallel=2):
                 if size < 0 or size > MAX_BODY:
                     return self.error(413, 'Request exceeds byte limit')
                 data = self.rfile.read(size) if size else None
+                watcher = threading.Thread(target=watch_disconnect, daemon=True)
+                watcher.start()
                 images = 0
                 if self.command == 'POST' and path.path.rstrip('/') == '/v1/chat/completions':
                     body = json.loads(data or b'{}')
                     images = prepare(body, max_edge)
+                    if body.get('stream'):
+                        # Keep upstream disconnect checks alive during prefill.
+                        body['return_progress'] = True
+                        body['sse_ping_interval'] = 0.1
                     data = json.dumps(body, ensure_ascii=False).encode('utf-8')
-                    queued = admission.acquire(work)
+                    queued = admission.acquire(work, cancelled=cancelled)
                     admitted = True
                 headers = {key: value for key, value in self.headers.items() if key.lower() not in HOP_HEADERS}
                 if data is not None:
                     headers['Content-Length'] = str(len(data))
-                request = urllib.request.Request(upstream + self.path, data=data, headers=headers, method=self.command)
-                try:
-                    response = opener.open(request, timeout=180)
-                except urllib.error.HTTPError as error:
-                    response = error
+                upstream.connect()
+                upstream_socket = upstream.sock
+                if cancelled.is_set():
+                    return
+                upstream.request(self.command, self.path, body=data, headers=headers)
+                response = upstream.getresponse()
                 with response:
                     self.send_response(response.status)
                     for key, value in response.headers.items():
@@ -198,10 +231,14 @@ def create_server(host, port, upstream_port, *, max_edge=256, parallel=2):
                     self.error(400, 'Invalid JSON request')
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Closing the upstream connection also cancels generation.
-            except (OSError, urllib.error.URLError):
-                if not response_started:
+            except (OSError, http.client.HTTPException):
+                if not response_started and not cancelled.is_set():
                     self.error(503, 'Local inference is temporarily unavailable', 'inference_unavailable')
             finally:
+                finished.set()
+                upstream.close()
+                if watcher is not None:
+                    watcher.join(timeout=0.2)
                 if admitted:
                     admission.release(work)
 

@@ -109,6 +109,16 @@ LiveKitの利用環境やworkerのbackend次第では課金されるため、[�
 
 起動中に準備を済ませる[低遅延化の設計](../conversation/conversation-pipeline-ja.md#音声会話の低遅延化)では、準備時間・成功率と、準備後の会話遅延を別に評価する。現行の`--greeting-timeout`は挨拶音声の終了確認であり、モデル・音声経路すべての準備完了を通知する仕組みではない。準備世代や同一部屋での連続ターンの評価は今後の拡張で、現在の`live`は1試料ごとに新しい部屋を作る。準備後に再起動やCPU切替が起きた試行も残し、遅い結果だけを除外しない。
 
+### アプリ設定と推論取り消しの比較
+
+conditionsの`app_profile`に`style`と`hello`を指定すると、`live`は準備完了の通知後に`ciel.style`・`ciel.app`を送り、初回挨拶が落ち着いてから音声を再生する。`style`はtalk/presence/meeting、`hello`はapp.hello v1の能力一覧。本人認証や実端末の動作は模擬しない。アプリ設定なしの旧測定や、挨拶後に設定を変更した試行と混ぜず、前後とも同じ送信タイミングを使う。
+
+`voice-home.py stage --agent-revision <commit>`は会話実装・promptを指定コミットから配置し、測定器は作業ツリーの同じ版を使う。通常のstageは改修候補を配置する。試験workerを止めてから実装を入れ替え、配置した各ファイルの指紋をsource-provenanceへ記録する。試料・期限・反復数を両版で揃え、遅かった中間候補の結果も保持する。
+
+`scripts/server/benchmark-conversation-tools.py --output <new.json>`は実pipelineで組み立てた指示と道具をローカル実モデルへ渡す。能力ロード以外のツールを実行せず、挨拶・否定・議事録・名前・保存状態・会話検索の選択を記録する。モデルの選択とMCPの実処理は別評価。状態照会を先に選んだ場合も記録し、実行完了と見なさない。
+
+`scripts/server/benchmark-inference-cancel.py --gateway <gateway.py> --output <new.json>`は既存の推論プロセスのnativeポート（既定18094）へ専用の入口を作り、入力処理中に切断して推論枠が解放されるまでを測る。枠が使用中なら開始しない。追加モデルは起動せず、通常APIの再配置もしない。各試行の先頭を変えてキャッシュの持ち越しを避け、取り消し後40秒を上限にする。通常の音声ベンチマークは8094経由を維持し、この測定値を音声全体の短縮率に換算しない。
+
 ### 自宅サーバーでの合成音声による基準測定
 
 `scripts/server/voice-home.py`はSSH設定を既存の`benchmark-home.py`から読み、自宅の`~/work/ciel-voice-evaluation`だけに測定コードを配置する。稼働中の`ciel-dev`がlocal・pipeline・voice・Irodori・devスコープであることを確認し、本番・開発ワーカーの再配置は行わない。試験クライアントとSTTは既存の開発イメージを使う一時コンテナ（2CPU・3GiB）で動かし、モデルを読み取り専用でマウントする。専用のLLMは起動しない。

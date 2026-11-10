@@ -8,6 +8,8 @@
 """
 import logging
 import os
+from types import SimpleNamespace
+import inference_activity
 
 import debug_log
 
@@ -56,6 +58,7 @@ LOCAL_MODEL = os.environ.get('CIEL_LOCAL_LLM_MODEL', 'local')             # llam
 LOCAL_TIMEOUT = float(os.environ.get('CIEL_LOCAL_TIMEOUT', '90'))           # 1 回の上限（秒）。歌を聴くあいだは CPU の形で遅い
 _local_client = None
 CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt', 'research'}
+BACKGROUND_ROLES = {'thought', 'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
 if LOCAL_TEST and not LOCAL_URL:
     raise ValueError('CIEL_LOCAL_LLM_URL is required for local backend')
 
@@ -95,6 +98,22 @@ def model(role: str) -> str:
     return os.environ.get(env, default)
 
 
+async def background_completion(client, **kwargs):
+    """Collect JSON/text privately while keeping the HTTP stream cancellable."""
+    kwargs = {**kwargs, 'stream': True, 'stream_options': {'include_usage': True}}
+    stream = await client.chat.completions.create(**kwargs)
+    content, usage = [], None
+    try:
+        async for chunk in stream:
+            if chunk.usage is not None:
+                usage = chunk.usage
+            if chunk.choices and chunk.choices[0].delta.content:
+                content.append(chunk.choices[0].delta.content)
+    finally:
+        await stream.close()
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=''.join(content)))], usage=usage)
+
+
 def client_for(role: str, default):
     """その役目の呼び先（ローカルなら llama-server の OpenAI 互換の窓口。そうでなければ default をそのまま）"""
     global _local_client
@@ -103,6 +122,13 @@ def client_for(role: str, default):
     if _local_client is None:
         import openai
         _local_client = openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0)
+    if role in BACKGROUND_ROLES and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+        async def create(**kwargs):
+            async def operation(**values):
+                return await background_completion(_local_client, **values)
+            return await inference_activity.activity.run(operation, **kwargs)
+        return SimpleNamespace(base_url=_local_client.base_url,
+                               chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     return _local_client
 
 
@@ -119,7 +145,7 @@ def options(role: str, **kwargs) -> dict:
     extra = dict(kwargs.get('extra_body') or {})
     extra['chat_template_kwargs'] = {'enable_thinking': False}
     kwargs['extra_body'] = extra
-    background = role in {'thought', 'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
+    background = role in BACKGROUND_ROLES
     headers = dict(kwargs.get('extra_headers') or {})
     headers['X-Ciel-Work-Class'] = ('background' if background and os.environ.get('CIEL_VOICE_FAST', '1') == '1'
                                     else 'foreground')

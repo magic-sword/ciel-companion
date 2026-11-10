@@ -93,9 +93,11 @@ cpuは共有APIを変更しない。gpuは開始時に共有APIがGPU・準備�
 
 ## 会話を優先する入場制御の設計
 
+gatewayは要求本文の受信後から接続終了まで切断を監視する。入場待ち中の取り消しは上流へ送らず、上流接続後の取り消しではソケットをshutdownして、ヘッダー・最初のトークン待ちも解除する。入場枠はfinallyで返す。会話ジョブ側の`inference_activity`はローカルの背景モデル要求を会話開始時に取り消すが、DBトランザクションを中断しない。別ジョブ間の能動的な背景処理の追い出しは実装していない。配布済みかどうかと実モデルの解放時間は確認状況を参照する。
+
 以下は[音声会話の低遅延化](../conversation/conversation-pipeline-ja.md#音声会話の低遅延化)の設計。`gateway.Admission`に有界キューと分類別の同時数制御を実装した。通常サービスへの反映と専用評価の結果は[確認状況](../testing/verification-status-ja.md)を参照する。起動時に準備しても、背景要求が共有枠とキャッシュを使用するため、会話中の待ち時間を別に制御する。
 
-ローカルの`POST /v1/chat/completions`要求を`X-Ciel-Work-Class: foreground|background`で分類する。他のAPIはこの入場制御の対象外。未指定は通常のOpenAI互換クライアントの前景要求、不正な値は400。`models.options`は要約・内なる考え・記憶保守・議事録を背景に分類し、会話・依頼確認等は前景にする。実行中の最大数は構成のparallel、背景は最大1。前景待機があれば背景待機より先に受け入れる。枠はストリーム終了/例外で解放し、待機期限30秒・全体64要求の上限を持つ。待機超過は429、上流タイムアウトは503。`X-Ciel-Admission-Ms`へ待機時間を返す。実行中の背景生成の強制取消は行わない。
+ローカルの`POST /v1/chat/completions`要求を`X-Ciel-Work-Class: foreground|background`で分類する。他のAPIはこの入場制御の対象外。未指定は通常のOpenAI互換クライアントの前景要求、不正な値は400。`models.options`は要約・内なる考え・記憶保守・議事録を背景に分類し、会話・依頼確認等は前景にする。実行中の最大数は構成のparallel、背景は最大1。前景待機があれば背景待機より先に受け入れる。枠はストリーム終了/例外で解放し、待機期限30秒・全体64要求の上限を持つ。待機超過は429、上流タイムアウトは503。`X-Ciel-Admission-Ms`へ待機時間を返す。gateway itself does not preempt another client; the conversation worker cancels its own background request when foreground activity resumes.
 
 新supervisorの`/mode`は`generation`と`generation_scope=inference_process`を持ち、モデルプロセス起動ごとに世代を変える。準備処理は世代識別がない制御先を準備済みとして扱わない。専用評価の`evaluation_gateway.py`は8096/8097で動き、既存8095/8094を読み取り・推論要求の転送に使うだけで通常サービスを更新しない。この世代は専用受信口を指し、上流モデルの再起動世代とは異なる。専用経路を通らない通常クライアントの背景要求まで制御できたとは扱わない。
 

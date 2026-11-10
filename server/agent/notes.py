@@ -24,6 +24,7 @@ import openai
 from memory_jobs import run_memory_job
 
 import models
+import inference_activity
 import speakers
 from conversation import Conversation, Turn
 from jst import JST
@@ -198,6 +199,8 @@ class NoteTaker:
                 log.warning('メモを書けない：%s', type(e).__name__)
                 self._requested.setdefault(pid, [])[:0] = requested
                 self._forgets.setdefault(pid, [])[:0] = forgets
+                if isinstance(e, inference_activity.Deferred):
+                    self._arm_timer()
                 return
             valid = {i for i, _ in existing}
             add = [t.strip()[:MAX_NOTE_CHARS] for t in result.get('add', []) if isinstance(t, str) and t.strip()]

@@ -49,7 +49,6 @@ import growth
 import health
 import initiative
 import interruptions
-import listener
 import irodori_tts
 import errors
 import activity as activity_
@@ -122,7 +121,6 @@ ENDPOINT_MODE = os.environ.get('CIEL_ENDPOINT_MODE', 'dynamic')
 ENDPOINT_MIN = float(os.environ.get('CIEL_ENDPOINT_MIN', '0.6'))
 ENDPOINT_MAX = float(os.environ.get('CIEL_ENDPOINT_MAX', '1.5'))
 # 返事を作る前に、聞く係が頼みを確かめ終えるのを待つ上限（ふだんは約 1 秒で終わる）
-LISTENER_WAIT = 3.0
 # 議事録の知らせは、相手がこの秒数だまってから言う（息つぎの間に言いかけて、続きの話で止められた。2026-10-30）
 MINUTES_SETTLE = 1.2
 # 話者の識別（speakers.py）は、文字から声を作る方式と Realtime API・pipeline のときだけ
@@ -224,6 +222,7 @@ class Ciel(Agent):
             if game is not None:
                 self.capabilities.bind_external(game.tools, "game")
         self.grown = grown   # 出来事から育った好み（growth.context。会話の始めに DB から読む）
+        self._conversation_prefix_prepared = False
         self.game = game     # game_env.GameEnv（会話の始めにつないだゲームの環境。無ければ None）
         # 道具（tools/）は、会話モデルが必要なときに呼ぶ。使い方は config/prompts/ で教える
         # ゲームの道具（体・見る・知識）は、ゲームの環境が出したものを足す。渡すかは心が決める（mind.py の tools_for）
@@ -234,7 +233,6 @@ class Ciel(Agent):
         self.aizuchi = aizuchi.Backchannel(self.volume)   # 返事の声ができるまでの相づち（aizuchi.py）
         self.preamble = emotion.PreambleCut()   # 道具を呼んだ返事の前置きを止める（歌・議事録の道具が頼む）
         self.mind: mind.Mind | None = None      # pipeline の心（entrypoint がつなぐ）
-        self.ear: listener.Listener | None = None   # pipeline の聞く係（entrypoint がつなぐ）
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
         self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
@@ -264,11 +262,6 @@ class Ciel(Agent):
         turn = await self.replies.pipeline_turn() if self.replies is not None else {}
         debug_log.record('voice_turn_prepare', speech_id=getattr(self.session.current_speech, 'id', None),
                          ms=round((time.monotonic()-turn_started)*1000, 2))
-        prepared_at = time.monotonic()
-        if self.ear is not None:
-            await self.ear.settled(LISTENER_WAIT)   # 聞く係が確かめている頼みは、受けたかが分かってから振り分ける
-        debug_log.record('voice_listener_wait', speech_id=getattr(self.session.current_speech, 'id', None),
-                         ms=round((time.monotonic()-prepared_at)*1000, 2))
         who = self.mind.route(chat_ctx, turn)
         work = self.mind.goals
         speech_id = getattr(self.session.current_speech, 'id', None)
@@ -295,26 +288,15 @@ class Ciel(Agent):
                 if reply is not None:
                     yield reply
                     return
-        # While playing, one decision-capable loop handles conversation. No game talker/promise handoff.
-        if self.mind.playing() and who != 'skip':
-            who = 'mind'
-        if who == 'talker':
-            who = await self.mind.second_look(chat_ctx)   # 遊んでいるあいだは、意味の近さでもう一度見る（router.py）
         if who == 'skip':
-            return   # 頼みだけの発言で、付箋になった。一言は議事録係の知らせが言う
+            return
+        # One conversation loop; load service schemas and instructions on demand.
+        who = 'mind'
         if self.activity is not None:
             self.activity.thinking(who, self.mind.reply_origin)
-        if who == 'mind':
-            # 心：全部の指示と道具で作る（頼みごと・長い話・何人も話した・名前を呼ばれた・知らせ・道具の結果の続き）
-            ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
-            if intake_checked:
-                # The work decision already classified this input as conversation.
-                fns = [fn for fn in fns if getattr(fn, 'id', None) not in mind.GOAL_MOVING]
-        else:
-            # 小脳：短い指示・道具なしで、すぐ返す
-            style = self.style
-            brief = self.talker_instructions_for(style.talk if style else 'normal', style.presence if style else 'solo')
-            ctx, fns = self.mind.build(chat_ctx, talker_instructions=brief, turn=turn), []
+        ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
+        if intake_checked:
+            fns = [fn for fn in fns if getattr(fn, 'id', None) not in mind.GOAL_MOVING]
         if who == 'mind' and self.capabilities is not None:
             state = self.session.userdata
             self.capabilities.disabled = {name for name, ready in (
@@ -334,6 +316,11 @@ class Ciel(Agent):
             ctx.add_message(role='system', content=self.capabilities.summary())
             debug_log.record('capability_exposure', loaded=list(self.capabilities.loaded),
                              eligible=len(self.capabilities.allowed), exposed=len(fns))
+        if (self.mind.reply_origin == 'greeting' and not self._conversation_prefix_prepared
+                and models.is_local('mind') and os.environ.get('CIEL_VOICE_FAST', '1') == '1'):
+            fixed = next((item.text_content for item in ctx.items if getattr(item, 'role', None) == 'system'), '')
+            await voice_preparation.prepare_conversation_prefix(fixed, fns, self.persona.voice_warmup)
+            self._conversation_prefix_prepared = True
         # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
@@ -432,11 +419,13 @@ class Ciel(Agent):
                  p.self_instructions,    # シエル自身の好み・苦手・こだわり（ciel_self.md）
                  self.grown,             # 出来事から育った好み（growth.py）
                  p.touch_instructions]   # 画面のタッチへの反応（touch.py）
-        if SPEAKERS:
-            # 誰と話しているか（[発言者：…]）と、人についての道具の使い方（speakers.py、tools/people.py）
-            parts.append(p.speaker_instructions)
-        # 声で頼まれたときの議事録の道具と、始めた・終えたときの一言（tools/minutes.py、minutes.py）
         loaded = (set(self.capabilities.loaded) - self.capabilities.disabled) if self.capabilities is not None else None
+        if PIPELINE:
+            parts.append(p.talker_instructions)
+            if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+                parts.append(p.voice_first_sentence)
+        if SPEAKERS and (loaded is None or 'memory' in loaded):
+            parts.append(p.speaker_instructions)
         for service, prompt in [('minutes', p.minutes_voice_instructions),
                                 ('conversation', p.conversation_instructions),
                                 ('research', p.research_voice_instructions),
@@ -719,9 +708,6 @@ async def entrypoint(ctx: JobContext) -> None:
                     goal_runner.reported()
             agent.mind.handed = None
         session.on('conversation_item_added', on_said)
-        # 聞く係：話の途中の議事録の頼みを、文字起こしの区切りごとに見つけて、コードが直接動かす（listener.py）
-        agent.ear = listener.Listener(history, minute_taker, agent.persona.listener_instructions, board=tasks)
-        session.on('user_input_transcribed', agent.ear.on_transcribed)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
     session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
@@ -743,6 +729,11 @@ async def entrypoint(ctx: JobContext) -> None:
         talker.paused = lambda: song.active
         song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
         song.preamble = agent.preamble   # 「どうぞ」を 2 文までにする
+    if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
+        import inference_activity
+        session.on('user_state_changed', lambda ev: inference_activity.activity.update(user=ev.new_state == 'speaking'))
+        session.on('agent_state_changed', lambda ev: inference_activity.activity.update(
+            agent=ev.new_state in ('thinking', 'speaking', 'initializing')))
     session.on('user_state_changed', talker.on_user_state)
     session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:
@@ -796,6 +787,10 @@ async def entrypoint(ctx: JobContext) -> None:
     session.on('conversation_item_added', recorder.on_item)
 
     async def close_store() -> None:
+        if models.LOCAL_TEST:
+            import inference_activity
+            inference_activity.activity.update(user=False, agent=False)
+            inference_activity.activity.quiet_since -= 3
         usage_log.summary()
         voice.summary()
         debug_log.record('end')

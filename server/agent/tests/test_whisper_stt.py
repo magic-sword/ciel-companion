@@ -13,6 +13,19 @@ from whisper_stt import WhisperSTT
 
 
 class WhisperTest(unittest.IsolatedAsyncioTestCase):
+    def test_subsecond_full_hint_echo_is_dropped_but_name_and_long_speech_survive(self):
+        prompt = 'シエル、マインクラフト、議事録。'
+        model = Mock()
+        with patch('whisper_engine.load_model', return_value=model):
+            for seconds, text, expected in [(.6, prompt, ''), (.6, 'シエル。', 'シエル。'),
+                                            (3, prompt, prompt), (.6, '議事録を始めないで', '議事録を始めないで')]:
+                model.transcribe.return_value = (iter([Obj(text=text)]), None)
+                self.assertEqual(whisper_engine.recognize('offline', np.zeros(int(16000*seconds)), prompt), expected)
+            model.transcribe.return_value = (iter([Obj(text='シエル')]), None)
+            self.assertEqual(whisper_engine.recognize('offline', np.zeros(9600), 'シエル'), 'シエル')
+            model.transcribe.return_value = (iter([Obj(text=prompt)]), None)
+            self.assertEqual(whisper_engine.recognize('offline', np.zeros(9600), prompt+'\n田中'), '')
+
     async def test_resamples_without_rewriting_names_or_negation(self):
         engine = WhisperSTT('/offline/small', 'vocabulary')
         frames = [rtc.AudioFrame(bytes(4800*2), 48000, 1, 4800) for _ in range(2)]

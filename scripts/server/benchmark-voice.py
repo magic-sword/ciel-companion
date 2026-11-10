@@ -150,6 +150,11 @@ async def live_trial(row, args):
             await asyncio.wait_for(ready_event.wait(), args.connect_timeout)
             if ready_info.get('v') != 1 or ready_info.get('ready') is not True:
                 raise ValueError('Invalid or failed voice readiness')
+        if getattr(args, 'app_profile', None):
+            profile = args.app_profile
+            await room.local_participant.publish_data(json.dumps(profile['style']), reliable=True, topic='ciel.style')
+            await room.local_participant.publish_data(json.dumps(profile['hello']), reliable=True, topic='ciel.app')
+            await asyncio.sleep(1)
         deadline = time.perf_counter() + args.connect_timeout
         while not tasks:
             if time.perf_counter() > deadline:
@@ -241,6 +246,7 @@ def main():
         parser.error('live requires an explicit named --agent and paced audio')
     rows = corpus(args.corpus)
     conditions = json.loads(args.conditions.read_text(encoding='utf-8'))
+    args.app_profile = conditions.get('app_profile')
     required = ('stt_model', 'llm_model', 'tts_model', 'hardware', 'shared_load', 'runtime_config')
     if not isinstance(conditions, dict) or any(not conditions.get(k) for k in required):
         parser.error('conditions requires: ' + ', '.join(required))

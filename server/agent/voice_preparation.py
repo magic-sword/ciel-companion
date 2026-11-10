@@ -10,6 +10,30 @@ import irodori_tts
 import models
 
 
+async def prepare_conversation_prefix(instructions, functions, text):
+    """Prime the real fixed prefix after app/style negotiation, before greeting.
+
+The tool schema precedes the system text in Qwen's template. Priming a tool-free
+talker cannot warm this prefix. Never record or execute the generated output.
+"""
+    from livekit.agents.llm import utils
+    schemas = [getattr(fn.info, 'raw_schema', None) or utils.build_legacy_openai_schema(fn)['function']
+               for fn in functions]
+    kwargs = {'tools': [{'type': 'function', 'function': s} for s in schemas]} if schemas else {}
+    client = models.create_client('mind')
+    started = time.monotonic()
+    try:
+        await client.chat.completions.create(model=models.LOCAL_MODEL, max_tokens=1,
+            messages=[{'role':'system','content':instructions}, {'role':'user','content':text}],
+            extra_body={'chat_template_kwargs':{'enable_thinking':False}},
+            extra_headers={'X-Ciel-Work-Class':'foreground'}, timeout=models.LOCAL_TIMEOUT, **kwargs)
+        debug_log.record('voice_prepare', stage='conversation_prefix',
+                         ms=round((time.monotonic()-started)*1000, 2), tools=len(functions),
+                         prefix_sha256=hashlib.sha256(instructions.encode()).hexdigest())
+    finally:
+        await client.close()
+
+
 async def mode_snapshot():
     url = os.environ.get('CIEL_LOCAL_LLM_CONTROL', 'http://127.0.0.1:8095')
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as http:

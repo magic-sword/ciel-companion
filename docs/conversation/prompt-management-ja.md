@@ -32,7 +32,7 @@
 | `server/agent/config/prompts/relationship.md` | 会話の終わりに、シエルがその人をどう思っているか（関係）を書き直す係への指示。処理は `relationship.py`。[関係の決定記録](../services/shared-memory-ja.md) |
 | `server/agent/config/prompts/minutes.md`・`minutes_live.md`・`minutes_voice.md` | 会話のまとめ（議事録など）の清書・ライブの差分・声での頼まれ方。処理は `minutes.py`・`summaries/`。[議事録の決定記録](../services/meeting-minutes-ja.md) |
 | `server/agent/config/summaries/*.toml`・`*.md` | まとめのテンプレート。TOML は見出しと種類（モデルへの本文ではない）、Markdown は書き方の指示（モデルへそのまま渡す） |
-| `server/agent/config/prompts/talker.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline` の小脳（すぐの返事。短い指示で道具を持たない）、心が「今のまとめ」を書く指示、聞く係が話の途中の議事録の頼みを確かめる指示、付箋の一覧「[今のタスク]」と頼みの発言に付く印の読み方（心と小脳の両方）。処理は `mind.py`・`listener.py`・`board.py`。[聞く・考える・話すの作り直し](conversation-pipeline-ja.md) |
+| `server/agent/config/prompts/talker.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline`の共通会話指示（会話と必要な道具の選択）、背景の短いまとめ、付箋と依頼の印の読み方。`listener.md`は独立モジュール用に残すが、通常pipelineの途中文字起こしには接続しない。処理は`mind.py`・`board.py`。[会話の処理構造](conversation-pipeline-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
 | `server/agent/agent.py` | 声の方式に応じた指示の組み合わせと会話への適用 |
 
@@ -66,7 +66,7 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 会話開始ログには `persona_sha256`、会話モデルの選択、Realtime のモデル名、声の方式を記録する。ハッシュは読み込んだ本文一式を順序固定で JSON 化し、UTF-8 の SHA-256 を求める。適用しない感情指示も含む、設定一式の識別子である。履歴の保存・復元は Git が担う。ハッシュだけで本文は復元できず、モデル出力の完全な再現を保証するものでもない。プロンプト本文や会話内容はこの識別用ログへ出さない。
 ## 能力の段階的ロード
 
-音声の準備と最初の文には`voice_warmup_file`・`voice_first_sentence_file`を必須設定として読み込む。前者は準備時だけLLM/TTSへ渡し、会話の履歴へ保存しない。後者はローカルの高速音声設定でtalkerへ追加し、人物像や操作の確認を省略せずに最初の一文を短くする。どちらも人物設定の指紋へ含め、比較時には実際に適用した高速設定も記録する。
+音声の準備と最初の文には`voice_warmup_file`・`voice_first_sentence_file`を必須設定として読み込む。前者は準備時だけLLM/TTSへ渡し、会話の履歴へ保存しない。後者はローカルの高速音声設定で共通会話指示へ追加し、人物像や操作の確認を省略せずに最初の一文を短くする。どちらも人物設定の指紋へ含め、比較時には実際に適用した高速設定も記録する。
 
 `tool_discovery_instructions_file`を必須設定とし、会話開始時に読み込んで指紋へ含める。pipelineはサービスの使い方を能力ロード後に渡す。人物像、本人確認・保存同意・公開範囲は常時保持する。[能力カタログ](capability-runtime-ja.md)を参照する。
 

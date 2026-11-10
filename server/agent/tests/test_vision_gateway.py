@@ -5,6 +5,8 @@ import io
 import json
 from pathlib import Path
 import threading
+import socket
+import time
 import unittest
 from unittest import mock
 import urllib.error
@@ -104,6 +106,8 @@ class HttpTest(unittest.TestCase):
             self.assertEqual(response.headers['X-Ciel-Image-Count'], '1')
         forwarded = self.received[0]['messages'][0]['content'][0]['image_url']['url']
         self.assertEqual(decode(forwarded).size, (256, 128))
+        self.assertTrue(self.received[0]['return_progress'])
+        self.assertEqual(self.received[0]['sse_ping_interval'], .1)
 
     def test_text_and_capability_requests_remain_supported(self):
         with self.post({'messages':[{'role':'user','content':'hello'}]}) as response:
@@ -137,6 +141,40 @@ class HttpTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             self.post({'messages':[]})
         self.assertEqual(error.exception.code,503)
+
+
+class CancellationTest(unittest.TestCase):
+    def test_disconnect_before_headers_releases_upstream_and_admission(self):
+        started, disconnected = threading.Event(), threading.Event()
+        class Backend(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers['Content-Length']))
+                started.set()
+                self.connection.settimeout(3)
+                if self.connection.recv(1) == b'':
+                    disconnected.set()
+            def log_message(self, *args):
+                pass
+        backend = ThreadingHTTPServer(('127.0.0.1', 0), Backend)
+        server = gateway.create_server('127.0.0.1', 0, backend.server_port, parallel=1)
+        for item in (backend, server):
+            threading.Thread(target=item.serve_forever, daemon=True).start()
+            self.addCleanup(item.server_close)
+            self.addCleanup(item.shutdown)
+        client = socket.create_connection(server.server_address)
+        client.sendall(b'POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nContent-Length: 15\r\n\r\n{"messages":[]}')
+        self.assertTrue(started.wait(2))
+        began = time.monotonic()
+        client.close()
+        self.assertTrue(disconnected.wait(1), 'upstream must close before producing a token')
+        self.assertLess(time.monotonic() - began, 1)
+        # The cancelled request must not keep the only admission slot occupied.
+        started.clear()
+        client = socket.create_connection(server.server_address)
+        self.addCleanup(client.close)
+        client.sendall(b'POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nContent-Length: 15\r\n\r\n{"messages":[]}')
+        self.assertTrue(started.wait(1))
+        client.close()
 
 
 class DiscoveryTest(unittest.IsolatedAsyncioTestCase):

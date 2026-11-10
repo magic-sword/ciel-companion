@@ -17,6 +17,29 @@ spec.loader.exec_module(gateway)
 
 
 class AdmissionTest(unittest.TestCase):
+    def test_cancelled_waiter_never_acquires_an_upstream_slot(self):
+        gate = gateway.Admission(1)
+        gate.acquire('foreground')
+        cancelled, finished = threading.Event(), threading.Event()
+        outcomes = []
+        def wait():
+            try:
+                gate.acquire('foreground', cancelled=cancelled)
+                outcomes.append('admitted')
+            except ConnectionResetError:
+                outcomes.append('cancelled')
+            finally:
+                finished.set()
+        thread = threading.Thread(target=wait)
+        thread.start()
+        cancelled.set()
+        self.assertTrue(finished.wait(1))
+        thread.join(1)
+        self.assertEqual(outcomes, ['cancelled'])
+        self.assertEqual(list(gate.waiting), [])
+        self.assertEqual(gate.active, 1)
+        gate.release('foreground')
+
     def test_background_reserves_capacity_and_foreground_overtakes_waiter(self):
         gate = gateway.Admission(2)
         gate.acquire('background')
@@ -69,6 +92,18 @@ class ClauseTest(unittest.TestCase):
 
 
 class PreparationTest(unittest.IsolatedAsyncioTestCase):
+    async def test_greeting_prefix_uses_real_tool_schema_without_executing_output(self):
+        client = Obj(chat=Obj(completions=Obj(create=AsyncMock(return_value=Obj(tool_calls=['not executed'])))), close=AsyncMock())
+        schema = {'name':'fixture_tool','description':'fixture','parameters':{'type':'object','properties':{}}}
+        fn = MagicMock(info=Obj(raw_schema=schema))
+        with patch('voice_preparation.models.create_client', return_value=client):
+            await voice_preparation.prepare_conversation_prefix('fixed instructions', [fn], 'warmup')
+        request = client.chat.completions.create.call_args.kwargs
+        self.assertEqual(request['tools'], [{'type':'function','function':schema}])
+        self.assertEqual(request['max_tokens'], 1)
+        fn.assert_not_called()
+        client.close.assert_awaited_once()
+
     async def test_preparation_never_records_a_user_turn_or_plays_audio(self):
         client = Obj(chat=Obj(completions=Obj(create=AsyncMock())), close=AsyncMock())
         agent = Obj(persona=Obj(voice_warmup='fixture speech', fingerprint='fixture'),

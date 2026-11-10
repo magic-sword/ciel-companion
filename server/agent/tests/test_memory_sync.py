@@ -12,6 +12,22 @@ from notes import NoteTaker
 
 
 class MemorySyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_deferred_model_request_is_retained_and_rearmed_without_db_write(self):
+        from inference_activity import Deferred
+        with patch('openai.AsyncOpenAI'):
+            taker = NoteTaker(self.book, 'test', Conversation())
+        self.book.known = [Known(1, 'Synthetic', [np.ones(192)], notes_ok=True)]
+        self.store.apply_notes = AsyncMock()
+        taker._requested[1] = ['new preference']
+        taker._count[1] = 1
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(
+            create=AsyncMock(side_effect=Deferred('busy')))))
+        with patch('notes.models.client_for', return_value=client), patch.object(taker, '_arm_timer') as timer:
+            await taker._write(1)
+        self.assertEqual(taker._requested[1], ['new preference'])
+        self.store.apply_notes.assert_not_awaited()
+        timer.assert_called_once()
+
     def setUp(self):
         self.snapshot = {'revision': 1, 'name': 'Synthetic', 'consent': True,
                          'notes': [[1, 'tea']], 'relationship': None, 'blocked': False, 'forgets': []}

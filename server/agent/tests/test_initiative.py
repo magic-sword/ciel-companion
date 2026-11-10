@@ -27,6 +27,22 @@ def agent_finished(i, at):
 
 
 class ThinkingStatusTests(unittest.IsolatedAsyncioTestCase):
+    def test_local_thinking_requires_new_stimulus_and_keeps_pending_thoughts(self):
+        i = make('chatty')
+        i._last = i._thought_at = 0
+        saved = Thought('家を完成させたい', 'act', 4)
+        i.thoughts = [saved]
+        with patch('models.LOCAL_TEST', True), patch.dict('os.environ', {'CIEL_VOICE_FAST':'1'}), \
+                patch('inference_activity.activity.available', return_value=True):
+            self.assertFalse(i._should_think(1000))
+            i.game = lambda: 'materials ready'
+            self.assertTrue(i._should_think(1000))
+            i._observed_game = 'materials ready'
+            self.assertFalse(i._should_think(1000))
+            i._new_at = 990
+            self.assertTrue(i._should_think(1000))
+            self.assertEqual(i.thoughts, [saved])
+
     async def test_status_clears_on_failure_and_cancellation(self):
         for error in (RuntimeError('test'), asyncio.CancelledError()):
             i = make()
