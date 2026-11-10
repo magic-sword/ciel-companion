@@ -58,6 +58,12 @@ python scripts/server/run-regression.py --suite all
 
 ## 結果と終了コード
 
+重み編集の独立評価器を変更した場合は、追加で次を実行する。モデル・音声・ネットワークを使わず、SSE解析、段階的ツール公開、型を含む引数採点、欠測・比較不能・人手未採点を検証する。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 -m unittest discover -s server/benchmark/tests -v
+```
+
 結果は `.local/regression/<UTC日時-ID>/` に保存する。スクリプト・テスト・合成データ・手順をGitで管理し、結果やDB資格情報は管理しない。Python版の `--output <新規ディレクトリ>` で出力先を変更できる。既存の結果は上書きしない。
 
 | ファイル | 内容 |

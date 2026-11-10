@@ -1,0 +1,8 @@
+{
+  "model_id": "REPLACE exact checkpoint/revision and quantization",
+  "weights_sha256": "REPLACE actual 64-character SHA-256",
+  "hardware": "REPLACE CPU/RAM/GPU and offload/limits/client network",
+  "runtime": "REPLACE llama.cpp commit/template/ctx/slots/cache/thinking/sampling settings; unchanged between variants",
+  "shared_load": "REPLACE observed quiet/normal/busy workload; singing CPU switch is a separate condition",
+  "notes": "Do not copy credentials. URL model aliases are not checkpoint identity."
+}

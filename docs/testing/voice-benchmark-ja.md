@@ -8,6 +8,8 @@
 
 ## 評価の根拠
 
+ローカルLLMの重み変更を比べる場合は[人格・身体性・ツール・一般性能の評価](weight-space-benchmark-ja.md)も併用する。正解テキストとSTT認識文を分けてLLMへ入力し、CERの変化と意味の保持、推論遅延と本返答音声遅延を区別する。
+
 | 一次資料 | この評価で採用すること・限界 |
 |---|---|
 | Radford et al., [Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356), 2022 | 認識器を正解付き音声で評価し、条件と正規化を固定する。モデル名だけから実際の利用者の精度を推定しない。本実装の正規化は独自の固定仕様で、Whisperの公開値と直接比較しない。 |

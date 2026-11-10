@@ -4,6 +4,7 @@
 
 - Minecraft の動作評価、課題の追加、モデル・プロンプト・体の変更前後の比較では、[ciel-minecraft-benchmark スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)を読む。
 - 音声認識精度・発話確定・返答音声の遅延の測定や前後比較では、[ciel-voice-benchmark スキル](.agents/skills/ciel-voice-benchmark/SKILL.md)を読む。
+- ローカルLLMの重み直接編集、人格・身体性・ツール性能の比較では、[ciel-weight-space-programming スキル](.agents/skills/ciel-weight-space-programming/SKILL.md)を読む。
 - 終了条件は [practical-v1](docs/games/minecraft/minecraft-benchmark-ja.md)。既定1配置・1回、課題60〜120秒、操作未発行30秒、全体10分。CPU待ちや失敗を救済して課題期限を延長しない。旧900秒条件の基準値と直接比較しない。
 - ローカル推論は [共通GPU API](docs/operations/shared-llm-api-ja.md) を参照。既定のベンチマーク会話もシエルと同じ8094を使う。追加のCPUモデル起動は明示した場合だけ。共有負荷・歌によるCPU切替を評価条件に記録する。
 - 文字の推論と道具呼び出しはローカル LLM に切り替えて試験できる。設定は [ローカル LLM](docs/operations/local-runtime-ja.md)。Minecraft の実機評価は自宅サーバーの専用環境を使う。手元PCへの Minecraft の新規起動や、普段のワールドの初期化で代用しない。
