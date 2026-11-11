@@ -9,6 +9,8 @@ description: シエルのローカルLLMの重み直接編集を調査・設計�
 
 量子化モデルの直接編集を頼まれた場合は、先に[量子化GGUFの実行手順](references/quantized-gguf.md)を読む。高精度checkpointがないことだけで、その経路を中断しない。確認済みの適用範囲から方法を選ぶ。
 
+評価基準の設計・見直しや介入効果の比較には[改善量を測る採点スキル](../ciel-benchmark-progress/SKILL.md)を使う。基準の高得点や同じ合否だけで改善余地なしと判断せず、段階別・観点別の感度と対応差を確認する。
+
 1. 現行GGUF・tokenizer・template・推論設定・共有モードの識別を確保する。35B MoEへ0.8Bの層・方向を流用しない。高精度重みと内部hookを使う方法では元checkpoint・資源も確認し、不足時は量子化直接編集で検証できる範囲と、内部活性の因果解析に必要な準備を分ける。
 2. シエルの設定原本と`character.md` / `ciel_self.md`を照合。安定した人格と、現在の体・権限・作業・記憶を分ける。後者はホストから渡し続ける。「待てが苦手」を取消無視へ変えない。
 3. `python -B -m server.benchmark.weight_space validate`でsuiteを確認。固定した開発セットで基準を採り、編集用対照例と質問系列を分ける。既存promptありを主比較、最小promptを補助比較にする。
