@@ -708,6 +708,8 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
             agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions,
+                                                    select_instructions=agent.persona.game_select_instructions,
+                                                    draft_instructions=agent.persona.game_draft_instructions,
                 authorized=lambda: agent.mind.is_owner() and not agent.mind.from_comment)
             session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
             session.on('user_state_changed', agent.game_intake.on_user_state)

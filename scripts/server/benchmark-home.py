@@ -214,6 +214,12 @@ reports=list(root.rglob('report.json'))
 if reports:
     path=max(reports,key=lambda p:p.stat().st_mtime)
     report=json.loads(path.read_text())
+    if 'manifest'not in report:
+        print(json.dumps({'path':str(path),'scope':report.get('scope'),'suite':report.get('suite'),
+            'variant':report.get('variant'),'gate_complete':report.get('gate_complete',False),
+            'human_review':report.get('human_review'),'cases':[
+                {k:c.get(k)for k in ('id','case','passed','seconds','error')if k in c}for c in report.get('cases',[])]},ensure_ascii=False,indent=2))
+        raise SystemExit(0)
     print(json.dumps({'path':str(path),'completion':report['manifest'].get('completion'),
         'run_error':report['manifest'].get('run_error'),'summary':report['summary'],'trials':report['trials']},ensure_ascii=False,indent=2))
     for trace in path.parent.glob('*/trace.jsonl'):

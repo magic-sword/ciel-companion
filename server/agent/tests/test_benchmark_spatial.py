@@ -9,7 +9,7 @@ from benchmark.run import load_tasks
 class SpatialOracleTest(unittest.TestCase):
     def test_all_fixtures_valid(self):
         tasks=[t for t in load_tasks() if t.get('spatial')]
-        self.assertEqual(len(tasks),16)
+        self.assertEqual(len(tasks),28)
         for task in tasks:
             validate_spatial(task)
 

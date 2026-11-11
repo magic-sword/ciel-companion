@@ -9,6 +9,12 @@
 set -euo pipefail
 MODE=prod
 if [ "${1:-}" = --dev ]; then MODE=dev; shift; fi
+MINECRAFT=
+if [ "${1:-}" = --minecraft ]; then
+  [ "$MODE" = dev ] || { echo '--minecraft requires --dev'; exit 2; }
+  MINECRAFT=minecraft
+  shift
+fi
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/scripts/server/ssh-target.sh" "${1:-}"
 
@@ -21,5 +27,5 @@ else
 fi
 tar -C "$ROOT/server" -cf - --exclude=.env --exclude=.env.shared --exclude=.env.dev --exclude=.env.minecraft --exclude=__pycache__ --exclude=node_modules --exclude=data ${EXCLUDES[@]+"${EXCLUDES[@]}"} . \
   | "${SSH[@]}" "mkdir -p $DEST && cd $DEST && tar xf -"
-"${SSH[@]}" "bash $DEST/deploy-remote.sh $([ $MODE = dev ] && echo dev)"
+"${SSH[@]}" "bash $DEST/deploy-remote.sh $([ $MODE = dev ] && echo dev) $MINECRAFT"
 echo DEPLOY_SERVER_DONE

@@ -8,6 +8,16 @@ async def submit_game_task(context: RunContext, capability: str, arguments: dict
                            title: str, seconds: int = 90) -> str:
     """ゲームの公開する能力へ作業を依頼する。引数と制約は公開schemaに従う。受付は完了ではない。"""
     runner = context.userdata.goals
+    env = getattr(runner, 'env', None)
+    definition = next((d for d in ((env.profile.get('work') or {}).get('capabilities', []))
+                       if d['name'] == capability), {}) if env else {}
+    if definition.get('preparation'):
+        # The verified user item already passed the same intake. A second model
+        # route cannot replace its bound coordinates or run an unresolved draft.
+        intake = getattr(runner, 'intake', None)
+        reply = intake._items.get(intake._current_item) if intake else None
+        return json.dumps({'status': 'handled' if reply else 'clarification_required',
+                           'message': reply or '施工対象を今回の発言で確定してください。'}, ensure_ascii=False)
     activity = getattr(context.userdata, 'activity', None)
     if runner and getattr(activity, 'thinking_origin', '') == 'initiative' and runner.work and runner.work['state'] != 'succeeded':
         return json.dumps({'status': 'busy', 'reason': 'awaiting_owner'})

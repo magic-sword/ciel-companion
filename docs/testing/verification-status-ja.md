@@ -17,8 +17,8 @@
 | 対象 | 直近の根拠 | 残る確認 |
 |---|---|---|
 | ドキュメント整合性 | 2026-11-11、文書一覧・責務・ローカルリンク検査と検証器の自己テスト6項目に成功。実測の根拠は分野別の資料を参照 | 外部URLの到達性は対象外 |
-| 会話ホストの通常回帰 | `eec8d6d`の変更でunit755件合格（`.local/regression/20261111T010207Z-2d5866/report.json`）。同じ実行ではDB非選択。オフラインMCP結合成功。以前の統合版は使い捨てDB結合9件合格（`hybrid-runtime-all/report.json`） | 今回の変更後のDB結合・実アプリ端末・人のマイク・継続負荷 |
-| 本番・開発のbackend | 2026-11-11、`eec8d6d`を両環境へ配布し、主要ソース指紋一致、LiveKit登録、再起動回数0、一時ルームでの挨拶・文字入力→返答音声を確認。local・voice設定を維持 | 人のマイク、実アプリでの表情・発話・割り込み、継続負荷 |
+| 会話ホストの通常回帰 | 段階1の最終固定版でunit795件・使い捨てDB結合9件が同じ実行で全合格（`server/benchmark/data/stage1-final-draft-acceptance-regression/report.json`）。オフラインMCP結合成功、Node126件合格・既存1件skip（`stage1-node-obtain-interpretation.log`） | 実アプリ端末・人のマイク・継続負荷。途中のDocker起動失敗も保存し、成功した再実行と区別する |
+| 本番・開発のbackend | 本番は`eec8d6d`配布を維持。開発は段階1の未コミット固定版へ更新し、282ファイルと実コンテナの一致、LiveKit worker登録、MCP読取疎通、pipeline/local/voice/Whisper設定を確認。本番8サービスのID・image・起動時刻を維持 | 最終開発版での人のマイク、実アプリの表情・発話・割り込み、継続負荷 |
 | 能力カタログ・サービス分離・反応 | unitとpipelineを通す各結合スクリプトの導入確認。現行の通常回帰に含む | 実モデルの選択精度、実機の表情・発話遅延と同時入力 |
 | Unity作業表示 | 実ソースを使う.NET検証35項目、C#本体・Editorビルド成功。Editorで状態表示11・カード57・構成42項目成功 | 現行Playerの実サービス接続、全画面・実機の品質 |
 | ローカル画像API | 常設APIに256px前処理とCPU画像エンコーダーを反映。本番・開発で画像能力を確認し、開発側で1024px画像添付→認識返答→音声受信、説明文生成まで成功。[画像の実測](vision-results-ja.md)を参照 | 写真・OCR・実ゲームの品質、Unity端末の画像選択UI、連続入力・同時会話の負荷 |
@@ -29,6 +29,7 @@
 | Minecraftの方向探索 | `0f9149c`で本番の体へ初回反映し、`30951b8`から体を再構築して再入場を確認。専用実機で256ブロック先のチャンク情報、384ブロック先の角度だけからの接近・停止を確認 | 改修した受付からの遠距離探索は未測定。通常ワールドの自然地形、見失いからの復帰の実機反復 |
 | Minecraftの指示棒・目線・対象候補 | `eec8d6d`を本番・開発の会話と共用の体へ配布。通常ワールドをバックアップしてPaperへ移行し、プラグイン・MCP定義・体の再接続・seed保持を確認。専用評価は会話7/8→8/8、最終補強後3/3、受付8入力5/8→8/8。[対象候補の実測](minecraft-results-ja.md#対象候補の固定と正確な座標の受け渡し)を参照 | 通常ワールドでの実クリック・人の音声と目線、聞き返し文と後続経路、同じ軸を複数指定する座標文 |
 | Minecraftの整地・建築 | 最大64マスの除去・床・壁を`5445a62`に実装・コミットし、`30951b8`から通常の体へ配布。施工body8/8、会話6/8→7/8。既存の採集・接近・追従も会話3/3。配布前の実測でunit737件成功、今回のNode102成功・既存1件skip。通常ワールドの施工は未確認 | 条件付き整地依頼のZ上限を誤解する1件が残る。自然地形・大規模施工・実音声・反復・未使用寸法は未測定 |
+| Minecraft段階1の施工改修 | prepare→work、全域事前検査、埋め戻し、停止後継続、確認草案を実装し、最終固定版を開発`Ciel_Dev`へ反映。G1受付16/48→48/48（新k群24/24）、G2 body26/42→42/42、文字22/42→42/42。各モードの改修版は目的達成27・適切な停止15、施工監査の範囲外変更0。監査故障注入3/3。再利用の条件・出典・失敗は[実測](minecraft-results-ja.md#段階1の施工改修と開発測定)を参照 | 報告レビュー・G3実マイク・実指示棒・音声停止は未完了。機械判定で段階1完了とはしない。本番の体は従来版 |
 | キャラクター | current/rig/runtimeの正式manifest・確認図、Unity更新検証 | 配布モデルで明記した衣服・大きな腕の補正等、端末ごとの負荷 |
 
 生データの多くはGit対象外。文書やハッシュをコミットしただけでは保存したことにならない。表のテスト件数を新しい実行なしに増やしたり、以前の小さい件数を各仕様書へ残したりしない。
@@ -46,6 +47,20 @@ commit `30951b8`を標準`deploy-server.sh --dev`、続いて`deploy-server.sh`�
 共用Minecraftは停止・保存後のバックアップを取り、`compose.yaml`と`compose.pointing.yaml`でPaper `1.21.11-132-c5eb079`へ移行した。既存ワールドのseed保持と体の参加、正常healthを確認。Paper imageは`d9a5a6eb0be70e94978051352649cb76b859f75518556b88f1a820e99ce2e708`、体は`a3fd9f0bcfa556316392b6f43708bafb656a162740dc0905fb20ff0733136068`。プラグインSHA-256は専用評価と同じ`b27992f9ad136d16d3e2f04765466b636bb8f704fb426df9c60f99bb13375dfe`。本番MCPのprofile 2・4操作の対象対応定義・選択ファイルversion 1も確認した。実クリックやゲーム作業を通常ワールドで自動実行した確認ではない。
 
 バックアップと前後状態・疎通結果はサーバーの`~/work/ciel-companion/server/data/deployments/target-candidates-20261111T011825Z/`。DBは`database.sql.gz`、ワールドは`minecraft-before-paper.tar.gz`、指紋は`world-backup.json`。共有GPU APIは再作成せず、generation `b668da4b0f25403ea308cb9b63ba3dee`を維持した。Minecraft更新時は[Paper用の両Compose指定](../operations/local-runtime-ja.md#Minecraftの指差し機能を導入する構成)を使う。
+
+## 段階1の開発用Minecraftへの先行反映
+
+利用者から開発への随時デプロイを許可され、`deploy-server.sh --dev --minecraft`を追加した。開発agentは専用body/MCPへ接続し、共用の通常Paperワールドには`Ciel_Dev`として参加する。MCPは8775、bodyは8774、eyeは3009のループバック。開発の設定・DBを退避し、既存whitelistを保持してCiel_Devを追加した。通常ワールドの初期化や本番の体の更新は行っていない。
+
+初回配布ではagent/Minecraftソース320ファイルの指紋一致、prepareを伴う`minecraft.edit_region`と`minecraft.obtain_item`の公開、既存本番8サービスのコンテナID・イメージ・起動時刻の維持を確認した。サーバーの`~/work/ciel-companion-dev/server/data/deployments/minecraft-stage1-1794367996389552605/`に前後状態・ソース照合・検証結果を保持する。`20261111-123515`と`20261111-131130`は当時の開発版の配布記録。
+
+受付の高さラベル・軸名併記・肯定依頼制約を含む先行版は`20261111-144948`に反映し、278ファイルの一致を確認した。証跡は`minecraft-stage1-final-1794376176061440500/`と、回収先`server/benchmark/data/stage1-dev-deployment-final/`に保持する。
+
+最終固定版は`20261111-201955`に`deploy-server.sh --dev --minecraft`で反映した。agent/Minecraftのpy・js・json・md・tomlの282ファイル、agentの主要ソース・3種類の受付指示、体の全srcの実コンテナ内指紋を照合。実際のpersonaローダーが読み込む指示も一致し、MCPのprofile 2/work 1・prepare・高さラベル・旧clear/build撤去、開発接続先8775、持ち主設定、Ciel_Devの参加とLiveKit worker登録を確認した。実行設定はpipeline/local/voice/Whisper。開発agent imageは`185beda81de394690699faccfe5214269872fd424c5061ef846851e10b700c3d`、bodyは`4d75d0abd8e1d9761f624105d4dc171867fa0a0671a018a2a0f4c6e9a83bc575`。本番8サービスのID・image・起動時刻を維持し、通常10サービスが稼働した。
+
+最終証跡は`~/work/ciel-companion-dev/server/data/deployments/minecraft-stage1-final-1794395358159843124/`のbefore/after/source-files/verification JSON、回収先は`server/benchmark/data/stage1-dev-final-verification/`。DBバックアップは`~/work/ciel-db-backups/ciel-20261111-201955.sql.gz`。資格情報・DB・ワールドは回収していない。これは配布・登録・読取疎通の確認であり、通常ワールドの施工や実マイクの合格記録ではない。
+
+実マイク・指示棒・音声停止の確認はまだ行っていない。利用者は準備が整ったら手順の案内を希望しており、[G3の操作手順](../games/minecraft/minecraft-benchmark-ja.md#g3の操作手順)を案内する。開発反映だけで段階1完了とはしない。
 
 ## 本番・開発のローカル推論への反映
 

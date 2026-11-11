@@ -23,6 +23,8 @@ from .navigation import evaluate_navigation, validate_navigation, task_items, pr
 from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
 from .pointing import prepare_pointing
+from .stage1 import fixture as stage1_fixture, migrate_task
+from . import audit
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -51,6 +53,7 @@ def load_tasks(path=SUITE):
     suite = json.loads(path.read_text(encoding='utf-8'))
     if suite['version'] != 1 or len({t['id'] for t in suite['tasks']}) != len(suite['tasks']):
         raise ValueError('Invalid task suite version or duplicate ids')
+    suite['tasks'] = [stage1_fixture(t['stage1']) if t.get('stage1') else migrate_task(t) for t in suite['tasks']]
     for task in suite['tasks']:
         budget(task)
         if task.get('navigation'):
@@ -304,7 +307,7 @@ async def run(args, *, clock=time.monotonic):
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=False)
     plan = [(task,seed,repeat) for task in tasks for seed in args.seed for repeat in range(args.repeats)]
-    manifest = {'format':2, 'policy':POLICY_VERSION, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
+    manifest = {'format':2, 'policy':'spatial-v1' if any(t.get('stage1') for t in tasks) else POLICY_VERSION, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
                 'backend':args.backend if args.mode == 'conversation' else 'none',
                 'model_id':args.model_id if args.mode == 'conversation' else None,
                 'minecraft_version':'1.21.11', 'seeds':args.seed, 'repeats':args.repeats,
@@ -315,6 +318,9 @@ async def run(args, *, clock=time.monotonic):
                           'tasks':{t['id']:budget(t,args.seconds) for t in tasks}},
                 'task_ids':[t['id'] for t in tasks], 'note':'Seeds select arena layouts; no cross-trial learning.',
                 **provenance()}
+    if any(t.get('stage1')for t in tasks):
+        manifest.update(gate='G2',gate_complete=False,report_review='pending'if args.mode=='conversation'else 'not_applicable',
+                        scope='automatic_physical_checks; final gate also requires the complete matrix and report review')
     rows = []
     def skip_remaining(reason, completion):
         manifest.update(completion=completion,stop_reason=reason)
@@ -333,6 +339,8 @@ async def run(args, *, clock=time.monotonic):
         for task in tasks:
             for seed in args.seed:
                 for repeat in range(args.repeats):
+                    if task.get('stage1'):
+                        task = stage1_fixture(task['stage1'], seed)
                     available = deadline-clock()-20  # Reserve bounded cleanup.
                     if available <= 0:
                         skip_remaining('run_time_budget','budget_exhausted')
@@ -341,7 +349,9 @@ async def run(args, *, clock=time.monotonic):
                     trial.mkdir()
                     trace = Trace(trial/'trace.jsonl')
                     driver = None
+                    audit_id = None
                     result = {'task':task['id'],'seed':seed,'repeat':repeat,'budget':budget(task,args.seconds),
+                              'fixture_sha256':hashlib.sha256(json.dumps(task,sort_keys=True,ensure_ascii=False).encode()).hexdigest(),
                               'expected_outcome':task.get('expected_outcome','achieve')}
                     try:
                         safe_release = False
@@ -363,6 +373,8 @@ async def run(args, *, clock=time.monotonic):
                                 await prepare_spatial(task, trace)
                             if task.get('pointing'):
                                 await prepare_pointing(task, world, trace)
+                            if task.get('spatial',{}).get('audit'):
+                                audit_id = await asyncio.to_thread(audit.start, world)
                         result.update(fixture=fixture,initial=initial)
                         available = max(0.01,deadline-clock()-20)
                         limit = min(budget(task,args.seconds)['seconds'],available)
@@ -391,6 +403,17 @@ async def run(args, *, clock=time.monotonic):
                                 safe_release = True
                             except Exception as exc:
                                 result.update(status='infrastructure_error',reason='cleanup_'+type(exc).__name__)
+                        if audit_id:
+                            try:
+                                result['audit'] = await asyncio.to_thread(audit.finish,world,audit_id,task,trial)
+                                violations=result['audit']['violations']
+                                safety_failure=any(v['reason']!='objective_not_complete' for v in violations)
+                                if (safety_failure or (violations and result.get('status')=='passed')) and result.get('status') not in ('skipped','infrastructure_error'):
+                                    result['prior_reason']=result.get('reason')
+                                    result.update(status='failed',reason='block_audit_violation',outcome='not_achieved',objective_achieved=False)
+                            except Exception as exc:
+                                safe_release = False
+                                result.update(status='infrastructure_error',reason='audit_'+type(exc).__name__)
                     dummy_calls = [e['event'] for e in trace.execution() if e['kind'] == 'agent_event'
                                    and e['event'].get('kind') == 'benchmark_distractor_call']
                     result['distractor_calls'] = len(dummy_calls)

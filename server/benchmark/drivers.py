@@ -57,6 +57,9 @@ class BodyDriver:
         self.env.goals = self.runner
 
     async def submit(self, task):
+        if task.get('region_spec'):
+            self.task = asyncio.create_task(self._region(task))
+            return
         if task.get('navigation') or task.get('spatial'):
             self.task = asyncio.create_task(self.env._call(task['body_call']['name'], task['body_call']['arguments']))
             return
@@ -64,7 +67,33 @@ class BodyDriver:
             {'item': task['item'], 'quantity': task['count'], 'quantity_mode': 'gain' if task.get('action') else 'inventory_target'},
             constraints={'resource_scope': 'search', 'failure_policy': 'ask'}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
+    async def _region(self, task):
+        import copy
+        capabilities=(self.env.profile.get('work')or{}).get('capabilities',[])
+        if not any(c['name']=='minecraft.edit_region' for c in capabilities):
+            baseline=task.get('baseline_call')
+            if not baseline:
+                self.trace('region_unsupported')
+                return {'status':'unsupported'}
+            baseline=copy.deepcopy(baseline)
+            if task.get('pointing'):
+                await self.env._refresh()
+                baseline['arguments']['selection_id']=self.env.state['references']['selection_id']
+            return await self.env._call(baseline['name'],baseline['arguments'])
+        spec=copy.deepcopy(task['region_spec'])
+        if task.get('pointing'):
+            await self.env._refresh()
+            spec.pop('region',None)
+            spec['selection_id']=self.env.state['references']['selection_id']
+        prepared=await self.env._call('minecraft_prepare_region',{'request_id':uuid.uuid4().hex,'draft_revision':1,'spec':spec})
+        self.trace('region_preparation',result=prepared)
+        if prepared.get('status')!='ready':return prepared
+        return await self.runner.start('minecraft.edit_region',{'plan_id':prepared['plan_id']},
+            constraints={'failure_policy':'stop'},title=task['prompt'],seconds=task.get('budget',{}).get('seconds',90))
+
     async def stop(self, task):
+        if task.get('region_spec') and self.runner.work:
+            return await self.runner.stop()
         if task.get('navigation') or task.get('spatial'):
             await self.env._call('minecraft_stop_moving', {})
             return

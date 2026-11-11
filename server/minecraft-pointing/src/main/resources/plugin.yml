@@ -3,6 +3,8 @@ version: 1.0.0
 main: local.ciel.PointingPlugin
 api-version: '1.21.11'
 commands:
+  cielbenchaudit:
+    description: Dedicated benchmark console-only observation.
   cielpoint:
     description: 指示棒を受け取る。右クリックで始点、しゃがんで右クリックで終点。
     usage: /cielpoint

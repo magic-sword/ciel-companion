@@ -1,5 +1,6 @@
 import { BodyCommands, commandBot } from './body-command.js';
-import { editRegion } from './spatial.js';
+import { executeRegion } from './spatial.js';
+import { confirmedCrafting } from './craft-sync.js';
 // 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 技は一度に 1 つ。新しい技を受けたら、今の技を止めてから始める。終わったら（止めたときも）必ず done を 1 回送る。
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
@@ -11,7 +12,7 @@ import { guarded } from './guard.js';
 import { planCraft } from './craft-plan.js';
 import { planGoal } from './goal-plan.js';
 import { blocksFor } from './names.js';
-import { knows, rememberAround } from './sight.js';
+import { knows, remember, rememberAround } from './sight.js';
 import { collectMovements, escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
 
 const { goals } = pathfinderPkg;
@@ -88,7 +89,7 @@ export class Runner extends BodyCommands {
 
   attach(bot) {
     this.bot = bot;
-    if (bot) { groundedDig(bot); this.blocked = false; }
+    if (bot) { groundedDig(bot); confirmedCrafting(bot); this.blocked = false; }
   }
 
   doing() {
@@ -101,7 +102,7 @@ export class Runner extends BodyCommands {
     c.bot = this.bot;
     const bot = commandBot(this.bot, c, this);
     try {
-      const note = await SKILL_RUN[skill](bot, args, token, { owner: this.owner, guard: this.guard });
+      const note = await SKILL_RUN[skill](bot, args, token, { owner: this.owner, guard: this.guard, scope:c.scope });
       return token.cancelled ? cancelled(skill, token, note) : { ok: true, note };
     } catch (err) {
       if (token.cancelled) return cancelled(skill, token);
@@ -338,9 +339,13 @@ const GIVE_SEARCH = 6;       // 投げた物を探す距離
 const GIVE_WAIT_MS = 6000;   // 相手が拾うのを待つ（拾えるまで 2 秒かかる）
 
 const SKILL_RUN = {
+  edit_region: async (bot,args,token,{guard,scope}) => {
+    let plan;
+    try { plan=bot.regionPlans.start(bot,args.plan_id,scope); }
+    catch(e) { throw new Failed(e.reason??'unknown_plan'); }
+    return executeRegion(bot,plan,token,{guard,Failed,watched},args.budget_ms);
+  },
   pointed_action: (bot, args, token, { guard }) => actOnSelection(bot, args, token, { guard, Failed, watched }),
-  clear_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, false),
-  build_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, true),
   async follow(bot, args, token, { owner, guard }) {
     let target = await findPlayer(bot, args, token, { owner, guard });
     if (token.cancelled) return;
@@ -576,21 +581,41 @@ const SKILL_RUN = {
       throw new Failed(plan.needsTable ? 'no_table' : 'missing_materials', { needs: plan.missing, steps: plan.steps.map((st) => st.name) });
     }
     let table = null;
+    let ownTable=false;
+    const crafted=[];
     for (const step of plan.steps) {
       if (token.cancelled) break;
       if (step.recipe.requiresTable && !table) {
-        table = await findTable(bot, guard, token);
+        const found=await findTable(bot, guard, token);
+        table=found?.block;ownTable=Boolean(found?.placed);
         if (token.cancelled) break;
         if (!table) throw new Failed('no_table');
       }
-      await bot.craft(step.recipe, step.times, step.recipe.requiresTable ? table : undefined);
+      bot.__craftEvidence=null;
+      try {await bot.craft(step.recipe, step.times, step.recipe.requiresTable ? table : undefined);}
+      catch(e){if(bot.__craftEvidence)throw new Failed('cannot_craft',{...bot.__craftEvidence,crafted,inventory:counts(bot)});throw e;}
       await bot.waitForTicks(CRAFT_SETTLE_TICKS);   // 持ち物の更新を待つ（作ってすぐの作業台が、まだ持ち物に見えなかった）
+      crafted.push({item:step.name,available:counts(bot)[step.name]??0});
     }
     const made = (counts(bot)[args.item] ?? 0) - (before[args.item] ?? 0);
     const note = { gained: made > 0 ? { [args.item]: made } : {}, wanted: args.count };
     if (!token.cancelled && made < args.count) {
-      if (made <= 0) throw new Failed('missing_materials', note);
+      if (made <= 0) throw new Failed('missing_materials', {...note,crafted,inventory:counts(bot)});
       note.short = 'missing_materials';
+    }
+    if(!token.cancelled&&made>=args.count&&ownTable&&bot.blockAt(table.position)?.name==='crafting_table'){
+      try {
+        const target=bot.blockAt(table.position);
+        await guarded(guard,token,async()=>{
+          const movements=collectMovements(bot,target);
+          movements.exclusionAreasBreak.push(b=>b.position.equals(target.position)?0:100);
+          bot.collectBlock.movements=movements;
+          try {await watched(bot,()=>bot.collectBlock.collect(target),2000);}
+          finally {bot.collectBlock.movements=playerMovements(bot);if(!guard?.active)bot.pathfinder.setMovements(bot.collectBlock.movements);}
+        });
+        if(!token.cancelled)await pickUpNear(bot,table.position,guard,token);
+        note.table_recovered=(counts(bot).crafting_table??0)>0;
+      }catch(e){note.table_recovered=false;note.table_recovery_reason=String(e.message).slice(0,120);}
     }
     return note;
   },
@@ -892,7 +917,7 @@ async function findTable(bot, guard, token) {
   const table = pos ? bot.blockAt(pos) : await placeTable(bot);
   if (!table) return null;
   await walk(bot, guard, token, () => new goals.GoalNear(table.position.x, table.position.y, table.position.z, TABLE_RANGE));
-  return bot.blockAt(table.position);
+  return {block:bot.blockAt(table.position),placed:!pos};
 }
 
 async function placeTable(bot) {
@@ -918,6 +943,7 @@ async function placeTable(bot) {
       return null;   // 置けなかった（面が見えない・届かない）：次の場所へ
     }
     const placed = bot.blockAt(at);
+    if(placed?.name==='crafting_table')remember(bot,at,'crafting_table');
     return placed?.name === 'crafting_table' ? placed : null;
   };
   // 足と同じ高さ、1 段上、1 段下の順に、近くの空いた所（下が地面）を探す

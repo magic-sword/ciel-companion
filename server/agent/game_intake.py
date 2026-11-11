@@ -9,14 +9,77 @@ import uuid
 import debug_log
 import models
 import jsonschema
-from target_candidates import TargetCandidates
+from target_candidates import TargetCandidates,quoted_contents
 
 STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*(?:(?:その場で待ってください|こちらが頼むまで再開しないでください)[。\s、]*)*$')
 
 
+def decision_schema(payload):
+    def obj(properties,required=None):
+        return {'type':'object','additionalProperties':False,'properties':properties,'required':required or list(properties)}
+    alternatives=[obj({'operation':{'const':v}})for v in ('none','cancel','status')]
+    alternatives.append(obj({'operation':{'const':'clarify'},'message':{'type':'string'}}))
+    if payload['stage']=='select':
+        complete_axes={'x','y','z'}<={t.get('axis')for t in payload.get('targets',[])}
+        for capability in payload['capabilities']:
+            for variant in capability.get('variants')or[None]:
+                properties={'operation':{'const':'select'},'capability':{'const':capability['id']}}
+                if variant:properties['variant']={'const':variant['id']}
+                modes=['new'];draft=payload.get('draft')
+                if (draft and not complete_axes and (draft.get('capability')==capability['id']or(draft.get('capability')is None and capability.get('variants')))
+                        and (draft.get('variant')in(None,variant['id']if variant else None))):
+                    modes=['continue']
+                if payload.get('previous_request')and not complete_axes:modes.append('repeat')
+                properties['draft_action']={'enum':modes}
+                alternatives.append(obj(properties))
+        current=payload.get('current',{})
+        decision=(current.get('decision')or{}).get('decision_id')
+        if current.get('state')=='needs_decision'and decision:
+            alternatives.append(obj({'operation':{'const':'answer'},'decision_id':{'const':decision},'action':{'enum':['retry','cancel']}}))
+    else:
+        definition=payload['capability']
+        if payload.get('confirmed_request'):
+            # This path is reached only after game-declared intent proof and
+            # missing-field checks. Geometry conflicts belong to preparation.
+            alternatives=[]
+        properties={'operation':{'const':payload['required_operation']},'arguments':definition['arguments']}
+        if definition['kind']=='work':
+            properties.update(constraints=definition['constraints'],title={'type':'string'},seconds={'type':'integer','minimum':1,'maximum':120})
+        alternatives.append(obj(properties))
+    return {'anyOf':alternatives}
+
+
+def quoted_instruction(text,definition=None):
+    values=(definition or{}).get('preparation',{}).get('source_values',{})
+    literals={alias.casefold()for choices in values.values()for aliases in choices.values()for alias in aliases}
+    return any(value and value.casefold()not in literals for value in quoted_contents(text))
+
+
+def positive_request(text,patterns,denials=()):
+    return (isinstance(patterns,list)and bool(patterns)and not any(re.search(p,text,re.I)for p in denials)
+            and any(re.search(p,text,re.I)for p in patterns))
+
+
+def available_variants(definition,mentions,source_roles=None):
+    ranged_height=any(m['axis']=='y'and m['range'][0]!=m['range'][1]for m in mentions)
+    labelled=set(source_roles or {})
+    variants=definition.get('preparation',{}).get('variants',{})
+    # If all service-declared height roles are explicit, only offer variants
+    # that can represent those roles. The model still decides the user's intent.
+    labelled_heights=not ranged_height and any(v.get('required_height_mentions')
+        and len(labelled)>=v['required_height_mentions'] and labelled<=set(v.get('roles',[]))for v in variants.values())
+    return [{'id':key,'description':v['description']}for key,v in definition.get('preparation',{}).get('variants',{}).items()
+            if not(ranged_height and v.get('required_height_mentions'))
+            and not(labelled_heights and not labelled<=set(v.get('roles',[])))]
+
+
 class GameIntake:
-    def __init__(self, runner, instructions, *, client=None, authorized=lambda: True):
+    LOCAL_TEMPERATURE = 0
+
+    def __init__(self, runner, instructions, *, client=None, authorized=lambda: True, select_instructions=None, draft_instructions=''):
         self.runner, self.instructions, self._client = runner, instructions, client
+        self.select_instructions = select_instructions or instructions
+        self.draft_instructions = draft_instructions
         self.authorized = authorized
         self._items = {}
         self._lock = asyncio.Lock()
@@ -26,6 +89,10 @@ class GameIntake:
         self._reference_items = {}
         self._reference_tasks = set()
         self._speech_item = None
+        self._draft = None
+        self._previous = None
+        self._current_item = None
+        runner.intake = self
 
     async def _capture_references(self):
         env = self.runner.env
@@ -62,6 +129,7 @@ class GameIntake:
         definitions = [dict(kind='work', name=d['name'], description=d.get('description', ''),
                             arguments=copy.deepcopy(d.get('arguments', {})),
                             constraints=copy.deepcopy(d.get('constraints', {})),
+                            **({'preparation': copy.deepcopy(d['preparation'])} if d.get('preparation') else {}),
                             interpretation=d.get('interpretation', ''))
                        for d in (env.profile.get('work') or {}).get('capabilities', [])]
         for fn in getattr(env, 'tools', []):
@@ -77,6 +145,7 @@ class GameIntake:
         return {str(i): d for i, d in enumerate(definitions, 1)}
 
     async def _stop(self):
+        self._draft = None
         if self.runner.body_step():
             return await self.runner.stop()
         env = self.runner.env
@@ -90,6 +159,8 @@ class GameIntake:
         return await self.runner.stop()
 
     def on_transcribed(self, event, owner=True):
+        if not owner:
+            self._draft = None
         item_id = getattr(event, 'item_id', None)
         if owner and item_id and getattr(event, 'is_final', False) and not STOP.fullmatch(event.transcript.strip()):
             if (not self._speech_reference or time.monotonic()-self._speech_reference[0] >= 10
@@ -117,20 +188,36 @@ class GameIntake:
             return result
 
     async def _infer(self, payload, started):
+        if payload['stage']=='arguments':
+            # Intent and ownership are checked outside argument generation.
+            payload={k:v for k,v in payload.items()if k not in ('current','body')}
+            payload['capability']={k:v for k,v in payload['capability'].items()
+                if k in ('kind','name','arguments','constraints','interpretation','reference_argument','target_ids')}
+        if 'current'in payload:
+            payload={**payload,'current':{k:v for k,v in payload['current'].items()
+                if k in ('state','capability','message','decision','remaining_ms','reason','status')}}
         if 'body' in payload:
             # Completed command arguments are not the destination of a new request.
-            payload = {**payload, 'body': {k: v for k, v in payload['body'].items() if k != 'last'}}
+            payload = {**payload, 'body': {k: bool(v) for k, v in payload['body'].items() if k in ('current','pending','blocked')}}
         if payload['stage'] == 'arguments':
             payload = {**payload, 'required_operation': 'submit' if payload['capability']['kind'] == 'work' else 'execute'}
         request = uuid.uuid4().hex
         began = time.monotonic()
         remaining = max(.1, 20 - (began - started))
         content = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+        instructions=self.select_instructions if payload['stage']=='select'else self.instructions
+        if payload['stage']=='select'and payload.get('draft'):
+            instructions+='\n'+self.draft_instructions
         debug_log.record('work_inference', id=request, model=models.model('mind'),
-                         stage=payload['stage'], input_chars=len(content))
+                         stage=payload['stage'], input_chars=len(content),
+                         temperature=self.LOCAL_TEMPERATURE if models.is_local('mind')else None)
         try:
             options = models.options('mind', model=models.model('mind'), max_completion_tokens=600, timeout=remaining,
-                messages=[{'role': 'system', 'content': self.instructions}, {'role': 'user', 'content': content}])
+                messages=[{'role': 'system', 'content': instructions},
+                          {'role': 'user', 'content': content}])
+            options['response_format']=({'type':'json_schema','json_schema':{'name':'game_decision','schema':decision_schema(payload)}}
+                if models.is_local('mind') else {'type':'json_object'})
+            if models.is_local('mind'):options['temperature']=self.LOCAL_TEMPERATURE
             response = await asyncio.wait_for(self._client.chat.completions.create(**options), remaining)
             models.record('mind', models.model('mind'), getattr(response, 'usage', None))
             action = json.loads(response.choices[0].message.content or '')
@@ -157,6 +244,15 @@ class GameIntake:
         if self._client is None:
             self._client = models.create_client('mind')
         started = time.monotonic()
+        self._current_item = request_id
+        epoch = getattr(env, '_connection_epoch', None)
+        draft = self._draft
+        source = None
+        draft_revision = 1
+        selected_variant = None
+        confirmed_request = False
+        if draft and (draft['expires'] <= started or draft['epoch'] != epoch):
+            self._draft = draft = None
         # Capture once before model selection. Later pointer changes cannot retarget this request.
         references = None
         if env.profile.get('reference_context'):
@@ -174,6 +270,7 @@ class GameIntake:
         definitions = self._capabilities()
         targets = TargetCandidates(request_id, text, references, definitions)
         exposed = targets.definitions
+        complete_coordinates={'x','y','z'}<={m['axis']for m in targets.mentions}
         # Bound targets replace raw references on the new contract; other games keep
         # their existing opaque reference contract.
         model_references = None if targets.bindings else references
@@ -182,23 +279,76 @@ class GameIntake:
             action = await self._infer({'stage': 'select', 'input': text,
                 'capabilities': [{'id': i, 'description': d['description'],
                                   **({'reference_argument': d['reference_argument']} if d.get('reference_argument') else {}),
-                                  **({'target_ids': d['target_ids']} if 'target_ids' in d else {}),
+                                  **({'target_ids': d['target_ids']} if 'target_ids' in d and not definitions[i].get('preparation') else {}),
+                                  **({'variants': available_variants(definitions[i],targets.mentions,targets.role_candidates.get(i))}
+                                     if definitions[i].get('preparation',{}).get('variants') else {}),
                                   **({'examples': d['examples']} if d.get('examples') else {})}
                                  for i, d in exposed.items() if d.get('target_ids') != []],
                 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
-                'targets': targets.targets, 'references': model_references}, started)
+                'targets': targets.targets, 'references': model_references,
+                **({'draft': {'input': draft['text'], 'question': draft['question'],
+                    'capability':draft.get('capability'),'variant':draft.get('variant')}} if draft and not complete_coordinates else {}),
+                **({'previous_request': self._previous['text']} if self._previous and self._previous['epoch'] == epoch and not complete_coordinates else {})}, started)
             selected = None
             if action.get('operation') == 'select':
                 selected = action.get('capability')
+                selected_variant = action.get('variant')
                 if not isinstance(selected, str) or selected not in definitions:
                     raise ValueError('Unknown capability')
                 definition = definitions[selected]
+                if quoted_instruction(text,definition):
+                    self._draft=None
+                    return '引用文として受け取りました。作業は開始していません。'
+                source = draft if action.get('draft_action') == 'continue' else self._previous if action.get('draft_action') == 'repeat' else None
+                if action.get('draft_action') in ('continue', 'repeat'):
+                    if not source or source['epoch'] != epoch:
+                        return '引き継ぐ依頼を確認できません。範囲と材料を指定してください。'
+                    if action['draft_action']=='repeat' and source.get('spec'):
+                        references={'source':'previous_work','confirmed_spec':copy.deepcopy(source['spec']),'summary':source.get('summary','')}
+                    else:
+                        text = source['text'] + '\n補足：' + text if action['draft_action'] == 'continue' else source['text']
+                        references = copy.deepcopy(source['references'])
+                    targets = TargetCandidates(request_id, text, references, definitions)
+                    exposed = targets.definitions
+                    if source is draft:
+                        request_id = draft['request_id']
+                        draft_revision = draft['revision'] + 1
+                self._draft = None
+                variants = definition.get('preparation', {}).get('variants')
+                if variants:
+                    variant = variants.get(action.get('variant'))
+                    if variant is None:
+                        return '施工の種類を確認できませんでした。'
+                    preparation=definition['preparation']
+                    patterns=preparation.get('continuation_patterns')if action.get('draft_action')=='repeat'else variant.get('request_patterns')
+                    if patterns is None:
+                        return '依頼の確認方式に対応していません。ゲーム側の更新が必要です。'
+                    if not positive_request(text,patterns,preparation.get('negative_request_patterns',[])):
+                        return '作業は開始していません。'
+                    confirmed_request = True
+                    narrowed = copy.deepcopy(definitions)
+                    narrowed[selected]['preparation'].update(intent_schema=variant['schema'], roles=variant['roles'],
+                        required_axes=variant.get('required_axes',[]),required_height_mentions=variant.get('required_height_mentions',0),
+                        reference_axes=variant.get('reference_axes',[]))
+                    targets = TargetCandidates(request_id, text, references, narrowed)
+                    exposed = targets.definitions
                 model_definition = exposed[selected]
+                if model_definition.get('missing_fields'):
+                    labels={'block':'施工に使う材質','clear_blocks':'取り除く材質','ground/top':'残す地面と上限のY座標',
+                            'coordinate_roles':'編集範囲の最終のX/Y/Z一組（保存範囲は分けて）'}
+                    question='、'.join(labels.get(k,k.upper()+'座標')for k in model_definition['missing_fields'])+'を指定してください。'
+                    self._draft={'text':text,'references':copy.deepcopy(references),'epoch':epoch,
+                        'capability':selected,'variant':selected_variant,
+                        'expires':min(started+60,source['expires']if source is draft and draft else started+60),
+                        'started':source['started']if source is draft and draft else started,'question':question,
+                        'request_id':request_id,'revision':draft_revision}
+                    return question
                 if model_definition.get('target_ids') == []:
                     return '今回の対象を特定できません。座標を一組で指定するか、指示棒で選び直してください。'
                 debug_log.record('work_capability_selected', capability=definition['name'], capability_kind=definition['kind'],
                     version=hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest()[:12])
                 action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
+                    'confirmed_request':confirmed_request,
                     'capability': model_definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
                     'targets': targets.targets,
                     'references': model_references if definition.get('reference_argument') else None}, started)
@@ -211,9 +361,19 @@ class GameIntake:
         if generation != self._generation or not self.authorized():
             return '依頼の確認中に中止の指示があったため、作業を開始しませんでした。'
         if op == 'none':
+            self._draft = None
             return None
+        if op == 'answer'and quoted_instruction(text):
+            self._draft=None
+            return '引用文として受け取りました。作業は開始していません。'
         if op == 'clarify':
-            return str(action.get('message') or 'どの作業をするか教えてください。')[:200]
+            question = str(action.get('message') or 'どの作業をするか教えてください。')[:200]
+            self._draft = {'text': text, 'references': copy.deepcopy(references), 'epoch': epoch,
+                           'capability':selected,'variant':selected_variant,
+                           'expires': min(started + 60, source['expires'] if source is draft and draft else started + 60),
+                           'started': source['started'] if source is draft and draft else started, 'question': question,
+                           'request_id': request_id, 'revision': draft_revision}
+            return question
         if op == 'status':
             return self.runner.status().get('message') or '今は作業中です。' if self.runner.work else '今は作業していません。'
         if op == 'cancel':
@@ -229,6 +389,14 @@ class GameIntake:
             if self.runner.body_step():
                 return '今の作業を中止してから、新しい操作を依頼してください。'
             expected = 'submit' if definition['kind'] == 'work' else 'execute'
+            def clarify_spec():
+                question='施工範囲と保存範囲を区別して、最終の座標一組を指定してください。'
+                self._draft={'text':text,'references':copy.deepcopy(references),'epoch':epoch,
+                    'capability':selected,'variant':selected_variant,
+                    'expires':min(started+60,draft['expires']if source is draft and draft else started+60),
+                    'started':draft['started']if source is draft and draft else started,'question':question,
+                    'request_id':request_id,'revision':draft_revision}
+                return question
             for attempt in range(2):
                 try:
                     if (action.get('operation') != expected
@@ -236,21 +404,23 @@ class GameIntake:
                         raise ValueError('Wrong operation')
                     jsonschema.validate(action.get('arguments'), model_definition['arguments'])
                     resolved = targets.resolve(selected, action['arguments'])
-                    jsonschema.validate(resolved, definition['arguments'])
+                    if not definition.get('preparation'):
+                        jsonschema.validate(resolved, definition['arguments'])
                     if expected == 'submit':
                         jsonschema.validate(action.get('constraints'), definition['constraints'])
                     break
                 except (ValueError, jsonschema.ValidationError):
                     if attempt or time.monotonic() - started >= 15:
-                        return '操作の引数を確認できませんでした。'
+                        return clarify_spec()if definition.get('preparation')else '操作の引数を確認できませんでした。'
                     try:
                         action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
+                            'confirmed_request':confirmed_request,
                             'capability': model_definition, 'current': self.runner.status(),
                             'targets': targets.targets,
                             'references': model_references if definition.get('reference_argument') else None,
-                            'correction': '引数と制約のschemaに従い、必須項目をすべて指定する。'}, started)
+                            'correction': '引数と制約のschemaに従う。定義にない項目・不要な空配列・同じ候補の二重使用を追加しない。'}, started)
                     except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
-                        return '操作の引数を確認できませんでした。'
+                        return clarify_spec()if definition.get('preparation')else '操作の引数を確認できませんでした。'
             if (generation != self._generation or not self.authorized() or not env.playing() or self.runner.body_step()
                     or epoch != getattr(env, '_connection_epoch', None) or self._capabilities().get(selected) != definition):
                 return '操作の確認中に状態が変わったため、開始しませんでした。'
@@ -263,10 +433,43 @@ class GameIntake:
                 seconds = action.get('seconds', 90)
                 if type(seconds) is not int or not 1 <= seconds <= 120:
                     return '作業の条件を確認できませんでした。'
-                remaining = seconds - (time.monotonic() - started)
+                origin = draft['started'] if draft and source is draft else started
+                remaining = seconds - (time.monotonic() - origin)
                 if remaining < 5:
                     return '依頼の確認に時間がかかったため、作業を開始しませんでした。'
-                r = await self.runner.start(definition['name'], action['arguments'], constraints=action['constraints'],
+                if definition.get('preparation'):
+                    prep = definition['preparation']
+                    if prep.get('version') != 1 or not prep.get('tool'):
+                        return '施工の準備方式に対応していません。サービスの更新が必要です。'
+                    if source is draft and draft and time.monotonic() >= draft['expires']:
+                        return '確認待ちの有効期限が切れました。範囲と材料を改めて指定してください。'
+                    try:
+                        r = await asyncio.wait_for(env.use(prep['tool'], {
+                            'request_id': request_id, 'draft_revision': draft_revision, 'spec': resolved}), max(.1, min(6, remaining)))
+                    except Exception:
+                        return '施工の準備状態を確認できないため、開始していません。'
+                    if (generation != self._generation or not self.authorized() or epoch != getattr(env, '_connection_epoch', None)
+                            or self._capabilities().get(selected) != definition):
+                        return '準備中に状態が変わったため、作業を開始しませんでした。'
+                    if r.get('status') != 'ready' or not r.get('plan_id'):
+                        if r.get('status') == 'needs_clarification':
+                            question = str(r.get('message') or '施工の範囲と条件を改めて指定してください。')[:200]
+                            self._draft = {'text': text, 'references': copy.deepcopy(references), 'epoch': epoch,
+                                'capability':selected,'variant':selected_variant,
+                                'expires': min(started + 60, draft['expires'] if source is draft and draft else started + 60),
+                                'started': origin, 'question': question, 'request_id': request_id, 'revision': draft_revision}
+                            return question
+                        reason = r.get('reason', 'preparation_error')
+                        why = env.profile.get('reasons', {}).get(reason, reason)
+                        debug_log.record('work_preparation_refused', reason=reason)
+                        return r.get('message') or f'施工を開始していません。{why}。'
+                    resolved = {prep['result_argument']: r['plan_id']}
+                    remaining = seconds - (time.monotonic() - origin)
+                    if remaining < 5:
+                        return '施工の確認に時間がかかったため、開始していません。'
+                    self._previous = {'text': text, 'references': copy.deepcopy(references), 'epoch': epoch,
+                                      'spec':copy.deepcopy(r.get('spec')), 'summary':r.get('summary','')}
+                r = await self.runner.start(definition['name'], resolved, constraints=action['constraints'],
                     title=str(action.get('title') or '')[:100], seconds=remaining, request_id=request_id)
         else:
             return '作業の依頼を確認できませんでした。'
@@ -274,6 +477,7 @@ class GameIntake:
                                    else '操作を受け付けられませんでした。')
 
     async def close(self):
+        self._draft = self._previous = None
         for task in self._reference_tasks:
             task.cancel()
         await asyncio.gather(*self._reference_tasks, return_exceptions=True)

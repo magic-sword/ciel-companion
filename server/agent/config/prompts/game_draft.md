@@ -1,0 +1,1 @@
+draftは直前の確認中の依頼。今回が「材料はガラスです」「Y=70です」「Z=8の一面です」のような断定形の回答なら、元のcapability/variantをselectしdraft_action=continueとする。元の範囲・材料はdraft.inputにある。回答された値を再確認せず、命令文がないことを理由にnoneやclarifyにしない。質問・引用・否定は補足へ変えない。完全なX/Y/Zの再指定はnewで置き換える。

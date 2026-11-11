@@ -53,8 +53,11 @@ export function notices(bot, entity) {
 const memories = new WeakMap();
 
 function memory(bot) {
-  let m = memories.get(bot);
-  if (!m) memories.set(bot, (m = new Map()));
+  // Command proxies share the real entity, so a later skill retains what the
+  // body saw. Respawn/reconnection creates a new entity and a fresh memory.
+  const body=bot.entity??bot;
+  let m = memories.get(body);
+  if (!m) memories.set(body, (m = new Map()));
   return m;
 }
 

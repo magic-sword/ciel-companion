@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import { Vec3 } from 'vec3';
 
 import { blocksFor } from '../src/names.js';
-import { canSee, known, knows, notices, rememberAround } from '../src/sight.js';
+import { canSee, known, knows, notices, remember, rememberAround } from '../src/sight.js';
+import { commandBot } from '../src/body-command.js';
 import { harvestable, weakestTool } from '../src/skills.js';
 import { planCraft } from '../src/craft-plan.js';
 import { nearbyBlocks } from '../src/state.js';
@@ -13,6 +14,19 @@ const require = createRequire(import.meta.url);
 const registry = require('prismarine-registry')('1.21.11');
 const World = require('prismarine-world')(registry);
 const Chunk = require('prismarine-chunk')(registry);
+
+test('作業台の記憶を別の身体操作と共有し、再参加した身体へは持ち越さない',()=>{
+  const {bot,set}=world(),at=new Vec3(4,64,4);
+  set(4,64,4,'crafting_table');
+  const command=()=>({token:{cancelled:false},operations:new Set()});
+  const first=commandBot(bot,command(),{}),second=commandBot(bot,command(),{});
+  remember(first,at,'crafting_table');
+  bot.entity.position=new Vec3(0,58,0);
+  assert.equal(canSee(second,at),false);
+  assert.equal(known(second,at),true);assert.equal(known(bot,at),true);
+  bot.entity={...bot.entity};
+  assert.equal(known(commandBot(bot,command(),{}),at),false);
+});
 
 // 地面（y 63 まで石、上に草）。シエルは (0, 64, 0) に立つ
 function world() {

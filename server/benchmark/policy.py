@@ -7,6 +7,7 @@ VERSION = 'practical-v1'
 DEFAULT = {'seconds':90, 'first_action':30, 'no_progress':30, 'same_failure':2,
            'blocked_grace':10, 'stop_grace':5}
 ACTION_TOOLS = {'minecraft_pointed_action','minecraft_clear_region','minecraft_build_region','minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item',
+                'minecraft_prepare_region',
                 'minecraft_give_item','minecraft_go_to_place','minecraft_follow_me',
                 'minecraft_come_here','minecraft_find_blocks','minecraft_dig_down','minecraft_look_around'}
 CONSTRAINT = r'(原木|木材|木|材料|作業台|道具|資源).{0,40}(不足|見つから|見当たら|ありません|無い|ない|足り|用意でき)'
@@ -40,12 +41,23 @@ class Progress:
         self.decline = None
         self.decline_at = None
         self.resumed_after_decline = False
+        self.region_distance = self.distance_to_region(initial) if task.get('region_spec') else None
+
+    def distance_to_region(self,state):
+        rows=self.task.get('spatial',{}).get('expected',[])
+        return min((math.dist(state['position'],[x+.5,y+.5,z+.5]) for x,y,z,_ in rows),default=0)
 
     @staticmethod
     def cell(state):
         return tuple(math.floor(x/2) for x in state['position'])
 
     def observe(self, state, elapsed):
+        if self.region_distance is not None:
+            distance=self.distance_to_region(state)
+            if distance < self.region_distance-.5:
+                self.region_distance=distance
+                self.last_progress=elapsed
+            return
         cell = self.cell(state)
         progress = cell not in self.cells
         self.cells.add(cell)

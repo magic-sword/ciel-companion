@@ -29,8 +29,10 @@ public final class PointingPlugin extends JavaPlugin implements Listener {
     private Map<String,Object> gaze;
     private Map<String,Object> presence;
     private static final long TTL = 60000;
+    private BenchmarkAudit audit;
 
     @Override public void onEnable() {
+        if("true".equals(System.getenv("CIEL_BENCH_AUDIT")))audit=new BenchmarkAudit(this);
         owner = System.getenv().getOrDefault("CIEL_POINTING_OWNER", "");
         key = new NamespacedKey(this, "pointer");
         output = Path.of("/data/ciel-pointing/selection.json");
@@ -48,6 +50,7 @@ public final class PointingPlugin extends JavaPlugin implements Listener {
     @Override public void onDisable() { selections.clear(); gaze=null; presence=null; publish(); }
     private boolean allowed(Player p) { return !owner.isBlank() && p.getName().equals(owner); }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(command.getName().equals("cielbenchaudit"))return audit!=null&&audit.command(sender,args);
         if (!(sender instanceof Player p) || !allowed(p)) return true;
         if(args.length>0 && (args[0].equals("gaze") || args[0].equals("clear"))) {
             gazeMode=args[0].equals("gaze"); selections.clear(); gaze=null; presence=null; publish();

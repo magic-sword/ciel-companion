@@ -3,6 +3,23 @@
 
 // うまくいかなかった理由（体の done・error の reason）。（ ）の前が付箋の短いひとこと
 export const WHY_FAILED = {
+  invalid_spec:'施工する範囲・材質・条件を確認してほしい',
+  ambiguous_region:'作業対象を一つに確定してほしい',
+  invalid_level:'残す地面の高さと除去上限を確認してほしい',
+  floor_not_level:'床は同じ高さの1層で指定してほしい',
+  wall_not_plane:'壁の向きと高さを確認してほしい',
+  protected_overlap:'作業範囲と残す範囲が重なっているので、何も変更していない',
+  invalid_preserve_region:'残す範囲を確認してほしい',
+  unsupported_material:'この施工では対応していない材質が指定されている',
+  material_required:'取り除く材質を指定してほしい',
+  dimension_mismatch:'座標から計算した寸法と指定した寸法が一致していない',
+  observation_limit:'作業に必要な周辺情報が確認できる上限を超えている',
+  hazard_near_region:'周囲に液体・落下物・装置などがあるので、何も変更していない',
+  region_changed:'作業中に対象や周囲の状態が変わったので停止した',
+  unknown_plan:'この接続で準備した施工計画を確認できない',
+  plan_expired:'施工計画の有効期限が切れたので、対象を再指定してほしい',
+  plan_already_used:'この施工計画は受付済み。続ける場合は残りを確認して新しく依頼してほしい',
+  material_consumption_mismatch:'配置数と材料の消費数が一致しないので、完了を確認できない',
   selection_expired: '選択が失効したので指示棒で選び直してほしい',
   selection_changed: '選んだブロックが変わったので作業を止めた',
   selection_needs_two_points: '範囲の始点と終点を指示棒で選んでほしい',
@@ -39,6 +56,7 @@ export const WHY_FAILED = {
   died: '途中で倒れた',
   unlinked: '体から切れた',
   stopped: '止められた',
+  requested: '中止の指示があった',
   replaced: 'ほかの頼みに替えた',
   mind_failed: '自分では進められなかった',
   no_answer: '体から返事が無い',
@@ -57,8 +75,8 @@ export const NEXT_STEP = {
   not_found: 'minecraft_find_blocks で探せる（地中の物は how=dig、地面の上の物は how=walk）',
 };
 export const SKILL_NAMES = {
+  edit_region:'範囲を施工する',
   pointed_action: '指し示した場所で作業する',
-  clear_region: '範囲を整地する', build_region: '床や壁を建築する',
   follow: 'ついていく', come: 'そばへ行く', go_to: '場所へ行く', collect: '集める', give: '渡す',
   dig_down: '足元を掘って降りる', craft: '作る', find: '探す',
 };
@@ -92,8 +110,6 @@ export function title(skill, args = {}) {
   const who = args.player ?? '持ち主';
   switch (skill) {
     case 'pointed_action': return ({move:'指した場所へ行く',recover:'選んだ作業台を回収する',clear:'選んだ範囲を除去する',floor:'選んだ範囲へ床を敷く'})[args.action] ?? '指し示した場所で作業する';
-    case 'clear_region': return '指定範囲を整地する';
-    case 'build_region': return `${ja(args.block)}で指定範囲を建築する`;
     case 'follow': return `${who}についていく`;
     case 'come': return `${who}のそばへ行く`;
     case 'go_to': return args.player !== undefined ? `${who}のところへ行く` : `（${args.x}, ${args.z}）へ行く`;

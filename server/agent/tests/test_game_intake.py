@@ -20,7 +20,7 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
             stop=AsyncMock(return_value={'state': 'cancelled', 'message': 'Stopped'}), answer=AsyncMock())
         self.create = AsyncMock()
         self.client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=self.create)), close=AsyncMock())
-        self.intake = GameIntake(self.runner, 'Return a work decision', client=self.client)
+        self.intake = GameIntake(self.runner, 'Return work arguments', select_instructions='Select a capability', client=self.client)
 
     def respond(self, value):
         self.create.return_value = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(value)))])
@@ -48,6 +48,8 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(self.runner.start.await_args.kwargs['seconds'], 90)
         first = json.loads(self.create.await_args_list[0].kwargs['messages'][1]['content'])
         second = json.loads(self.create.await_args_list[1].kwargs['messages'][1]['content'])
+        self.assertEqual(self.create.await_args_list[0].kwargs['messages'][0]['content'],'Select a capability')
+        self.assertEqual(self.create.await_args_list[1].kwargs['messages'][0]['content'],'Return work arguments')
         self.assertEqual(first['capabilities'], [{'id': '1', 'description': 'Solve a puzzle'}])
         self.assertNotIn('arguments', first['capabilities'][0])
         self.assertEqual(second['capability']['name'], 'puzzle.solve')
@@ -234,11 +236,11 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.runner.start.assert_not_awaited()
         detail=json.loads(self.create.await_args_list[1].kwargs['messages'][1]['content'])
         self.assertEqual(detail['required_operation'], 'execute')
-        for call in self.create.await_args_list:
-            body=json.loads(call.kwargs['messages'][1]['content'])['body']
-            self.assertNotIn('last',body)
-            self.assertIn('current',body)
-            self.assertIn('blocked',body)
+        selection=json.loads(self.create.await_args_list[0].kwargs['messages'][1]['content'])
+        self.assertEqual(selection['body'],{'current':False,'pending':False,'blocked':False})
+        self.assertNotIn('body',detail)
+        self.assertNotIn('current',detail)
+        self.assertNotIn('preparation',detail['capability'])
 
     async def test_wrong_operation_is_repaired_with_bound_kind_not_executed_as_work(self):
         self.tool()

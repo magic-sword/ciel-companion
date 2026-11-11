@@ -1,9 +1,7 @@
 {
   "about": "マイクラの道具ごとの「呼ぶきっかけ」（スキルのトリガーと同じ考え方）。MCP の道具の _meta の ciel/triggers と、様子の profile の goal_triggers・talker_examples として会話サーバーへ渡す（src/ciel/mcp.js）。遊んでいるあいだ、相手の発言がどれかの道具のきっかけに意味で近ければ、道具を持つ心へ回す（会話サーバーの router.py）。talker は小脳でよい発言。遊びながら増えるきっかけは会話サーバーの DB（route_examples）に置き、ここには書き足さない。道具を足したら、ここにもきっかけを書く（test/ciel.test.js が確かめる）。",
   "tools": {
-    "minecraft_pointed_action": ["指した場所へ行って", "この作業台を回収して", "ここからあそこまで土を取って", "選んだ範囲に床を敷いて"],
-    "minecraft_clear_region": ["指定した範囲を整地して", "この座標の土を取り除いて", "地面の上を平らにして"],
-    "minecraft_build_region": ["板材で床を作って", "丸石の壁を建てて", "この範囲をブロックで埋めて"],
+    "minecraft_pointed_action": ["指した場所へ行って", "この作業台を回収して"],
     "minecraft_follow_me": [
       "ついてきて",
       "一緒に来て",

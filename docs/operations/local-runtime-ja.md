@@ -79,6 +79,16 @@ docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .en
 
 環境変数の編集後は対象コンテナを再作成する。単なるrestartや設定移行だけを反映済みとしない。ゲーム契約が変わる更新ではMCPの版も揃えるが、Minecraft本体・ワールドの再作成はbackend切替に含めない。共有LLMを環境ごとに追加起動しない。
 
+### 開発専用のMinecraftの体
+
+開発agentの接続先は`127.0.0.1:8775/mcp`。`compose.dev.yaml`のminecraftプロファイルは、本番のCielとは別プレイヤー`Ciel_Dev`を起動する。bodyは8774、目は3009でループバックだけに開く。本番のMinecraftワールドと持ち主の指示棒を共有し、体のコード・会話所有権は分離する。同じワールド内にいるため、検証する小範囲は利用者が指定する。
+
+Git Bashから`scripts/server/deploy-server.sh --dev --minecraft`で、開発agentと開発専用の体をビルド・反映する。通常の`--dev`はagentだけを更新する。初回は`minecraft/dev-setup.py`が既存のEULA同意・持ち主・offline mode・whitelistを検査し、既存の登録を保持してCiel_Devのoffline UUIDを追加する。変更前のwhitelistは通常Minecraftの`ciel-config-backups/`へ保存し、whitelist reloadだけを実行する。Minecraft本体・本番の体の再作成やワールド復元は行わない。
+
+反映前後の証拠は[照合helper](../../scripts/server/verify-minecraft-dev.py)で残せる。ルートで`.venv/Scripts/python.exe -X utf8 scripts/server/verify-minecraft-dev.py before --evidence <一意の名前>`、配布後に同じ名前で`after`を実行する。既存記録の上書きは拒否する。開発ホストと実コンテナのソース、読み込まれる3種類の受付指示、MCPのprofile 2/work 1・新旧API、worker登録、開発接続先・持ち主設定・Ciel_Devの参加、通常サービスの稼働と本番のID・image・起動時刻を確認し、`~/work/ciel-companion-dev/server/data/deployments/<名前>/`の4個のJSONへ保存する。MCPの体の取得やゲーム操作は行わず、設定はmode/backend/input/STTの名前だけを記録し、資格情報は出力しない。
+
+`.env.minecraft`は体のホスト・持ち主の設定に使い、本番の会話用`.env`は開発へ重ねない。開発からの通常ワールド検証と、専用アリーナを復元するベンチマークは別に扱う。
+
 ## Minecraftの指差し機能を導入する構成
 
 `server/compose.pointing.yaml`は通常のMinecraftへPaper 1.21.11 build 132と指差しプラグインを追加する明示的な上書き構成。標準デプロイだけではVanillaから切り替わらない。専用ベンチマークで確認した後、通常ワールドを停止してバックアップし、Paper移行として適用する。会話サーバーだけの再配布と同じ扱いにしない。

@@ -2,7 +2,6 @@
 // 受けた命令は、ここで形を確かめてから動かす。一覧に無い技・形の違う引数は動かさない（任意のコードは実行しない）。
 
 export const VERSION = 1;
-import { regionArgs } from './spatial.js';
 const NAME = /^[A-Za-z0-9_]{1,16}$/;        // マイクラのプレイヤー名
 const BLOCK = /^[a-z0-9_]{1,64}$/;           // ブロック・持ち物の名前（oak_log など）
 const CHAT_CHARS = 256;                      // マイクラのチャットの上限
@@ -14,12 +13,10 @@ const COORD_MAX = 30_000_000;
 
 // 技と、その引数の確かめ方。返すのは整えた引数か、だめな理由
 export const SKILLS = {
+  edit_region: a => onlyPlan(a) ? {args:{plan_id:a.plan_id,budget_ms:a.budget_ms}} : {error:'bad_args'},
   pointed_action: a => typeof a.selection_id==='string' && /^[a-f0-9-]{36}$/.test(a.selection_id)
-    && ['move','recover','clear','floor'].includes(a.action)
-    && (a.action!=='floor' || ['dirt','cobblestone','stone','oak_planks','glass'].includes(a.block))
-    ? {args:{selection_id:a.selection_id,action:a.action,...(a.action==='floor'?{block:a.block}:{})}} : {error:'bad_args'},
-  clear_region: a => regionArgs(a),
-  build_region: a => regionArgs(a, true),
+    && ['move','recover'].includes(a.action)
+    ? {args:{selection_id:a.selection_id,action:a.action}} : {error:'bad_args'},
   // ついていく（止めるまで続く）。player を省けば持ち主
   follow: (a) => player(a),
   // そばまで来る
@@ -68,6 +65,11 @@ export const SKILLS = {
     return { args: { ...p.args, item: a.item, ...(a.count !== undefined ? { count: a.count } : {}) } };
   },
 };
+
+function onlyPlan(a) {
+  return Object.keys(a).every(k=>['plan_id','budget_ms'].includes(k)) && typeof a.plan_id==='string'
+    && /^[a-f0-9-]{36}$/.test(a.plan_id) && Number.isFinite(a.budget_ms) && a.budget_ms>0 && a.budget_ms<=120000;
+}
 
 function player(a) {
   if (a.player === undefined) return { args: {} };

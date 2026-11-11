@@ -6,7 +6,7 @@ services:
     image: itzg/minecraft-server:2026.10.1-java21
     user: '0'
     entrypoint: [sh, -c]
-    command: ['mkdir -p /data/ciel-pointing && chown 1000:1000 /data/ciel-pointing']
+    command: ['mkdir -p /data/ciel-pointing /data/ciel-benchmark-audit && chown 1000:1000 /data/ciel-pointing /data/ciel-benchmark-audit']
     volumes:
       - ./benchmark/data/world:/data
     restart: 'no'
@@ -39,6 +39,7 @@ services:
       TYPE: PAPER
       PAPER_BUILD: '132'
       CIEL_POINTING_OWNER: Bench_Owner
+      CIEL_BENCH_AUDIT: 'true'
       VERSION: 1.21.11
       LEVEL: ciel-benchmark
       LEVEL_TYPE: FLAT
@@ -88,6 +89,8 @@ services:
       CIEL_BENCH_LLM_CONTROL: ${CIEL_BENCH_LLM_CONTROL:-http://127.0.0.1:8095}
     volumes:
       - ./benchmark/data:/workspace/server/benchmark/data
+      - ./benchmark/data/world/ciel-benchmark-audit:/workspace/server/benchmark/data/audit:ro
+      - ./stage1-baseline/source:/stage1-baseline:ro
 
   body-bench:
     build:

@@ -12,8 +12,48 @@ export const CAPABILITIES = [{
       quantity_mode: { enum: ['inventory_target', 'gain'] } } },
   constraints: { type: 'object', required: ['resource_scope', 'failure_policy'], additionalProperties: false,
     properties: { resource_scope: { enum: ['nearby', 'search'] }, failure_policy: { enum: ['ask', 'stop'] } } },
-  interpretation: '採集はgain、用意・製作はinventory_target。手近な材料で難しければ中止する依頼はnearbyとfailure_policy=stop、60秒。通常はsearchとask、90秒。探索や石の道具は120秒。',
+  interpretation: '通常の製作・用意はquantity_mode=inventory_target、constraints={resource_scope:"search",failure_policy:"ask"}。数量省略は1個。石のつるはし等の石の道具と探索はseconds=120、他の通常依頼は90。原木等を指定個数集める採集だけquantity_mode=gain。例外として、利用者が「手近な材料で難しければ中止」と明示した場合だけnearby/stop/60秒を選ぶ。普通の「石のつるはしを作って」へこの例外を当てはめない。',
+}, {
+  name:'minecraft.edit_region', description:'指定範囲の整地・床・壁・穴の埋め戻し。地面や保護範囲を維持し、手持ち材料で施工する。',
+  arguments:{type:'object',additionalProperties:false,required:['plan_id'],properties:{plan_id:{type:'string',format:'uuid'}}},
+  constraints:{type:'object',additionalProperties:false,required:['failure_policy'],properties:{failure_policy:{const:'stop'}}},
+  interpretation:'施工は準備した計画を実行する。通常90秒、64マス・確認会話を含む場合120秒。不能時は停止して部分結果を報告する。',
+  preparation:{version:1,tool:'minecraft_prepare_region',result_argument:'plan_id',allow_repeat:true,
+    intent_schema:{type:'object',additionalProperties:false,required:['operation','on_protected'],
+      allOf:[{if:{properties:{operation:{enum:['clear','level']}}},then:{required:['clear_blocks']}},
+        {if:{properties:{operation:{enum:['floor','wall','backfill']}}},then:{required:['block']}}],properties:{
+      operation:{enum:['clear','level','floor','wall','backfill']},block:{enum:['dirt','cobblestone','stone','oak_planks','glass']},
+      clear_blocks:{type:'array',minItems:1,uniqueItems:true,items:{enum:['dirt','grass_block','stone','cobblestone']}},
+      on_protected:{const:'stop_before_edit'}}},target_binding:{kind:'region_roles'}},
 }];
+const regionPreparation=CAPABILITIES[1].preparation;
+const requestEnd=String.raw`(?:ください|下さい|ほしい(?:です)?|欲しい(?:です)?|くれる|くれますか|もらえる|もらえますか|もらいたい(?:です)?|いただけますか)?(?:ね|よ)?(?=[。！？!?.\n、,;；]|$)`;
+const removalRequest=String.raw`(?:取り除いて|除いて|除去して|整地して|平らにして|空気にして|掘って|取って|片付けて|片づけて|除去をお願い(?:します)?|整地をお願い(?:します)?)`;
+const compoundRemoval=String.raw`(?:取り除き|除去し|整地し)[、,][^。！？!?\n]*(?:残して|保護して|維持して)`;
+const requestForms={clear:removalRequest,level:removalRequest,
+  floor:String.raw`(?:敷いて|敷設して|作って|作ろう|作りましょう|設置して|置いて|床をお願い(?:します)?)`,
+  wall:String.raw`(?:建てて|建てよう|建てましょう|建築して|作って|作ろう|作りましょう|設置して|壁をお願い(?:します)?)`,
+  backfill:String.raw`(?:埋めて|埋めよう|埋め戻して|埋め戻そう|埋め戻しましょう|埋め戻しをお願い(?:します)?)`};
+regionPreparation.continuation_patterns=[String.raw`(?:続けて|再開して|再開|続行|残りをお願い(?:します)?|続きをお願い(?:します)?)`+requestEnd];
+regionPreparation.negative_request_patterns=[
+  String.raw`(?:まだ|今は|今回は)(?:実行|開始|着手|施工|作業|操作)(?:は|を)?(?:しない|不要|禁止)`,
+  String.raw`(?:^|[。！？!?\n、,])\s*(?:(?:ただし|でも)[、,]?)?\s*(?:(?:これ|それ|この依頼|この作業)(?:は|を)?)?\s*(?:実行|開始|着手|施工|作業|操作)(?:は|を)?(?:しない|するな|不要|禁止)`];
+regionPreparation.source_roles={preserve:['残す','残し','残せ','残さ','残る','保存','保護','維持','そのまま','触ら','壊さ','keep','preserve','protect']};
+regionPreparation.role_prefixes={ground:['地面','残す地面','ground'],top:['上限','除去上限','top']};
+const materialAliases={dirt:['土','dirt'],grass_block:['草ブロック','grass_block'],stone:['石','stone'],
+  cobblestone:['丸石','cobblestone'],oak_planks:['オークの板材','オークの木材','オークの板','オーク板材','oak_planks'],glass:['ガラス','glass']};
+regionPreparation.source_values=Object.fromEntries(['block','clear_blocks'].map(field=>[field,
+  Object.fromEntries((field==='block'?['dirt','cobblestone','stone','oak_planks','glass']:['dirt','grass_block','stone','cobblestone']).map(name=>[name,materialAliases[name]]))]));
+regionPreparation.variants=Object.fromEntries(Object.entries({clear:'指定範囲の材質を取り除く',level:'残す地面の高さと上限から整地する',
+  floor:'水平な床を敷く',wall:'垂直な壁を建てる',backfill:'穴の空気だけを埋め戻す'}).map(([operation,description])=>{
+    const build=['floor','wall','backfill'].includes(operation),properties=regionPreparation.intent_schema.properties;
+    return [operation,{description,request_patterns:[requestForms[operation]+requestEnd,...(['clear','level'].includes(operation)?[compoundRemoval+requestEnd]:[])],schema:{type:'object',additionalProperties:false,
+      required:['operation','on_protected',build?'block':'clear_blocks'],properties:{operation:{const:operation},
+        on_protected:properties.on_protected,...(build?{block:properties.block}:{clear_blocks:properties.clear_blocks})}},
+      roles:operation==='level'?['edit','reference','preserve','ground','top','dimensions']:['edit','reference','preserve','dimensions'],
+      required_axes:operation==='level'?['x','z']:['x','y','z'],required_height_mentions:operation==='level'?2:0,
+      reference_axes:operation==='level'?['x','z']:[]}];
+  }));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const validId = s => typeof s === 'string' && s.length > 0 && s.length <= 160;
 const keys = (o, allowed) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
@@ -32,12 +72,19 @@ export class GameTasks {
   view(t = this.active) {
     if (!t) return null;
     const item = ja(t.request.arguments.item);
-    const message = t.state === 'succeeded' ? `${item}を${t.target}個用意できました。`
+    let message = t.state === 'succeeded' ? `${item}を${t.target}個用意できました。`
       : t.state === 'cancelled' ? (t.request.constraints.failure_policy === 'stop' && ['not_found', 'missing_materials', 'needs_tool', 'cannot_harvest'].includes(t.reason)
         ? `${ja(Object.keys(t.evidence.needs ?? {})[0] || t.evidence.item || '材料')}が不足して作れません。中止して待っています。` : '作業を中止して待っています。')
       : t.state === 'needs_decision' ? `${item}の用意を止めて待っています。${shortWhy(t.reason, t.evidence)}。続けるか中止するか決めてください。`
       : t.reason === 'stop_unconfirmed' ? '停止を確認できません。新しい作業は始めていません。'
       : t.state === 'failed' ? `${item}を期限内に用意できず、作業を止めました。` : '';
+    if(t.request.capability==='minecraft.edit_region') {
+      const e=t.evidence;
+      message=t.reason==='stop_unconfirmed'?'停止を確認できません。新しい作業は始めていません。'
+        :t.state==='succeeded'?`施工完了。${e.total}マス確認、${e.changed}マス変更しました。`
+        :['cancelled','failed'].includes(t.state)?`施工停止。${shortWhy(t.reason,e)}。変更${e.changed??0}、未完了${(e.total??0)-(e.verified??0)}マスです。`
+        :t.state==='cancelling'?'施工の停止を確認しています。':`施工を始めます。対象${e.total}マスです。`;
+    }
     return structuredClone({ version: TASK_VERSION, session: this.link.session, task_id: t.id, request_id: t.request.request_id, message,
       revision: t.revision, state: t.state, capability: t.request.capability, arguments: t.request.arguments,
       reason: t.reason, evidence: t.evidence, decision: t.decision, remaining_ms: Math.max(0, t.deadline - this.clock()) });
@@ -52,14 +99,17 @@ export class GameTasks {
 
   submit(r) {
     if (this.closed) return { status: 'error', reason: 'unlinked' };
+    const spatial=r?.capability==='minecraft.edit_region';
+    const validArguments=spatial
+      ? keys(r.arguments,['plan_id']) && typeof r.arguments.plan_id==='string' && /^[a-f0-9-]{36}$/.test(r.arguments.plan_id)
+        && keys(r.constraints,['failure_policy']) && r.constraints.failure_policy==='stop'
+      : r?.capability===CAPABILITIES[0].name && keys(r.arguments,['item','quantity','quantity_mode'])
+        && /^[a-z_]+$/.test(r.arguments?.item??'') && Number.isInteger(r.arguments?.quantity)
+        && r.arguments.quantity>=1 && r.arguments.quantity<=64 && ['inventory_target','gain'].includes(r.arguments.quantity_mode)
+        && keys(r.constraints,['resource_scope','failure_policy']) && ['nearby','search'].includes(r.constraints.resource_scope)
+        && ['ask','stop'].includes(r.constraints.failure_policy);
     if (!keys(r, ['request_id', 'capability', 'arguments', 'budget_ms', 'constraints']) || !validId(r.request_id)
-        || r.capability !== CAPABILITIES[0].name || !keys(r.arguments, ['item', 'quantity', 'quantity_mode'])
-        || !/^[a-z_]+$/.test(r.arguments?.item ?? '') || !Number.isInteger(r.arguments?.quantity)
-        || r.arguments.quantity < 1 || r.arguments.quantity > 64
-        || !['inventory_target', 'gain'].includes(r.arguments.quantity_mode)
-        || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > 120000
-        || !keys(r.constraints, ['resource_scope', 'failure_policy']) || !['nearby', 'search'].includes(r.constraints.resource_scope)
-        || !['ask', 'stop'].includes(r.constraints.failure_policy)) {
+        || !validArguments || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > 120000) {
       return { status: 'error', reason: 'invalid_request' };
     }
     const signature = JSON.stringify([r.capability, r.arguments, r.constraints]);
@@ -71,6 +121,13 @@ export class GameTasks {
     if (this.tasks.size >= 512) return { status: 'error', reason: 'session_request_limit' };
     const t = { id: randomUUID(), request: structuredClone(r), signature, revision: 0, state: 'accepted', reason: '',
       evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, failures: new Map(), generation: 0 };
+    if(spatial) {
+      const claim=this.link.claimRegion?.(r.arguments.plan_id,t.id);
+      if(!claim?.plan)return {status:'error',reason:claim?.error??'unknown_plan'};
+      t.evidence={spec:claim.plan.spec,summary:claim.plan.summary,total:claim.plan.total,changed:0,
+        verified:claim.plan.total-claim.plan.actions.length};
+      t.region_total=claim.plan.total;t.region_changes=claim.plan.actions.length;
+    }
     this.tasks.set(t.id, t); this.requests.set(r.request_id, t); this.active = t;
     // Reject beyond the history bound; never evict a request and execute its retry a second time.
     this.changed(t, 'accepted');
@@ -85,6 +142,7 @@ export class GameTasks {
   async run(t) {
     const generation = ++t.generation;
     this.changed(t, 'running');
+    if(t.request.capability==='minecraft.edit_region')return this.runRegion(t,generation);
     try {
       const a = t.request.arguments;
       let plan = await this.link.plan(a.item, a.quantity);
@@ -144,6 +202,23 @@ export class GameTasks {
     }
   }
 
+  async runRegion(t,generation) {
+    t.operation=randomUUID();
+    const args={plan_id:t.request.arguments.plan_id,budget_ms:Math.max(1,t.deadline-this.clock()-1000)};
+    this.link.notice({kind:'work_action',id:t.operation,task_id:t.id,skill:'edit_region',arguments:args});
+    try {
+      const done=await this.link.runSkill('edit_region',args,t.operation,args.budget_ms);
+      this.link.notice({kind:'work_action_result',id:t.operation,task_id:t.id,result:done});
+      t.evidence={...t.evidence,...done.note};
+      if(!this.current(t,generation))return;
+      const b=this.link.body;
+      if(done.ok&&done.note?.completed&&done.note.total===t.region_total&&done.note.verified===t.region_total
+          &&done.note.changed===t.region_changes&&b&&!b.current&&!b.pending&&!b.blocked&&!b.owner)
+        this.changed(t,'succeeded','',t.evidence);
+      else await this.cancel(t.id,done.reason??'objective_unverified');
+    }catch(e){if(this.current(t,generation))await this.cancel(t.id,'execution_error');}
+  }
+
   block(t, reason, evidence = {}) {
     if (t.request.constraints.failure_policy === 'stop') {
       t.evidence = evidence;
@@ -183,7 +258,7 @@ export class GameTasks {
     const until = this.clock() + this.stopMs;
     while (this.clock() < until) {
       const b = this.link.body;
-      if (b && !b.current && !b.pending && !b.blocked) {
+      if (b && !b.current && !b.pending && !b.blocked && !b.owner) {
         this.changed(t, reason === 'deadline' ? 'failed' : 'cancelled', reason);
         return this.view(t);
       }

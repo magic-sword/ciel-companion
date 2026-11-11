@@ -1,4 +1,4 @@
-# 開発用の会話サーバー（本番とは別のコンテナ）。分析・デバッグ・試験はここで行い、本番の会話サーバーには触らない。
+# 開発用の会話サーバーと任意起動のMinecraftの体（本番とは別のコンテナ）。分析・デバッグ・試験はここで行い、本番の会話サーバーには触らない。
 # 置き場所は ~/work/ciel-companion-dev/server（本番は ~/work/ciel-companion/server）。手元から：
 #   scripts/server/deploy-server.sh --dev     開発中のコードを送り、開発用だけを作り直す（server/deploy-remote.sh dev）
 # 読み上げ（Irodori-TTS、127.0.0.1:8766）と DB のコンテナは、本番のものを共通で使う。
@@ -39,7 +39,7 @@ services:
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env.shared に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
       # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
-      - CIEL_GAMES=minecraft=http://127.0.0.1:8771/mcp
+      - CIEL_GAMES=minecraft=http://127.0.0.1:8775/mcp
       # 本番と共用するローカルLLM。localでは返答・道具選択も使う。歌唱中はCPUへ切り替える
       - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
       - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
@@ -54,4 +54,29 @@ services:
       - ${CIEL_WHISPER_MODELS_DIR:-${HOME}/models/faster-whisper}:/models-whisper:ro
       - ./agent/data/minutes:/app/data/minutes
       - ./agent/data/debug:/app/data/debug
+    restart: unless-stopped
+  minecraft-body-dev:
+    profiles: [minecraft]
+    build:
+      context: ./minecraft
+      network: host
+    image: ciel-dev-minecraft-body
+    network_mode: host
+    env_file:
+      - ../../ciel-companion/server/.env.minecraft
+    environment:
+      - MC_HOST=${MC_BIND:-127.0.0.1}
+      - MC_PORT=25565
+      - MC_VERSION=1.21.11
+      - MC_USERNAME=Ciel_Dev
+      - MC_OWNER=${MC_OWNER:-}
+      - BODY_HOST=127.0.0.1
+      - BODY_PORT=8774
+      - CIEL_PORT=8775
+      - EYE_PORT=3009
+      - KNOWLEDGE_DATA=/app/knowledge-data
+      - CIEL_POINTING_FILE=/app/pointing/selection.json
+    volumes:
+      - ../../ciel-companion/server/minecraft/knowledge/data:/app/knowledge-data:ro
+      - ../../ciel-companion/server/minecraft/data/ciel-pointing:/app/pointing:ro
     restart: unless-stopped

@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameTasks } from '../src/ciel/tasks.js';
+import { GameTasks, CAPABILITIES } from '../src/ciel/tasks.js';
+
+test('construction request proof accepts compound preservation and rejects negative examples', () => {
+  const preparation=CAPABILITIES.find(c=>c.name==='minecraft.edit_region').preparation;
+  const matches=text=>preparation.variants.clear.request_patterns.some(p=>new RegExp(p).test(text));
+  assert.equal(matches('土を全部除去し、Y=63の地面は残してください。'),true);
+  assert.equal(matches('土を全部除いて平らにして。地面は残してね。'),true);
+  assert.equal(matches('平らにしないでください。'),false);
+  assert.equal(matches('土を取り除かないでください。'),false);
+  assert.equal(matches('土を除去しないでください。'),false);
+  assert.equal(matches('土を除去してと言われた例です。'),false);
+});
 
 const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.obtain_item',
   arguments: { item: 'stone_pickaxe', quantity: 1, quantity_mode: 'inventory_target' },
@@ -110,4 +121,23 @@ test('an explicitly requested practical stop confirms idle body and reports the 
   assert.match(work.view().message, /原木/);
   assert.deepEqual(link.calls, []);
   work.close();
+});
+
+test('prepared construction verifies physical evidence and deduplicates work',async()=>{
+  const {link,work}=fixture(),plan_id='11111111-1111-4111-8111-111111111111';
+  let claimed=false;
+  link.claimRegion=()=>claimed?{error:'plan_already_used'}:(claimed=true,{plan:{spec:{},summary:'指定した床',total:9,actions:[1,2]}});
+  link.runSkill=async(skill,args)=>{link.calls.push([skill,args]);return{ok:true,note:{completed:true,total:9,verified:9,changed:2,summary:'指定した床'}};};
+  const r=request({capability:'minecraft.edit_region',arguments:{plan_id},constraints:{failure_policy:'stop'}});
+  const a=work.submit(r);assert.equal(work.submit(r).task_id,a.task_id);
+  await wait(()=>work.active.state==='succeeded');
+  assert.equal(link.calls[0][0],'edit_region');assert.match(work.view().message,/2マス変更/);
+  assert.equal(work.submit({...r,request_id:'two'}).reason,'plan_already_used');work.close();
+});
+test('construction ok without verified completion is stopped, never succeeded',async()=>{
+  const {link,work}=fixture();
+  link.claimRegion=()=>({plan:{spec:{},summary:'壁',total:9,actions:[1]}});
+  link.runSkill=async()=>({ok:true,note:{changed:1}});
+  work.submit(request({capability:'minecraft.edit_region',arguments:{plan_id:'11111111-1111-4111-8111-111111111111'},constraints:{failure_policy:'stop'}}));
+  await wait(()=>work.active.state==='cancelled');assert.equal(work.view().reason,'objective_unverified');work.close();
 });

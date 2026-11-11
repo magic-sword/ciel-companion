@@ -22,6 +22,7 @@ import { knows } from './sight.js';
 import { Runner } from './skills.js';
 import { PlayerLocator } from './player-locator.js';
 import { Pointing } from './pointing.js';
+import { RegionPlans } from './spatial.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
@@ -35,6 +36,7 @@ const MC = {
 };
 const OWNER = env.MC_OWNER || null;
 const pointing = new Pointing(env.CIEL_POINTING_FILE, OWNER);
+const regionPlans = new RegionPlans();
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
 const CIEL_PORT = Number(env.CIEL_PORT ?? 8771);   // MCP の入口（src/ciel/mcp.js）。BODY_HOST だけで開く
@@ -114,9 +116,12 @@ const hub = makeHub({
   onClaim: (l) => {
     link = l;
     l.bodyScope = randomUUID();
+    l.prepareRegion = r => regionPlans.prepare(bot, r, l.bodyScope);
+    l.claimRegion = (id, task) => regionPlans.claim(id, l.bodyScope, task);
     send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
   },
   onRelease: (l) => {
+    regionPlans.clear(l.bodyScope);
     runner.stop('unlinked');   // 会話を切ったら、その場で待つ（ログアウトしない）
     if (link === l) link = null;
   },
@@ -172,6 +177,7 @@ let retry = RETRY_MIN_MS;
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
   const b = mineflayer.createBot(MC);
+  b.regionPlans = regionPlans;
   b.pointing = pointing;
   b.playerLocator = new PlayerLocator(b);
   bot = b;
@@ -197,6 +203,7 @@ function connect() {
     health = b.health;
   });
   b.on('death', () => {
+    if (link?.bodyScope) regionPlans.clear(link.bodyScope);
     log('倒れた');
     runner.stop('died');
     health = null;
@@ -224,6 +231,7 @@ function connect() {
   b.on('kicked', (reason) => log('サーバーから外された', typeof reason === 'string' ? reason.slice(0, 200) : ''));
   b.on('error', (err) => log('マイクラの接続のエラー', err?.code ?? err?.name ?? err));
   b.on('end', () => {
+    if (link?.bodyScope) regionPlans.clear(link.bodyScope);
     if (bot === b) {
       runner.stop('disconnected');
       runner.attach(null);

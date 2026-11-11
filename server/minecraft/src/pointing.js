@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs';
 import { Vec3 } from 'vec3';
-import { regionArgs, editRegion } from './spatial.js';
+import { regionArgs } from './spatial.js';
 import { carefulMovements } from './movements.js';
 import pathfinderPkg from 'mineflayer-pathfinder';
 const { goals } = pathfinderPkg;
@@ -82,11 +82,6 @@ export async function actOnSelection(bot,args,token,ctx) {
   };
   check();
   if(s.points.some(q=>new Vec3(q.x,q.y,q.z).distanceTo(bot.entity.position)>32)) fail('region_too_far');
-  if(args.action==='clear' || args.action==='floor') {
-    const r=selectedRegion(s,args.action==='floor',args.block);
-    if(r.error) fail(r.error);
-    return editRegion(bot,r.args,token,ctx,args.action==='floor');
-  }
   if(s.points.length!==1) fail('selection_needs_one_point');
   await guard?.idle(token);
   if(token.cancelled) return;

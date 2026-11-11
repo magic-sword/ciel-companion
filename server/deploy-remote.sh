@@ -17,7 +17,12 @@ if [ "${1:-}" = dev ]; then
   docker exec ciel-db-1 pg_dump -U ciel -d ciel | gzip > $BACKUPS/ciel-$(date +%Y%m%d-%H%M%S).sql.gz
   ls -1t $BACKUPS/ciel-*.sql.gz | tail -n +15 | xargs -r rm -f
   echo "DB のバックアップ：$(ls -1t $BACKUPS/ciel-*.sql.gz | head -1)"
-  docker compose -f compose.dev.yaml --env-file $PROD/.env.shared --env-file .env.dev up -d --build 2>&1 | tail -6
+  COMPOSE=(docker compose -f compose.dev.yaml --env-file "$PROD/.env.shared" --env-file .env.dev)
+  if [ "${2:-}" = minecraft ]; then
+    python3 minecraft/dev-setup.py --prod-dir "$PROD"
+    COMPOSE+=(--env-file "$PROD/.env.minecraft" --profile minecraft)
+  fi
+  "${COMPOSE[@]}" up -d --build 2>&1 | tail -8
   exit 0
 fi
 
