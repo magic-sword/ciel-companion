@@ -41,6 +41,15 @@ def load_suite(path):
         if case['id'] in seen or case['split'] not in ('dev', 'holdout'):
             raise ValueError('Duplicate ID or invalid split')
         seen.add(case['id'])
+        if 'dialogue' in case:
+            if case.get('stage') not in (1, 2, 3) or not case['dialogue']:
+                raise ValueError('Dialogue requires stage 1..3 and turns')
+            for turn in case['dialogue']:
+                if (not isinstance(turn.get('user'), str)
+                        or not any(ch.isalnum() for ch in turn['user']) or not turn.get('rubric')):
+                    raise ValueError('Dialogue turn requires user and rubric')
+                if not isinstance(turn.get('max_chars'), int) or turn['max_chars'] < 1:
+                    raise ValueError('Dialogue turn requires positive max_chars')
         if not case.get('messages') or not case.get('checks'):
             raise ValueError('Messages and checks required')
         if any(not isinstance(m.get('content'), str) or not any(ch.isalnum() for ch in m['content'])
@@ -147,6 +156,8 @@ def stream_chat(base_url, payload, timeout):
 
 
 def run_case(case, system, args, seed, chat=stream_chat):
+    if 'dialogue' in case:
+        return run_dialogue(case, system, args, seed, chat)
     history = [{'role': 'system', 'content': system + '\n' + case.get('context', '')}] + copy.deepcopy(case['messages'])
     generated, calls, measurements = [], [], []
     steps = case.get('steps', [])
@@ -198,6 +209,59 @@ def run_case(case, system, args, seed, chat=stream_chat):
     return result
 
 
+def response_metrics(text, previous):
+    """Literal repetition signals only; semantic repetition needs human review."""
+    sentences = [s.strip() for s in re.split(r'[。！？!?\n]+', text) if s.strip()]
+    normalized = [re.sub(r'\s+', '', s) for s in sentences]
+    eligible = [s for s in normalized if len(s) >= 8]
+    old = {re.sub(r'\s+', '', s.strip()) for reply in previous
+           for s in re.split(r'[。！？!?\n]+', reply) if s.strip()}
+    return dict(chars=len(text), sentences=len(sentences),
+                repeated_sentences=len(eligible) - len(set(eligible)),
+                reused_sentences=sum(s in old for s in eligible))
+
+
+def run_dialogue(case, system, args, seed, chat):
+    history = copy.deepcopy(case['messages'])
+    generated, measurements, calls, turns = [], [], [], []
+    started = time.monotonic()
+    status = 'ok'
+    error = None
+    for index, turn in enumerate(case['dialogue']):
+        remaining = args.timeout - (time.monotonic() - started)
+        if remaining <= 0:
+            status = 'error'
+            error = 'TimeoutError: Dialogue deadline exceeded'
+            break
+        history.append({'role': 'user', 'content': turn['user']})
+        child = dict(id=case['id'], category=case['category'], messages=history,
+                     context=case.get('context', ''), checks=[{'type': 'no_calls'}])
+        child_args = copy.copy(args)
+        child_args.timeout = remaining
+        row = run_case(child, system, child_args, seed + index, chat)
+        text = '\n'.join(m.get('content') or '' for m in row['messages'])
+        metrics = response_metrics(text, [m.get('content') or '' for m in generated])
+        turns.append(dict(index=index, user=turn['user'], response=row['messages'],
+                          rubric=turn['rubric'], max_chars=turn['max_chars'],
+                          over_length=metrics['chars'] > turn['max_chars'], metrics=metrics,
+                          status=row['status'], error=row.get('error'), ratings=None, evidence=None))
+        generated.extend(row['messages'])
+        measurements.extend(row['measurements'])
+        calls.extend(row['calls'])
+        history.extend(row['messages'])
+        if not row['automatic_pass'] or not text.strip():
+            status = row['status'] if row['status'] != 'ok' else 'error'
+            error = row.get('error') or ('Empty response' if not text.strip() else row['status'])
+            break
+    checks = score(case, generated, calls)
+    return dict(id=case['id'], category=case['category'], stage=case['stage'], seed=seed,
+                status=status, error=error, messages=generated, calls=calls, measurements=measurements,
+                turns=turns, checks=checks, human_pending=True,
+                total_ms=(time.monotonic() - started) * 1000,
+                automatic_pass=status == 'ok' and len(turns) == len(case['dialogue'])
+                    and all(c['pass'] for c in checks if c['type'] != 'human'))
+
+
 def summary(trials):
     groups = {}
     for category in sorted({r['category'] for r in trials}):
@@ -206,6 +270,15 @@ def summary(trials):
         groups[category] = dict(n=len(rows), automatic_pass=sum(r['automatic_pass'] for r in rows),
             errors=sum(r['status'] != 'ok' for r in rows), human_pending=sum(r['human_pending'] for r in rows),
             latency_n=len(latency), p50_ms=percentile(latency, .5), p95_ms=percentile(latency, .95))
+        turns = [t for r in rows for t in r.get('turns', [])]
+        if turns:
+            groups[category]['conversation'] = dict(
+                observed_turns=len(turns),
+                over_length_turns=sum(t['over_length'] for t in turns),
+                repeated_sentences=sum(t['metrics']['repeated_sentences'] for t in turns),
+                reused_sentences=sum(t['metrics']['reused_sentences'] for t in turns),
+                chars_p50=percentile([t['metrics']['chars'] for t in turns], .5),
+                chars_p95=percentile([t['metrics']['chars'] for t in turns], .95))
         for key in ('first_event_ms', 'first_content_ms'):
             values = [m.get(key) for r in rows for m in r.get('measurements', []) if m.get(key) is not None]
             groups[category][key] = dict(n=len(values), p50=percentile(values, .5), p95=percentile(values, .95))
@@ -354,6 +427,8 @@ def main():
                 reviews.append(dict(id=row['id'], repeat=repeat, messages=case['messages'],
                     response=row['messages'], rubrics=[c['rubric'] for c in row['checks'] if c['type'] == 'human'],
                     ratings=None, evidence=None))
+                if 'turns' in row:
+                    reviews[-1]['turns'] = row['turns']
             report['summary'] = summary(report['trials'])
             write(args.output / 'report.json', report)
             write(args.output / 'human-review.json', reviews)

@@ -1,0 +1,861 @@
+{
+  "schema": "ciel-weight-space-v1",
+  "cases": [
+    {
+      "id": "chat-s1-greeting-dev",
+      "split": "dev",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "greeting",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "おはよう。",
+          "max_chars": 80,
+          "rubric": "挨拶に短く自然に応じ、機能一覧を始めない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-greeting-holdout",
+      "split": "holdout",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "greeting",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "こんにちは。",
+          "max_chars": 80,
+          "rubric": "挨拶に短く自然に応じ、機能一覧を始めない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-fact-dev",
+      "split": "dev",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "fact",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "一日は何時間？短く。",
+          "max_chars": 80,
+          "rubric": "正しい答えを簡潔に返す。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-fact-holdout",
+      "split": "holdout",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "fact",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "一週間は何日？短く。",
+          "max_chars": 80,
+          "rubric": "正しい答えを簡潔に返す。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-comfort-dev",
+      "split": "dev",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "comfort",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "疲れた。助言より聞いてほしい。",
+          "max_chars": 120,
+          "rubric": "共感し、対策を並べない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-comfort-holdout",
+      "split": "holdout",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "comfort",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "落ち込んでる。今はただ聞いて。",
+          "max_chars": 120,
+          "rubric": "共感し、対策を並べない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-detail-dev",
+      "split": "dev",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "detail",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "虹のできる仕組みを子ども向けに少し詳しく教えて。",
+          "max_chars": 500,
+          "rubric": "理由を分かりやすく説明。必要な内容を省かず反復しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s1-detail-holdout",
+      "split": "holdout",
+      "category": "conversation_stage1",
+      "stage": 1,
+      "family": "detail",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "氷が浮く理由を子ども向けに少し詳しく教えて。",
+          "max_chars": 500,
+          "rubric": "理由を分かりやすく説明。必要な内容を省かず反復しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-backchannel-dev",
+      "split": "dev",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "backchannel",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "パンを焼いたよ。",
+          "max_chars": 120,
+          "rubric": "話題に反応。"
+        },
+        {
+          "user": "うん。",
+          "max_chars": 60,
+          "rubric": "相づちに短く応じる。"
+        },
+        {
+          "user": "焦げたけどおいしかった。",
+          "max_chars": 120,
+          "rubric": "新しい内容に応じる。"
+        },
+        {
+          "user": "また作りたい。",
+          "max_chars": 100,
+          "rubric": "自然に受け止め、既出の返答を繰り返さない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-backchannel-holdout",
+      "split": "holdout",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "backchannel",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "クッキーを焼いたよ。",
+          "max_chars": 120,
+          "rubric": "話題に反応。"
+        },
+        {
+          "user": "そうだね。",
+          "max_chars": 60,
+          "rubric": "相づちに短く応じる。"
+        },
+        {
+          "user": "形は悪いけど味はよかった。",
+          "max_chars": 120,
+          "rubric": "新しい内容に応じる。"
+        },
+        {
+          "user": "次も挑戦したい。",
+          "max_chars": 100,
+          "rubric": "自然に受け止め、既出の返答を繰り返さない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-followup-dev",
+      "split": "dev",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "followup",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "散歩に持っていく物を一つ教えて。",
+          "max_chars": 120,
+          "rubric": "提案を一つに絞る。"
+        },
+        {
+          "user": "その理由は？",
+          "max_chars": 180,
+          "rubric": "自分の直前の提案の理由を答える。"
+        },
+        {
+          "user": "他にも一つある？",
+          "max_chars": 120,
+          "rubric": "既出と違う案を一つ。"
+        },
+        {
+          "user": "ありがとう。",
+          "max_chars": 80,
+          "rubric": "短く応じ、提案を再説明しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-followup-holdout",
+      "split": "holdout",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "followup",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "読書の工夫を一つ教えて。",
+          "max_chars": 120,
+          "rubric": "提案を一つに絞る。"
+        },
+        {
+          "user": "どうしてそれがいい？",
+          "max_chars": 180,
+          "rubric": "自分の直前の提案の理由を答える。"
+        },
+        {
+          "user": "もう一つ挙げるなら？",
+          "max_chars": 120,
+          "rubric": "既出と違う案を一つ。"
+        },
+        {
+          "user": "参考になったよ。",
+          "max_chars": 80,
+          "rubric": "短く応じ、提案を再説明しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-correction-dev",
+      "split": "dev",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "correction",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "明日は映画を見るよ。",
+          "max_chars": 120,
+          "rubric": "予定の話に応じる。"
+        },
+        {
+          "user": "訂正、明日じゃなく土曜日。",
+          "max_chars": 100,
+          "rubric": "後の訂正を受け止める。"
+        },
+        {
+          "user": "いつ行くと言った？",
+          "max_chars": 80,
+          "rubric": "訂正後の曜日を簡潔に答える。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s2-correction-holdout",
+      "split": "holdout",
+      "category": "conversation_stage2",
+      "stage": 2,
+      "family": "correction",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "明日は買い物に行くよ。",
+          "max_chars": 120,
+          "rubric": "予定の話に応じる。"
+        },
+        {
+          "user": "訂正、明日ではなく日曜日。",
+          "max_chars": 100,
+          "rubric": "後の訂正を受け止める。"
+        },
+        {
+          "user": "予定は何曜日？",
+          "max_chars": 80,
+          "rubric": "訂正後の曜日を簡潔に答える。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-shorten-dev",
+      "split": "dev",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "shorten",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "睡眠の工夫を教えて。",
+          "max_chars": 300,
+          "rubric": "役立つ説明。"
+        },
+        {
+          "user": "短くして。一番大事なことだけ一文で。",
+          "max_chars": 100,
+          "rubric": "要点一つを一文で。前置きや謝罪で長くしない。"
+        },
+        {
+          "user": "朝の準備の工夫も一つ教えて。",
+          "max_chars": 100,
+          "rubric": "短くという希望を維持。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-shorten-holdout",
+      "split": "holdout",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "shorten",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "集中の工夫を教えて。",
+          "max_chars": 300,
+          "rubric": "役立つ説明。"
+        },
+        {
+          "user": "大事な一つだけ一文でお願い。",
+          "max_chars": 100,
+          "rubric": "要点一つを一文で。前置きや謝罪で長くしない。"
+        },
+        {
+          "user": "休憩の工夫も一つ教えて。",
+          "max_chars": 100,
+          "rubric": "短くという希望を維持。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-already-heard-dev",
+      "split": "dev",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "already-heard",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "水分補給の注意点は？",
+          "max_chars": 220,
+          "rubric": "質問に答える。"
+        },
+        {
+          "user": "それはもう聞いた。同じ説明はここまで。",
+          "max_chars": 70,
+          "rubric": "説明を止め、要点を再説明しない。"
+        },
+        {
+          "user": "うん、ありがとう。",
+          "max_chars": 60,
+          "rubric": "終わった説明を再開しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-already-heard-holdout",
+      "split": "holdout",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "already-heard",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "休憩の注意点は？",
+          "max_chars": 220,
+          "rubric": "質問に答える。"
+        },
+        {
+          "user": "その話は分かった。説明はもう大丈夫。",
+          "max_chars": 70,
+          "rubric": "説明を止め、要点を再説明しない。"
+        },
+        {
+          "user": "了解、ありがとう。",
+          "max_chars": 60,
+          "rubric": "終わった説明を再開しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-topic-change-dev",
+      "split": "dev",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "topic-change",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "今日は雨だったね。",
+          "max_chars": 120,
+          "rubric": "天候の話に応じる。"
+        },
+        {
+          "user": "話は変わるけど猫の寝顔ってかわいいね。",
+          "max_chars": 120,
+          "rubric": "新しい話題に応じ、天候へ戻さない。"
+        },
+        {
+          "user": "うん。",
+          "max_chars": 60,
+          "rubric": "短く自然に応じ、同じ感想を長く言い換えない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-topic-change-holdout",
+      "split": "holdout",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "topic-change",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "今日は暑かったね。",
+          "max_chars": 120,
+          "rubric": "天候の話に応じる。"
+        },
+        {
+          "user": "別の話だけど犬の寝顔ってかわいいね。",
+          "max_chars": 120,
+          "rubric": "新しい話題に応じ、天候へ戻さない。"
+        },
+        {
+          "user": "そうだね。",
+          "max_chars": 60,
+          "rubric": "短く自然に応じ、同じ感想を長く言い換えない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-end-dev",
+      "split": "dev",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "end",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "週末の楽しみを一つ考えよう。",
+          "max_chars": 180,
+          "rubric": "提案を一つ。"
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "max_chars": 80,
+          "rubric": "別れの挨拶で終え、質問や提案で引き留めない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-end-holdout",
+      "split": "holdout",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "end",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "休日の楽しみを一つ考えよう。",
+          "max_chars": 180,
+          "rubric": "提案を一つ。"
+        },
+        {
+          "user": "終わりにするね。おやすみ。",
+          "max_chars": 80,
+          "rubric": "別れの挨拶で終え、質問や提案で引き留めない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-repeat-request-dev",
+      "split": "dev",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "repeat-request",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "虹ができる理由を一文で。",
+          "max_chars": 140,
+          "rubric": "正しい理由を一文で。"
+        },
+        {
+          "user": "聞き取れなかった。同じ説明をもう一度お願い。",
+          "max_chars": 160,
+          "rubric": "必要な再説明に応じ、省略しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    },
+    {
+      "id": "chat-s3-repeat-request-holdout",
+      "split": "holdout",
+      "category": "conversation_stage3",
+      "stage": 3,
+      "family": "repeat-request",
+      "messages": [
+        {
+          "role": "user",
+          "content": "これから日本語で会話しましょう。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "氷が浮く理由を一文で。",
+          "max_chars": 140,
+          "rubric": "正しい理由を一文で。"
+        },
+        {
+          "user": "よく聞こえなかった。さっきの説明をもう一度言って。",
+          "max_chars": 160,
+          "rubric": "必要な再説明に応じ、省略しない。"
+        }
+      ],
+      "checks": [
+        {
+          "type": "no_calls"
+        },
+        {
+          "type": "human",
+          "rubric": "内容充足・長さの適切さ・不要な反復・自然さを各0〜4点。段階3は修正追従と維持も採点し根拠を記録。"
+        }
+      ]
+    }
+  ]
+}

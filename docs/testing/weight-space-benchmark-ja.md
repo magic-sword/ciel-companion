@@ -48,6 +48,23 @@ holdoutは公開された初期評価用の言い換えセットで、秘密の�
 
 ## ローカルで検証・実行
 
+### 段階1〜3の会話課題
+
+`server/benchmark/weight_space/conversation-suite.json`は独立した24課題（dev12・holdout12）。既存64課題の回帰セットと併用する。段階1は挨拶・短い事実質問・共感・詳しい説明の4系列、段階2は相づち・追加質問・訂正の3系列、段階3は短文化・既出説明の停止・話題変更・会話終了・求められた再説明の5系列。各系列のdev/holdoutは近い言い換えであり、独立した未知場面への汎化保証にはしない。
+
+`dialogue`に固定したユーザー発言を順に送り、各ターンの実モデルの返答を次の履歴へ戻す。前の返答に依存する追加質問も含む。ユーザー発言を生成する対話相手モデルは使わない。`stage`は1〜3、`max_chars`はターン別の長さの注意閾値、`rubric`は人手判定基準。閾値は暫定値で、超過だけでは自動不合格にしない。詳しい説明と聞き直しを対照課題に含め、一律の短文化・反復抑制で内容を失っていないか確認する。
+
+各ターンに文字数・文数・同じ文の重複数・過去の返答と同じ文の出現数・文字数超過を保存する。文は句点・疑問符・感嘆符・改行で区切り、空白を除いて8文字以上の完全一致だけを反復信号に数える。短い相づちは対象外。言い換えによる反復や説明の必要性は検出できず、再説明を求められたターンの一致も失敗扱いにはしない。カテゴリ集計と比較結果に観測ターン数・文字数p50/p95・超過ターン数・反復数を出す。失敗ターンも保存し、途中で打ち切られた会話を全ターン完走と扱わない。
+
+`human-review.json`の`turns`で内容充足、長さの適切さ、不要な反復、自然さを各0〜4点で採点し、段階3では修正への追従と後続ターンでの維持も採点する。0=満たさない、1=大きな欠陥、2=一部満たす、3=自然に満たす、4=状況に特によく合う。根拠発言を`evidence`へ記録する。段階別に全ターン完走と各必要観点3点以上を確認するのを初期受入条件とし、下位段階の退行も確認する。自動成功は生成完走・空返答なし・ツール呼出しなしを示すだけで、人手未採点は会話品質合格ではない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 -m server.benchmark.weight_space validate --suite server/benchmark/weight_space/conversation-suite.json
+.\.venv\Scripts\python.exe -B -X utf8 -m server.benchmark.weight_space run --suite server/benchmark/weight_space/conversation-suite.json --conditions .local/wsp/conditions.json --output .local/wsp/conversation-dev --rounds 1 --timeout 180
+```
+
+`--timeout`は会話全体の期限、`--max-tokens`は各返答の上限。初回疎通は`--limit 1`、段階指定は`--case chat-s3-shorten-dev`等で課題IDを選ぶ。全devは12会話・28返答。候補と基準で同一条件を固定し、前述の`compare`を使う。本試験は固定5promptによるLLM単体評価で、音声・割り込み・本番の動的記憶は別評価。実モデルでの基準値と閾値の妥当性は未確認。
+
 作業起点はリポジトリのルート。既存`.venv`を使う。Linuxでは`python3`へ読み替える。`.env`やクラウド資格情報は自動読込しない。
 
 ```powershell
@@ -119,4 +136,4 @@ runの終了コード0は自動check通過、1は自動失敗、引数エラー�
 
 同じIDの正解音声・正解文で、(1) Voskのみ、(2)正解テキスト→LLM、(3)Vosk認識テキスト→LLM、(4)live音声を測る。人/合成・話者・雑音・距離・小声・途中の間・無音を分ける。既存コーパスには否定・名前・数量が含まれる。録音と注釈がない台本だけでは音声評価準備完了とは扱わない。
 
-音声の実行は[音声仕様](voice-benchmark-ja.md)と[音声スキル](../../.claude/skills/ciel-voice-benchmark/SKILL.md)、実Minecraftは[practical-v1](../games/minecraft/minecraft-benchmark-ja.md)を使う。appの実動作・画像による自己同定・実モデルが全ターン生成する対話・追加の人の録音は初期suiteの測定範囲外。未実施を自動合格に含めない。
+音声の実行は[音声仕様](voice-benchmark-ja.md)と[音声スキル](../../.claude/skills/ciel-voice-benchmark/SKILL.md)、実Minecraftは[practical-v1](../games/minecraft/minecraft-benchmark-ja.md)を使う。appの実動作・画像による自己同定・追加の人の録音は初期suiteの測定範囲外。全ターンの応答生成は前述の会話suiteで別に測る。未実施を自動合格に含めない。
