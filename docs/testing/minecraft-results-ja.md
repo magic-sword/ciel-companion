@@ -16,7 +16,7 @@
 
 同じサーバーの`Ciel_Debug`を`(8.5,69,37.5)`へ配置し、掘削・足場設置を無効にして`GoalNear(-18,74,50,2)`への歩行を比較した。Mineflayer 4.39.0、pathfinder 2.4.5。半幅が既定の`0.3`では約19秒で371回の座標補正を受け、最初の段差で停止した。半幅だけを`Math.fround(0.6)/2`へ変えると補正0回で約8秒後に`(-15.396,74,50.564)`へ到達した。経路探索を変更せず、サーバーのfloat幅と身体側のdouble幅の差をなくした結果である。Ciel本人への試験命令、採掘、設置、ワールド初期化は行っていない。
 
-実装は`2ebd9ca`からの未コミット差分で、`Runner.attach`から`alignPlayerCollision`を呼ぶ。実際のprismarine-physicsを使い、東西南北の壁に接した位置がサーバーの衝突境界を越えない回帰4件を追加した。Nodeは130件成功・既存1件skip。生データはGit対象外の`.local/debug-walk-before.jsonl`・`.local/debug-walk-trace.jsonl`、実行条件は同じ場所の`probe-debug-walk.py`に保存した。通常ワールドでの単発比較であり、practical-v1全課題の成績や採集成功率には読み替えない。ノックバック、水中移動、採集、人の音声からの修正後の接近は未確認。
+実装は`5d2eb54`で、`Runner.attach`から`alignPlayerCollision`を呼ぶ。測定時は`2ebd9ca`からの未コミット差分だった。実際のprismarine-physicsを使い、東西南北の壁に接した位置がサーバーの衝突境界を越えない回帰4件を追加した。Nodeは130件成功・既存1件skip。生データはGit対象外の`.local/debug-walk-before.jsonl`・`.local/debug-walk-trace.jsonl`、実行条件は同じ場所の`probe-debug-walk.py`に保存した。通常ワールドでの単発比較であり、practical-v1全課題の成績や採集成功率には読み替えない。ノックバック、水中移動、採集は未確認。
 
 配布後、利用者がアプリから「こっちへ来て」と指示し、`Ciel_Dev`が到着したとの報告を受けた。これは利用者による接近の確認で、上記の専用ボットの比較とは区別する。原木採集の再確認は残る。
 

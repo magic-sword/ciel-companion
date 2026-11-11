@@ -16,9 +16,11 @@
 
 ### Minecraftの衝突幅補正
 
-2026-11-11、`2ebd9ca`からの未コミット変更で、`skills.js`と`player-physics.js`だけを開発用の身体へ反映した。imageは`fb42e9e74759830a9974439cbfb5406a5053cf9a3748e0622254b97ff36f12ae`。実行中の33ソースが手元と一致し、再接続した`Ciel_Dev`の半幅が`0.30000001192092896`であることを読取確認した。他サービスのID・image・起動時刻は不変。本番の身体へは未反映。
+2026-11-11、修正を`5d2eb54`にコミットし、開発・本番の身体へ反映した。対象は`skills.js`での初期化呼び出しと新規`player-physics.js`だけ。本番の既存の施工・製作実装を維持し、開発の段階1改修全体は本番へ持ち込んでいない。imageは開発`6a292d253e99eef4acc55b8057e4a435de73c90c61a05be7c4358926d11d47e1`、本番`5024b0dfe2d023031d7b999b4f9712aef46c5fd8a871e5c5df34b8908c7d598f`。各配置先と実コンテナの全ソース（開発33・本番32ファイル）が一致し、他の全サービスのID・image・起動時刻は不変。両方の入場と、実行中の本番`Ciel`の物理更新・半幅`0.30000001192092896`を読取確認した。デバッガーは終了後に閉鎖済み。
 
-配布根拠は自宅サーバーの`~/work/ciel-companion-dev/server/data/deployments/player-physics-20261111/verification.json`、旧skillsは同じ場所の`skills-before.js`。現場の`Ciel_Debug`比較では段差の座標巻き戻しが371回から0回となり、歩行目標へ到達した。Node130件成功・既存1件skip。[条件と未確認範囲](minecraft-results-ja.md#段差での座標巻き戻し)を参照。配布後に利用者から「こっちへ来て」で`Ciel_Dev`が到着したとの報告を受けた。原木採集は未確認。
+配布根拠は両環境の`server/data/deployments/collision-5d2eb54/verification.json`・`before.json`・`after.json`・`sources-before.json`、旧skillsは`skills-before.js`。現場の`Ciel_Debug`比較では段差の座標巻き戻しが371回から0回となり、歩行目標へ到達した。Node130件成功・既存1件skip、配布した両コンテナでも衝突回帰4件ずつ成功。[条件と未確認範囲](minecraft-results-ja.md#段差での座標巻き戻し)を参照。利用者から開発`Ciel_Dev`の到着とスキン適用の報告を受けた。本番での実音声の接近・原木採集は未確認。
+
+`Ciel_Dev`だけが応答した件は、配信アプリの保存値`ciel.devServer=1`と開発agentへの命令到達を確認した。配信アプリを正常終了してこの設定だけを`0`へ戻し、再起動した。新しい会話を本番agentが受け持つことと、アプリの「ゲーム：入っている」を確認済み。本番agentは8771の`Ciel`、開発agentは8775の`Ciel_Dev`という分離を維持する。アプリはマイクOFFで再起動した。
 
 ### 返答生成の役目別OpenAI切替
 
