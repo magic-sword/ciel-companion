@@ -14,6 +14,14 @@
 
 ## 確認範囲
 
+### 返答生成の役目別OpenAI切替
+
+2026-11-11、実装`ad04a29`の`models.py`・`voice_preparation.py`だけを開発・本番へ選択して反映した。起動中とホストの他ソースを照合してから対象agentのみをビルド・再作成し、各段階で他の9サービスのID・image・起動時刻不変を確認した。Minecraft本体・本番と開発の体・知識・共有LLM・TTS・DB・歌の再配布は行っていない。リポジトリ全体や他のserverファイルまで同じコミットへ配布したという意味ではない。
+
+開発でmindだけOpenAIへ切り替える実設定を確認したが、短文の実API疎通はHTTP 429・`credit_balance_exhausted`で失敗した。開発設定を元へ復元して再作成し、両環境はmind・thoughtともローカル、開発Whisper・本番Vosk、worker登録・HTTP 200を確認した。本番のAPI切替は有効にしていない。残高追加後の速度・品質比較が残る。
+
+2ファイルの実イメージ内SHA-256は、modelsが`35231702fcefb5bc8e219b8881cc3553f8a94841b73d7887381d0c4797654f5f`、voice_preparationが`fdb132498c0d0fcbbf883d61fb44943bcb9f1f30e22e816213ab27f9eaedc97b`で実装コミットと一致。開発imageは`07c7621aa5026af15fb97f0be444e85f67c65aed224fe338dfed2696dea1ea4b`、本番imageは`d4dfc3ef4faacf838fc8dd400e676e71502a68ff6a3cb493a09c293fb76eed8f`。通常回帰797件・隔離DB9件成功。条件・復旧・証拠は[音声の実測](voice-results-ja.md#openai部分切替の疎通と復旧)、操作は[役目別切替](../operations/local-runtime-ja.md#待ち時間の大きい役目だけopenaiへ送る)を参照する。
+
 | 対象 | 直近の根拠 | 残る確認 |
 |---|---|---|
 | ドキュメント整合性 | 2026-11-11、文書一覧・責務・ローカルリンク検査と検証器の自己テスト6項目に成功。実測の根拠は分野別の資料を参照 | 外部URLの到達性は対象外 |

@@ -56,6 +56,8 @@ CIEL_MIND_REASONING=none
 
 本番は本番の`server/.env`、開発は開発の`server/.env.dev`だけを変更し、対象agentを再作成する。APIキーは既存の`.env.shared`を使い、動作設定へ複製しない。設定例ファイルは切替を有効にしていない。
 
+2026-11-11の実API疎通は残高不足（429・`credit_balance_exhausted`）で停止したため、現在は両環境とも切替指定を空に戻している。キーが設定されていることと、利用可能なAPI残高があることは別。残高追加後に単発から比較し、エラー時は元の設定へ戻す。自動フォールバックで比較条件を変えない。[疎通と復旧の証拠](../testing/voice-results-ja.md#openai部分切替の疎通と復旧)を参照する。
+
 `mind`は通常の返答と`game_intake.py`の能力選択・引数生成が共用する。選択だけ・引数だけを個別backendへ分ける設定ではない。`listener / brief / thought / minutes_live / minutes / notes / relationship / growth / eyes`も指定可能。`talk / stt / research`や未知の名前は起動時に拒否する。音声入力は既存の`CIEL_STT_BACKEND`とlocal時の規則を保ち、読み上げはIrodoriを継続する。検索や埋め込み等のlocal時の制約も変わらない。
 
 ローカルLLMの会話prefixと1tokenのウォームアップは、mindがローカルの場合だけ実行する。mindをOpenAIへ切り替えた場合はSTT・TTS等の準備だけを行い、ローカル用のモデルIDやQwen用引数をOpenAIへ送らない。会話開始のデバッグ記録の`role_models`で役目別の実モデルを確認する。`backend=local`は基本方針であり、全役目がローカルという意味ではない。

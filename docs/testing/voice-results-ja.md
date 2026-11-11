@@ -23,6 +23,16 @@
 
 集計はサーバー内の直近ファイルを読み取ったもので、生の会話を新たに回収・公開していない。実行時のコード基点は`c6ebebb`、開発の最新ログは調査時点で1時間以内。現在のファイルだけで全利用の平均とみなさない。再測定の設定と戻し方は[部分切替](../operations/local-runtime-ja.md#待ち時間の大きい役目だけopenaiへ送る)を参照。
 
+### OpenAI部分切替の疎通と復旧
+
+実装`ad04a29`の`models.py`と`voice_preparation.py`だけを開発へ反映し、`CIEL_OPENAI_ROLES=mind`・`CIEL_MIND_MODEL=gpt-5.4-mini`・`CIEL_MIND_REASONING=none`で実際の振り分けを確認した。短い合成文を一つ、出力上限64token・streamで送るAPI直接疎通は、HTTP 429・`credit_balance_exhausted`（`insufficient_quota`、残高不足）となった。返答を取得できず、切替後の速度・音声・ゲーム受付の品質は測定できていない。モデルの性能低下やネットワーク遅延として扱わず、条件を変えない再試行はしていない。
+
+開発の環境設定を保存済みの元ファイルへ戻し、対象agentだけを再作成した。新しい切替機能のソースは保持し、mind・thoughtともlocal、CPU Whisper、worker登録・HTTP 200を再確認した。本番はAPI切替を有効にせず、同じ2ファイルを機能準備として反映し、既存のlocal・VoskとHTTP 200を維持した。API残高を追加するまで、両環境の`CIEL_OPENAI_ROLES`は空のままとする。
+
+通常回帰797件、隔離DB9件、文書検証器の自己テスト6件が成功。実APIによる会話全体の比較は未実施。検証済みソース2ファイルだけを転送し、それ以外のゲーム受付・体・ワールドの版を変更しない方式を取った。反映直前にホストのagentソースと実コンテナを照合し、未配布の別変更が混ざっていないことを検査した。
+
+証拠は自宅サーバーの開発`~/work/ciel-companion-dev/server/data/deployments/hybrid-dev-1794400364014993647/`（`verification.json`・`api-smoke.json`・`restored.json`）、本番`~/work/ciel-companion/server/data/deployments/hybrid-prod-1794400501875227606/`（`verification.json`）。機密を含まないJSONだけをGit対象外`.local/hybrid-routing-evidence.json`へ回収した。旧設定と旧イメージの復旧情報はサーバーの保護した同フォルダーへ保存し、回収していない。ローカルのテスト結果は`.local/hybrid-routing-unit/`と`.local/hybrid-routing-db/`。
+
 ## 会話処理の一本化と前景優先の実測
 
 2026-11-10、基準`ba505dd`と未コミットの改修候補を専用workerで比較した。通常の本番・開発workerには未反映。モデル重みは変更せず、共有Qwen3.5-35B-A3B-Q4_K_M、RTX A2000 12GB（専門家はCPU）、32768×2枠を使用した。Listenerの並行推論とtalker/mindの応答経路切替を外し、会話を一つのループに統合。MCPの段階的公開と権限検査を維持した。内発的動機は経過時間だけで起動せず、新しいユーザー発話・調査結果・ゲーム状態変化を契機とし、会話中は背景モデル要求を取り消して保留する。DB更新は取り消さない。
