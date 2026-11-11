@@ -86,6 +86,16 @@ commit `30951b8`を標準`deploy-server.sh --dev`、続いて`deploy-server.sh`�
 
 本番workerに一時LiveKitルームを作り、voice.ready、初回挨拶の文字/音声、文字入力後の応答文字/音声受信を確認した。最初の数字37指定では期待する文字列が60秒以内に確認できず（`smoke.json`）、次の挨拶による疎通試験は応答84文字と音声受信で成功（`smoke-greeting.json`）。音声は保存せず、各ルームは削除済み。準備通知は初回13.49秒、次回3.12秒で、キャッシュや共有負荷を揃えていない単発値のため速度改善率にはしない。人格指紋は`19fc8c7672656f6bc76040ee338924bf5b2773fdc29d1d03741164761a3f55c7`、LLM世代は前後同じ`5c3ff24d8e4543b68a36b40576fb05a9`。人のマイク・実アプリ・STT精度の検証は含まない。
 
+## 配信アプリのマイク再接続
+
+2026-11-11、作業ツリーの`CielConversation.cs`を修正した。切断時に`_busy / _micRestarting`を解除してマイク操作のcoroutineを停止し、旧接続の録音開始・公開完了・機器切替が新しい接続を変更しないよう世代とルームを照合する。録音・公開に失敗した場合は音源とトラックを破棄して再試行可能にし、予期しない切断は接続済み表示を残さない。SDKの接続完了前はDisconnectが無効になるため、遅延完了した旧ルームも個別に閉じる。
+
+Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公開待ち状態での切断、旧機器切替の遅延再開、旧ルームの切断通知、音声機器がない状態での録音フラグ解除、接続中のマイク操作拒否、繰り返しの終了を、実マイク・LiveKitを開かずに確認した。既存の`CielAppCompositionCheck`42件も成功し、正式出力`unity/Builds/Broadcast/CIEL Broadcast.exe`を再ビルド（284MB、42秒）した。
+
+起動中の同じ配信アプリを通常終了する前に、旧ビルドをGit対象外`.local/mic-reconnect-build-before/`へ退避した。修正版を元の場所から再起動し、マイクOFFでのルーム接続と、NullReference/ObjectDisposed/InvalidOperation等の起動例外およびマイク初期化エラー0件をPlayer.logで確認した。ユーザー設定の変更、マイクON、配信・録画開始、サーバー再配布は行っていない。
+
+証拠はGit対象外`unity/Logs/mic-reconnect-check.log`（10件）、`unity/Logs/mic-reconnect-build.log`（42件・CIEL_BUILD_OK）。Playerの`Assembly-CSharp.dll` SHA-256は`00ce02bc7eddbf2566f4ab995e5ac6ad03662315e0e8ed764e810ab7653643e8`。実マイクを使った連続再接続と相手への入力到達、Androidでの権限待ち、日常版の再ビルドは未実施。仕組みと再確認方法は[アプリ構成](../app/app-composition-ja.md#会話の再接続とマイク)を参照する。
+
 ## Unityの描画
 
 初回の制限環境ではEditorがライセンスエラー198となった。通常権限ではUnity Personalが有効・サインイン済み、Editor 6000.6.4f1を認識し、再実行で成功した。MCP登録やライセンスの変更は行っていない。`server/benchmark/data/work-display-unity-retry.log`と`work-display-unity-render.log`、`.local/app-refactor/audience-card-{work,decision,unknown}-v2.png`を確認した。

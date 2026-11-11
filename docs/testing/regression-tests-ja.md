@@ -99,6 +99,7 @@ python scripts/server/run-regression.py --suite all
 | ローカル音声 | `test_vosk_stt.py`、`test_whisper_stt.py`（CPU固定・オフライン・リサンプリング・二重VAD防止）、`test_voice_benchmark.py`、`test_voice_fast.py`（準備・世代失効・役目の分類・入場制御・文分割）、`test_vision_gateway.py`（HTTP/SSE）、[音声会話ベンチマーク](voice-benchmark-ja.md)の録音再生と[CPU音声認識](../services/local-stt-ja.md)の専用実測 |
 | Minecraftの技・作業 | Nodeのテスト、PythonのGameEnv/Goal、[専用ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md) |
 | Unity作業表示 | `dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`、本体・Editorのコンパイル |
+| Unityマイク再接続 | Editorで`Ciel.EditorTools.CielMicrophoneReconnectCheck.Run`。マイクやLiveKitを開かず、切断時のbusy解除・旧coroutineと旧通知の無効化を確認 |
 
 Unityの実パーサー・描画はEditorで`CielStreamStatusCheck.Run`、`CielAudienceCardCheck.Run`を実行する。CLIでは`run`管理下の`-quit`を二重指定せず、描画確認には`-nographics`を使わない。制限環境でEditorやライセンスが見えない場合は、通常の端末権限で`unity license status`とEditorの登録を切り分ける。ライセンス情報を変更する前にアクセス失敗を調べる。
 

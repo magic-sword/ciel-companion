@@ -79,6 +79,8 @@ namespace Ciel.Conversation
         RemoteTrackPublication _aizuchiPublication;
         AgentVoiceMeter _aizuchiMeter;
         bool _recording, _busy, _quitting, _micRestarting;
+        Coroutine _micCoroutine, _micRestartCoroutine;
+        int _connectionGeneration;
         int? _sleepTimeoutBeforeMinutes;
         bool _applicationPaused;
         string _micGuid;   // いまのつなぎ方で選んだマイク。null は OS の既定（会議では、見つけた仮想ケーブル。MicChoice）
@@ -87,7 +89,7 @@ namespace Ciel.Conversation
         public enum State { Disconnected, Connecting, Connected, Failed }
         public State Status { get; private set; } = State.Disconnected;
         public bool MicEnabled => _recording;
-        public bool MicBusy => _busy;
+        public bool MicBusy => _busy || _micRestarting;
         /// 自分の声が会話サーバーに届いているか（LiveKit の「話している人」の知らせで変わる。0.3〜0.5 秒ほど遅れる）
         public bool UserSpeaking => _userSpeaking && _recording;
         bool _userSpeaking;
@@ -459,15 +461,8 @@ namespace Ciel.Conversation
         void OnRoomDisconnected(Room room)
         {
             if (room != _room) return;
-            _userSpeaking = false;
-            SetMinutesRecording(false);
-            SetSongState("idle");
-            ResetGame();
-            ResetYouTube();
-            ResetGoal();
-            ResetActivity();
-            Card = null;
-            Changed?.Invoke();
+            EndConversation();
+            SetStatus(State.Failed);
         }
 
         void OnActiveSpeakersChanged(List<Participant> speakers)
@@ -482,12 +477,14 @@ namespace Ciel.Conversation
 
         IEnumerator Connect()
         {
+            var generation = ++_connectionGeneration;
             _restartAfterConnect = false;
             ClearRouteChecks();
             SetStatus(State.Connecting);
             Trace("トークンを取得");
             string serverUrl = null, token = null;
             yield return FetchToken((u, t) => { serverUrl = u; token = t; });
+            if (generation != _connectionGeneration) yield break;
             Trace("トークンを取得した");
             if (string.IsNullOrEmpty(token))
             {
@@ -536,7 +533,22 @@ namespace Ciel.Conversation
             _room.Disconnected += OnRoomDisconnected;
             _room.ActiveSpeakersChanged += OnActiveSpeakersChanged;
             Trace("ルームへ接続");
-            yield return _room.Connect(serverUrl, token, new RoomOptions());
+            var room = _room;
+            var connect = room.Connect(serverUrl, token, new RoomOptions());
+            yield return connect;
+            if (generation != _connectionGeneration || room != _room)
+            {
+                // SDK Disconnect is a no-op while Connect is pending. Close the
+                // obsolete room once its delayed completion actually arrives.
+                room.Disconnect();
+                yield break;
+            }
+            if (connect.IsError)
+            {
+                EndConversation();
+                SetStatus(State.Failed);
+                yield break;
+            }
             Debug.Log($"[CielConversation] ルーム '{_room.Name}' に接続した（マイクは切ってある）");
             // 接続のときに WebRTC が声の出力を OS の既定（通話用の機器）へ戻すので、選んだ機器をかけ直す。
             // 会話サーバーの声が届いて再生が始まる前なら、ここで切り替わる
@@ -641,8 +653,8 @@ namespace Ciel.Conversation
         /// マイクを入れる・切る（画面のマイクボタン）
         public void SetMicEnabled(bool on)
         {
-            if (_busy || _room == null || on == _recording) return;
-            StartCoroutine(on ? MicOn() : MicOff());
+            if (MicBusy || _room == null || Status != State.Connected || on == _recording) return;
+            _micCoroutine = StartCoroutine(on ? MicOn() : MicOff());
         }
 
         /// いまのつなぎ方のマイクの機器を選ぶ（null は OS の既定。会議では見つけた仮想ケーブル）。録音中なら入れ直す
@@ -652,19 +664,31 @@ namespace Ciel.Conversation
             if (guid == null) PlayerPrefs.DeleteKey(MicKey);
             else PlayerPrefs.SetString(MicKey, guid);
             UpdateRouteMissing();
-            if (_recording || _busy) StartCoroutine(RestartMic());
+            if (_recording || _busy) _micRestartCoroutine = StartCoroutine(RestartMic());
             Changed?.Invoke();
         }
 
         // 入れる・切るの途中なら、終わるのを待ってから入れ直す（待たずにやめると、あとで選んだ機器が使われない）
         IEnumerator RestartMic()
         {
-            while (_busy) yield return null;
+            var generation = _connectionGeneration;
+            while (_busy && generation == _connectionGeneration) yield return null;
+            if (generation != _connectionGeneration || Status != State.Connected) yield break;
             if (!_recording || _micRestarting) yield break;
             _micRestarting = true;
-            yield return MicOff();
-            yield return MicOn();
-            _micRestarting = false;
+            try
+            {
+                yield return MicOff();
+                if (generation == _connectionGeneration && Status == State.Connected) yield return MicOn();
+            }
+            finally
+            {
+                if (generation == _connectionGeneration)
+                {
+                    _micRestarting = false;
+                    Changed?.Invoke();
+                }
+            }
         }
 
         /// いまのつなぎ方の声を出す機器を選ぶ（null は OS の既定。会議では見つけた仮想ケーブル）。会話中でもすぐ切り替える
@@ -838,58 +862,101 @@ namespace Ciel.Conversation
 
         IEnumerator MicOn()
         {
+            var generation = _connectionGeneration;
+            var room = _room;
+            var audio = _platformAudio;
+            if (room == null || audio == null || Status != State.Connected) yield break;
             _busy = true;
-            Changed?.Invoke();
-            yield return StartRecording();
-            if (_recording)
+            var ready = false;
+            try
             {
-                if (_micTrack == null)
+                Changed?.Invoke();
+                // Drive this iterator here so an SDK exception also runs our
+                // finally, rather than stranding the parent coroutine as busy.
+                var recording = StartRecording(generation, audio);
+                while (recording.MoveNext()) yield return recording.Current;
+                if (generation != _connectionGeneration || room != _room) yield break;
+                if (_recording)
                 {
-                    // エコー除去・雑音除去・自動音量を有効にする
-                    _micSource = new PlatformAudioSource(_platformAudio, AudioProcessingOptions.Default);
-                    _micTrack = LocalAudioTrack.CreateAudioTrack("ciel-user-mic", _micSource, _room);
-                    var publish = _room.LocalParticipant.PublishTrack(_micTrack, new TrackPublishOptions
+                    if (_micTrack == null)
                     {
-                        AudioEncoding = new AudioEncoding { MaxBitrate = 64000 },
-                        Source = TrackSource.SourceMicrophone
-                    });
-                    yield return publish;
-                    if (publish.IsError)
+                        // エコー除去・雑音除去・自動音量を有効にする
+                        _micSource = new PlatformAudioSource(audio, AudioProcessingOptions.Default);
+                        _micTrack = LocalAudioTrack.CreateAudioTrack("ciel-user-mic", _micSource, room);
+                        var publish = room.LocalParticipant.PublishTrack(_micTrack, new TrackPublishOptions
+                        {
+                            AudioEncoding = new AudioEncoding { MaxBitrate = 64000 },
+                            Source = TrackSource.SourceMicrophone
+                        });
+                        yield return publish;
+                        if (generation != _connectionGeneration || room != _room) yield break;
+                        ready = !publish.IsError;
+                        if (!ready) Debug.LogError("[CielConversation] マイクを公開できない");
+                    }
+                    else
                     {
-                        Debug.LogError("[CielConversation] マイクを公開できない");
-                        StopRecording();
+                        ((ILocalTrack)_micTrack).SetMute(false);
+                        ready = true;
                     }
                 }
-                else
+            }
+            finally
+            {
+                if (generation == _connectionGeneration)
                 {
-                    ((ILocalTrack)_micTrack).SetMute(false);
+                    if (!ready) ReleaseMicrophone();
+                    _busy = false;
+                    Changed?.Invoke();
                 }
             }
-            _busy = false;
-            Changed?.Invoke();
         }
 
         IEnumerator MicOff()
         {
             _busy = true;
-            if (_micTrack != null) ((ILocalTrack)_micTrack).SetMute(true);
-            StopRecording();   // OS のマイク使用中の表示も消える
-            _busy = false;
-            Changed?.Invoke();
+            try
+            {
+                try { if (_micTrack != null) ((ILocalTrack)_micTrack).SetMute(true); }
+                catch (Exception e) { Debug.LogWarning($"[CielConversation] マイクをミュートできない: {e.Message}"); }
+                StopRecording();   // OS のマイク使用中の表示も消える
+            }
+            finally
+            {
+                _busy = false;
+                Changed?.Invoke();
+            }
             yield break;
         }
 
         void StopRecording()
         {
-            if (_platformAudio == null || !_recording) return;
+            var wasRecording = _recording;
             _recording = false;
+            if (_platformAudio == null || !wasRecording) return;
             try { _platformAudio.StopRecording(); }
             catch (Exception e) { Debug.LogWarning($"[CielConversation] 録音を止められない: {e.Message}"); }
         }
 
+        void ReleaseMicrophone()
+        {
+            var track = _micTrack;
+            var source = _micSource;
+            _micTrack = null;
+            _micSource = null;
+            StopRecording();
+            try
+            {
+                if (track != null && _room?.LocalParticipant != null && !string.IsNullOrEmpty(track.Sid))
+                    _room.LocalParticipant.UnpublishTrack(track, stopOnUnpublish: false);
+            }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] マイクの公開を解除できない: {e.Message}"); }
+            try { source?.Dispose(); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] マイク音源を片付けられない: {e.Message}"); }
+        }
+
         // 選んだマイク（無ければ OS の既定）で録音を始める。開けなければ一覧の順に試す。
         // StartRecording は失敗すると例外を投げるので、列挙子を手で進めて受け止める（エラーで再生が一時停止しないように）
-        IEnumerator StartRecording()
+        IEnumerator StartRecording(int generation, PlatformAudio audio)
         {
             _recording = false;
             var tries = new List<(string name, string guid)>();
@@ -901,15 +968,17 @@ namespace Ciel.Conversation
 
             foreach (var (name, guid) in tries)
             {
+                if (generation != _connectionGeneration || audio != _platformAudio) yield break;
                 if (guid != null)
                 {
-                    try { _platformAudio.SetRecordingDevice(guid); }
+                    try { audio.SetRecordingDevice(guid); }
                     catch (Exception e) { Debug.LogWarning($"[CielConversation] マイク '{name}' を選べない: {e.Message}"); continue; }
                 }
-                var it = _platformAudio.StartRecording();
+                var it = audio.StartRecording();
                 var ok = false;
                 while (true)
                 {
+                    if (generation != _connectionGeneration || audio != _platformAudio) yield break;
                     object current;
                     try
                     {
@@ -1421,6 +1490,12 @@ namespace Ciel.Conversation
 
         public void EndConversation()
         {
+            ++_connectionGeneration;
+            if (_micCoroutine != null) StopCoroutine(_micCoroutine);
+            if (_micRestartCoroutine != null) StopCoroutine(_micRestartCoroutine);
+            _micCoroutine = _micRestartCoroutine = null;
+            _busy = _micRestarting = false;
+            _userSpeaking = false;
             SetMinutesRecording(false);
             SetSongState("idle");
             ResetGame();
@@ -1430,13 +1505,11 @@ namespace Ciel.Conversation
             Card = null;
             DisposeVoice();
             DisposeAizuchi();
-            if (_micTrack != null && _room != null) _room.LocalParticipant.UnpublishTrack(_micTrack, stopOnUnpublish: false);
-            _micTrack = null;
-            StopRecording();
-            _micSource?.Dispose();
-            _micSource = null;
-            _platformAudio?.Dispose();
+            ReleaseMicrophone();
+            var audio = _platformAudio;
             _platformAudio = null;
+            try { audio?.Dispose(); }
+            catch (Exception e) { Debug.LogWarning($"[CielConversation] 端末の音声を片付けられない: {e.Message}"); }
             if (_room != null)
             {
                 _room.TrackSubscribed -= OnTrackSubscribed;
@@ -1447,8 +1520,10 @@ namespace Ciel.Conversation
                 _room.ParticipantAttributesChanged -= OnParticipantAttributesChanged;
                 _room.Disconnected -= OnRoomDisconnected;
                 _room.ActiveSpeakersChanged -= OnActiveSpeakersChanged;
-                _room.Disconnect();
+                var room = _room;
                 _room = null;
+                try { room.Disconnect(); }
+                catch (Exception e) { Debug.LogWarning($"[CielConversation] ルームを切断できない: {e.Message}"); }
             }
             if (_mouth != null) _mouth.MouthOpening = 0f;
             _researchResults.Clear();
