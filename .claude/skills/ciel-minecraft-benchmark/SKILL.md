@@ -57,4 +57,4 @@ helperは1課題・配置11・1回用。全課題・複数配置・反復・`--r
 
 policy・モード・共有/専用・モデル/コード/source/suiteの識別情報、課題・seed・反復・実効期限・全体予算、打ち切り理由、結果の保存先、未測定範囲を日本語で報告する。通常のシエルと共有APIが稼働しているか、専用サービスの後片付けも確認する。生の結果はGit対象外なので、文書のコミットだけで保存されたと扱わない。
 
-確認済みの条件・ソース・未確認範囲は[確認状況](../../../docs/testing/verification-status-ja.md)を参照する。現在の作業契約は[game-work-contract](../../../docs/games/game-work-contract-ja.md)。日付付き報告を増やさず、仕様と確認状況の正本を更新する。
+測定の条件・ソース・未確認範囲は[Minecraftの実測](../../../docs/testing/minecraft-results-ja.md)、現在の配布・確認範囲は[確認状況](../../../docs/testing/verification-status-ja.md)を参照する。現在の作業契約は[game-work-contract](../../../docs/games/game-work-contract-ja.md)。日付付き報告を増やさず、仕様と該当する実測資料を更新する。

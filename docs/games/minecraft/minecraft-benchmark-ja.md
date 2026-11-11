@@ -8,7 +8,7 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 現在の終了条件は [実用性評価 practical-v1](minecraft-benchmark-ja.md)。課題別60〜120秒、操作未発行・不進行で早期終了し、既定は1配置・1回・実行全体10分。旧900秒条件の基準値とは直接比較しない。
 
-現在の測定結果・ソース指紋・保存先は[確認状況](../../testing/verification-status-ja.md)を参照する。会話受付・能力公開や採点条件が異なる版の値を、現在の性能として合成しない。内部操作の`work_action`と状態取得の`status_polls`も区別する。
+測定結果・ソース指紋・保存先は[Minecraftの実測](../../testing/minecraft-results-ja.md)を参照する。会話受付・能力公開や採点条件が異なる版の値を、現在の性能として合成しない。内部操作の`work_action`と状態取得の`status_polls`も区別する。
 
 ## エージェントからの入口
 
@@ -66,7 +66,7 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 .\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py conversation --task clear_small_area --task build_floor --task build_wall --failure-streak 0
 ```
 
-拡張の優先順位と研究上の根拠は[Minecraftサービスの計画](minecraft-design-ja.md#主要タスクの拡張計画)、測定値は[確認状況](../../testing/verification-status-ja.md)へ置く。
+拡張の優先順位と研究上の根拠は[Minecraftサービスの計画](minecraft-design-ja.md#主要タスクの拡張計画)、測定値は[Minecraftの実測](../../testing/minecraft-results-ja.md)へ置く。
 
 ### 既存の採集・製作・移動
 
@@ -409,4 +409,4 @@ manifestはformat 2・policy `practical-v1`。課題ごとの実効予算、全�
 
 ## 現在の確認範囲
 
-直近の評価値・条件・生データの参照先は[確認状況](../../testing/verification-status-ja.md)が正本。測定条件を変えた評価を過去の値と直結せず、実装・モデル・課題・キャッシュ・共有負荷を揃える。日付付きの測定報告を新設せず、この仕様と確認状況を更新する。
+評価値・条件・生データの参照先は[Minecraftの実測](../../testing/minecraft-results-ja.md)が正本。現在の配布範囲は[確認状況](../../testing/verification-status-ja.md)を参照する。測定条件を変えた評価を過去の値と直結せず、実装・モデル・課題・キャッシュ・共有負荷を揃える。日付付きの測定報告を新設せず、この仕様と該当する実測資料を更新する。

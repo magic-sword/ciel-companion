@@ -18,7 +18,7 @@
 
 `LOCAL_LLM_CTX` は1要求あたりの容量。明示した `--parallel` ではllama.cppが総容量を各枠へ分割するため、supervisorは `CTX × PARALLEL` を渡す。32,768×2なら `-c 65536 --parallel 2`。実容量は `/props` と `/slots` で確認する。上限は履歴・道具定義・出力を含む。
 
-`LOCAL_LLM_UBATCH`は入力処理の物理単位（128 / 256 / 512、既定512）。文脈容量や同時枠とは別で、`/mode`の`ubatch`にも出す。`shared-llm-home.py configure --ubatch 128`で比較できるが、キャッシュ済み要求だけで採用しない。小さくすると再計算する入力は減っても、初回・長文の処理能力が悪化し得る。現在の採用は512で、比較と復旧の根拠は[確認状況](../testing/verification-status-ja.md#cpu音声認識)に置く。
+`LOCAL_LLM_UBATCH`は入力処理の物理単位（128 / 256 / 512、既定512）。文脈容量や同時枠とは別で、`/mode`の`ubatch`にも出す。`shared-llm-home.py configure --ubatch 128`で比較できるが、キャッシュ済み要求だけで採用しない。小さくすると再計算する入力は減っても、初回・長文の処理能力が悪化し得る。現在の採用は512で、比較と復旧の根拠は[音声の実測](../testing/voice-results-ja.md#cpu音声認識)に置く。
 
 `/mode` は現在の `mode`、`ready`、モデル名、設定容量、同時枠を返す。歌の分析が始まると既存の制御でCPUへ切り替わり、終了後にGPUへ戻る。共有なので、ベンチマークのためにGPUへ強制固定しない。実験では前後のモード・キャッシュ・同時負荷も記録する。
 
@@ -86,7 +86,7 @@ LOCAL_LLM_IMAGE_MAX_EDGE=256
 
 ## 画像APIを隔離して検証する
 
-常設の縮小処理を経由しないモデル単体の画像互換性・解像度別処理時間は、同じ重みと対応するmmprojを使う使い捨ての8098 APIで確認できる。事前に検証済みの`~/models/llm/mmproj-F16-Qwen3.5-35B-A3B.gguf`と取得元・SHA-256の隣接JSONを配置する。配布元、版、実測は[確認状況](../testing/verification-status-ja.md#ローカルqwenの画像入力)を参照する。
+常設の縮小処理を経由しないモデル単体の画像互換性・解像度別処理時間は、同じ重みと対応するmmprojを使う使い捨ての8098 APIで確認できる。事前に検証済みの`~/models/llm/mmproj-F16-Qwen3.5-35B-A3B.gguf`と取得元・SHA-256の隣接JSONを配置する。配布元、版、実測は[画像の実測](../testing/vision-results-ja.md#ローカルqwenの画像入力)を参照する。
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/server/probe-local-vision.py cpu

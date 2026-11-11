@@ -6,7 +6,7 @@
 
 ## 読む順番
 
-設計変更は[設計方針](project/design-policy-ja.md)と対象の契約から、導入は[開発環境](development/development-setup-ja.md)から始める。本番・開発の切替は[実行設定](operations/local-runtime-ja.md)、確認済みの範囲は[確認状況](testing/verification-status-ja.md)を参照する。文書を整理・追加するときは[共有スキル](../.claude/skills/ciel-documentation/SKILL.md)を使う。
+設計変更は[設計方針](project/design-policy-ja.md)と対象の契約から、導入は[開発環境](development/development-setup-ja.md)から始める。本番・開発の切替は[実行設定](operations/local-runtime-ja.md)、性能評価の全体像は[ベンチマーク案内](testing/benchmark-guide-ja.md)、条件と生データはカテゴリ別の実測資料、現在の配布範囲は[確認状況](testing/verification-status-ja.md)を参照する。文書を整理・追加するときは[共有スキル](../.claude/skills/ciel-documentation/SKILL.md)を使う。
 
 ## フォルダの担当範囲
 
@@ -62,11 +62,17 @@
 | 資料 | このファイルが所有する内容 |
 |---|---|
 | [testing/regression-tests-ja.md](testing/regression-tests-ja.md) | 変更に応じたテストの選び方、コマンド、終了コード。 |
+| [testing/benchmark-guide-ja.md](testing/benchmark-guide-ja.md) | 分野ごとの課題・合格条件・採用した改善と結果・残課題を見渡す入口。 |
 | [testing/voice-benchmark-ja.md](testing/voice-benchmark-ja.md) | 音声認識精度と応答時間の評価根拠、録音コーパス、再生・集計・比較の方法。 |
 | [testing/weight-space-benchmark-ja.md](testing/weight-space-benchmark-ja.md) | 人格・身体性・ツール・一般性能を比較する課題、採点、実行条件、音声・実機評価への接続。 |
 | [operations/weight-space-programming-ja.md](operations/weight-space-programming-ja.md) | 重み直接編集の研究根拠、現行モデルへの適用判断、実験・量子化・復元の進め方。 |
 | [testing/paid-checks-ja.md](testing/paid-checks-ja.md) | 外部APIを呼ぶ試験、費用と実行範囲の確認方法。 |
-| [testing/verification-status-ja.md](testing/verification-status-ja.md) | 直近の検証・性能の条件、ソース識別、生データの場所、未確認範囲。 |
+| [testing/verification-status-ja.md](testing/verification-status-ja.md) | 現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。 |
+| [testing/minecraft-results-ja.md](testing/minecraft-results-ja.md) | Minecraftの行動・依頼受付・対象指定の実測条件、結果、残課題、生データ。 |
+| [testing/voice-results-ja.md](testing/voice-results-ja.md) | 音声認識・本返答の速度の実測条件、改善結果、残課題、生データ。 |
+| [testing/capability-results-ja.md](testing/capability-results-ja.md) | 能力追加・公開方式・キャッシュの比較条件、改善結果、残課題、生データ。 |
+| [testing/weight-space-results-ja.md](testing/weight-space-results-ja.md) | 人格・身体表現の指示候補の採点条件、採用判断、残課題、生データ。 |
+| [testing/vision-results-ja.md](testing/vision-results-ja.md) | 画像API・会話添付の実測条件、改善結果、残課題、生データ。 |
 
 ## 会話と実行基盤
 

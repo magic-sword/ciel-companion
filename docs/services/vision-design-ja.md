@@ -34,4 +34,4 @@ localでも既存の受信・画像ID・心への添付・説明文生成を使�
 
 設定`LOCAL_LLM_IMAGE_MAX_EDGE`と画像用重みは[共用API](../operations/shared-llm-api-ja.md#画像入力と縮小設定)が正本。外部URL・file URLをAPI側で取得せず、JPEG/PNG/WebPのbase64データURLだけを受け付ける。会話ホストの3MB受信制限・保持範囲に加え、API入口もリクエスト16MiB・単一画像8MiB・復号前24百万画素で制限する。利用者の元画像や縮小画像をログ・ディスクへ保存しない。
 
-実測と反映範囲は[確認状況](../testing/verification-status-ja.md#ローカルqwenの画像入力)で管理する。合成図形での成功を写真・日本語OCR・実ゲームの品質確認へ読み替えない。
+実測と反映範囲は[画像の実測](../testing/vision-results-ja.md#ローカルqwenの画像入力)で管理する。合成図形での成功を写真・日本語OCR・実ゲームの品質確認へ読み替えない。

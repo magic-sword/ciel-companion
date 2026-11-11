@@ -14,6 +14,6 @@
 
 - 作業・目標や会話中の表示を変更するときは[表示契約](docs/app/work-display-contract-ja.md)を読む。goal.state / goal.control v2、元のwork状態と確認の有効期間、表示対象のID・版を維持する。旧段一覧・paused集約へ戻さない。
 
-- 文書の追加・整理・更新には[ciel-documentation共有スキル](.agents/skills/ciel-documentation/SKILL.md)を使う。文書は[管理ルール](docs/project/documentation-policy-ja.md)と[資料一覧](docs/README.md)の責務に従い、既存の正本を更新する。日付付きの設計書・実装記録・旧仕様の併記を増やさず、履歴はGit、確認済みの条件と未確認範囲は[確認状況](docs/testing/verification-status-ja.md)へ置く。
+- 文書の追加・整理・更新には[ciel-documentation共有スキル](.agents/skills/ciel-documentation/SKILL.md)を使う。文書は[管理ルール](docs/project/documentation-policy-ja.md)と[資料一覧](docs/README.md)の責務に従い、既存の正本を更新する。日付付きの設計書・実装記録・旧仕様の併記を増やさず、履歴はGit、測定の条件と未確認範囲は[分野別の実測資料](docs/README.md#テストと確認状況)、現在の配布・確認範囲は[確認状況](docs/testing/verification-status-ja.md)へ置く。
 
 - 共有スキルの正本は`.claude/skills/<name>/SKILL.md`。Codexは`.agents/skills/<name>/SKILL.md`から参照する。手順の本文は正本だけへ更新し、Codexの入口へ複製しない。
