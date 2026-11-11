@@ -13,6 +13,7 @@ home = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(home)
 DEST = "Path.home()/'work/ciel-weight-space-benchmark'"
 FILES = ['server/benchmark/weight_space.py', 'server/benchmark/weight_space/suite.json',
+         'server/benchmark/weight_space/conversation-suite.json',
          'server/benchmark/weight_space/conditions.example.json'] + [
              'server/agent/config/prompts/' + p + '.md' for p in ('character','ciel_self','app','tool_discovery','game')]
 
@@ -34,6 +35,7 @@ def main():
     p.add_argument('--limit', type=int, default=1)
     p.add_argument('--output', type=Path)
     p.add_argument('--case', action='append', dest='selected')
+    p.add_argument('--conversation', action='store_true', help='Run stage 1-3 conversation suite')
     p.add_argument('--prompt-revision', help='stage: Git commit for baseline prompts; code stays current')
     p.add_argument('--prompt-dir', type=Path, help='stage: explicit experimental prompt directory')
     args = p.parse_args()
@@ -84,6 +86,8 @@ print('Staged harness and prompt fixtures only:',root)
                    '--split',args.split,'--rounds',str(args.rounds),'--limit',str(args.limit)]
         for id in args.selected or []:
             command += ['--case', id]
+        if args.conversation:
+            command += ['--suite', 'server/benchmark/weight_space/conversation-suite.json', '--timeout', '180']
         remote(prefix + 'command=' + repr(command) + '\n' + """
 with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as r:mode=json.load(r)
 if not mode.get('ready'):raise SystemExit('Shared API is not ready')

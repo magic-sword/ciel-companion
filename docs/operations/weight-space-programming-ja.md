@@ -30,6 +30,20 @@ W_candidate = W_base + ΔW
 
 これは検証する仮説である。分母が小さい、非有限値、方向のノルムが異常な候補は棄却する。平均での直交性は未知の文章やJSONでの非干渉を保証しない。発話開始・文中・文末・特殊トークン・tool-call位置を実tokenizerで区別する。重みを増分で累積せず毎回同一の基準から候補を作る。FP32で差分計算し、保存dtypeへの丸め後にも変更要素数・差分ノルムを測る。
 
+## 量子化済み35Bの限定的な直接編集
+
+元checkpointを使う内部活性の解析とは別に、現行GGUFの出力層へ限定した介入を実験する。現行ファイルは`qwen35moe`、`output.weight`は形状[2048,248320]のQ6_K、入力埋込みは別テンソルのQ8_0。EOSはID248046の`<|im_end|>`。小型モデルの層番号・ニューロンを流用しない。
+
+初回仮説はEOSの出力行を1.05倍すると過剰な継続を減らせるか。`logit_eos = w_eos · h`の行だけを拡大するため、終了logitが負の場合はさらに低くなる。定数のlogit biasや、常に終了確率が上がる操作とは異なる。空返答・説明不足・JSON途中終了・ツール省略も測る。勾配学習を伴わない保存重みの直接編集だが、公開研究の内部ニューロン修復の再現ではない。
+
+[ggmlのQ6_K定義](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h)と[公式の逆量子化実装](https://github.com/ggml-org/llama.cpp/blob/master/gguf-py/gguf/quants.py)に基づき、1ブロック256要素・210byteの末尾FP16スケールだけを変更する。EOS行の8ブロック以外はバイト一致を検証する。全重みの逆量子化・再量子化は不要。FP16丸め後の値と差分ノルムを記録し、元の高精度値を復元したとは扱わない。
+
+編集器は`server/benchmark/gguf_eos_edit.py`、比較器は`server/benchmark/gguf_eos_experiment.py`。解析依存はgguf0.19.0・numpy2.5.4。原本を読み取り専用にし新規コピーだけへ書く。係数は1超〜1.1以下に制限、初回候補は1.05の1個。architecture・token・形状・型・有限値・丸め誤差・変更範囲・両ファイルhashを検証する。
+
+専用配置は`~/work/ciel-weight-space-quant`。既存イメージを使いCPU8threads・40GiB上限・context8192・parallel1・loopback18099で未編集と候補を順に起動する。共有モデルの再起動・GPU割当は行わない。同じ現行5prompt、会話4課題（事実・詳説・短文化・曜日訂正）と既存3課題（JSON・計算・停止fixture）を各512token・課題180秒・温度0・thinking無効で測る。初回は各1回の探索で、holdout・一般性能全体・実音声の証明ではない。専用コンテナは終了・例外時に削除する。強制終了時に残った場合は`ciel-wsp-quant-pilot`だけを確認して終了する。
+
+`scripts/server/weight-space-remote.py <明示したPython実験ファイル> --upload <ファイル>`は既存SSH設定で専用領域へコードを置いて実行する補助。高精度checkpointを使う通常のWSPと量子化スケールの限定実験を区別する。採用判断は[実測](../testing/weight-space-results-ja.md)へ記録する。
+
 ## シエルに入れるもの
 
 設定の参照元は `D:\CIEL\企画設計\キャラ\シエル` の設定資料・台詞集・AR知覚資料。指定の[GitHub設定リポジトリ](https://github.com/magic-sword/ciel-anime-design)は今回Web経由では本文を取得できなかったため、ローカル資料を読んだ。両者の一致は未確認。採用する文書のSHA-256と所在は実験manifestへ残し、原本は変更しない。
