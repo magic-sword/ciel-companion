@@ -14,6 +14,12 @@
 
 ## 確認範囲
 
+### Minecraftの衝突幅補正
+
+2026-11-11、`2ebd9ca`からの未コミット変更で、`skills.js`と`player-physics.js`だけを開発用の身体へ反映した。imageは`fb42e9e74759830a9974439cbfb5406a5053cf9a3748e0622254b97ff36f12ae`。実行中の33ソースが手元と一致し、再接続した`Ciel_Dev`の半幅が`0.30000001192092896`であることを読取確認した。他サービスのID・image・起動時刻は不変。本番の身体へは未反映。
+
+配布根拠は自宅サーバーの`~/work/ciel-companion-dev/server/data/deployments/player-physics-20261111/verification.json`、旧skillsは同じ場所の`skills-before.js`。現場の`Ciel_Debug`比較では段差の座標巻き戻しが371回から0回となり、歩行目標へ到達した。Node130件成功・既存1件skip。[条件と未確認範囲](minecraft-results-ja.md#段差での座標巻き戻し)を参照。配布後に利用者から「こっちへ来て」で`Ciel_Dev`が到着したとの報告を受けた。原木採集は未確認。
+
 ### 返答生成の役目別OpenAI切替
 
 2026-11-11、実装`ad04a29`の`models.py`・`voice_preparation.py`だけを開発・本番へ選択して反映した。起動中とホストの他ソースを照合してから対象agentのみをビルド・再作成し、各段階で他の9サービスのID・image・起動時刻不変を確認した。Minecraft本体・本番と開発の体・知識・共有LLM・TTS・DB・歌の再配布は行っていない。リポジトリ全体や他のserverファイルまで同じコミットへ配布したという意味ではない。

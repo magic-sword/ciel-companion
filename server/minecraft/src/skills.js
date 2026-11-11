@@ -1,6 +1,7 @@
 import { BodyCommands, commandBot } from './body-command.js';
 import { executeRegion } from './spatial.js';
 import { confirmedCrafting } from './craft-sync.js';
+import { alignPlayerCollision } from './player-physics.js';
 // 体の技。1 つずつ決まった処理で書き、その場でコードを書かせない。docs/games/minecraft/minecraft-design-ja.md の 4.2。
 // 技は一度に 1 つ。新しい技を受けたら、今の技を止めてから始める。終わったら（止めたときも）必ず done を 1 回送る。
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
@@ -89,7 +90,7 @@ export class Runner extends BodyCommands {
 
   attach(bot) {
     this.bot = bot;
-    if (bot) { groundedDig(bot); confirmedCrafting(bot); this.blocked = false; }
+    if (bot) { alignPlayerCollision(bot); groundedDig(bot); confirmedCrafting(bot); this.blocked = false; }
   }
 
   doing() {

@@ -19,6 +19,8 @@ Java版MinecraftとMineflayerの体を別サービスとして動かす。`serve
 
 ホストの`CIEL_GAMES`は`minecraft=http://127.0.0.1:8771/mcp`を指定する。接続だけでは体を取得せず、アプリからの有効化と所有権取得を必要とする。通常ワールドと専用ベンチマークは接続先も復元範囲も異なる。
 
+体をRunnerへ接続するとき、`src/player-physics.js`で衝突判定の半幅を`Math.fround(0.6) / 2`へ合わせる。Vanillaのプレイヤー幅はfloatの`0.6F`であり、prismarine-physicsの既定値`0.3`との差が、Paper 1.21.11で壁・段差に接したジャンプの座標巻き戻しを起こす。経路探索の予測と実際の物理更新は同じ`bot.physics`を使う。サーバーのscale属性は変更しない。[上流の報告](https://github.com/PrismarineJS/mineflayer/issues/3911)と[現場の実測](../../testing/minecraft-results-ja.md#段差での座標巻き戻し)を参照する。
+
 ## 利用者の依頼
 
 LLMは公開された能力から目的・数量・制約・予算を構造化する。`minecraft.obtain_item`の採集・製作はゲームが段を組み、観測して進める。旧plan/step/repairと直接の採集・製作MCPツールは公開しない。追従・移動・観察等の公開範囲は`mcp.js`とprofileを確認する。
