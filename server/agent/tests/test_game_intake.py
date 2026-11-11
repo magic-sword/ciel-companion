@@ -60,6 +60,66 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(await self.intake.handle(llm.ChatMessage(role='user', content=['Do it'])))
         self.runner.start.assert_not_awaited()
 
+    async def test_reference_is_frozen_across_selection_and_argument_generation(self):
+        self.tool()
+        env=self.runner.env
+        env.profile['reference_context']=True
+        env.state={'references':{'selection_id':'old'}}
+        env._refresh=AsyncMock()
+        env.tools[0].info.raw_schema['parameters']['properties']['selection_id']={'type':'string'}
+        env.meta['puzzle_move']['ciel/reference_argument']='selection_id'
+        responses=iter([{'operation':'select','capability':'2'},
+                        {'operation':'execute','arguments':{'x':5,'selection_id':'old'}}])
+        async def generate(**kw):
+            env.state['references']['selection_id']='new'
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(next(responses))))])
+        self.create.side_effect=generate
+        await self.intake.handle(llm.ChatMessage(role='user',content=['Move here']))
+        env.use.assert_awaited_once_with('puzzle_move',{'x':5,'selection_id':'old'})
+        selection=json.loads(self.create.await_args_list[0].kwargs['messages'][1]['content'])
+        self.assertEqual(selection['capabilities'][1]['reference_argument'],'selection_id')
+        for call in self.create.await_args_list:
+            self.assertEqual(json.loads(call.kwargs['messages'][1]['content'])['references']['selection_id'],'old')
+
+    async def test_model_cannot_substitute_another_reference(self):
+        self.tool()
+        env=self.runner.env
+        env.profile['reference_context']=True
+        env.state={'references':{'selection_id':'old'}}
+        env._refresh=AsyncMock()
+        env.tools[0].info.raw_schema['parameters']['properties']['selection_id']={'type':'string'}
+        env.meta['puzzle_move']['ciel/reference_argument']='selection_id'
+        self.sequence({'operation':'select','capability':'2'},
+                      {'operation':'execute','arguments':{'x':5,'selection_id':'invented'}})
+        await self.intake.handle(llm.ChatMessage(role='user',content=['Move here']))
+        env.use.assert_not_awaited()
+
+    async def test_speech_end_reference_is_bound_to_transcribed_item(self):
+        env=self.runner.env
+        env.profile['reference_context']=True
+        env.state={'references':{'selection_id':'spoken-target'}}
+        env._refresh=AsyncMock()
+        self.intake.on_user_state(types.SimpleNamespace(old_state='speaking',new_state='listening'))
+        await self.intake._speech_reference[1]
+        self.intake.on_transcribed(types.SimpleNamespace(is_final=True,item_id='speech1',transcript='Look here'))
+        env.state={'references':{'selection_id':'later-target'}}
+        self.respond({'operation':'none'})
+        await self.intake.handle(llm.ChatMessage(id='speech1',role='user',content=['Look here']))
+        payload=json.loads(self.create.await_args.kwargs['messages'][1]['content'])
+        self.assertEqual(payload['references']['selection_id'],'spoken-target')
+        self.intake.on_user_state(types.SimpleNamespace(old_state='listening',new_state='speaking'))
+        self.assertIsNone(self.intake._speech_reference)
+
+    async def test_failed_refresh_cannot_reuse_stale_reference(self):
+        env=self.runner.env
+        env.profile['reference_context']=True
+        env.state={'references':{'selection_id':'stale'}}
+        env._refresh=AsyncMock(return_value=False)
+        result=await self.intake.handle(llm.ChatMessage(role='user',content=['Move here']))
+        self.assertIn('確認できません',result)
+        self.create.assert_not_awaited()
+        env.use.assert_not_awaited()
+
     async def test_stop_during_inference_prevents_delayed_submission(self):
         entered, release = asyncio.Event(), asyncio.Event()
         self.respond({'operation': 'select', 'capability': '1'})

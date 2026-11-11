@@ -502,9 +502,9 @@ class GameEnv:
         """体を受け持っていて、ゲームの中にいる"""
         return bool(self.linked and self.state.get('playing'))
 
-    async def _refresh(self) -> None:
+    async def _refresh(self) -> bool:
         if self._session is None:
-            return
+            return False
         session, epoch = self._session, self._connection_epoch
         try:
             r = await self._session.read_resource('game://state')
@@ -512,15 +512,15 @@ class GameEnv:
             log.info('ゲーム（%s）の様子を読めない：%s', self.game, type(e).__name__)
             if getattr(getattr(e, 'error', None), 'message', '') == 'Session terminated':
                 self._reconnect(session)
-            return
+            return False
         if session is not self._session or epoch != self._connection_epoch:
-            return
+            return False
         state = _json(getattr(r.contents[0], 'text', '') if r.contents else '')
         body = state.get('body')
         self._body_protocol_valid = isinstance(body, dict) and body.get('version') == 1
         if self._body_protocol_valid:
             if (self._body.get('session'), self._body.get('epoch')) == (body.get('session'), body.get('epoch')) and body.get('revision', 0) < self._body.get('revision', -1):
-                return
+                return False
             self._body = body
         else:
             self._body = {}
@@ -531,6 +531,7 @@ class GameEnv:
         self.publish()
         if self.activity is not None:
             self.activity.changed()   # 体がいましていること（いま）
+        return self._body_protocol_valid
 
     def context(self) -> str | None:
         """心と小脳へ渡す「[マイクラの様子]」（つなぐ先が無ければ None）"""

@@ -5,6 +5,7 @@ import { editRegion } from './spatial.js';
 // 身を守る係（guard.js）が経路探索を使っているあいだは、技は待ち、守り終えたら続ける（guarded）。
 import pathfinderPkg from 'mineflayer-pathfinder';
 import { Vec3 } from 'vec3';
+import { actOnSelection } from './pointing.js';
 
 import { guarded } from './guard.js';
 import { planCraft } from './craft-plan.js';
@@ -337,6 +338,7 @@ const GIVE_SEARCH = 6;       // 投げた物を探す距離
 const GIVE_WAIT_MS = 6000;   // 相手が拾うのを待つ（拾えるまで 2 秒かかる）
 
 const SKILL_RUN = {
+  pointed_action: (bot, args, token, { guard }) => actOnSelection(bot, args, token, { guard, Failed, watched }),
   clear_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, false),
   build_region: (bot, args, token, { guard }) => editRegion(bot, args, token, { guard, Failed, watched }, true),
   async follow(bot, args, token, { owner, guard }) {

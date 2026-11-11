@@ -42,7 +42,7 @@ const ACT = (name, extra) => ({ annotations: { readOnlyHint: false }, _meta: met
 export function profile() {
   const reasons = Object.fromEntries(Object.keys(WHY_FAILED).map((k) => [k, shortWhy(k)]));
   return {
-    profile: PROFILE_VERSION, game: GAME, label: LABEL,
+    profile: PROFILE_VERSION, game: GAME, label: LABEL, reference_context: true,
     route_words: ROUTE_WORDS,
     link_tool: 'minecraft_link', stop_tool: 'minecraft_stop_moving',
     work: { version: TASK_VERSION, submit: 'minecraft_task_submit', status: 'minecraft_task_status',
@@ -80,6 +80,12 @@ export function makeServer(hub, sessionId) {
   });
 
   // ---- 体の技（以前の tools/minecraft.py） ----
+  server.registerTool('minecraft_pointed_action', {
+    title: '指し示した場所で作業する',
+    description: '指示棒または目線で示した「ここ」「これ」「ここからあそこまで」を使う。referencesのselection_idを指定し、move=1地点へ接近、recover=選んだ作業台1個の回収、clear=2点を含む直方体の自然ブロック除去、floor=同じ高さの地面2点の上へ床を作る。最大64マス・距離32以内。選択がなければ選んでもらう。床の材料はblockで指定する。',
+    inputSchema: { selection_id:z.string().uuid(), action:z.enum(['move','recover','clear','floor']), block:z.enum(BUILD_BLOCKS).optional() },
+    ...ACT('minecraft_pointed_action', { 'ciel/long_running':true, 'ciel/reference_argument':'selection_id' }),
+  }, args => body(l => l.do('pointed_action',args)));
   const region = Object.fromEntries(['x1','y1','z1','x2','y2','z2'].map(k => [k,
     z.number().int().describe(`${k[0].toUpperCase()}軸の${k[1]==='1'?'最小':'最大'}座標（このマスを含む）。利用者の指定した同じ軸の${k[1]==='1'?'下限':'上限'}値。`)]));
   server.registerTool('minecraft_clear_region', {
@@ -172,7 +178,7 @@ export function makeServer(hub, sessionId) {
     async (uri) => {
       const l = mine();
       const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
-        body: l.body, work: l.work.view() }
+        body: l.body, work: l.work.view(), references: hub.references?.() ?? null }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

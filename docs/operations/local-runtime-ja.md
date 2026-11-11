@@ -79,6 +79,22 @@ docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .en
 
 環境変数の編集後は対象コンテナを再作成する。単なるrestartや設定移行だけを反映済みとしない。ゲーム契約が変わる更新ではMCPの版も揃えるが、Minecraft本体・ワールドの再作成はbackend切替に含めない。共有LLMを環境ごとに追加起動しない。
 
+## Minecraftの指差し機能を導入する構成
+
+`server/compose.pointing.yaml`は通常のMinecraftへPaper 1.21.11 build 132と指差しプラグインを追加する明示的な上書き構成。標準デプロイだけではVanillaから切り替わらない。専用ベンチマークで確認した後、通常ワールドを停止してバックアップし、Paper移行として適用する。会話サーバーだけの再配布と同じ扱いにしない。
+
+`.env.minecraft`の`MC_OWNER`をプラグインの`CIEL_POINTING_OWNER`へ渡す。体には`CIEL_POINTING_FILE=/app/pointing/selection.json`を渡し、`minecraft/data/ciel-pointing/`だけを読取専用で共有する。`pointing-init`がこの専用ディレクトリの所有者をMinecraftの既定UID 1000へ揃える。別UIDを使う構成では両方を合わせる。資格情報や任意の外部受信口は追加しない。
+
+serverディレクトリでの適用コマンドは次のとおり。実行前に配布対象のコミットとワールドのバックアップを確認する。
+
+```sh
+docker compose --env-file .env.shared --env-file .env --env-file .env.minecraft \
+  -f compose.yaml -f compose.pointing.yaml --profile minecraft \
+  up -d --build minecraft minecraft-body
+```
+
+以降、このMinecraft構成を更新するときも両方のComposeを指定する。Paper移行後のワールドをVanillaへ戻す操作は自動化していない。操作方法は[Minecraftサービス](../games/minecraft/minecraft-design-ja.md#指示棒と目線による対象指定)、配布済みかどうかは[確認状況](../testing/verification-status-ja.md)で確認する。
+
 ## 文字入力と検証
 
 開発`.env.dev`の`CIEL_INPUT=text`でagentを再作成し、LiveKit資格情報のある`server/agent`から`python local_chat.py --agent ciel-dev --game minecraft`を実行できる。端末は別の試験用の部屋を作る。通常の開発用DB・同意範囲を使い、永続記憶を無効化した[専用ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md)とは区別する。

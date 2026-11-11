@@ -22,6 +22,7 @@ from .policy import VERSION as POLICY_VERSION, Progress, budget
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
+from .pointing import prepare_pointing
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('tasks.json')
@@ -95,9 +96,9 @@ def provenance():
         result = status = subprocess.CompletedProcess('git',1,stdout='')
     digest = hashlib.sha256()
     files = list((ROOT/'server'/'agent').glob('*.py'))
-    for base in ['agent/config','minecraft/src','benchmark','local-llm']:
+    for base in ['agent/config','minecraft/src','minecraft-pointing','benchmark','local-llm']:
         files += [p for p in (ROOT/'server'/base).rglob('*') if p.is_file() and
-                  p.suffix in ('.py','.js','.md','.json','.toml') and 'data' not in p.relative_to(ROOT/'server'/base).parts
+                  (p.suffix in ('.py','.js','.md','.json','.toml','.java','.xml','.yml') or p.name=='Dockerfile') and 'data' not in p.relative_to(ROOT/'server'/base).parts
                   and p.name != 'staged-provenance.json'
                   and '__pycache__' not in p.parts]
     files += list((ROOT/'server').glob('compose*.yaml'))
@@ -360,6 +361,8 @@ async def run(args, *, clock=time.monotonic):
                                 await prepare_navigation(task, initial)
                             if task.get('spatial'):
                                 await prepare_spatial(task, trace)
+                            if task.get('pointing'):
+                                await prepare_pointing(task, world, trace)
                         result.update(fixture=fixture,initial=initial)
                         available = max(0.01,deadline-clock()-20)
                         limit = min(budget(task,args.seconds)['seconds'],available)

@@ -13,7 +13,8 @@ Runner.prototype.attach = function (bot) {
     const state = { t: Date.now() / 1000, body: this.snapshot(),
       target_entity_known: Boolean(target && bot.entities[target.id]),
       target_entity_position: target?.position ?? null,
-      hint: bot.playerLocator?.hint('Bench_Owner') ?? null };
+      hint: bot.playerLocator?.hint('Bench_Owner') ?? null,
+      references: bot.pointing?.latest(bot) ?? null };
     const watch='/app/benchmark-data/spatial-watch.json';
     if (existsSync(watch)) {
       const request=JSON.parse(readFileSync(watch,'utf8'));

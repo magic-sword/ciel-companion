@@ -9,7 +9,7 @@ from benchmark.run import load_tasks
 class SpatialOracleTest(unittest.TestCase):
     def test_all_fixtures_valid(self):
         tasks=[t for t in load_tasks() if t.get('spatial')]
-        self.assertEqual(len(tasks),8)
+        self.assertEqual(len(tasks),16)
         for task in tasks:
             validate_spatial(task)
 
@@ -33,3 +33,15 @@ class SpatialOracleTest(unittest.TestCase):
         self.assertEqual(spatial_outcome(spec,state,body,1)[0],'failed')
         body['current']={'skill':'build_region'}
         self.assertIsNone(spatial_outcome(spec,state,body,1))
+
+    def test_pointing_claim_requires_arrival_or_collected_item(self):
+        body={'last':{'skill':'pointed_action','since':2000,'phase':'succeeded'}}
+        state={'spatial_expected':[True],'spatial_preserved':[True],'position':[0,64,0],'inventory':{}}
+        spec={'skill':'pointed_action','arrival':[12,64,0]}
+        self.assertEqual(spatial_outcome(spec,state,body,1)[1],'wrong_destination')
+        state['position']=[12,64,0]
+        self.assertEqual(spatial_outcome(spec,state,body,1)[0],'passed')
+        spec={'skill':'pointed_action','recovered':'crafting_table'}
+        self.assertEqual(spatial_outcome(spec,state,body,1)[1],'item_not_recovered')
+        state['inventory']['crafting_table']=1
+        self.assertEqual(spatial_outcome(spec,state,body,1)[0],'passed')

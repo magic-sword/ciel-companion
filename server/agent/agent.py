@@ -710,6 +710,7 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions,
                 authorized=lambda: agent.mind.is_owner() and not agent.mind.from_comment)
             session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
+            session.on('user_state_changed', agent.game_intake.on_user_state)
             ctx.add_shutdown_callback(agent.game_intake.close)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える

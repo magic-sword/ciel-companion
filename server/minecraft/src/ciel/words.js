@@ -3,6 +3,12 @@
 
 // うまくいかなかった理由（体の done・error の reason）。（ ）の前が付箋の短いひとこと
 export const WHY_FAILED = {
+  selection_expired: '選択が失効したので指示棒で選び直してほしい',
+  selection_changed: '選んだブロックが変わったので作業を止めた',
+  selection_needs_two_points: '範囲の始点と終点を指示棒で選んでほしい',
+  selection_needs_one_point: '対象を1地点だけ選んでほしい',
+  selection_floor_not_level: '床の両端は同じ高さの地面の上面を選んでほしい',
+  unsupported_selected_block: '指定回収は現在、作業台1個に対応している',
   region_too_far: '指定範囲が遠すぎる（32ブロック以内で頼んでほしい）',
   unloaded_region: '指定範囲のブロック情報を取得できない',
   protected_block: '指定範囲に建物などの壊せないブロックがある',
@@ -51,6 +57,7 @@ export const NEXT_STEP = {
   not_found: 'minecraft_find_blocks で探せる（地中の物は how=dig、地面の上の物は how=walk）',
 };
 export const SKILL_NAMES = {
+  pointed_action: '指し示した場所で作業する',
   clear_region: '範囲を整地する', build_region: '床や壁を建築する',
   follow: 'ついていく', come: 'そばへ行く', go_to: '場所へ行く', collect: '集める', give: '渡す',
   dig_down: '足元を掘って降りる', craft: '作る', find: '探す',
@@ -84,6 +91,7 @@ export const facingJa = (f) => FACING[f] ?? '';
 export function title(skill, args = {}) {
   const who = args.player ?? '持ち主';
   switch (skill) {
+    case 'pointed_action': return ({move:'指した場所へ行く',recover:'選んだ作業台を回収する',clear:'選んだ範囲を除去する',floor:'選んだ範囲へ床を敷く'})[args.action] ?? '指し示した場所で作業する';
     case 'clear_region': return '指定範囲を整地する';
     case 'build_region': return `${ja(args.block)}で指定範囲を建築する`;
     case 'follow': return `${who}についていく`;

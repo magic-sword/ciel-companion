@@ -129,7 +129,7 @@ def run(*args):
     result=subprocess.run(compose+list(args),cwd=root)
     if result.returncode:
         raise SystemExit(result.returncode)
-run('build','body-bench','owner-bench','benchmark-runner' MODE_BUILD)
+run('build','minecraft-bench','body-bench','owner-bench','benchmark-runner' MODE_BUILD)
 run('run','--rm','--no-deps','-T','--user','0','--entrypoint','node','body-bench','-e',
     "require('fs').chmodSync('/app/benchmark-data',0o777)")
 LLM_START

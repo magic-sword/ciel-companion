@@ -6,7 +6,7 @@ import re
 VERSION = 'practical-v1'
 DEFAULT = {'seconds':90, 'first_action':30, 'no_progress':30, 'same_failure':2,
            'blocked_grace':10, 'stop_grace':5}
-ACTION_TOOLS = {'minecraft_clear_region','minecraft_build_region','minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item',
+ACTION_TOOLS = {'minecraft_pointed_action','minecraft_clear_region','minecraft_build_region','minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item',
                 'minecraft_give_item','minecraft_go_to_place','minecraft_follow_me',
                 'minecraft_come_here','minecraft_find_blocks','minecraft_dig_down','minecraft_look_around'}
 CONSTRAINT = r'(原木|木材|木|材料|作業台|道具|資源).{0,40}(不足|見つから|見当たら|ありません|無い|ない|足り|用意でき)'

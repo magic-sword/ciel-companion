@@ -21,6 +21,7 @@ import { carefulMovements } from './movements.js';
 import { knows } from './sight.js';
 import { Runner } from './skills.js';
 import { PlayerLocator } from './player-locator.js';
+import { Pointing } from './pointing.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
@@ -33,6 +34,7 @@ const MC = {
   hideErrors: true,  // つなげないときの詳しいエラーは出さない（下の 'error' で短く出す）
 };
 const OWNER = env.MC_OWNER || null;
+const pointing = new Pointing(env.CIEL_POINTING_FILE, OWNER);
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
 const CIEL_PORT = Number(env.CIEL_PORT ?? 8771);   // MCP の入口（src/ciel/mcp.js）。BODY_HOST だけで開く
@@ -121,6 +123,7 @@ const hub = makeHub({
   log,
 });
 startHttp(hub, { host: BODY_HOST, port: CIEL_PORT, idleMs: CIEL_IDLE_MS, log });
+hub.references = () => pointing.latest(bot);
 
 // 景色を 1 枚撮って返す。向いている方角も添える（「北を向いている」）
 async function look(id) {
@@ -169,6 +172,7 @@ let retry = RETRY_MIN_MS;
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
   const b = mineflayer.createBot(MC);
+  b.pointing = pointing;
   b.playerLocator = new PlayerLocator(b);
   bot = b;
   b.loadPlugin(pathfinderPkg.pathfinder);

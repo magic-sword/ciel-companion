@@ -14,6 +14,10 @@ const COORD_MAX = 30_000_000;
 
 // 技と、その引数の確かめ方。返すのは整えた引数か、だめな理由
 export const SKILLS = {
+  pointed_action: a => typeof a.selection_id==='string' && /^[a-f0-9-]{36}$/.test(a.selection_id)
+    && ['move','recover','clear','floor'].includes(a.action)
+    && (a.action!=='floor' || ['dirt','cobblestone','stone','oak_planks','glass'].includes(a.block))
+    ? {args:{selection_id:a.selection_id,action:a.action,...(a.action==='floor'?{block:a.block}:{})}} : {error:'bad_args'},
   clear_region: a => regionArgs(a),
   build_region: a => regionArgs(a, true),
   // ついていく（止めるまで続く）。player を省けば持ち主

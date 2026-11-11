@@ -9,6 +9,7 @@ COPY agent/summaries/ ./agent/summaries/
 COPY agent/config/ ./agent/config/
 COPY minecraft/src/ ./minecraft/src/
 COPY minecraft/package.json minecraft/package-lock.json ./minecraft/
+COPY minecraft-pointing/ ./minecraft-pointing/
 COPY local-llm/supervisor.py ./local-llm/
 COPY compose*.yaml ./
 COPY benchmark/*.py benchmark/*.json benchmark/*.js ./benchmark/

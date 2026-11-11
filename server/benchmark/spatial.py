@@ -3,6 +3,7 @@ import asyncio
 import time
 import json
 import uuid
+import math
 from pathlib import Path
 from .navigation import read_body_observation, task_items
 from .policy import Progress, budget
@@ -40,15 +41,22 @@ def validate_spatial(task):
             x,y,z,name = row
             if any(type(v) is not int for v in (x,y,z)) or not (-40<=x<=40 and 61<=y<=78 and -40<=z<=40):
                 raise ValueError('Spatial fixture outside arena')
-            if name not in ('air','dirt','stone','cobblestone','oak_planks','glass','chest','grass_block'):
+            if name not in ('air','dirt','stone','cobblestone','oak_planks','glass','chest','grass_block','crafting_table'):
                 raise ValueError('Unknown fixture block')
             if (x,y,z) in seen:
                 raise ValueError('Duplicate fixture cell')
             seen.add((x,y,z))
-    if task['body_call']['name'] not in ('minecraft_clear_region','minecraft_build_region'):
+    if task['body_call']['name'] not in ('minecraft_clear_region','minecraft_build_region','minecraft_pointed_action','minecraft_go_to_place'):
         raise ValueError('Invalid spatial body operation')
     if spec.get('expected_reason') not in (None,'missing_materials','protected_block'):
         raise ValueError('Unknown refusal oracle')
+    if task.get('pointing'):
+        points=task['pointing']['points']
+        if not isinstance(points,list) or not 1<=len(points)<=2:
+            raise ValueError('Invalid pointing fixture')
+        for p in points:
+            if len(p)!=3 or any(type(v) is not int for v in p) or not (-35<=p[0]<=35 and 63<=p[1]<=72 and -35<=p[2]<=35):
+                raise ValueError('Pointing fixture outside arena')
 
 
 def spatial_outcome(spec, current, body, started):
@@ -64,6 +72,10 @@ def spatial_outcome(spec, current, body, started):
             return ('passed','refused_without_changes') if good else ('failed','wrong_refusal_or_changes')
         if last.get('phase') == 'failed':
             return 'failed', 'body_' + str(last.get('result',{}).get('reason'))
+        if spec.get('arrival') and math.dist(current['position'],spec['arrival'])>3:
+            return 'failed', 'wrong_destination'
+        if spec.get('recovered') and current['inventory'].get(spec['recovered'],0)<1:
+            return 'failed', 'item_not_recovered'
         return ('passed','blocks_verified') if all(current['spatial_expected']) else ('failed','false_completion')
     return None
 

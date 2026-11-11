@@ -1,0 +1,30 @@
+# Opt-in Paper migration. Back up the world and validate in the benchmark first.
+# docker compose --env-file .env.shared --env-file .env --env-file .env.minecraft \
+#   -f compose.yaml -f compose.pointing.yaml --profile minecraft up -d --build minecraft minecraft-body
+services:
+  pointing-init:
+    profiles: [minecraft]
+    image: itzg/minecraft-server:2026.10.1-java21
+    user: '0'
+    entrypoint: [sh, -c]
+    command: ['mkdir -p /data/ciel-pointing && chown 1000:1000 /data/ciel-pointing']
+    volumes:
+      - ./minecraft/data:/data
+    restart: 'no'
+  minecraft:
+    image: ciel-minecraft-pointing
+    build:
+      context: ./minecraft-pointing
+      network: host
+    depends_on:
+      pointing-init:
+        condition: service_completed_successfully
+    environment:
+      TYPE: PAPER
+      PAPER_BUILD: '132'
+      CIEL_POINTING_OWNER: ${MC_OWNER:?Set the Minecraft owner for pointing}
+  minecraft-body:
+    environment:
+      CIEL_POINTING_FILE: /app/pointing/selection.json
+    volumes:
+      - ./minecraft/data/ciel-pointing:/app/pointing:ro

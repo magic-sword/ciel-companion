@@ -33,6 +33,13 @@ class Driver:
         return False
 
 class PracticalTest(unittest.IsolatedAsyncioTestCase):
+    def test_pointing_action_counts_as_first_action_without_extending_progress(self):
+        watch=Progress(state(),load_tasks()[0])
+        watch.event({'kind':'game_call','id':'p','name':'minecraft_pointed_action',
+                     'arguments':{'selection_id':'selected','action':'floor'}},2)
+        self.assertEqual(watch.first_action,2)
+        self.assertEqual(watch.reason(31,budget(load_tasks()[0])),'no_progress')
+
     async def evaluate(self,task=None,driver=None,states=None,**options):
         now=[0]
         async def sleep(seconds):

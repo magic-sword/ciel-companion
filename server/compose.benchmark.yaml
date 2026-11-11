@@ -2,6 +2,14 @@
 # Run from server/ with --env-file .env.benchmark -f compose.benchmark.yaml.
 name: ciel-minecraft-benchmark
 services:
+  pointing-init:
+    image: itzg/minecraft-server:2026.10.1-java21
+    user: '0'
+    entrypoint: [sh, -c]
+    command: ['mkdir -p /data/ciel-pointing && chown 1000:1000 /data/ciel-pointing']
+    volumes:
+      - ./benchmark/data/world:/data
+    restart: 'no'
   llm-bench:
     profiles: [local]
     build:
@@ -20,10 +28,17 @@ services:
     restart: 'no'
 
   minecraft-bench:
-    image: itzg/minecraft-server:2026.10.1-java21
+    build:
+      context: ./minecraft-pointing
+      network: host
+    depends_on:
+      pointing-init:
+        condition: service_completed_successfully
     environment:
       EULA: ${MINECRAFT_EULA:-FALSE}
-      TYPE: VANILLA
+      TYPE: PAPER
+      PAPER_BUILD: '132'
+      CIEL_POINTING_OWNER: Bench_Owner
       VERSION: 1.21.11
       LEVEL: ciel-benchmark
       LEVEL_TYPE: FLAT
@@ -91,9 +106,11 @@ services:
       CIEL_PORT: '8773'
       EYE_PORT: '3008'
       KNOWLEDGE_DATA: /app/knowledge-data
+      CIEL_POINTING_FILE: /app/pointing/selection.json
     volumes:
       - ./benchmark:/app/benchmark:ro
       - ./benchmark/data/observations:/app/benchmark-data
+      - ./benchmark/data/world/ciel-pointing:/app/pointing:ro
       - ${CIEL_BENCH_KNOWLEDGE_DIR:-../../ciel-companion/server/minecraft/knowledge/data}:/app/knowledge-data:ro
     depends_on:
       minecraft-bench:
@@ -108,6 +125,7 @@ services:
     command: [node, benchmark/owner.js]
     volumes:
       - ./benchmark:/app/benchmark:ro
+      - ./benchmark/data/observations:/app/benchmark-data
     depends_on:
       minecraft-bench:
         condition: service_healthy
