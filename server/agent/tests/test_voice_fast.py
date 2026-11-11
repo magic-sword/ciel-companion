@@ -96,7 +96,8 @@ class PreparationTest(unittest.IsolatedAsyncioTestCase):
         client = Obj(chat=Obj(completions=Obj(create=AsyncMock(return_value=Obj(tool_calls=['not executed'])))), close=AsyncMock())
         schema = {'name':'fixture_tool','description':'fixture','parameters':{'type':'object','properties':{}}}
         fn = MagicMock(info=Obj(raw_schema=schema))
-        with patch('voice_preparation.models.create_client', return_value=client):
+        with patch('voice_preparation.models.is_local', return_value=True), \
+             patch('voice_preparation.models.create_client', return_value=client):
             await voice_preparation.prepare_conversation_prefix('fixed instructions', [fn], 'warmup')
         request = client.chat.completions.create.call_args.kwargs
         self.assertEqual(request['tools'], [{'type':'function','function':schema}])
@@ -108,7 +109,8 @@ class PreparationTest(unittest.IsolatedAsyncioTestCase):
         client = Obj(chat=Obj(completions=Obj(create=AsyncMock())), close=AsyncMock())
         agent = Obj(persona=Obj(voice_warmup='fixture speech', fingerprint='fixture'),
                     talker_instructions_for=lambda *args: 'fixture system')
-        with patch('voice_preparation.models.create_client', return_value=client), \
+        with patch('voice_preparation.models.is_local', return_value=True), \
+             patch('voice_preparation.models.create_client', return_value=client), \
              patch('voice_preparation.mode_snapshot', AsyncMock(return_value={'model':'fixture','mode':'gpu','generation':'1'})), \
              patch('vosk_engine.load_model', return_value=object()), \
              patch('voice_preparation.irodori_tts.request_audio', AsyncMock(return_value=(bytes(640),16000))):
@@ -119,6 +121,22 @@ class PreparationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs['max_tokens'], 1)
         self.assertEqual(kwargs['extra_headers']['X-Ciel-Work-Class'], 'background')
         client.close.assert_awaited_once()
+
+    async def test_cloud_mind_skips_local_llm_warmup_but_prepares_stt_and_tts(self):
+        agent = Obj(persona=Obj(voice_warmup='fixture speech', fingerprint='fixture'),
+                    talker_instructions_for=lambda *args: 'fixture system')
+        with patch('voice_preparation.models.is_local', return_value=False), \
+             patch('voice_preparation.models.create_client') as create, \
+             patch('voice_preparation.mode_snapshot', AsyncMock(return_value={'generation':'1'})), \
+             patch('speech_input.prepare') as stt, \
+             patch('voice_preparation.irodori_tts.request_audio', AsyncMock(return_value=(bytes(640),16000))) as tts:
+            await voice_preparation.prepare_conversation_prefix('system', [], 'warmup')
+            result = await voice_preparation.prepare(agent, Obj())
+        self.assertTrue(result['ready'])
+        self.assertEqual(set(result['stages']), {'stt','tts'})
+        create.assert_not_called()
+        stt.assert_called_once()
+        tts.assert_awaited_once()
 
     async def test_failed_encoder_never_claims_ready(self):
         task = asyncio.create_task(asyncio.sleep(0))

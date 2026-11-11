@@ -8,6 +8,25 @@ import singing
 
 
 class RoutingTest(unittest.TestCase):
+    def test_explicit_cloud_mind_preserves_local_background_and_options(self):
+        with mock.patch.object(models, 'LOCAL_TEST', True), \
+             mock.patch.object(models, 'LOCAL_URL', 'http://local.invalid/v1'), \
+             mock.patch.object(models, 'LOCAL_ROLES', {'mind', 'thought'}), \
+             mock.patch.object(models, 'OPENAI_ROLES', {'mind'}), \
+             mock.patch.dict('os.environ', {'CIEL_MIND_MODEL': 'gpt-5.4-mini'}):
+            self.assertFalse(models.is_local('mind'))
+            self.assertTrue(models.is_local('thought'))
+            self.assertEqual(models.model('mind'), 'gpt-5.4-mini')
+            self.assertEqual(models.model('thought'), models.LOCAL_MODEL)
+            self.assertEqual(models.reply_options('none'), {'model': 'gpt-5.4-mini', 'reasoning_effort': 'none'})
+            self.assertEqual(models.options('mind', model='gpt-5.4-mini', timeout=20),
+                             {'model': 'gpt-5.4-mini', 'timeout': 20})
+            with mock.patch('openai.AsyncOpenAI') as create:
+                self.assertIs(models.create_client('mind'), create.return_value)
+                create.assert_called_once_with()
+            default = object()
+            self.assertIs(models.client_for('mind', default), default)
+
     def test_only_listed_roles_go_local(self):
         with mock.patch.object(models, 'LOCAL_URL', 'http://127.0.0.1:8094/v1'), \
              mock.patch.object(models, 'LOCAL_ROLES', {'thought', 'brief'}), mock.patch.object(models, '_local_client', None):

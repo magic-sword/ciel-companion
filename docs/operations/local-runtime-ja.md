@@ -41,6 +41,29 @@ CIEL_MINUTES_DISCORD_WEBHOOK=
 
 Voskはホストのモデル親ディレクトリをコンテナの`/models`へ読み取り専用でマウントする。CPU Whisperを使う環境は`CIEL_STT_BACKEND=whisper`、`CIEL_WHISPER_MODELS_DIR=${HOME}/models/faster-whisper`、`CIEL_WHISPER_MODEL_PATH=/models-whisper/small`を指定する。STT_BACKEND空の既定は変えず、環境ごとに明示選択する。モデルの実行時取得・OpenAIへの代替接続で欠落を隠さない。人のマイク・停止・返答の品質は設定解決や起動確認とは別に測定する。[音声認識](../services/local-stt-ja.md)を参照する。
 
+## 待ち時間の大きい役目だけOpenAIへ送る
+
+`CIEL_OPENAI_ROLES`で明示した文字推論の役目は、`CIEL_LLM_BACKEND=local`と`CIEL_LOCAL_ROLES`より優先してOpenAIへ送る。空なら従来どおり。失敗時に別backendへ自動で切り替えない。モデル名は既存の役目別変数を使う。
+
+返答生成とゲーム受付を切り替える例：
+
+```dotenv
+CIEL_LLM_BACKEND=local
+CIEL_OPENAI_ROLES=mind
+CIEL_MIND_MODEL=gpt-5.4-mini
+CIEL_MIND_REASONING=none
+```
+
+本番は本番の`server/.env`、開発は開発の`server/.env.dev`だけを変更し、対象agentを再作成する。APIキーは既存の`.env.shared`を使い、動作設定へ複製しない。設定例ファイルは切替を有効にしていない。
+
+`mind`は通常の返答と`game_intake.py`の能力選択・引数生成が共用する。選択だけ・引数だけを個別backendへ分ける設定ではない。`listener / brief / thought / minutes_live / minutes / notes / relationship / growth / eyes`も指定可能。`talk / stt / research`や未知の名前は起動時に拒否する。音声入力は既存の`CIEL_STT_BACKEND`とlocal時の規則を保ち、読み上げはIrodoriを継続する。検索や埋め込み等のlocal時の制約も変わらない。
+
+ローカルLLMの会話prefixと1tokenのウォームアップは、mindがローカルの場合だけ実行する。mindをOpenAIへ切り替えた場合はSTT・TTS等の準備だけを行い、ローカル用のモデルIDやQwen用引数をOpenAIへ送らない。会話開始のデバッグ記録の`role_models`で役目別の実モデルを確認する。`backend=local`は基本方針であり、全役目がローカルという意味ではない。
+
+比較時は同じ発言と準備条件で、最初の文字・本返答音声・ゲームの初回操作・失敗・API使用量を測る。`model_response.seconds`は生成終了まで、`voice_first_delta.ms`は最初の本文までで、音声の聞こえ始めとは別。背景負荷・キャッシュ・入力の長さが異なる通常ログ同士だけで速度改善率を出さない。戻すときは`CIEL_OPENAI_ROLES=`に戻し、対象agentを再作成する。
+
+既存のgpt-5.4-miniは[OpenAI公式のモデル資料](https://developers.openai.com/api/docs/models/gpt-5.4-mini)でChat Completionsと`reasoning.effort=none`への対応を確認した。APIへの切替だけで高速化を保証せず、[公式の遅延最適化ガイド](https://developers.openai.com/api/docs/guides/latency-optimization)と同様に、呼び出し回数・入力・出力と実測も確認する。実測は[音声と返答速度](../testing/voice-results-ja.md)、配布範囲は[確認状況](../testing/verification-status-ja.md)に記録する。
+
 ## 読み込みと優先順位
 
 本番は`--env-file .env.shared --env-file .env`、開発は`--env-file ../../ciel-companion/server/.env.shared --env-file .env.dev`を使う。開発で本番の`.env`を重ねない。Composeの`env_file`も資格情報と対象環境のファイルだけを読み、その他の環境設定をコンテナへ渡さない。

@@ -54,17 +54,21 @@ PER_MINUTE = {'gpt-realtime-whisper': 0.017, 'gpt-live-transcribe': 0.017}
 # 裏で動く役目（内なる考え・まとめ・メモ・関係・育つ好み）向け：少し遅れても会話は止まらない（1 回 13〜50 秒）
 LOCAL_URL = os.environ.get('CIEL_LOCAL_LLM_URL', 'http://127.0.0.1:8094/v1' if LOCAL_TEST else '').strip()
 LOCAL_ROLES = {r.strip() for r in os.environ.get('CIEL_LOCAL_ROLES', '').split(',') if r.strip()}
+OPENAI_ROLES = {r.strip() for r in os.environ.get('CIEL_OPENAI_ROLES', '').split(',') if r.strip()}
 LOCAL_MODEL = os.environ.get('CIEL_LOCAL_LLM_MODEL', 'local')             # llama-server の --alias
 LOCAL_TIMEOUT = float(os.environ.get('CIEL_LOCAL_TIMEOUT', '90'))           # 1 回の上限（秒）。歌を聴くあいだは CPU の形で遅い
 _local_client = None
 CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt', 'research'}
+if OPENAI_ROLES - CHAT_ROLES:
+    raise ValueError('CIEL_OPENAI_ROLES contains unsupported roles: ' + ', '.join(sorted(OPENAI_ROLES - CHAT_ROLES)))
 BACKGROUND_ROLES = {'thought', 'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
 if LOCAL_TEST and not LOCAL_URL:
     raise ValueError('CIEL_LOCAL_LLM_URL is required for local backend')
 
 
 def is_local(role: str) -> bool:
-    return bool(LOCAL_URL) and (role in LOCAL_ROLES or (LOCAL_TEST and role in CHAT_ROLES))
+    # Explicit cloud routing wins without changing local STT/service policies.
+    return role not in OPENAI_ROLES and bool(LOCAL_URL) and (role in LOCAL_ROLES or (LOCAL_TEST and role in CHAT_ROLES))
 
 
 def create_client(role: str):

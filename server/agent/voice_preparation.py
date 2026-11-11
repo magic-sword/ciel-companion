@@ -16,6 +16,8 @@ async def prepare_conversation_prefix(instructions, functions, text):
 The tool schema precedes the system text in Qwen's template. Priming a tool-free
 talker cannot warm this prefix. Never record or execute the generated output.
 """
+    if not models.is_local('mind'):
+        return
     from livekit.agents.llm import utils
     schemas = [getattr(fn.info, 'raw_schema', None) or utils.build_legacy_openai_schema(fn)['function']
                for fn in functions]
@@ -79,7 +81,8 @@ async def prepare(agent, replies, encoder_task=None):
                 extra_headers={'X-Ciel-Work-Class': 'background'}, timeout=models.LOCAL_TIMEOUT)
         finally:
             await client.close()
-    await stage('llm', llm)
+    if models.is_local('mind'):
+        await stage('llm', llm)
     async def tts():
         async with aiohttp.ClientSession() as http:
             pcm, rate = await irodori_tts.request_audio(http, {'text': text})

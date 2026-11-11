@@ -35,6 +35,7 @@ services:
       - CIEL_LOCAL_TIMEOUT=${CIEL_LOCAL_TIMEOUT:-90}
       - CIEL_LOCAL_LLM_CONTROL=${CIEL_LOCAL_LLM_CONTROL:-http://127.0.0.1:8095}
       - CIEL_LOCAL_ROLES=${CIEL_LOCAL_ROLES:-}
+      - CIEL_OPENAI_ROLES=${CIEL_OPENAI_ROLES:-}
       - CIEL_MINUTES_DISCORD_WEBHOOK=${CIEL_MINUTES_DISCORD_WEBHOOK:-}
       # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口（server/minecraft の src/ciel/mcp.js）。
       # 会話の始めにつなぎ、アプリの設定「マイクラで一緒に遊ぶ」をオンにした会話だけが体を受け持つ。知識の道具も同じ入口から出る
