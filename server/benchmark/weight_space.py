@@ -42,14 +42,22 @@ def load_suite(path):
             raise ValueError('Duplicate ID or invalid split')
         seen.add(case['id'])
         if 'dialogue' in case:
-            if case.get('stage') not in (1, 2, 3) or not case['dialogue']:
-                raise ValueError('Dialogue requires stage 1..3 and turns')
+            if case.get('stage') not in (1, 2, 3, 4) or not case['dialogue']:
+                raise ValueError('Dialogue requires stage 1..4 and turns')
             for turn in case['dialogue']:
                 if (not isinstance(turn.get('user'), str)
                         or not any(ch.isalnum() for ch in turn['user']) or not turn.get('rubric')):
                     raise ValueError('Dialogue turn requires user and rubric')
                 if not isinstance(turn.get('max_chars'), int) or turn['max_chars'] < 1:
                     raise ValueError('Dialogue turn requires positive max_chars')
+                if 'loop_probe' in turn and turn['loop_probe'] not in ('forbidden', 'allowed'):
+                    raise ValueError('Unknown loop probe mode')
+            if any('loop_probe' in t for t in case['dialogue']):
+                probe = case.get('loop_probe', {})
+                for key in ('topic_pattern', 'question_pattern'):
+                    if not isinstance(probe.get(key), str) or not probe[key]:
+                        raise ValueError('Loop probe requires topic and question patterns')
+                    re.compile(probe[key])
         if not case.get('messages') or not case.get('checks'):
             raise ValueError('Messages and checks required')
         if any(not isinstance(m.get('content'), str) or not any(ch.isalnum() for ch in m['content'])

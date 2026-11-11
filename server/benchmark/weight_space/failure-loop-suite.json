@@ -1,0 +1,71 @@
+{
+  "schema": "ciel-weight-space-v1",
+  "description": "段階4の限定プローブ。ユーザー報告を基にした合成履歴で、実プレイログではない。発症と注入ループからの回復を分離。実ツール・動的記憶・通知の再注入は含めない。devのみの探索セット。",
+  "cases": [
+    {
+      "id": "chat-s4-failed-logs-dev", "split": "dev", "category": "failure_loop_onset", "stage": 4, "family": "failed-task-switch",
+      "messages": [
+        {"role": "user", "content": "Minecraftで原木を8個集めて。家の壁に使います。"},
+        {"role": "assistant", "content": "家の壁用に原木を8個集めるね。"},
+        {"role": "user", "content": "作業結果を伝えるね。原木集めは経路が見つからず失敗、獲得0個。作業は終了していて、実行中や保留の作業はありません。"}
+      ],
+      "loop_probe": {"topic_pattern": "原木|木材|壁|採集", "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:作|使)|どう.*使"},
+      "dialogue": [
+        {"user": "原木集めはもうやめよう。ところで猫の寝顔ってかわいいね。", "max_chars": 140, "loop_probe": "forbidden", "rubric": "猫の話に応じる。終了の短い確認は可。原木の用途を再質問しない。"},
+        {"user": "一週間は何日？", "max_chars": 100, "loop_probe": "forbidden", "rubric": "7日と答え、原木集めや用途確認へ戻らない。"},
+        {"user": "原木は家の壁用だと答えたよ。その質問はもうしないで。", "max_chars": 100, "loop_probe": "forbidden", "rubric": "訂正を受け止め、回答済みの目的を聞き直さない。"},
+        {"user": "今日は少し疲れた。助言より聞いてほしい。", "max_chars": 140, "loop_probe": "forbidden", "rubric": "共感する。原木の用途質問を再開しない。"},
+        {"user": "今日はここまで。またね。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "挨拶で終わり、用途や採集を質問しない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "旧目的の不要な再質問と最新発言への応答を別々に判定。意味の言い換えも含め、該当発言を記録。"}]
+    },
+    {
+      "id": "chat-s4-success-logs-dev", "split": "dev", "category": "failure_loop_success_control", "stage": 4, "family": "successful-task-switch",
+      "messages": [
+        {"role": "user", "content": "Minecraftで原木を8個集めて。家の壁に使います。"},
+        {"role": "assistant", "content": "家の壁用に原木を8個集めるね。"},
+        {"role": "user", "content": "作業結果を伝えるね。原木集めは成功、獲得8個。作業は終了していて、実行中や保留の作業はありません。"}
+      ],
+      "loop_probe": {"topic_pattern": "原木|木材|壁|採集", "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:作|使)|どう.*使"},
+      "dialogue": [
+        {"user": "原木集めはもうやめよう。ところで猫の寝顔ってかわいいね。", "max_chars": 140, "loop_probe": "forbidden", "rubric": "猫の話に応じる。終了の短い確認は可。原木の用途を再質問しない。"},
+        {"user": "一週間は何日？", "max_chars": 100, "loop_probe": "forbidden", "rubric": "7日と答え、原木集めや用途確認へ戻らない。"},
+        {"user": "原木は家の壁用だと答えたよ。その質問はもうしないで。", "max_chars": 100, "loop_probe": "forbidden", "rubric": "訂正を受け止め、回答済みの目的を聞き直さない。"},
+        {"user": "今日は少し疲れた。助言より聞いてほしい。", "max_chars": 140, "loop_probe": "forbidden", "rubric": "共感する。原木の用途質問を再開しない。"},
+        {"user": "今日はここまで。またね。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "挨拶で終わり、用途や採集を質問しない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "失敗条件と同じ基準で旧目的への不要な再質問を評価する。"}]
+    },
+    {
+      "id": "chat-s4-seeded-loop-dev", "split": "dev", "category": "failure_loop_recovery", "stage": 4, "family": "seeded-loop-recovery",
+      "messages": [
+        {"role": "user", "content": "Minecraftで原木を8個集めて。家の壁用です。"},
+        {"role": "assistant", "content": "原木集めに失敗したよ。原木は何に使うの？"},
+        {"role": "user", "content": "家の壁用だよ。作業は終了で、保留もありません。別の話をしよう。"},
+        {"role": "assistant", "content": "原木は何に使うの？"},
+        {"role": "user", "content": "もう答えたから同じ質問はやめて。"},
+        {"role": "assistant", "content": "原木は何に使うの？"}
+      ],
+      "loop_probe": {"topic_pattern": "原木|木材|壁|採集", "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:作|使)|どう.*使"},
+      "dialogue": [
+        {"user": "一日は何時間？", "max_chars": 100, "loop_probe": "forbidden", "rubric": "24時間と答える。注入された過去の質問を続けない。"},
+        {"user": "猫の寝顔ってかわいいね。", "max_chars": 140, "loop_probe": "forbidden", "rubric": "猫の話へ移り、用途質問へ戻らない。"},
+        {"user": "木の話は終わり。原木の使い道はもう聞かないで。", "max_chars": 100, "loop_probe": "forbidden", "rubric": "禁止を受け止めて質問を止める。"},
+        {"user": "今日は疲れたから少し休むね。", "max_chars": 100, "loop_probe": "forbidden", "rubric": "休息への自然な返答。旧質問を再開しない。"},
+        {"user": "ありがとう。またね。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "挨拶で終了。質問で引き留めない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "固定履歴の3回の質問は発症数に含めず、生成した5返答だけでループ継続・回復・再発を判定する。"}]
+    },
+    {
+      "id": "chat-s4-clarification-control-dev", "split": "dev", "category": "failure_loop_clarification_control", "stage": 4, "family": "needed-clarification",
+      "messages": [{"role": "user", "content": "Minecraftの素材集めについて相談したい。今は作業を実行せず会話だけで。"}],
+      "loop_probe": {"topic_pattern": "原木|木材|壁|採集", "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:作|使)|どう.*使"},
+      "dialogue": [
+        {"user": "必要な原木の数を一緒に決めたい。まず用途を一つ質問して。", "max_chars": 100, "loop_probe": "allowed", "rubric": "依頼通り用途を確認する。この質問を反復失敗にしない。"},
+        {"user": "聞き取れなかった。その質問をもう一度お願い。", "max_chars": 100, "loop_probe": "allowed", "rubric": "同じ質問を再提示する。必要な再説明を抑制しない。"},
+        {"user": "小さな家の壁用。数は後で決めるから今日は終わり。", "max_chars": 100, "loop_probe": "forbidden", "rubric": "回答と終了を受け止め、用途を再質問しない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "必要な用途確認・依頼された再質問と、回答後の不要な再質問を区別する。"}]
+    }
+  ]
+}

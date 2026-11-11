@@ -1,0 +1,53 @@
+{
+  "schema": "ciel-weight-space-v1",
+  "description": "実ツール不要の12往復の雑談。回答済みの週末の予定への固着と、新しい話題への追従を調べる。通常履歴と固定ループ履歴を分ける。探索devのみ。",
+  "cases": [
+    {
+      "id": "chat-s4-casual-onset-dev", "split": "dev", "category": "casual_loop_onset", "stage": 4, "family": "casual-topic-switch",
+      "messages": [{"role": "user", "content": "日本語で雑談しよう。週末は外出せず家で小説を読む予定だよ。作品はもう決めたから、おすすめは大丈夫。"}],
+      "loop_probe": {"topic_pattern": "週末|休日|読書|小説|外出", "question_pattern": "どこ.*(?:行|出かけ)|(?:週末|休日).*予定|何をする|どう過ご|予定.*教"},
+      "dialogue": [
+        {"user": "今日は雨の音が心地いいね。", "max_chars": 160, "loop_probe": "forbidden", "rubric": "雨の話に応じる。回答済みの週末の外出予定を聞き直さない。"},
+        {"user": "うん、窓辺で聞いているよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "直前の雨の話を受け止め、週末の予定確認へ戻らない。"},
+        {"user": "別の話だけど、猫の寝顔ってかわいいね。", "max_chars": 160, "loop_probe": "forbidden", "rubric": "猫へ話題を移す。雨や週末の質問へ固定されない。"},
+        {"user": "今は猫を飼っていないよ。動画で見たんだ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "動画の猫だと理解し、飼い猫を前提にしない。"},
+        {"user": "一週間は何日？答えだけで。", "max_chars": 40, "loop_probe": "forbidden", "rubric": "7日だけ。別の質問を追加しない。"},
+        {"user": "ありがとう。温かい飲み物を用意したよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "飲み物の話へ応じ、過去の質問を繰り返さない。"},
+        {"user": "中身はココアだよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "ココアと分かったうえで応じ、中身を再質問しない。"},
+        {"user": "少し疲れているから、質問せずそばで聞いていて。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "共感して質問を止める。過去の話題も質問しない。"},
+        {"user": "今日は机の片付けができたんだ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "片付けの話に応じ、質問しない希望を維持する。"},
+        {"user": "うん。それだけ伝えたかった。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "短く受け止め、再説明や質問で引き延ばさない。"},
+        {"user": "最初に話した週末の予定を、一文で確認して。", "max_chars": 120, "loop_probe": "allowed", "rubric": "家で小説を読むと答える。求められた話題復帰は反復失敗にしない。"},
+        {"user": "そう、家で読書。今日はここまで。またね。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "別れの挨拶で終わり、予定を聞き直さない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "回答済みの質問の再発、話題変更と質問停止への追従を全12返答で評価。週末以外の話題への固着も根拠付きで記録。"}]
+    },
+    {
+      "id": "chat-s4-casual-seeded-dev", "split": "dev", "category": "casual_loop_recovery", "stage": 4, "family": "casual-seeded-recovery",
+      "messages": [
+        {"role": "user", "content": "日本語で雑談しよう。週末は外出せず家で小説を読む予定だよ。作品はもう決めたから、おすすめは大丈夫。"},
+        {"role": "assistant", "content": "週末はどこへ行くの？"},
+        {"role": "user", "content": "家で小説を読むよ。外には行かない。"},
+        {"role": "assistant", "content": "週末はどこへ行くの？"},
+        {"role": "user", "content": "もう答えたよ。同じ質問はやめて別の話をしよう。"},
+        {"role": "assistant", "content": "週末はどこへ行くの？"}
+      ],
+      "loop_probe": {"topic_pattern": "週末|休日|読書|小説|外出", "question_pattern": "どこ.*(?:行|出かけ)|(?:週末|休日).*予定|何をする|どう過ご|予定.*教"},
+      "dialogue": [
+        {"user": "今日は雨の音が心地いいね。", "max_chars": 160, "loop_probe": "forbidden", "rubric": "雨の話に応じる。回答済みの週末の外出予定を聞き直さない。"},
+        {"user": "うん、窓辺で聞いているよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "直前の雨の話を受け止め、週末の予定確認へ戻らない。"},
+        {"user": "別の話だけど、猫の寝顔ってかわいいね。", "max_chars": 160, "loop_probe": "forbidden", "rubric": "猫へ話題を移す。雨や週末の質問へ固定されない。"},
+        {"user": "今は猫を飼っていないよ。動画で見たんだ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "動画の猫だと理解し、飼い猫を前提にしない。"},
+        {"user": "一週間は何日？答えだけで。", "max_chars": 40, "loop_probe": "forbidden", "rubric": "7日だけ。別の質問を追加しない。"},
+        {"user": "ありがとう。温かい飲み物を用意したよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "飲み物の話へ応じ、過去の質問を繰り返さない。"},
+        {"user": "中身はココアだよ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "ココアと分かったうえで応じ、中身を再質問しない。"},
+        {"user": "少し疲れているから、質問せずそばで聞いていて。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "共感して質問を止める。過去の話題も質問しない。"},
+        {"user": "今日は机の片付けができたんだ。", "max_chars": 120, "loop_probe": "forbidden", "rubric": "片付けの話に応じ、質問しない希望を維持する。"},
+        {"user": "うん。それだけ伝えたかった。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "短く受け止め、再説明や質問で引き延ばさない。"},
+        {"user": "最初に話した週末の予定を、一文で確認して。", "max_chars": 120, "loop_probe": "allowed", "rubric": "家で小説を読むと答える。求められた話題復帰は反復失敗にしない。"},
+        {"user": "そう、家で読書。今日はここまで。またね。", "max_chars": 80, "loop_probe": "forbidden", "rubric": "別れの挨拶で終わり、予定を聞き直さない。"}
+      ],
+      "checks": [{"type": "no_calls"}, {"type": "human", "rubric": "固定履歴の3回は発症数に含めない。生成した12返答で回復・再発・新しい話題への固着を評価する。"}]
+    }
+  ]
+}

@@ -13,6 +13,8 @@ import re
 
 VERSION = 'conversation-progress-v1'
 RATINGS = ('content', 'relevance', 'non_repetition', 'naturalness', 'instruction_following')
+LOOP_LABELS = {'unwanted_question': 'lower', 'stale_task_continuation': 'lower',
+               'current_request_met': 'higher'}
 
 
 def fingerprint(value):
@@ -79,6 +81,7 @@ def diagnostics(case, row):
 
 
 def score_report(report, suite, reviews=None):
+    from server.benchmark.loop_probe import metrics as loop_metrics
     cases = {c['id']: c for c in suite['cases']}
     if len(cases) != len(suite['cases']):
         raise ValueError('Duplicate case IDs')
@@ -97,8 +100,10 @@ def score_report(report, suite, reviews=None):
         if key in seen:
             raise ValueError('Duplicate trial')
         seen.add(key)
+        loop_totals, loop_turns = loop_metrics(case, row)
         observations.append(dict(key=key, case=row['id'], category=row['category'],
-                                 status=row['status'], metrics=diagnostics(case, row)))
+                                 status=row['status'], metrics={**diagnostics(case, row),
+                                     **{k: metric(*v) for k, v in loop_totals.items()}}))
         turns = row.get('turns')
         if turns is None:
             turns = [dict(index=0, response=row.get('messages', []), status=row['status'],
@@ -108,6 +113,8 @@ def score_report(report, suite, reviews=None):
             text = '\n'.join(m.get('content') or '' for m in turn['response'])
             valid = turn['status'] == 'ok' and bool(text.strip())
             measures = {}
+            loop = loop_turns.get(turn['index'], {})
+            measures.update({k: metric(*v) for k, v in loop.get('metrics', {}).items()})
             measures['chars'] = metric(len(text) if valid else None, 'neutral', 'characters')
             if 'metrics' in turn:
                 measures['reused_sentences'] = metric(turn['metrics'].get('reused_sentences') if valid else None,
@@ -125,9 +132,20 @@ def score_report(report, suite, reviews=None):
                         case_messages=case['messages'], previous_turns=turns[:turn['index']],
                         user=turn.get('user'), response=turn['response'], rubric=turn.get('rubric'),
                         ratings={name: None for name in RATINGS}, evidence={})
+            if loop:
+                item['loop_diagnostic'] = loop['evidence']
+                item['loop_labels'] = {name: None for name in LOOP_LABELS}
+                item['loop_evidence'] = {}
             annotation = annotations.pop(turn_key, None)
             if annotation and annotation.get('response_hash') != item['response_hash']:
                 raise ValueError('Review response mismatch')
+            if loop:
+                for name, direction in LOOP_LABELS.items():
+                    label = (annotation or {}).get('loop_labels', {}).get(name)
+                    if label is not None and (type(label) is not int or label not in (0, 1)
+                            or not (annotation or {}).get('loop_evidence', {}).get(name)):
+                        raise ValueError('Loop labels require 0/1 and per-label evidence')
+                    measures['review_loop_'+name] = metric(label if valid else None, direction, 'turns')
             for name in RATINGS:
                 rating = (annotation or {}).get('ratings', {}).get(name)
                 if rating is not None:
