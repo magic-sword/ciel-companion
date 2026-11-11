@@ -22,6 +22,14 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 ## 何を比較するか
 
+### 対象候補の受付だけを調べる
+
+`server/benchmark/target_intake.py`は、専用MCPから実際の能力定義を読み、固定の指差し観測と8つの文字入力を`GameIntake`へ渡す。実モデルを使うが操作は記録だけに差し替え、ワールドへ発行しない。明示座標と古い指差し、単一の高さ、負座標、座標不足、言い直し、対象なし、否定を扱う。正例は操作名・引数の完全一致、非実行例は操作発行0件を要求し、推論タイムアウトを適切な非実行に数えない。対象なしへの確認文の品質や、その後の通常会話経路は採点しない。
+
+希望する版を`benchmark-home.py stage`で配置し、その版のbodyを専用試験で起動してから、`.venv/Scripts/python.exe -X utf8 scripts/server/benchmark-target-home.py --label candidate`を実行する。基準版は`--label baseline`。labelは結果名であり実装を切り替えない。helperは現在配置された受付を使い、評価モジュールだけを同じ版へ揃える。共有GPU APIを使い、1入力の受付20秒・8入力全体180秒。結果名を指定して通常の`benchmark-home.py pull --run <名前>`で回収する。
+
+この成績は実機の目的達成率とは別に記載する。実機は同じ8課題（point_move、point_recover、point_clear、point_floor、3つのpoint_*_coordinates、gaze_move）の`conversation`をseed 11・1回で比較し、RCONで実状態を検証する。初期化では評価側が入室・通知の受信準備を終えてからagentをdispatchし、初期のenv.listの取りこぼしを避ける。
+
 | モード | 入力 | 評価する範囲 |
 |---|---|---|
 | `body` | 構造化した目的・直接操作 | 採集・製作はGoalRunner → MCP work → ゲーム側の計画・実行 → 体。移動は会話でも公開される直接操作を呼ぶ。LLMを呼ばず、心の判断が必要なら `needs_mind` で失敗 |

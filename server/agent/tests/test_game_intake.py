@@ -94,6 +94,42 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         await self.intake.handle(llm.ChatMessage(role='user',content=['Move here']))
         env.use.assert_not_awaited()
 
+    async def test_bound_coordinate_schema_resolves_without_model_numbers(self):
+        self.tool()
+        env = self.runner.env
+        env.meta['puzzle_move']['ciel/target_binding'] = {'kind': 'axes', 'fields': {'x': ['x', 0]}, 'point': True}
+        self.sequence({'operation': 'select', 'capability': '2'},
+                      {'operation': 'execute', 'arguments': {'target_id': 'T1'}})
+        await self.intake.handle(llm.ChatMessage(role='user', content=['X=-12へ移動して']))
+        env.use.assert_awaited_once_with('puzzle_move', {'x': -12})
+        detail = json.loads(self.create.await_args.kwargs['messages'][1]['content'])
+        self.assertNotIn('x', detail['capability']['arguments']['properties'])
+
+    async def test_model_cannot_override_bound_numbers_or_use_missing_target(self):
+        self.tool()
+        env = self.runner.env
+        env.meta['puzzle_move']['ciel/target_binding'] = {'kind': 'axes', 'fields': {'x': ['x', 0]}}
+        for arguments in ({'target_id': 'T1', 'x': 99}, {'target_id': 'invented'}):
+            self.sequence({'operation': 'select', 'capability': '2'},
+                          {'operation': 'execute', 'arguments': arguments},
+                          {'operation': 'execute', 'arguments': arguments})
+            await self.intake.handle(llm.ChatMessage(role='user', content=['X=5へ']))
+        self.sequence({'operation': 'select', 'capability': '2'})
+        await self.intake.handle(llm.ChatMessage(role='user', content=['X=へ']))
+        env.use.assert_not_awaited()
+
+    async def test_explicit_axes_block_old_pointer_even_if_model_selects_it(self):
+        self.tool()
+        env = self.runner.env
+        env.profile['reference_context'] = True
+        env.state = {'references': {'selection_id': 'old'}}
+        env._refresh = AsyncMock()
+        env.meta['puzzle_move']['ciel/target_binding'] = {'kind': 'reference', 'argument': 'selection_id'}
+        self.sequence({'operation': 'select', 'capability': '2'})
+        await self.intake.handle(llm.ChatMessage(role='user', content=['X=5、Y=64、Z=0を除去して']))
+        self.assertEqual(self.create.await_count, 1)
+        env.use.assert_not_awaited()
+
     async def test_speech_end_reference_is_bound_to_transcribed_item(self):
         env=self.runner.env
         env.profile['reference_context']=True
@@ -117,6 +153,32 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         env._refresh=AsyncMock(return_value=False)
         result=await self.intake.handle(llm.ChatMessage(role='user',content=['Move here']))
         self.assertIn('確認できません',result)
+        self.create.assert_not_awaited()
+        env.use.assert_not_awaited()
+
+    async def test_next_text_item_does_not_reuse_previous_speech_capture(self):
+        env = self.runner.env
+        env.profile['reference_context'] = True
+        env.state = {'references': {'selection_id': 'first'}}
+        env._refresh = AsyncMock()
+        self.intake.on_transcribed(types.SimpleNamespace(is_final=True, item_id='one', transcript='Here'))
+        await self.intake._speech_reference[1]
+        env.state = {'references': {'selection_id': 'second'}}
+        self.intake.on_transcribed(types.SimpleNamespace(is_final=True, item_id='two', transcript='Here'))
+        await self.intake._speech_reference[1]
+        self.respond({'operation': 'none'})
+        await self.intake.handle(llm.ChatMessage(id='two', role='user', content=['Here']))
+        self.assertEqual(json.loads(self.create.await_args.kwargs['messages'][1]['content'])['references']['selection_id'], 'second')
+
+    async def test_reconnect_after_speech_capture_cannot_reuse_reference(self):
+        env = self.runner.env
+        env.profile['reference_context'] = True
+        env.state = {'references': {'selection_id': 'old-world'}}
+        env._refresh = AsyncMock()
+        self.intake.on_transcribed(types.SimpleNamespace(is_final=True, item_id='one', transcript='Here'))
+        await self.intake._speech_reference[1]
+        env._connection_epoch += 1
+        await self.intake.handle(llm.ChatMessage(id='one', role='user', content=['Here']))
         self.create.assert_not_awaited()
         env.use.assert_not_awaited()
 

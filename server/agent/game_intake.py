@@ -9,6 +9,7 @@ import uuid
 import debug_log
 import models
 import jsonschema
+from target_candidates import TargetCandidates
 
 STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*(?:(?:その場で待ってください|こちらが頼むまで再開しないでください)[。\s、]*)*$')
 
@@ -24,18 +25,21 @@ class GameIntake:
         self._speech_reference = None
         self._reference_items = {}
         self._reference_tasks = set()
+        self._speech_item = None
 
     async def _capture_references(self):
         env = self.runner.env
         if not env.playing() or not env.profile.get('reference_context'):
             return None
-        if await asyncio.wait_for(env._refresh(), 2) is False:
+        epoch = getattr(env, '_connection_epoch', None)
+        if await asyncio.wait_for(env._refresh(), 2) is False or epoch != getattr(env, '_connection_epoch', None):
             raise RuntimeError('Reference observation unavailable')
         return copy.deepcopy(env.state.get('references'))
 
     def on_user_state(self, event):
         if event.new_state == 'speaking':
             self._speech_reference = None
+            self._speech_item = None
             return
         if getattr(event, 'old_state', None) != 'speaking' or event.new_state == 'speaking':
             return
@@ -44,6 +48,7 @@ class GameIntake:
     def _begin_reference_capture(self):
         task = asyncio.create_task(self._capture_references())
         self._speech_reference = (time.monotonic(), task)
+        self._speech_item = None
         self._reference_tasks.add(task)
         def finished(t):
             self._reference_tasks.discard(t)
@@ -67,6 +72,7 @@ class GameIntake:
             definitions.append(dict(kind='tool', name=fn.id, description=schema.get('description', ''),
                                     arguments=schema['parameters'],
                                     reference_argument=env.meta[fn.id].get('ciel/reference_argument'),
+                                    target_binding=copy.deepcopy(env.meta[fn.id].get('ciel/target_binding')),
                                     examples=copy.deepcopy(env.meta[fn.id].get('ciel/triggers', [])[:3])))
         return {str(i): d for i, d in enumerate(definitions, 1)}
 
@@ -86,11 +92,13 @@ class GameIntake:
     def on_transcribed(self, event, owner=True):
         item_id = getattr(event, 'item_id', None)
         if owner and item_id and getattr(event, 'is_final', False) and not STOP.fullmatch(event.transcript.strip()):
-            if not self._speech_reference or time.monotonic()-self._speech_reference[0] >= 10:
+            if (not self._speech_reference or time.monotonic()-self._speech_reference[0] >= 10
+                    or self._speech_item not in (None, item_id)):
                 self._begin_reference_capture()
             captured_at, task = self._speech_reference
             if time.monotonic()-captured_at < 10:
-                self._reference_items[item_id] = task
+                self._speech_item = item_id
+                self._reference_items[item_id] = (task, getattr(self.runner.env, '_connection_epoch', None))
                 while len(self._reference_items)>16:
                     del self._reference_items[next(iter(self._reference_items))]
         if owner and getattr(event, 'is_final', False) and STOP.fullmatch(event.transcript.strip()):
@@ -154,29 +162,46 @@ class GameIntake:
         if env.profile.get('reference_context'):
             try:
                 capture = self._reference_items.pop(request_id, None)
-                references = await capture if capture else await self._capture_references()
+                if capture:
+                    task, capture_epoch = capture
+                    references = await task
+                    if capture_epoch != getattr(env, '_connection_epoch', None):
+                        raise RuntimeError('Reference connection changed')
+                else:
+                    references = await self._capture_references()
             except Exception:
                 return '指し示した対象の状態を確認できませんでした。'
         definitions = self._capabilities()
+        targets = TargetCandidates(request_id, text, references, definitions)
+        exposed = targets.definitions
+        # Bound targets replace raw references on the new contract; other games keep
+        # their existing opaque reference contract.
+        model_references = None if targets.bindings else references
         epoch = getattr(env, '_connection_epoch', None)
         try:
             action = await self._infer({'stage': 'select', 'input': text,
                 'capabilities': [{'id': i, 'description': d['description'],
                                   **({'reference_argument': d['reference_argument']} if d.get('reference_argument') else {}),
+                                  **({'target_ids': d['target_ids']} if 'target_ids' in d else {}),
                                   **({'examples': d['examples']} if d.get('examples') else {})}
-                                 for i, d in definitions.items()],
-                'current': self.runner.status(), 'body': getattr(env, '_body', {}), 'references': references}, started)
+                                 for i, d in exposed.items() if d.get('target_ids') != []],
+                'current': self.runner.status(), 'body': getattr(env, '_body', {}),
+                'targets': targets.targets, 'references': model_references}, started)
             selected = None
             if action.get('operation') == 'select':
                 selected = action.get('capability')
                 if not isinstance(selected, str) or selected not in definitions:
                     raise ValueError('Unknown capability')
                 definition = definitions[selected]
+                model_definition = exposed[selected]
+                if model_definition.get('target_ids') == []:
+                    return '今回の対象を特定できません。座標を一組で指定するか、指示棒で選び直してください。'
                 debug_log.record('work_capability_selected', capability=definition['name'], capability_kind=definition['kind'],
                     version=hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest()[:12])
                 action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
-                    'capability': definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
-                    'references': references if definition.get('reference_argument') else None}, started)
+                    'capability': model_definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
+                    'targets': targets.targets,
+                    'references': model_references if definition.get('reference_argument') else None}, started)
         except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
             return '依頼の操作を確認できませんでした。'
         except Exception as e:
@@ -209,7 +234,9 @@ class GameIntake:
                     if (action.get('operation') != expected
                             or action.get('capability', selected) not in (selected, definition['name'])):
                         raise ValueError('Wrong operation')
-                    jsonschema.validate(action.get('arguments'), definition['arguments'])
+                    jsonschema.validate(action.get('arguments'), model_definition['arguments'])
+                    resolved = targets.resolve(selected, action['arguments'])
+                    jsonschema.validate(resolved, definition['arguments'])
                     if expected == 'submit':
                         jsonschema.validate(action.get('constraints'), definition['constraints'])
                     break
@@ -218,8 +245,9 @@ class GameIntake:
                         return '操作の引数を確認できませんでした。'
                     try:
                         action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
-                            'capability': definition, 'current': self.runner.status(),
-                            'references': references if definition.get('reference_argument') else None,
+                            'capability': model_definition, 'current': self.runner.status(),
+                            'targets': targets.targets,
+                            'references': model_references if definition.get('reference_argument') else None,
                             'correction': '引数と制約のschemaに従い、必須項目をすべて指定する。'}, started)
                     except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
                         return '操作の引数を確認できませんでした。'
@@ -228,9 +256,9 @@ class GameIntake:
                 return '操作の確認中に状態が変わったため、開始しませんでした。'
             if expected == 'execute':
                 ref_arg = getattr(env, 'meta', {}).get(definition['name'], {}).get('ciel/reference_argument')
-                if ref_arg and (not references or action['arguments'].get(ref_arg) != references.get('selection_id')):
+                if ref_arg and (not references or resolved.get(ref_arg) != references.get('selection_id')):
                     return '指し示した対象を確認できません。指示棒で選び直してください。'
-                r = await env.use(definition['name'], action['arguments'])
+                r = await env.use(definition['name'], resolved)
             else:
                 seconds = action.get('seconds', 90)
                 if type(seconds) is not int or not 1 <= seconds <= 120:

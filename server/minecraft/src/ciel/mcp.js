@@ -84,26 +84,29 @@ export function makeServer(hub, sessionId) {
     title: '指し示した場所で作業する',
     description: '指示棒または目線で示した「ここ」「これ」「ここからあそこまで」を使う。referencesのselection_idを指定し、move=1地点へ接近、recover=選んだ作業台1個の回収、clear=2点を含む直方体の自然ブロック除去、floor=同じ高さの地面2点の上へ床を作る。最大64マス・距離32以内。選択がなければ選んでもらう。床の材料はblockで指定する。',
     inputSchema: { selection_id:z.string().uuid(), action:z.enum(['move','recover','clear','floor']), block:z.enum(BUILD_BLOCKS).optional() },
-    ...ACT('minecraft_pointed_action', { 'ciel/long_running':true, 'ciel/reference_argument':'selection_id' }),
+    ...ACT('minecraft_pointed_action', { 'ciel/long_running':true, 'ciel/reference_argument':'selection_id',
+      'ciel/target_binding': { kind:'reference', argument:'selection_id' } }),
   }, args => body(l => l.do('pointed_action',args)));
   const region = Object.fromEntries(['x1','y1','z1','x2','y2','z2'].map(k => [k,
     z.number().int().describe(`${k[0].toUpperCase()}軸の${k[1]==='1'?'最小':'最大'}座標（このマスを含む）。利用者の指定した同じ軸の${k[1]==='1'?'下限':'上限'}値。`)]));
+  const regionBinding = { kind:'axes', fields: Object.fromEntries(Object.keys(region).map(k => [k,[k[0],Number(k[1])-1]])) };
   server.registerTool('minecraft_clear_region', {
     title: '範囲を整地する',
     description: '指定した直方体の自然ブロックを掘って空気にする。両端を含む最小座標x1,y1,z1と最大座標x2,y2,z2。最大64マス、距離32以内。建物は壊さない。高さを揃えるには残す地面の一つ上から指定。範囲が不明なら確認する。',
-    inputSchema: region, ...ACT('minecraft_clear_region', { 'ciel/long_running': true }),
+    inputSchema: region, ...ACT('minecraft_clear_region', { 'ciel/long_running': true, 'ciel/target_binding':regionBinding }),
   }, args => body(l => l.do('clear_region', args)));
   server.registerTool('minecraft_build_region', {
     title: '床や壁を建築する',
     description: '指定した直方体を手持ちの同じブロックで埋めて床・壁を作る。両端を含む最小座標x1,y1,z1と最大座標x2,y2,z2、blockは英語ID。最大64マス、距離32以内。既存の異なるブロックは壊さない。材料と足場が必要。寸法・座標が不明なら確認する。',
-    inputSchema: { ...region, block: z.enum(BUILD_BLOCKS) }, ...ACT('minecraft_build_region', { 'ciel/long_running': true }),
+    inputSchema: { ...region, block: z.enum(BUILD_BLOCKS) }, ...ACT('minecraft_build_region', { 'ciel/long_running': true, 'ciel/target_binding':regionBinding }),
   }, args => body(l => l.do('build_region', args)));
   server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'マイクラで、持ち主についていく（止めるまで続く）。相手が遠い・見失ったときは、方向表示の手掛かりがあれば最大60秒探す。', inputSchema: {},
     ...ACT('minecraft_follow_me', { 'ciel/long_running': true }) }, () => body((l) => l.do('follow')));
   server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。相手が遠いときは、方向表示の手掛かりがあれば最大60秒探してから近づく。', inputSchema: {},
     ...ACT('minecraft_come_here', { 'ciel/long_running': true }) }, () => body((l) => l.do('come')));
   server.registerTool('minecraft_go_to_place', { title: '場所へ行く', description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
-    inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true }) },
+    inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true,
+      'ciel/target_binding': {kind:'axes',point:true,fields:{x:['x',0],z:['z',0]}} }) },
   ({ x, z: zz }) => body((l) => l.do('go_to', { x, z: zz })));
   server.registerTool('minecraft_find_blocks', {
     title: '探す',

@@ -158,13 +158,16 @@ class ConversationDriver:
             task.add_done_callback(self.tasks.discard)
 
         self.room.register_text_stream_handler('lk.transcription', transcription)
-        await self.lk.room.create_room(api.CreateRoomRequest(
-            name=self.name, agents=[api.RoomAgentDispatch(agent_name=self.agent,
-                metadata=benchmark_contract.metadata(self.backend,self.model_id,self.trial))]))
+        await self.lk.room.create_room(api.CreateRoomRequest(name=self.name))
         self.created = True
         token = (api.AccessToken().with_identity('benchmark-user').with_name('ベンチマーク')
                  .with_grants(api.VideoGrants(room_join=True, room=self.name)).to_jwt())
         await self.room.connect(os.environ['LIVEKIT_URL'], token)
+        # Subscribe before starting the worker: env.list is an initial notification,
+        # not retained state. Dispatching at room creation could lose it on fast starts.
+        await self.lk.agent_dispatch.create_dispatch(api.CreateAgentDispatchRequest(
+            room=self.name, agent_name=self.agent,
+            metadata=benchmark_contract.metadata(self.backend,self.model_id,self.trial)))
         await asyncio.wait_for(ready.wait(), 90)
         paths = list(self.debug_dir.glob('*-' + self.name + '.jsonl'))
         if len(paths) != 1:
