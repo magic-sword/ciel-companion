@@ -1,0 +1,20 @@
+{
+  "schema": "ciel-wsp-decay-plan-v2",
+  "base_sha256": "3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375",
+  "hypothesis": "Increase decay in the six middle recurrent layers whose static dt biases have the most negative means. This may weaken stale context; not a causally identified repetition circuit.",
+  "layers": [12, 13, 14, 16, 17, 18],
+  "candidates": {"decay010": 0.1, "decay025": 0.25, "eos110": 1.1},
+  "candidate_methods": {"decay010": "dt_bias_shift", "decay025": "dt_bias_shift", "eos110": "eos_scale"},
+  "amendment": "After the first three screen runs: decay010 shortened answers but retained 2 unnecessary requestions; decay025 had longer, less relevant responses. Register one additional EOS1.10 candidate before observing it. Earlier EOS1.05 was ineffective. Keep v1 snapshots in prior run sources. Maximum three candidates in this study; no further expansion.",
+  "selection": "Exploratory semantic review: reduce unwanted questions and stale plan resumptions without losing current-request content or requested recap. decay010 repeat is already in progress at v2 registration. Repeat EOS only if its screen improves; select at most one candidate for guard and holdout. If none satisfies both target and preservation, do not adopt. Equal effects prefer smaller edit.",
+  "regression_gate": "No new automatic failures on baseline-passing cases; no new critical stop/negation/JSON/tool errors; review content, relevance, instruction following, naturalness and memory. Missing responses never count as improvement.",
+  "limitations": "Temperature-zero repeats test runtime consistency, not independent prevalence samples. One evaluator is exploratory. Text fixtures do not establish live audio, vision or real Minecraft non-regression. No automatic production adoption.",
+  "max_candidates": 3,
+  "max_model_runs": 11,
+  "phases": {
+    "screen": {"suites": ["stream-replay-suite.json"], "split": "dev", "rounds": 1, "timeout": 120, "wall_seconds": 900},
+    "repeat": {"suites": ["stream-replay-suite.json"], "split": "dev", "rounds": 3, "timeout": 120, "wall_seconds": 1800},
+    "guard": {"suites": ["suite.json", "conversation-suite.json"], "split": "dev", "rounds": 1, "timeout": 180, "wall_seconds": 8400},
+    "holdout": {"suites": ["suite.json", "conversation-suite.json"], "split": "holdout", "rounds": 1, "timeout": 180, "wall_seconds": 8400}
+  }
+}

@@ -44,6 +44,16 @@ W_candidate = W_base + ΔW
 
 `scripts/server/weight-space-remote.py <明示したPython実験ファイル> --upload <ファイル>`は既存SSH設定で専用領域へコードを置いて実行する補助。高精度checkpointを使う通常のWSPと量子化スケールの限定実験を区別する。採用判断は[実測](../testing/weight-space-results-ja.md)へ記録する。
 
+## 量子化35Bの記憶減衰を調べる限定実験
+
+`gguf_decay_edit.py`は現行GGUFに含まれるF32の`ssm_dt.bias`を直接編集する。量子化行列の再量子化はしない。[Qwen35MoEの推論実装](https://github.com/ggml-org/llama.cpp/blob/master/src/models/qwen35moe.cpp)では減衰gateを`A * softplus(alpha + dt_bias)`で作り、現行GGUFのAは負。biasの増加は同じ入力に対する減衰を強める。ただし入力alphaは動的であり、静的biasだけから実際の記憶期間や固着の原因を確定できない。
+
+現行40層のうち、静的bias平均が特に負だった中間6層（12/13/14/16/17/18）の各32要素を対象とする。+0.1/+0.25の2候補、合計192要素の編集を`server/benchmark/weight_space/decay-plan.json`へ事前固定した。古い状態への依存が減る可能性を検証する仮説であり、公開研究の0.8Bで特定されたMLP方向を移植するものではない。必要な記憶も弱まるため、訂正保持・必要な再説明・停止・JSON・ツール・通常会話を保護評価に含める。
+
+編集器は原本hash・architecture・形状・型・有限値と保存後の加算量を確認し、新規コピー以外への書込みを拒否する。対象外を含む全バイトを計画した差分と照合し、base/candidate hashと実変更量をmanifestへ保存する。実施結果と採用判断は[実測資料](../testing/weight-space-results-ja.md)を参照する。
+
+減衰2候補のscreen後、弱い候補では短文化しても再質問が残り、強い候補では長文化した。この観測を受けた計画v2は、EOS1.10倍を1候補だけ追加し、探索総数を3候補に固定する。追加前のv1計画・ソースは各run内へ保存する。EOSの拡大が必ず終了を促すわけではないという制約は上記と同じ。
+
 ## シエルに入れるもの
 
 設定の参照元は `D:\CIEL\企画設計\キャラ\シエル` の設定資料・台詞集・AR知覚資料。指定の[GitHub設定リポジトリ](https://github.com/magic-sword/ciel-anime-design)は今回Web経由では本文を取得できなかったため、ローカル資料を読んだ。両者の一致は未確認。採用する文書のSHA-256と所在は実験manifestへ残し、原本は変更しない。
@@ -84,7 +94,7 @@ Guo・Chenの[Generalized Cross-Attention（v2本文）](https://arxiv.org/html/
 6. **量子化と比較**：未編集元→未編集Q4_K_M、同じ元→編集→Q4_K_Mを作る。現行GGUF、再変換した未編集対照、編集版の三者を比較する。変換器・imatrixのhashを固定し、imatrixにholdoutを使わない。差分が量子化で消えた場合も失敗として記録。
 7. **最終評価**：候補選定後にholdoutを一度開き、人格の人手評価、ツール・一般性能、音声、実機の条件を確認する。見た結果で再調整したholdoutは開発用へ移し、新しい系列を用意。採用条件を満たさなければ基準を維持する。
 
-本番GGUFを上書きしない。候補重み・基準重み・変換物・manifestはGit対象外の別ディレクトリへ保存。推論APIだけでは内部活性や重みを編集できない。プロンプト候補は別ディレクトリでGit管理し、通常設定への採用と分ける。実施済みの同一重みでの比較結果は[確認状況](../testing/verification-status-ja.md)。重み編集器と35BでのWSP効果は未検証。
+本番GGUFを上書きしない。候補重み・基準重み・変換物・manifestはGit対象外の別ディレクトリへ保存。推論APIだけでは内部活性や重みを編集できない。プロンプト候補は別ディレクトリでGit管理し、通常設定への採用と分ける。実施済みの比較結果は[確認状況](../testing/verification-status-ja.md)。35B量子化GGUFの限定編集は実行済みだが、反復改善と他機能の維持を両立するモデルの採用は未達。
 
 ## 実験manifestと復元
 

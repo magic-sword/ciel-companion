@@ -235,6 +235,23 @@ helperの既定runは1課題1回。全devなら`--limit 32 --rounds 3`、最終h
 
 runの終了コード0は自動check通過、1は自動失敗、引数エラーは2。compareは不一致・欠測・自動劣化で非0。自動劣化が見つからなくても`review_required`であり、最終合格は出さない。人手評価・音声・実機を終えるまで採用しない。latency集計は観測された成功処理のみの件数・p50/p95であり、同時にerrorsと全試行数を読む。token上限・タイムアウトを除外して高速化率を算出しない。
 
+## 減衰重み候補の隔離比較
+
+`server/benchmark/gguf_decay_experiment.py`と`scripts/server/weight-space-decay-home.py`は、登録した未編集base・decay010・decay025・eos110を同じ自宅CPU環境で比較する。共有GPUの基準値とは直接比較しない。実行ごとにソース・suite・5promptを保存し、重みhashを再確認する。原本または候補1ファイルをread-onlyで専用コンテナへ渡し、CPU8threads・40GiB上限・context8192・parallel1・loopback18099で起動。終了時は専用`ciel-wsp-decay-test`だけを削除する。
+
+探索予算・採用ゲートは`server/benchmark/weight_space/decay-plan.json`を結果を見る前に固定する。screenは配信由来4課題各1回・課題120秒、改善候補1個だけをrepeat（同課題各3回）とguard（既存32＋会話12のdev）で比較する。選定後のholdoutは既存32＋会話12の未使用側。guard/holdoutは課題180秒。各返答512token・温度0・thinking無効で、欠測・途中終了を改善と数えない。同じ温度0での反復は独立した発症率の標本ではない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-decay-home.py stage
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-decay-home.py edit
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-decay-home.py run --model base --phase screen --label decay-screen-base
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-decay-home.py pull --label decay-screen-base --output server/benchmark/data/decay-screen-base
+```
+
+候補は`--model decay010`、`decay025`、`eos110`で新しいlabelを指定する。既存候補がある場合の追加作成は`edit --model eos110`のように対象を指定する。既存の重み・結果を上書きせず、実験中にstageしない。生成した各結果の`suite.json`と`report.json`は通常の`progress score/compare`で採点する。意味判定・不要反復・内容充足と、決定的な形式/ツールの退行を分ける。実音声・画像・実Minecraftはこの比較の範囲外であり、本番採用は自動で行わない。
+
+この隔離実験helperのrun終了コード0は予定課題の測定終了を示す。品質・自動checkの合格ではない。各試行の`automatic_pass`と通常比較器の新規退行一覧を確認する。終了後は`status`で専用コンテナの残存と全runの完了を確認できる。
+
 ## 比較条件と採用基準
 
 比較は同一suite/runner/prompt/sampling/seed/反復/課題/timeout/hardware/runtime/shared_loadを要求。開始・終了modeが不一致なら比較不能とする。途中の歌唱CPU切替・共有競合までは自動監視しないため、発生時は混合条件とし、時系列ログを追加して両版を取り直す。キャッシュ・warm/cold・起動準備は区別し、A→BだけでなくA/B順序を入れ替えて測る。
