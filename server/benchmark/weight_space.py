@@ -58,6 +58,20 @@ def load_suite(path):
                     if not isinstance(probe.get(key), str) or not probe[key]:
                         raise ValueError('Loop probe requires topic and question patterns')
                     re.compile(probe[key])
+                units = probe.get('units', {})
+                if not isinstance(units, dict):
+                    raise ValueError('Loop units must be a mapping')
+                for name, pattern in units.items():
+                    if not re.fullmatch('[a-z_]+', name) or not isinstance(pattern, str) or not pattern:
+                        raise ValueError('Invalid loop unit')
+                    re.compile(pattern)
+                units = probe.get('units', {})
+                if not isinstance(units, dict):
+                    raise ValueError('Loop units must be a mapping')
+                for name, pattern in units.items():
+                    if not re.fullmatch('[a-z_]+', name) or not isinstance(pattern, str) or not pattern:
+                        raise ValueError('Invalid loop unit')
+                    re.compile(pattern)
         if not case.get('messages') or not case.get('checks'):
             raise ValueError('Messages and checks required')
         if any(not isinstance(m.get('content'), str) or not any(ch.isalnum() for ch in m['content'])

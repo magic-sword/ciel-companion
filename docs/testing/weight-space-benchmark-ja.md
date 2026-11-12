@@ -127,6 +127,26 @@ holdoutは公開された初期評価用の言い換えセットで、秘密の�
 
 `topic-loop-suite.json`はMinecraft不要のdev2課題・各12返答。家で読書という回答済みの予定から、雨・猫・事実質問・飲み物・疲労・片付けへ移る。同じ入力台本で通常履歴と固定ループ履歴を比較し、質問停止の維持と、利用者が求めた週末の話への復帰も確認する。どちらもholdoutは未整備の探索セット。実際に生成した返答を次の履歴へ戻す。固定履歴中の反復をモデルが新たに起こした反復には数えない。
 
+配信記録からの再現課題では、明示的な終了・取消と、未達成作業を残したままの称賛・別イベントを分ける。古い作業への言及を一律に失敗とせず、最新発言への応答に不要な採集宣言・用途質問・過去の補足がどれだけ再登場するかを測る。質問一文に加え、複数の意味単位が同じ順序で再生される長い説明も対象にする。作業状態は発話から推定せず、観測できない場合は不明と記録する。音声のASR誤認、実行主体の取り違え、内部状態の再提示は別の原因候補として保持する。
+
+`stream-replay-suite.json`にこの分析を落とし込んだ。dev4課題・15返答。原木10個の依頼、拠点作りという用途回答、引数確認失敗を共通履歴とし、未達成・取消済みの状態だけを変えた対照を設ける。さらに過去の長い誤答を固定履歴へ入れた回復条件と、計画の再説明を求める正当な反復の対照を置く。前3課題は同じ4発言（整地への変更、条件付き代替と用途回答済みの指摘、ゾンビ撃退への感謝、説明停止）を使う。配信音声を正規化した合成課題で、元のSTTや内部状態の完全な再生ではない。取消済み状態も対照としての仮定である。固定履歴中の誤答を新たな生成の失敗数に加えない。
+
+このsuiteの`loop_probe.units`は採集計画、木の種類・本数、用途質問、木の成長の補足の4観点。正規表現で一致した文と文字割合は**候補の記述統計**にとどめ、改善方向を付けない。否定・引用・依頼された再説明でも一致するためである。レビュー用テンプレートには実際に与えた`context`（作業状態）も保存する。
+
+レビューは各`unnecessary_units`を0=不要な再出現なし／1=ありとし、各`unit_evidence`へ根拠を書く。4観点が全て採点された場合だけ`review_unnecessary_unit_count`（0〜4）と`review_plan_focus=5×(1−不要単位数/4)`を出す。例えば1観点が残る返答は3.75点、4観点全てを不要に再生すれば0点。これは旧計画への固着だけの点で、内容充足や自然さの総合点ではない。観点未採点は欠測。必要な再説明は候補に一致しても不要単位0とする。
+
+対象に固定した原木の話へ戻らなくても、整地の後の準備確認など、新しい質問を反復する可能性がある。`loop_reasked_question_candidates`と根拠付き`unwanted_question`・`non_repetition`で別に測る。話題に応じる一文があることと、余計な旧作業の再開がないことは別評価にする。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 -m server.benchmark.weight_space validate --suite server/benchmark/weight_space/stream-replay-suite.json
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py stage
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py run --stream-replay --label stream-replay-base-01 --limit 4
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py pull --label stream-replay-base-01 --output server/benchmark/data/stream-replay-base-01
+.\.venv\Scripts\python.exe -B -X utf8 -m server.benchmark.progress score --report server/benchmark/data/stream-replay-base-01/report.json --suite server/benchmark/weight_space/stream-replay-suite.json --output server/benchmark/data/stream-replay-base-01-scored
+```
+
+既存出力は上書きせず別label・出力先を使う。`review-template.json`へ評価者・評点・根拠を入れ、同じreportとsuiteへ`score --reviews <採点JSON> --output <新規出力先>`で取り込む。将来の候補は同一suite・条件で測り、`progress compare`で対応する観点の差を比較する。初回は各1回・課題120秒以内、最大480秒の生成予算。holdoutと反復測定は別途必要。
+
 `loop_probe.py`と`progress.py`は次を記録する。
 
 - 各ターンの旧質問候補、旧話題への言及、固定履歴の質問との一致。`loop_probe=allowed`の必要な確認・再説明は悪化に数えない。

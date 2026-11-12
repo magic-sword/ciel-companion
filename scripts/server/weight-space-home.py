@@ -16,6 +16,7 @@ FILES = ['server/benchmark/weight_space.py', 'server/benchmark/weight_space/suit
          'server/benchmark/weight_space/conversation-suite.json',
          'server/benchmark/weight_space/failure-loop-suite.json',
          'server/benchmark/weight_space/topic-loop-suite.json',
+         'server/benchmark/weight_space/stream-replay-suite.json',
          'server/benchmark/weight_space/conditions.example.json'] + [
              'server/agent/config/prompts/' + p + '.md' for p in ('character','ciel_self','app','tool_discovery','game')]
 
@@ -40,10 +41,11 @@ def main():
     p.add_argument('--conversation', action='store_true', help='Run stage 1-3 conversation suite')
     p.add_argument('--failure-loop', action='store_true', help='Run failure/topic fixation probes (120 seconds per case)')
     p.add_argument('--topic-loop', action='store_true', help='Run multi-turn casual topic fixation probes')
+    p.add_argument('--stream-replay', action='store_true', help='Run stream-derived task-switch probes')
     p.add_argument('--prompt-revision', help='stage: Git commit for baseline prompts; code stays current')
     p.add_argument('--prompt-dir', type=Path, help='stage: explicit experimental prompt directory')
     args = p.parse_args()
-    if sum((args.conversation, args.failure_loop, args.topic_loop)) > 1:
+    if sum((args.conversation, args.failure_loop, args.topic_loop, args.stream_replay)) > 1:
         p.error('Choose one conversation suite')
     if args.prompt_revision and args.prompt_dir:
         p.error('Choose prompt-revision OR prompt-dir')
@@ -98,6 +100,8 @@ print('Staged harness and prompt fixtures only:',root)
             command += ['--suite', 'server/benchmark/weight_space/failure-loop-suite.json', '--timeout', '120']
         if args.topic_loop:
             command += ['--suite', 'server/benchmark/weight_space/topic-loop-suite.json', '--timeout', '120']
+        if args.stream_replay:
+            command += ['--suite', 'server/benchmark/weight_space/stream-replay-suite.json', '--timeout', '120']
         remote(prefix + 'command=' + repr(command) + '\n' + """
 with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as r:mode=json.load(r)
 if not mode.get('ready'):raise SystemExit('Shared API is not ready')

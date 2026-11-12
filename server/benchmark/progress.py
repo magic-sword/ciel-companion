@@ -129,13 +129,16 @@ def score_report(report, suite, reviews=None):
             measures['literal_duplicate_sentences'] = metric(duplicated if valid else None, 'lower', 'sentences')
             measures['questions'] = metric(len(re.findall('[?？]',text)) if valid else None, 'neutral', 'questions')
             item = dict(key=turn_key, response_hash=fingerprint(turn['response']),
-                        case_messages=case['messages'], previous_turns=turns[:turn['index']],
+                        case_messages=case['messages'], context=case.get('context', ''), previous_turns=turns[:turn['index']],
                         user=turn.get('user'), response=turn['response'], rubric=turn.get('rubric'),
                         ratings={name: None for name in RATINGS}, evidence={})
             if loop:
                 item['loop_diagnostic'] = loop['evidence']
                 item['loop_labels'] = {name: None for name in LOOP_LABELS}
                 item['loop_evidence'] = {}
+                if case.get('loop_probe', {}).get('units'):
+                    item['unnecessary_units'] = {name: None for name in case['loop_probe']['units']}
+                    item['unit_evidence'] = {}
             annotation = annotations.pop(turn_key, None)
             if annotation and annotation.get('response_hash') != item['response_hash']:
                 raise ValueError('Review response mismatch')
@@ -146,6 +149,18 @@ def score_report(report, suite, reviews=None):
                             or not (annotation or {}).get('loop_evidence', {}).get(name)):
                         raise ValueError('Loop labels require 0/1 and per-label evidence')
                     measures['review_loop_'+name] = metric(label if valid else None, direction, 'turns')
+                unit_values = []
+                for name in case.get('loop_probe', {}).get('units', {}):
+                    value = (annotation or {}).get('unnecessary_units', {}).get(name)
+                    if value is not None and (type(value) is not int or value not in (0, 1)
+                            or not (annotation or {}).get('unit_evidence', {}).get(name)):
+                        raise ValueError('Unnecessary units require 0/1 and per-unit evidence')
+                    unit_values.append(value)
+                    measures['review_unnecessary_'+name] = metric(value if valid else None, 'lower', 'units')
+                if unit_values:
+                    count = sum(unit_values) if valid and None not in unit_values else None
+                    measures['review_unnecessary_unit_count'] = metric(count, 'lower', 'units')
+                    measures['review_plan_focus'] = metric(5*(1-count/len(unit_values)) if count is not None else None, 'higher', 'score_0_5')
             for name in RATINGS:
                 rating = (annotation or {}).get('ratings', {}).get(name)
                 if rating is not None:
