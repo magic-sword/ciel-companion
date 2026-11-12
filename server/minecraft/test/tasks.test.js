@@ -29,6 +29,91 @@ function fixture() {
   const work = new GameTasks(link, { stopMs: 30 });
   return { link, work };
 }
+
+test('follow yields to work only after planning and confirmed physical stop; retries deduplicate', async () => {
+  const { link, work } = fixture();
+  work.stopMs = 1000;
+  link.body.current = { id: 42, skill: 'follow', phase: 'running' };
+  const stopped = [];
+  link.stop = id => { stopped.push(id); };
+  const first = work.submit(request());
+  assert.equal(work.submit(request()).task_id, first.task_id);
+  await wait(() => stopped.length === 1);
+  assert.deepEqual(stopped, [42]);
+  assert.equal(link.calls.length, 0);
+  assert.equal(work.submit(request({ request_id: 'two' })).status, 'busy');
+  link.body.current = null;
+  await wait(() => work.active.state === 'succeeded');
+  assert.equal(link.calls.length, 1);
+  work.close();
+});
+
+test('invalid requests and unavailable plans leave follow running', async () => {
+  const { link, work } = fixture();
+  link.body.current = { id: 42, skill: 'follow' };
+  link.stop = () => assert.fail('must not stop follow');
+  assert.equal(work.submit(request({ budget_ms: 0 })).reason, 'invalid_request');
+  link.plan = async () => ({ error: 'unknown_item' });
+  work.submit(request({ constraints: { resource_scope: 'search', failure_policy: 'stop' } }));
+  await wait(() => work.active.state === 'cancelled');
+  assert.equal(link.body.current.id, 42);
+  assert.equal(link.calls.length, 0);
+  work.close();
+});
+
+test('a newer body command during planning is never cancelled by the follow handoff', async () => {
+  const { link, work } = fixture();
+  link.body.current = { id: 42, skill: 'follow' };
+  link.stop = () => assert.fail('must not stop newer command');
+  link.plan = async () => {
+    link.body.current = { id: 43, skill: 'goto' };
+    return { inventory: {}, steps: [{ kind: 'craft', item: 'stone_pickaxe', count: 1 }] };
+  };
+  work.submit(request());
+  await wait(() => work.active.state === 'failed');
+  assert.equal(work.active.reason, 'body_changed');
+  assert.equal(link.calls.length, 0);
+  work.close();
+});
+
+test('unconfirmed follow stop refuses work execution and retains ownership', async () => {
+  const { link, work } = fixture();
+  link.body.current = { id: 42, skill: 'follow' };
+  link.stop = id => assert.equal(id, 42);
+  work.submit(request());
+  await wait(() => work.active.reason === 'stop_unconfirmed');
+  assert.equal(work.active.state, 'cancelling');
+  assert.equal(link.calls.length, 0);
+  assert.equal(work.submit(request({ request_id: 'two' })).status, 'busy');
+  work.close();
+});
+
+test('defense, pending commands and other operations are not mistaken for replaceable follow', () => {
+  for (const patch of [{ owner: 'defending' }, { pending: { id: 43 } }, { blocked: true },
+    { current: { id: 42, skill: 'craft' } }]) {
+    const { link, work } = fixture();
+    link.body = { ...link.body, current: { id: 42, skill: 'follow' }, ...patch };
+    assert.equal(work.submit(request()).status, 'busy');
+    work.close();
+  }
+});
+
+test('construction validates plan before replacing follow', async () => {
+  const { link, work } = fixture();
+  link.body.current = { id: 42, skill: 'follow' };
+  let stops = 0;
+  link.stop = id => { assert.equal(id, 42); stops++; link.body.current = null; };
+  const r = request({ capability: 'minecraft.edit_region', arguments: { plan_id: '11111111-1111-4111-8111-111111111111' }, constraints: { failure_policy: 'stop' } });
+  link.claimRegion = () => ({ error: 'expired_plan' });
+  assert.equal(work.submit(r).reason, 'expired_plan');
+  assert.equal(stops, 0);
+  link.claimRegion = () => ({ plan: { spec: {}, total: 1, actions: [1] } });
+  link.runSkill = async () => ({ ok: true, note: { completed: true, total: 1, verified: 1, changed: 1 } });
+  work.submit(r);
+  await wait(() => work.active.state === 'succeeded');
+  assert.equal(stops, 1);
+  work.close();
+});
 test('work verifies final inventory, deduplicates a retry and rejects a conflicting request', async () => {
   const { link, work } = fixture();
   const a = work.submit(request()), b = work.submit(request());

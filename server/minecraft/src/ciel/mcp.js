@@ -44,6 +44,7 @@ export function profile() {
   return {
     profile: PROFILE_VERSION, game: GAME, label: LABEL, reference_context: true,
     route_words: ROUTE_WORDS,
+    speech_vocabulary: JSON.parse(readFileSync(new URL('./speech-vocabulary.json', import.meta.url), 'utf8')),
     link_tool: 'minecraft_link', stop_tool: 'minecraft_stop_moving',
     work: { version: TASK_VERSION, submit: 'minecraft_task_submit', status: 'minecraft_task_status',
       answer: 'minecraft_task_answer', cancel: 'minecraft_task_cancel', capabilities: CAPABILITIES },

@@ -10,9 +10,10 @@ import whisper_engine
 
 
 class WhisperSTT(stt.STT):
-    def __init__(self, model_path, prompt=''):
+    def __init__(self, model_path, prompt='', *, vocabulary=None):
         super().__init__(capabilities=stt.STTCapabilities(streaming=False, interim_results=False))
         self.model_path, self.prompt = model_path, prompt
+        self.vocabulary = vocabulary
 
     @property
     def model(self):
@@ -23,6 +24,9 @@ class WhisperSTT(stt.STT):
         return 'faster-whisper-cpu'
 
     async def _recognize_impl(self, buffer, *, language=None, conn_options=None):
+        # Snapshot before the first await: link changes cannot change an in-flight decode.
+        words = tuple(self.vocabulary()) if self.vocabulary is not None else ()
+        prompt = self.prompt + ('\n' + '、'.join(words) if words else '')
         frame = rtc.combine_audio_frames(buffer)
         if frame.num_channels != 1:
             raise ValueError('Whisper requires mono audio')
@@ -33,7 +37,7 @@ class WhisperSTT(stt.STT):
         started = time.perf_counter()
         # StreamAdapter has already selected speech with the session VAD. A second
         # VAD can discard short utterances after the first one trimmed their context.
-        result = await asyncio.to_thread(whisper_engine.recognize, self.model_path, audio, self.prompt,
+        result = await asyncio.to_thread(whisper_engine.recognize, self.model_path, audio, prompt,
                                          vad_filter=False)
         debug_log.record('local_stt_result', final=True, model=self.model,
                          audio_seconds=round(len(audio)/16000, 3),

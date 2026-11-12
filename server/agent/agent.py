@@ -175,13 +175,13 @@ def make_model(names: list[str] | None = None):
     )
 
 
-def make_pipeline(names: list[str]) -> dict:
+def make_pipeline(names: list[str], *, vocabulary=None) -> dict:
     """pipeline の部品（AgentSession に渡す）。音声検出は 1 つにして、文字起こしの区切りにも同じ設定を使う"""
     if TEXT_ONLY:
         return {'turn_detection': 'manual'}
     vad = inference.VAD()
     if STT_BACKEND in ('vosk', 'whisper'):
-        stt = speech_input.local_stt(vad=vad, names=names)
+        stt = speech_input.local_stt(vad=vad, names=names, vocabulary=vocabulary)
     else:
         hint = '、'.join(dict.fromkeys(['シエル', *names]))[:400]
         model = models.model('stt')
@@ -533,11 +533,13 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception as e:
             logger.warning('育った好みを読めない: %s', type(e).__name__)
     names = [k.name for k in book.known][:30] if book is not None else []   # 文字起こしのヒント（覚えている人の名前）
+    import speech_vocabulary
+    game = None
     session = AgentSession(llm=make_model(names), tts=irodori_tts.make() if VOICE == 'irodori' else None,
                            **({'conn_options': SessionConnectOptions(
                                llm_conn_options=agents.APIConnectOptions(timeout=models.LOCAL_TIMEOUT, max_retry=0))}
                               if models.is_local('mind') else {}),
-                           **(make_pipeline(names) if PIPELINE else
+                           **(make_pipeline(names, vocabulary=lambda: speech_vocabulary.game_terms(game)) if PIPELINE else
                               {'turn_detection': 'manual' if REALTIME else agents.NOT_GIVEN}),
                            # 読み上げる前の文字の変換は、絵文字を外すだけにする。既定の filter_markdown は、返事の頭の
                            # 感情の印「[happy]」をリンクの書きかけとみなし、返事を最後まで書き終えるまで読み上げに渡さなかった

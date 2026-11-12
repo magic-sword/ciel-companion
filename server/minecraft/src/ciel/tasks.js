@@ -85,6 +85,7 @@ export class GameTasks {
         :['cancelled','failed'].includes(t.state)?`施工停止。${shortWhy(t.reason,e)}。変更${e.changed??0}、未完了${(e.total??0)-(e.verified??0)}マスです。`
         :t.state==='cancelling'?'施工の停止を確認しています。':`施工を始めます。対象${e.total}マスです。`;
     }
+    if (t.reason === 'body_changed') message = '準備中に別の動作へ切り替わったため、この作業は開始しませんでした。';
     return structuredClone({ version: TASK_VERSION, session: this.link.session, task_id: t.id, request_id: t.request.request_id, message,
       revision: t.revision, state: t.state, capability: t.request.capability, arguments: t.request.arguments,
       reason: t.reason, evidence: t.evidence, decision: t.decision, remaining_ms: Math.max(0, t.deadline - this.clock()) });
@@ -115,12 +116,16 @@ export class GameTasks {
     const signature = JSON.stringify([r.capability, r.arguments, r.constraints]);
     const known = this.requests.get(r.request_id);
     if (known) return known.signature === signature ? this.view(known) : { status: 'error', reason: 'request_id_conflict' };
-    if ((this.active && !TERMINAL.has(this.active.state)) || this.link.body?.blocked
-        || this.link.body?.current || this.link.body?.pending || this.link.body?.owner) return { status: 'busy' };
+    const body = this.link.body;
+    const follow = body?.current?.skill === 'follow' && body.current.phase !== 'stopping'
+      && !body.blocked && !body.pending && !body.owner ? body.current.id : null;
+    if ((this.active && !TERMINAL.has(this.active.state)) || body?.blocked
+        || (body?.current && follow == null) || body?.pending || body?.owner) return { status: 'busy' };
     if (!this.link.playing()) return { status: 'unavailable' };
     if (this.tasks.size >= 512) return { status: 'error', reason: 'session_request_limit' };
     const t = { id: randomUUID(), request: structuredClone(r), signature, revision: 0, state: 'accepted', reason: '',
-      evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, failures: new Map(), generation: 0 };
+      evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, failures: new Map(), generation: 0,
+      follow, followStopping: false };
     if(spatial) {
       const claim=this.link.claimRegion?.(r.arguments.plan_id,t.id);
       if(!claim?.plan)return {status:'error',reason:claim?.error??'unknown_plan'};
@@ -139,10 +144,37 @@ export class GameTasks {
 
   current(t, generation) { return !this.closed && this.active === t && t.generation === generation && t.state === 'running'; }
 
+  async leaveFollow(t, generation) {
+    if (!this.current(t, generation)) return false;
+    if (t.follow == null) return true;
+    const b = this.link.body;
+    // Never stop a newer command that arrived while planning.
+    if (!b || b.blocked || b.pending || b.owner || (b.current && b.current.id !== t.follow)) {
+      this.changed(t, 'failed', 'body_changed');
+      return false;
+    }
+    t.followStopping = true;
+    this.link.stop(t.follow);
+    const until = Math.min(t.deadline, this.clock() + this.stopMs);
+    while (this.current(t, generation) && this.clock() < until) {
+      const body = this.link.body;
+      if (body && !body.current && !body.pending && !body.blocked && !body.owner) {
+        t.follow = null;
+        return true;
+      }
+      await pause(25);
+    }
+    if (this.current(t, generation)) await this.cancel(t.id, 'stop_unconfirmed');
+    return false;
+  }
+
   async run(t) {
     const generation = ++t.generation;
     this.changed(t, 'running');
-    if(t.request.capability==='minecraft.edit_region')return this.runRegion(t,generation);
+    if(t.request.capability==='minecraft.edit_region') {
+      if (await this.leaveFollow(t, generation) && this.current(t, generation)) return this.runRegion(t,generation);
+      return;
+    }
     try {
       const a = t.request.arguments;
       let plan = await this.link.plan(a.item, a.quantity);
@@ -155,6 +187,7 @@ export class GameTasks {
       if (!this.current(t, generation)) return;
       if (plan.error) return this.block(t, plan.error);
       let steps = stepsFrom(plan.steps), index = 0;
+      if (!await this.leaveFollow(t, generation) || !this.current(t, generation)) return;
       while (this.current(t, generation) && index < steps.length) {
         const step = steps[index], skill = skillFor(step);
         if (!skill) return this.block(t, 'unsupported_step', { item: step.args.item });
@@ -254,7 +287,12 @@ export class GameTasks {
   }
 
   async stop(t, reason) {
-    this.link.stop(undefined, t.operation);
+    // A rejected plan has not acquired the body: keep the existing follow alive.
+    if (t.follow != null && !t.followStopping && !t.operation) {
+      this.changed(t, reason === 'deadline' ? 'failed' : 'cancelled', reason);
+      return this.view(t);
+    }
+    this.link.stop(t.follow ?? undefined, t.operation);
     const until = this.clock() + this.stopMs;
     while (this.clock() < until) {
       const b = this.link.body;

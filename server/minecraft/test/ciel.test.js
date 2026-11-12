@@ -76,6 +76,10 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
 
     const profile = JSON.parse((await a.readResource({ uri: 'game://profile' })).contents[0].text);
     assert.equal(profile.label, 'マイクラ');
+    assert.equal(profile.speech_vocabulary.version, 1);
+    assert.equal(profile.speech_vocabulary.language, 'ja');
+    assert.ok(profile.speech_vocabulary.terms.includes('原木'));
+    assert.ok(profile.speech_vocabulary.terms.includes('整地'));
     assert.ok(new RegExp(profile.route_words).test('ついてきて'));
     assert.ok((await a.getPrompt({ name: 'play' })).messages[0].content.text.includes('minecraft_facts'));
 
