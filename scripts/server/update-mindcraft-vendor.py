@@ -24,7 +24,10 @@ ROOT = Path(__file__).resolve().parents[2]
 PREFIX = 'server/minecraft/src/vendor/mindcraft'
 UPSTREAM_URL = 'https://github.com/mindcraft-bots/mindcraft'
 VENDOR_BRANCH = 'ciel-vendor'
-SCOPE = ('Upstream src, profiles, templates, settings and package metadata. Native '
+# Upstream task definitions used by the CIEL body benchmark (data only, no runners).
+TASK_FILES = ('tasks/basic/single_agent.json', 'tasks/single_agent/crafting_train.json')
+SCOPE = ('Upstream src, profiles, templates, settings, package metadata and selected '
+         'single-agent task definitions. Native '
          'Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; '
          'CIEL owns authenticated transport and lifecycle.')
 
@@ -43,7 +46,7 @@ def vendor_path(path):
     """Map an upstream path to its vendored path, or None when it is not shipped."""
     if path == 'package.json':
         return 'package.upstream.json'
-    if path in ('settings.js', 'LICENSE') or path.split('/')[0] in ('src', 'profiles', 'bots'):
+    if path in ('settings.js', 'LICENSE', *TASK_FILES) or path.split('/')[0] in ('src', 'profiles', 'bots'):
         return path
     return None
 
