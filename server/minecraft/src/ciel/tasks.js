@@ -180,6 +180,7 @@ export class GameTasks {
       while (this.current(t, generation) && index < steps.length) {
         const step = steps[index], skill = skillFor(step);
         if (!skill) return this.block(t, 'unsupported_step', { item: step.args.item });
+        if (skill[0] === 'obtain') skill[1].resource_scope = t.request.constraints.resource_scope;
         t.operation = randomUUID();
         this.link.notice({ kind: 'work_action', id: t.operation, task_id: t.id, skill: skill[0], arguments: skill[1] });
         const done = await this.link.runSkill(skill[0], skill[1], t.operation, Math.max(1, t.deadline - this.clock()));

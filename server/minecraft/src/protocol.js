@@ -13,6 +13,10 @@ const COORD_MAX = 30_000_000;
 
 // 技と、その引数の確かめ方。返すのは整えた引数か、だめな理由
 export const SKILLS = {
+  obtain: a => typeof a.item === 'string' && BLOCK.test(a.item)
+    && Number.isInteger(a.count) && a.count >= 1 && a.count <= 64
+    && ['nearby', 'search'].includes(a.resource_scope)
+    ? { args: { item: a.item, count: a.count, resource_scope: a.resource_scope } } : { error: 'bad_args' },
   edit_region: a => onlyPlan(a) ? {args:{plan_id:a.plan_id,budget_ms:a.budget_ms}} : {error:'bad_args'},
   pointed_action: a => typeof a.selection_id==='string' && /^[a-f0-9-]{36}$/.test(a.selection_id)
     && ['move','recover'].includes(a.action)

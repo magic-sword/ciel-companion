@@ -27,6 +27,7 @@ export const findStep = (item) => ({ kind: 'find', args: { item, how: 'auto' }, 
 // 段を体の技にする：[技, 引数]。動かせない段なら null
 export function skillFor(step) {
   const a = step.args ?? {};
+  if (step.kind === 'obtain') return ['obtain', { item: a.item, count: a.count }];
   if (step.kind === 'gather') {
     const got = (step.progress ?? [0, a.count])[0];
     return ['collect', { block: a.item, count: Math.max(1, a.count - got) }];

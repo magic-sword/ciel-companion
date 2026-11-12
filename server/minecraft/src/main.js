@@ -4,22 +4,14 @@
 //   体を動かせる会話は、どちらの入口でも合わせて 1 つだけ。
 // - 会話モデルは使わない。MCP では、出来事をシエル向けの言葉にして、話すものだけを知らせる（src/ciel/words.js）。
 // - ゲームのチャットの中身はログに出さない（会話と同じ扱い）。
-import mineflayer from 'mineflayer';
+import { createMindcraftBot, MindcraftRunner } from './mindcraft/runtime.js';
 import { randomUUID } from 'node:crypto';
-import pathfinderPkg from 'mineflayer-pathfinder';
-import collectBlock from 'mineflayer-collectblock';
 import { WebSocketServer } from 'ws';
 
 import { makeHub } from './ciel/hub.js';
 import { startHttp } from './ciel/mcp.js';
 import { message, parseCommand } from './protocol.js';
-import { Care } from './care.js';
 import { Eye } from './eye.js';
-import { planGoal } from './goal-plan.js';
-import { Guard } from './guard.js';
-import { carefulMovements } from './movements.js';
-import { knows } from './sight.js';
-import { Runner } from './skills.js';
 import { PlayerLocator } from './player-locator.js';
 import { Pointing } from './pointing.js';
 import { RegionPlans } from './spatial.js';
@@ -59,11 +51,7 @@ function send(type, fields) {
   if (link?.readyState === 1) link.send(message(type, fields));
 }
 
-const guard = new Guard(send, OWNER);
-const runner = new Runner(send, OWNER, guard);
-const care = new Care(send, guard);
-guard.body = runner;
-care.body = runner;
+const runner = new MindcraftRunner(send, OWNER);
 const eye = new Eye({ host: BODY_HOST, port: EYE_PORT, log });
 let bot = null;
 
@@ -148,13 +136,9 @@ function plan({ id, item, count }) {
     send('error', { id, reason: 'not_spawned' });
     return;
   }
-  const inv = {};
-  for (const i of bot.inventory.items()) inv[i.name] = (inv[i.name] ?? 0) + i.count;
-  const tableId = bot.registry.blocksByName.crafting_table.id;
-  const hasTable = bot.findBlocks({ matching: tableId, maxDistance: 32, count: 8 }).some((p) => knows(bot, p));
-  const r = planGoal(bot.registry, (rid) => bot.recipesAll(rid, null, true), item, count, inv, hasTable);
+  const r = runner.plan(item, count);
   if (r.error) send('error', { id, reason: r.error });
-  else send('planned', { id, steps: r.steps, inventory: inv });
+  else send('planned', { id, ...r });
 }
 
 let blocks = {};
@@ -176,23 +160,18 @@ let retry = RETRY_MIN_MS;
 
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
-  const b = mineflayer.createBot(MC);
+  const b = createMindcraftBot(MC);
   b.regionPlans = regionPlans;
   b.pointing = pointing;
   b.playerLocator = new PlayerLocator(b);
   bot = b;
-  b.loadPlugin(pathfinderPkg.pathfinder);
-  b.loadPlugin(collectBlock.plugin);
   let health = null;
   let night = null;
 
   b.once('spawn', () => {
     retry = RETRY_MIN_MS;
     runner.attach(b);
-    guard.attach(b);
-    care.attach(b);
     eye.attach(b);
-    b.pathfinder.setMovements(carefulMovements(b));
     b.pathfinder.thinkTimeout = PATH_THINK_MS;
     log('入った');
     send('event', { kind: 'spawned' });
@@ -235,8 +214,6 @@ function connect() {
     if (bot === b) {
       runner.stop('disconnected');
       runner.attach(null);
-      guard.detach();
-      care.detach();
       eye.detach();
       bot = null;
     }

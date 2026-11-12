@@ -230,7 +230,7 @@ export class RegionPlans {
   }
 }
 
-export async function executeRegion(bot,plan,token,{guard,Failed,watched},budgetMs) {
+export async function executeRegion(bot,plan,token,{guard,Failed,watched,move,dig,place},budgetMs) {
   const deadline=performance.now()+Math.min(120000,budgetMs),expectedStates=new Map(plan.snapshot);
   let changed=0,stepRepairs=0,pathRepairs=0;
   const note=()=>({changed,verified:plan.total-plan.actions.length+changed,total:plan.total,step_repairs:stepRepairs,path_repairs:pathRepairs,remaining:plan.actions.slice(changed).map(a=>key(a.p)),summary:plan.summary});
@@ -251,7 +251,7 @@ export async function executeRegion(bot,plan,token,{guard,Failed,watched},budget
     if(!check())return note();
     await guard?.idle(token);if(!check())return note();
     bot.pathfinder.setMovements(carefulMovements(bot));
-    const go=s=>watched(bot,()=>bot.pathfinder.goto(new goals.GoalBlock(s.x,s.y,s.z)),2000);
+    const go=s=>move ? move(s) : watched(bot,()=>bot.pathfinder.goto(new goals.GoalBlock(s.x,s.y,s.z)),2000);
     try {await go(action.stance);}
     catch(e) {
       if(!check())return note();
@@ -315,10 +315,10 @@ export async function executeRegion(bot,plan,token,{guard,Failed,watched},budget
     if(build) {
       const item=bot.inventory.items().find(i=>i.name===plan.spec.block);if(!item)fail('missing_materials');
       await bot.equip(item,'hand');if(!check())return note();
-      await bot.placeBlock(bot.blockAt(p.minus(face)),face);
+      if(place) await place(p,plan.spec.block); else await bot.placeBlock(bot.blockAt(p.minus(face)),face);
     }else{
       if(bot.tool?.equipForBlock)await bot.tool.equipForBlock(bot.blockAt(p),{});
-      if(!check())return note();await bot.dig(bot.blockAt(p));
+      if(!check())return note();if(dig) await dig(p); else await bot.dig(bot.blockAt(p));
     }
     await bot.waitForTicks(2);
     const b=bot.blockAt(p),wanted=plan.expected.get(key(p));
