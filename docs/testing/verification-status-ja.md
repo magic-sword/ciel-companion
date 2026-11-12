@@ -2,6 +2,8 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+単一返答内の反復ベンチマークを追加し、途中終了でも重複量とSSEを保持する。感度テスト5件成功。現行Qwenで実ログ由来自発発話・話題切替・反復依頼対照を各1回測定し、全てstopで終了。対象2条件では今回の長い反復は再現せず、完全な実送信入力がない近似再構成の限界が残る。WSP比較の感度確立とは扱わない。[測定結果](weight-space-results-ja.md#単一返答の反復プローブ)。通常サービス・重みは変更していない。
+
 通常の開発接続を本番と同じCiel（8771）へ変更し、2026-11-12に反映した。開発agentは既存イメージのまま設定を再作成し、CIEL_DEBUG_LOG=1と書込可能なログvolume、worker登録、health 200、共有先のMCP profile 2/work 1を確認。旧Ciel_Devコンテナは停止した。本番各コンテナのID・image・起動時刻は不変。証拠は`~/work/ciel-companion-dev/server/data/deployments/shared-ciel-20261112-175822/`の設定退避・before/after/verification JSON。実音声による操作・新ログの内容確認は未実施。Ciel_Debugの明示起動経路は設定とwhitelistの2テストで確認し、今回は起動していない。通常の`--dev`と検証用`--dev --minecraft`の使い分けは[実行設定](../operations/local-runtime-ja.md)を参照する。
 
 ゲームprofileの`speech_vocabulary`をリンク中だけWhisperへ追加する機構をローカル実装。Minecraftの語彙21語をゲーム側へ置き、通常ヒントから分離した。unit801件・MCP読取等Node5件・能力結合が成功。配布・実音声の精度比較は未実施。[条件と未確認範囲](voice-results-ja.md#現在の判断)を参照する。
