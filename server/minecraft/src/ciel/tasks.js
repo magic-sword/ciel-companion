@@ -1,18 +1,15 @@
 // Game-owned work. The client sees tasks and decisions, never our recipe/repair loop.
 import { randomUUID } from 'node:crypto';
-import { stepsFrom, skillFor, stepResult, repair } from './goals.js';
 import { ja, shortWhy } from './words.js';
 
 export const TASK_VERSION = 1;
 export const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 export const CAPABILITIES = [{
-  name: 'minecraft.obtain_item', description: '材料を必要な分だけ集めて物を用意する。採集も製作もゲームが計画する。',
-  arguments: { type: 'object', additionalProperties: false, required: ['item', 'quantity', 'quantity_mode'],
-    properties: { item: { type: 'string', pattern: '^[a-z_]+$', description: 'Minecraftの物のID。木のつるはし=wooden_pickaxe、石のつるはし=stone_pickaxe、オークの原木=oak_log。日本語名とIDが対応するときは確認不要。' }, quantity: { type: 'integer', minimum: 1, maximum: 64 },
-      quantity_mode: { enum: ['inventory_target', 'gain'] } } },
-  constraints: { type: 'object', required: ['resource_scope', 'failure_policy'], additionalProperties: false,
-    properties: { resource_scope: { enum: ['nearby', 'search'] }, failure_policy: { enum: ['ask', 'stop'] } } },
-  interpretation: '通常の製作・用意はquantity_mode=inventory_target、constraints={resource_scope:"search",failure_policy:"ask"}。数量省略は1個。石のつるはし等の石の道具と探索はseconds=120、他の通常依頼は90。原木等を指定個数集める採集だけquantity_mode=gain。例外として、利用者が「手近な材料で難しければ中止」と明示した場合だけnearby/stop/60秒を選ぶ。普通の「石のつるはしを作って」へこの例外を当てはめない。',
+  name: 'minecraft.pursue_goal', description: 'Minecraftで材料を集める・探して持ち帰る・道具や物を作る。自然な依頼と条件をゲーム側へ渡す。',
+  arguments: {type:'object',additionalProperties:false,required:['request'],properties:{request:{type:'string',minLength:1,maxLength:2000}}},
+  constraints: {type:'object',additionalProperties:false,properties:{}},
+  handoff: {version:1,argument:'request',constraints:{},seconds:120},
+  interpretation: '依頼文をそのまま渡す。品目・数量・材料不足時の方針は現在のゲーム状態と合わせてMindcraftが判断する。',
 }, {
   name:'minecraft.edit_region', description:'指定範囲の整地・床・壁・穴の埋め戻し。地面や保護範囲を維持し、手持ち材料で施工する。',
   arguments:{type:'object',additionalProperties:false,required:['plan_id'],properties:{plan_id:{type:'string',format:'uuid'}}},
@@ -60,13 +57,17 @@ export class GameTasks {
 
   view(t = this.active) {
     if (!t) return null;
-    const item = ja(t.request.arguments.item);
-    let message = t.state === 'succeeded' ? `${item}を${t.target}個用意できました。`
-      : t.state === 'cancelled' ? (t.request.constraints.failure_policy === 'stop' && ['not_found', 'missing_materials', 'needs_tool', 'cannot_harvest'].includes(t.reason)
-        ? `${ja(Object.keys(t.evidence.needs ?? {})[0] || t.evidence.item || '材料')}が不足して作れません。中止して待っています。` : '作業を中止して待っています。')
-      : t.state === 'needs_decision' ? `${item}の用意を止めて待っています。${shortWhy(t.reason, t.evidence)}。続けるか中止するか決めてください。`
-      : t.reason === 'stop_unconfirmed' ? '停止を確認できません。新しい作業は始めていません。'
-      : t.state === 'failed' ? `${item}を期限内に用意できず、作業を止めました。` : '';
+    const item = ja(t.evidence.goal?.item ?? '');
+    let message = t.reason === 'stop_unconfirmed' ? '停止を確認できません。新しい作業は始めていません。'
+      : t.state === 'succeeded' ? `${item}を${t.evidence.target}個確保して戻りました。`
+      : t.state === 'needs_decision' ? `作業を止めて待っています。${t.evidence.clarification || shortWhy(t.reason,t.evidence)}。`
+      : t.state === 'cancelled' ? `${shortWhy(t.reason,t.evidence)}。作業を中止して待っています。`
+      : t.state === 'failed' ? '期限内に完了できず、作業を止めました。'
+      : t.state === 'cancelling' ? '作業の停止を確認しています。'
+      : t.evidence.activity?.stage==='thinking' ? '次の行動を考えています。'
+      : t.evidence.activity?.stage==='returning' ? '集めた物を持って戻っています。'
+      : t.evidence.activity?.command==='!collectBlocks' ? 'ブロックを集めています。'
+      : t.evidence.activity?.command==='!craftRecipe' ? '材料から作っています。' : '依頼を実行しています。';
     if(t.request.capability==='minecraft.edit_region') {
       const e=t.evidence;
       message=t.reason==='stop_unconfirmed'?'停止を確認できません。新しい作業は始めていません。'
@@ -93,11 +94,9 @@ export class GameTasks {
     const validArguments=spatial
       ? keys(r.arguments,['plan_id']) && typeof r.arguments.plan_id==='string' && /^[a-f0-9-]{36}$/.test(r.arguments.plan_id)
         && keys(r.constraints,['failure_policy']) && r.constraints.failure_policy==='stop'
-      : r?.capability===CAPABILITIES[0].name && keys(r.arguments,['item','quantity','quantity_mode'])
-        && /^[a-z_]+$/.test(r.arguments?.item??'') && Number.isInteger(r.arguments?.quantity)
-        && r.arguments.quantity>=1 && r.arguments.quantity<=64 && ['inventory_target','gain'].includes(r.arguments.quantity_mode)
-        && keys(r.constraints,['resource_scope','failure_policy']) && ['nearby','search'].includes(r.constraints.resource_scope)
-        && ['ask','stop'].includes(r.constraints.failure_policy);
+      : r?.capability===CAPABILITIES[0].name && keys(r.arguments,['request'])
+        && typeof r.arguments.request==='string' && r.arguments.request.trim().length>0 && r.arguments.request.length<=2000
+        && keys(r.constraints,[]);
     if (!keys(r, ['request_id', 'capability', 'arguments', 'budget_ms', 'constraints']) || !validId(r.request_id)
         || !validArguments || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > 120000) {
       return { status: 'error', reason: 'invalid_request' };
@@ -133,6 +132,15 @@ export class GameTasks {
 
   current(t, generation) { return !this.closed && this.active === t && t.generation === generation && t.state === 'running'; }
 
+  activity(event) {
+    const t=this.active;
+    if(!t || t.state!=='running' || event.request_id!==t.operation
+        || !['thinking','executing','returning'].includes(event.stage))return;
+    const activity={stage:event.stage,command:String(event.command??'').slice(0,64)};
+    this.link.notice({kind:'work_activity',task_id:t.id,...activity});
+    this.changed(t,'running','',{...t.evidence,activity});
+  }
+
   async leaveFollow(t, generation) {
     if (!this.current(t, generation)) return false;
     if (t.follow == null) return true;
@@ -164,65 +172,23 @@ export class GameTasks {
       if (await this.leaveFollow(t, generation) && this.current(t, generation)) return this.runRegion(t,generation);
       return;
     }
+    if (!await this.leaveFollow(t,generation) || !this.current(t,generation)) return;
+    t.operation=randomUUID();
+    const args={request:t.request.arguments.request,goal_id:t.id};
+    this.link.notice({kind:'work_action',id:t.operation,task_id:t.id,skill:'pursue',arguments:args});
     try {
-      const a = t.request.arguments;
-      let plan = await this.link.plan(a.item, a.quantity);
-      if (!this.current(t, generation)) return;
-      if (plan.error) return this.block(t, plan.error);
-      if (t.target == null) t.target = a.quantity + (a.quantity_mode === 'gain' ? (plan.inventory[a.item] ?? 0) : 0);
-      let have = plan.inventory[a.item] ?? 0;
-      if (have >= t.target) return this.changed(t, 'succeeded', '', { inventory: plan.inventory, target: t.target });
-      if (t.target - have !== a.quantity) plan = await this.link.plan(a.item, t.target - have);
-      if (!this.current(t, generation)) return;
-      if (plan.error) return this.block(t, plan.error);
-      let steps = stepsFrom(plan.steps), index = 0;
-      if (!await this.leaveFollow(t, generation) || !this.current(t, generation)) return;
-      while (this.current(t, generation) && index < steps.length) {
-        const step = steps[index], skill = skillFor(step);
-        if (!skill) return this.block(t, 'unsupported_step', { item: step.args.item });
-        if (skill[0] === 'obtain') skill[1].resource_scope = t.request.constraints.resource_scope;
-        t.operation = randomUUID();
-        this.link.notice({ kind: 'work_action', id: t.operation, task_id: t.id, skill: skill[0], arguments: skill[1] });
-        const done = await this.link.runSkill(skill[0], skill[1], t.operation, Math.max(1, t.deadline - this.clock()));
-        this.link.notice({ kind: 'work_action_result', id: t.operation, task_id: t.id, result: done });
-        if (!this.current(t, generation)) return;
-        const result = stepResult(step, done);
-        step.progress = result.progress;
-        if (result.complete) { index++; continue; }
-        if (['unlinked', 'disconnected', 'died', 'replaced', 'stopped', 'no_answer', 'stop_timeout'].includes(result.reason)) {
-          return this.cancel(t.id, result.reason);
-        }
-        const signature = JSON.stringify([step.kind, step.args, result.reason]);
-        const failures = (t.failures.get(signature) ?? 0) + 1;
-        t.failures.set(signature, failures);
-        if (t.repairs++ < 6 && failures <= 2) {
-          // A nearby-only request must never silently turn into an exploration task.
-          const allowed = result.reason !== 'not_found' || t.request.constraints.resource_scope === 'search';
-          if (allowed) {
-            const fresh = await this.link.plan(a.item, Math.max(1, t.target - (this.link.state?.inventory?.[a.item] ?? 0)));
-            if (!this.current(t, generation)) return;
-            let fixed = repair({ spec: { make: a.item }, step, result, remaining: steps.slice(index) }, () => fresh);
-            // An execution's concrete shortages can be more precise than a plan's table visibility.
-            // Even if replanning returns the same labels, obtain these resources before retrying.
-            if (!fixed && ['no_table', 'missing_materials'].includes(result.reason) && Object.keys(result.note?.needs ?? {}).length) {
-              const needed = Object.entries(result.note.needs).filter(([, count]) => Number.isInteger(count) && count > 0 && count <= 64);
-              if (needed.length) fixed = { steps: [...stepsFrom(needed.map(([item, count]) => ({ kind: 'gather', item, count }))), ...steps.slice(index)] };
-            }
-            if (fixed) { steps = fixed.steps; index = 0; continue; }
-          }
-        }
-        return this.block(t, result.reason || 'cannot_continue', { ...result.note, item: step.args.item });
-      }
-      if (!this.current(t, generation)) return;
-      // plan returns a fresh inventory read in the body process, independent of speech/skill ok.
-      const final = await this.link.plan(a.item, 1);
-      if (!this.current(t, generation)) return;
-      have = final.inventory?.[a.item] ?? 0;
-      if (!final.error && have >= t.target) this.changed(t, 'succeeded', '', { inventory: final.inventory, target: t.target });
-      else this.block(t, final.error || 'objective_unverified', { inventory: final.inventory ?? {}, target: t.target });
-    } catch (e) {
-      if (this.current(t, generation)) await this.cancel(t.id, 'execution_error');
-    }
+      const done=await this.link.runSkill('pursue',args,t.operation,Math.max(1,t.deadline-this.clock()));
+      this.link.notice({kind:'work_action_result',id:t.operation,task_id:t.id,result:done});
+      if(!this.current(t,generation))return;
+      t.evidence={...t.evidence,...done.note};
+      const e=t.evidence,b=this.link.body;
+      if(done.ok && e.goal?.item && Number.isInteger(e.target) && e.target>0 && e.returned===true
+          && (e.inventory?.[e.goal.item]??0)>=e.target && b&&!b.current&&!b.pending&&!b.blocked&&!b.owner)
+        this.changed(t,'succeeded','',e);
+      else if(['unlinked','disconnected','died','replaced','stopped','no_answer','stop_timeout'].includes(done.reason))
+        await this.cancel(t.id,done.reason);
+      else this.block(t,done.reason||'objective_unverified',e);
+    } catch(e) {if(this.current(t,generation))await this.cancel(t.id,'execution_error');}
   }
 
   async runRegion(t,generation) {
@@ -243,7 +209,7 @@ export class GameTasks {
   }
 
   block(t, reason, evidence = {}) {
-    if (t.request.constraints.failure_policy === 'stop') {
+    if (t.request.constraints.failure_policy === 'stop' || evidence.goal?.failure_policy === 'stop') {
       t.evidence = evidence;
       return this.cancel(t.id, reason);
     }

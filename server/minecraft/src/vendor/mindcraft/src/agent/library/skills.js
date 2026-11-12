@@ -451,10 +451,13 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
 
     for (let i=0; i<num; i++) {
         let blocks = world.getNearestBlocksWhere(bot, block => {
-            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
             if (!blocktypes.includes(block.name)) {
                 return false;
             }
+            // Mineflayer first calls matching with palette entries without positions.
+            // Only filter by type there; safety/exclusions require an actual world block.
+            if (!block.position) return true;
+            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
             if (exclude) {
                 for (let position of exclude) {
                     if (block.position.x === position.x && block.position.y === position.y && block.position.z === position.z) {

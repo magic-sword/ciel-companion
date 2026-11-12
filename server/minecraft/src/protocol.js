@@ -13,10 +13,10 @@ const COORD_MAX = 30_000_000;
 
 // 技と、その引数の確かめ方。返すのは整えた引数か、だめな理由
 export const SKILLS = {
-  obtain: a => typeof a.item === 'string' && BLOCK.test(a.item)
-    && Number.isInteger(a.count) && a.count >= 1 && a.count <= 64
-    && ['nearby', 'search'].includes(a.resource_scope)
-    ? { args: { item: a.item, count: a.count, resource_scope: a.resource_scope } } : { error: 'bad_args' },
+  pursue: a => Object.keys(a).every(k=>['request','goal_id'].includes(k))
+    && typeof a.request==='string' && a.request.trim().length>0 && a.request.length<=2000
+    && typeof a.goal_id==='string' && /^[a-f0-9-]{36}$/.test(a.goal_id)
+    ? {args:{request:a.request,goal_id:a.goal_id}} : {error:'bad_args'},
   edit_region: a => onlyPlan(a) ? {args:{plan_id:a.plan_id,budget_ms:a.budget_ms}} : {error:'bad_args'},
   pointed_action: a => typeof a.selection_id==='string' && /^[a-f0-9-]{36}$/.test(a.selection_id)
     && ['move','recover'].includes(a.action)
@@ -119,13 +119,6 @@ export function parseCommand(raw) {
     }
     case 'state':
       return { cmd: { type: 'state' } };
-    // 目的（物を作る）を段の一覧にする（goal-plan.js）。返事は planned（steps）か error
-    case 'plan': {
-      if (id === undefined) return { error: 'bad_id' };
-      const item = m.item, count = m.count === undefined ? 1 : m.count;
-      if (typeof item !== 'string' || !BLOCK.test(item) || !Number.isInteger(count) || count < 1 || count > CRAFT_MAX) return { error: 'bad_args', id };
-      return { cmd: { type: 'plan', id, item, count } };
-    }
     // 今の景色を 1 枚撮る（eye.js）。返事は seen（JPEG を base64）か error
     case 'look':
       if (id === undefined) return { error: 'bad_id' };

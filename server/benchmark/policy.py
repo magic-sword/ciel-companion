@@ -76,8 +76,16 @@ class Progress:
             self.failures[key] = self.failures.get(key,0)+1
 
     def event(self, e, elapsed):
+        if e['kind'] == 'work_activity':
+            physical = e.get('stage') == 'returning' or (e.get('stage') == 'executing'
+                and e.get('command') in {'!collectBlocks','!craftRecipe','!smeltItem','!searchForBlock',
+                    '!searchForEntity','!goToCoordinates','!moveAway','!equip','!consume','!clearFurnace','!goToSurface'})
+            if physical:
+                if self.first_action is None: self.first_action = elapsed
+                if self.decline is not None: self.resumed_after_decline = True
+            return
         if e['kind'] == 'work_action':
-            e = {**e, 'kind': 'game_call', 'name': 'minecraft_work_step'}
+            e = {**e, 'kind': 'game_call', 'name': 'minecraft_work_handoff' if e.get('skill')=='pursue' else 'minecraft_work_step'}
         elif e['kind'] == 'work_action_result':
             e = {**e, 'kind': 'game_result'}
         kind = e['kind']

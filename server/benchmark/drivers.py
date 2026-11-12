@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 
@@ -10,17 +11,33 @@ class BodyDriver:
     def __init__(self, url, trace, **_):
         self.url, self.trace = url, trace
         self.env = self.runner = self.task = None
+        self.core_host = None
         self.goal_state = {}
+
+    def record_core(self, kind, **data):
+        self.trace('agent_event', event={'t':time.time(),
+            'kind':'model_request' if kind=='core_request' else kind, **data})
 
     async def open(self):
         import game_env
         import goals
+        from types import SimpleNamespace
+        from core_host import CoreHost
+        from persona import load_persona
+        import models
+        if not models.is_local('mind'):
+            raise RuntimeError('Body execution benchmark requires the shared local model')
+        persona = load_persona()
+        agent = SimpleNamespace(persona=persona, style=None, mind=SimpleNamespace(_recent=lambda n: []),
+            instructions_for=lambda *args, **kwargs: persona.instructions+'\n'+persona.self_instructions+'\n'+persona.presence_solo_instructions)
+        self.core_host = CoreHost(agent, None, record=self.record_core)
         self.env = game_env.GameEnv('minecraft', self.url)
+        self.env.core_endpoint = await self.core_host.start()
         original = self.env._call
 
         async def call(name, args, **kwargs):
             request = uuid.uuid4().hex
-            self.trace('game_call', id=request, name=name, arguments=args)
+            self.trace('game_call', id=request, name=name, arguments={k:'[REDACTED]' if k=='token' else v for k,v in args.items()})
             result = await original(name, args, **kwargs)
             self.trace('game_result', id=request, name=name, result={k:v for k,v in result.items() if k != '_images'})
             return result
@@ -39,7 +56,7 @@ class BodyDriver:
         original_event = self.env.on_event
         def event(e):
             original_event(e)
-            if e.get('kind') in ('work_action', 'work_action_result'):
+            if e.get('kind') in ('work_action', 'work_action_result', 'work_activity'):
                 self.trace(e['kind'], **{k: v for k, v in e.items() if k != 'kind'})
         self.env.on_event = event
         if not await self.env.prepare():
@@ -63,9 +80,8 @@ class BodyDriver:
         if task.get('navigation') or task.get('spatial'):
             self.task = asyncio.create_task(self.env._call(task['body_call']['name'], task['body_call']['arguments']))
             return
-        self.task = asyncio.create_task(self.runner.start('minecraft.obtain_item',
-            {'item': task['item'], 'quantity': task['count'], 'quantity_mode': 'gain' if task.get('action') else 'inventory_target'},
-            constraints={'resource_scope': 'search', 'failure_policy': 'ask'}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
+        self.task = asyncio.create_task(self.runner.start('minecraft.pursue_goal',
+            {'request': task['prompt']}, constraints={}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
     async def _region(self, task):
         import copy
@@ -125,6 +141,8 @@ class BodyDriver:
             await self.runner.close()
         if self.env:
             await self.env.close()
+        if self.core_host:
+            await self.core_host.close()
 
 
 class ConversationDriver:

@@ -17,18 +17,20 @@
 ```json
 {
   "request_id": "user-item-id",
-  "capability": "minecraft.obtain_item",
-  "arguments": {"item": "stone_pickaxe", "quantity": 1, "quantity_mode": "inventory_target"},
+  "capability": "minecraft.pursue_goal",
+  "arguments": {"request": "石のつるはしを1本作ってください。"},
   "budget_ms": 90000,
-  "constraints": {"resource_scope": "search", "failure_policy": "ask"}
+  "constraints": {}
 }
 ```
 
-数量は1〜64。`inventory_target` は所持目標、`gain` は開始時から増やす数。新規製作回数の指定は未対応として受付前に確認する。`resource_scope=nearby` は資源未発見時に探索の段を追加しない指定、`search` は既存探索を許す指定であり、数値の探索半径を保証する機能ではない。`failure_policy=stop` は継続できないときに停止を確認して中止、`ask` は判断待ち。制約を省略・変更して実行しない。
+採集・製作では元の自然文（1〜2000字）を変更せず渡す。能力の`handoff={version:1,argument:"request",constraints:{},seconds:120}`に従い、ホストは依頼意図と権限を確認した後、引数生成の追加推論を行わない。Mindcraft側が最新の所持品・周辺資源と合わせて最終アイテム、数量1〜64、所持目標／増分、探索可否、不能時の判断待ち／停止を解釈する。材料を最終目標へ置き換えない。解釈できない場合は確認へ戻す。
+
+目標・開始時所持数・帰還地点はwork IDに結び付けて固定し、retryで増分目標を積み増さない。開始時の立ち位置のセルへ戻り、高さの差0.75未満・距離1.5以内、実所持数、体の停止を確認して成功にする。真下の坑道は帰還に含めない。足場の設置は禁止せず、移動で目的物を消費したら必要数まで補充する。`nearby`は探索命令を制限する指定であり、厳密な距離境界を保証するものではない。旧`minecraft.obtain_item`は受け付けない。
 
 `budget_ms` は受付時の残り時間で100〜120000ms。サーバーの単調時計で期限を固定し、再送・修復・判断回答では更新しない。シエル側は依頼の解釈時間も差し引く。終了処理の余裕を予約し、サーバー単独でも期限で中止へ移る。
 
-同一request_idの再送は同じtask_idを返す。引数が違う再送は `request_id_conflict`。追従だけが動いている場合は新規workを受け付け、採集・製作の計画取得、または施工計画の検証後に追従を対象ID付きで停止する。体の停止を確認してから新作業を開始し、計画・停止待ちも元の予算に含める。準備中に計画が拒否された場合は追従を維持し、別の身体命令に切り替わった場合はそれを停止しない。受付前に分かる実行可能性の確認であり、採集先の資源や到達可能性まで保証するものではない。
+同一request_idの再送は同じtask_idを返す。引数が違う再送は `request_id_conflict`。追従だけが動いている場合は新規workを受け付け、対象ID付きの停止を確認してからMindcraftへ渡す。施工は計画の検証後に停止する。解釈・停止待ちも元の予算に含め、別の身体命令に切り替わった場合はそれを停止しない。資源や到達可能性まで受付時に保証するものではない。
 
 別workの実行中・停止未確認・追従以外の体の別作業中・防御や食事中・次の身体命令が待機中は `busy`。今回の自動切り替えは追従からworkへの移行を対象とし、採集・施工中の別workへの置換は行わない。履歴上限512件に達した接続では新規作業を拒否し、IDを追い出して再実行する処理は行わない。
 
@@ -38,7 +40,7 @@
 
 ## 判断と中止
 
-`minecraft_task_answer` は `task_id`、`decision_id`、`action=retry|cancel`。IDの一致する判断待ちだけを受け付け、retryも元の制約と期限内に限定する。既知の修復は合計6回、同じ段・引数・理由で2回まで。判断からの再試行も同じ予算を消費し、既に修復を重ねた作業の無制限な再試行は拒否する。未知の段を共通部の子目標ツリーに変換しない。
+`minecraft_task_answer` は `task_id`、`decision_id`、`action=retry|cancel`。IDの一致する判断待ちだけを受け付け、retryも元の制約と期限内、3回までに限定する。Mindcraftの外側にレシピ分解・修復ループを重ねない。実行例外は失敗として返し、成功するまで探索を繰り返す根拠にしない。
 
 `minecraft_task_cancel` はtask_idを指定する。体へ対象を固定した停止を送り、現在・待機の操作がなくblockedでもないことを確認して `cancelled` とする。確認できないときは `cancelling / stop_unconfirmed` を保ち、新しい作業を拒否する。遅い計画・技の完了・判断回答で再開しない。
 
@@ -48,13 +50,15 @@
 
 最新状態は `minecraft_task_status` で再取得でき、`game://state.work` にも含む。通知 `work_state` を主に使い、シエル側の2秒間隔の状態取得で欠落を補う。`work_action` と `work_action_result` はゲーム内部で実際に技を発行したときと結果が戻ったときの計測用イベント。
 
+`work_activity`は同じ操作IDの`thinking`・`executing`・`returning`を知らせ、workのmessage/revisionへ反映する。古い操作や終了後の通知は反映しない。これは表示上の進捗であり、所持品・到達の成功証拠ではない。
+
 ベンチマークはこれらのイベントで初回操作・未完了操作を追跡し、MCPの状態取得回数は `status_polls`、技の発行は `work_actions` として分ける。状態取得だけで操作回数の上限を消費しない。最終採点はRCONの所持品等で独立して行い、作業の成功通知を採点の正解にしない。
 
 Unityへは[作業・会話の表示契約](../app/work-display-contract-ja.md)の `goal.state v2` で送る。元のstate、session/task_id/revision、判断ID、確認の有効期間、残り予算を保持する。操作は `goal.control v2` で表示対象を固定する。空の段一覧、旧pausedへの集約、can_resumeは撤去した。画面と配信が同じ表示モデルを使い、会話・リアクションは作業と並行して示す。
 
 ## 施工能力の追加設計
 
-以下は**実装済みの拡張**。現行work 1の状態・予算・取消・判断APIは維持し、Minecraftの能力として`minecraft.edit_region`を追加する。施工の対象・完成条件・準備は[Minecraftの段階1設計](minecraft/minecraft-design-ja.md#段階1を完了するための設計)が所有する。`tasks.js`はobtain_itemとedit_regionを能力別に検証・実行する。
+現行work 1の状態・予算・取消・判断APIは維持し、Minecraftの能力として`minecraft.edit_region`を提供する。施工の対象・完成条件・準備は[Minecraftの段階1設計](minecraft/minecraft-design-ja.md#段階1を完了するための設計)が所有する。`tasks.js`はpursue_goalとedit_regionを能力別に検証・実行する。
 
 施工のsubmitは`arguments={"plan_id":"ゲームが発行したID"}`、`constraints={"failure_policy":"stop"}`、既存のrequest_idと残りbudget_msを持つ。計画IDは権限ではなく、同じ所有者・接続・ワールド・未失効の計画であることをサービスが検証する。状態応答のargumentsはこの依頼を保持し、evidenceに正規化した施工仕様・確認済みセル数・変更数・部分結果を置く。UIへ内部の段一覧を公開しない。
 

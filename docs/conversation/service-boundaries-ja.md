@@ -12,7 +12,9 @@
 
 `server/agent/ciel_core.py`は、信頼する会話ホストが文脈取得関数と推論関数を`CielCore.bind`へ登録するセッション単位のAPIを提供する。登録時のランダムなBearerトークンで一つの会話に結び付ける。外部入力から人物ID・記憶所有者・人格本文を指定しない。文脈は要求ごとにホストから取得し、推論には複製を渡す。人格・許可された記憶・現在の会話を揃える責任は登録するホストにある。
 
-`POST /v1/respond`は`request_id`と`messages`を受け、`request_id`と`text`を返す。roleはuser/assistant、最大64メッセージ・本文合計64000字。同一セッションの要求は1件ずつで、IDはセッション中再利用しない。最大1024要求でセッションを更新する。期限は待機を含め120秒。`DELETE /v1/requests/{id}`とホストのreleaseは推論を取消し、取消を握り潰して遅れて返る推論結果も採用しない。結果は内部判断として返し、発話やゲーム内操作を直接実行しない。
+`POST /v1/respond`は`request_id`・`messages`・`response_format`（text/json）を必須とし、`request_id`と`text`を返す。roleはuser/assistant、最大64メッセージ・本文合計64000字。同一セッションの要求は1件ずつで、IDはセッション中再利用しない。最大1024要求でセッションを更新する。期限は待機を含め120秒。`DELETE /v1/requests/{id}`とホストのreleaseは推論を取消し、取消を握り潰して遅れて返る推論結果も採用しない。クライアントもHTTPを直ちにabortする。結果は内部判断として返し、発話やゲーム内操作を直接実行しない。
+
+実行用の`instructions_for(execution=True)`は共通の人格・成長・公開範囲を使い、音声・表情タグの指示を含めない。persona.tomlが参照する`config/prompts/execution_api.md`を会話開始時に読み込み、指紋にも含める。目標解釈はJSON mode、命令選択はtext、出力上限は256トークン、temperatureは0。`core_request`は入力サイズ、`model_response`は所要時間を記録し、モデル呼び出し数はmodelsの`model_request`で数える。
 
 Mindcraft用接続口は`server/minecraft/src/mindcraft/ciel-model.js`の`CielModel.sendRequest`。上流の実行用指示・観測は入力データとして渡し、シエルの人格を置き換えるsystem権限を与えない。接続先とセッショントークンはホストが設定する。取消時は要求IDを無効化し、サーバーにも取消を送る。
 

@@ -11,7 +11,6 @@ let nextCommandId = 1;   // 受け持つ会話が替わっても、遅い終了�
 
 const START_TIMEOUT_MS = 3000;    // 技を頼んでから「始めた」が返るまでの上限
 const LOOK_TIMEOUT_MS = 25000;    // 景色を頼んでから絵が返るまでの上限（初めはブラウザを開いて描き終えるまで 10 秒ほど）
-const PLAN_TIMEOUT_MS = 5000;     // 目的の計画（plan → planned）を待つ上限
 export const STEP_TIMEOUT_MS = 900000;   // 目的の段（技 1 つ）が終わるまで待つ上限
 
 function timeout(promise, ms, onTimeout) {
@@ -32,7 +31,7 @@ export class CielLink {
     this.state = null;
     this.session = randomUUID();
     this.body = null;
-    this._pending = new Map();   // id → 返事を待つ resolve（started・error・seen・planned）
+    this._pending = new Map();   // id → 返事を待つ resolve（started・error・seen）
     this._waiting = new Map();   // id → 目的の係が終わりを待つ resolve（知らせ・付箋は会話サーバーの目的の係が持つ）
     this._tasks = new Map();     // id → {title, skill}（頼まれた技。付箋の題）
     this._shown = '';
@@ -59,12 +58,14 @@ export class CielLink {
     } else if (kind === 'body') {
       this._body(m);
       this._maybeChanged();
-    } else if (['accepted', 'started', 'error', 'seen', 'planned'].includes(kind)) {
+    } else if (['accepted', 'started', 'error', 'seen'].includes(kind)) {
       const r = this._pending.get(m.id);
       if (r) {
         this._pending.delete(m.id);
         r(m);
       }
+    } else if (kind === 'activity') {
+      this.work.activity(m);
     } else if (kind === 'done') {
       this._done(m);
     } else if (kind === 'event') {
@@ -185,14 +186,6 @@ export class CielLink {
       this.stop(id);
       return { ok: false, reason: 'error', detail: 'timeout' };
     });
-  }
-
-  // 目的（物を作る）の段の一覧を、体に決めてもらう（体の plan → planned）
-  async plan(item, count) {
-    const { answer } = this._ask({ type: 'plan', item, count }, PLAN_TIMEOUT_MS, () => ({ type: 'timeout' }));
-    const m = await answer;
-    if (m.type === 'planned') return { steps: m.steps ?? [], inventory: m.inventory ?? {} };
-    return m.type === 'timeout' ? { error: 'no_answer' } : { error: m.reason ?? 'error', why: refused(m).why };
   }
 
   // 今の景色を 1 枚撮ってもらう

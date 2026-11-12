@@ -27,3 +27,17 @@ test('cancelled requests reject a late successful HTTP response', async () => {
   await model.cancel(); release();
   await assert.rejects(response, /cancelled/);
 });
+
+test('cancellation aborts the in-flight HTTP request before server acknowledgement', async () => {
+  let acknowledge;
+  const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: (url, options) => options.method === 'DELETE'
+      ? new Promise(resolve => { acknowledge = () => resolve({ ok: true }); })
+      : new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason))) });
+  const response = model.sendRequest([], 'context');
+  const cancelled = assert.rejects(response, /cancelled/);
+  const stop = model.cancel();
+  await cancelled;
+  acknowledge();
+  await stop;
+});

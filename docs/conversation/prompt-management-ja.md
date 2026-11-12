@@ -6,6 +6,8 @@
 
 ## 採用する構成と理由
 
+外部実行APIの出力形式は`server/agent/config/prompts/execution_api.md`をCoreHostが読み込む。人格・記憶は共通だが、音声の表情タグを行動命令へ混ぜない。Minecraftの目標解釈は`server/minecraft/src/mindcraft/prompts/goal.md`、行動判断は同じディレクトリの`action.md`をbrain.jsが読み込む。最終成果物と次の行動を区別し、Mindcraftのレシピ分析も観測に添える。これらを変更した場合も実モデルで依頼解釈と目的達成を別々に確認する。
+
 本文は UTF-8 の Markdown、参照先は TOML、読み込み処理は Python で管理する。日本語の長文を設定ファイルの文字列として編集する負担を減らし、エディタの Markdown プレビューと Git の差分確認を使える構成にする。専用のプロンプト管理サービスは現時点では導入しない。
 
 | ファイル | 責務 |

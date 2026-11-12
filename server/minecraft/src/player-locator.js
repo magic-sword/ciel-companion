@@ -50,3 +50,29 @@ export class PlayerLocator {
     this.bot.removeListener('playerLeft', this.left);
   }
 }
+
+// Use only the player's transmitted locator hint; movement is supplied by the body runtime.
+export async function approachTrackedPlayer(bot, name, token, move) {
+  const deadline = Date.now() + 60000;
+  while (!token.cancelled) {
+    if (bot.players[name]?.entity) return;
+    if (Date.now() >= deadline) throw new Error('player_search_timeout');
+    const hint = bot.playerLocator?.hint(name);
+    if (!hint) throw new Error('player_not_visible');
+    const p = bot.entity.position, distance = Math.hypot(hint.x-p.x,hint.z-p.z);
+    if (distance < 3) { await bot.waitForTicks(5); continue; }
+    const step = Math.min(16,distance);
+    let changed = false;
+    const timer = setInterval(() => {
+      const next = bot.playerLocator?.hint(name);
+      if (bot.players[name]?.entity || !next || token.cancelled || Date.now()>=deadline
+          || (next.source==='azimuth' && hint.source==='azimuth' && Math.cos(next.angle-hint.angle)<0.98)) {
+        changed = true; bot.pathfinder.setGoal(null);
+      }
+    },200);
+    try { await move(Math.floor(p.x+(hint.x-p.x)/distance*step),Math.floor(p.z+(hint.z-p.z)/distance*step)); }
+    catch (e) { if (!changed) throw e; }
+    finally { clearInterval(timer); }
+  }
+  throw new Error(token.reason ?? 'stopped');
+}

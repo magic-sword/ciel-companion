@@ -177,7 +177,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
         # BodyDriver writes directly into Trace, rather than returning agent events.
         if not hasattr(driver,'path'):
             for entry in trace.execution():
-                if id(entry) in seen_body or entry['kind'] not in ('game_call','game_result','game_task_result','work_action','work_action_result'):
+                if id(entry) in seen_body or entry['kind'] not in ('game_call','game_result','game_task_result','work_action','work_action_result','work_activity'):
                     continue
                 seen_body.add(id(entry))
                 watch.event(entry,before)
@@ -282,11 +282,11 @@ async def run(args, *, clock=time.monotonic):
         return 0
     from dotenv import load_dotenv
     load_dotenv(ROOT/'server'/'.env.benchmark')
-    if args.mode == 'conversation':
+    if args.mode in ('body','conversation'):
         load_dotenv(ROOT/'server'/'.env.shared')
         args.model_id = args.model_id or os.environ.get('CIEL_BENCH_MODEL_ID')
         if not args.model_id:
-            raise ValueError('Set CIEL_BENCH_MODEL_ID or pass --model-id for conversation evaluation')
+            raise ValueError('Set CIEL_BENCH_MODEL_ID or pass --model-id for execution evaluation')
     if args.task:
         selected = set(args.task)
         if selected - {t['id'] for t in tasks}:
@@ -308,8 +308,8 @@ async def run(args, *, clock=time.monotonic):
     directory.mkdir(parents=True, exist_ok=False)
     plan = [(task,seed,repeat) for task in tasks for seed in args.seed for repeat in range(args.repeats)]
     manifest = {'format':2, 'policy':'spatial-v1' if any(t.get('stage1') for t in tasks) else POLICY_VERSION, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
-                'backend':args.backend if args.mode == 'conversation' else 'none',
-                'model_id':args.model_id if args.mode == 'conversation' else None,
+                'backend':args.backend if args.mode == 'conversation' else 'local',
+                'model_id':args.model_id,
                 'minecraft_version':'1.21.11', 'seeds':args.seed, 'repeats':args.repeats,
                 'planned_trials':len(plan),
                 'distractors':distractor_configuration() if args.mode == 'conversation' else None,
@@ -330,7 +330,7 @@ async def run(args, *, clock=time.monotonic):
     rcon = world = None
     safe_release = True
     try:
-        if args.mode == 'conversation' and args.backend == 'local' and os.environ.get('CIEL_BENCH_LLM_SERVICE'):
+        if (args.mode == 'body' or args.backend == 'local') and os.environ.get('CIEL_BENCH_LLM_SERVICE'):
             manifest['inference_server'] = await asyncio.to_thread(inference_server_info)
         rcon = Rcon(password)
         world = World(rcon)

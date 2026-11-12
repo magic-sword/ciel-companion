@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameTasks, CAPABILITIES } from '../src/ciel/tasks.js';
 
-const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.obtain_item',
-  arguments: { item: 'stone_pickaxe', quantity: 1, quantity_mode: 'inventory_target' },
-  budget_ms: 10000, constraints: { resource_scope: 'search', failure_policy: 'ask' }, ...extra });
+const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.pursue_goal',
+  arguments: { request: 'Make a stone pickaxe' },
+  budget_ms: 10000, constraints: {}, ...extra });
 const wait = async predicate => {
   for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 5)); }
   throw new Error('condition did not arrive');
@@ -13,78 +13,82 @@ function fixture() {
   const link = { session: 'session', state: { inventory: {} }, body: { current: null, pending: null, blocked: false },
     events: [], playing: () => true, changed() {}, notice(e) { this.events.push(e); }, calls: [],
     async plan() { return { steps: [{ kind: 'craft', item: 'stone_pickaxe', count: 1 }], inventory: { ...this.state.inventory } }; },
-    async runSkill(skill, args) { this.calls.push([skill, args]); this.state.inventory.stone_pickaxe = 1; return { ok: true }; },
+    async runSkill(skill, args) { this.calls.push([skill, args]); this.state.inventory.stone_pickaxe = 1; return { ok: true, note: {goal:{item:'stone_pickaxe'},target:1,inventory:{stone_pickaxe:1},returned:true} }; },
     stop() { this.body.current = null; } };
   const work = new GameTasks(link, { stopMs: 30 });
   return { link, work };
 }
 
-test('follow yields to work only after planning and confirmed physical stop; retries deduplicate', async () => {
-  const { link, work } = fixture();
-  work.stopMs = 1000;
-  link.body.current = { id: 42, skill: 'follow', phase: 'running' };
-  const stopped = [];
-  link.stop = id => { stopped.push(id); };
-  const first = work.submit(request());
-  assert.equal(work.submit(request()).task_id, first.task_id);
-  await wait(() => stopped.length === 1);
-  assert.deepEqual(stopped, [42]);
-  assert.equal(link.calls.length, 0);
-  assert.equal(work.submit(request({ request_id: 'two' })).status, 'busy');
-  link.body.current = null;
-  await wait(() => work.active.state === 'succeeded');
-  assert.equal(link.calls.length, 1);
+test('natural goal is handed off once without recipe planning; conflicts are rejected', async()=>{
+  const {link,work}=fixture();link.plan=()=>assert.fail('Mindcraft owns planning');
+  const a=work.submit(request());assert.equal(work.submit(request()).task_id,a.task_id);
+  assert.equal(work.submit(request({arguments:{request:'Another goal'}})).reason,'request_id_conflict');
+  await wait(()=>work.active.state==='succeeded');
+  assert.equal(link.calls.length,1);assert.equal(link.calls[0][0],'pursue');
+  assert.equal(link.calls[0][1].request,'Make a stone pickaxe');
+  assert.equal(work.view().evidence.inventory.stone_pickaxe,1);work.close();
+});
+
+test('old structured requests and malformed natural requests are rejected',()=>{
+  const {work}=fixture();
+  for(const change of [{capability:'minecraft.obtain_item'}, {arguments:{request:''}},
+    {arguments:{request:'x'.repeat(2001)}}, {arguments:{request:'a',item:'stone'}}, {constraints:{resource_scope:'search'}}])
+    assert.equal(work.submit(request(change)).reason,'invalid_request');
   work.close();
 });
 
-test('invalid requests and unavailable plans leave follow running', async () => {
-  const { link, work } = fixture();
-  link.body.current = { id: 42, skill: 'follow' };
-  link.stop = () => assert.fail('must not stop follow');
-  assert.equal(work.submit(request({ budget_ms: 0 })).reason, 'invalid_request');
-  link.plan = async () => ({ error: 'unknown_item' });
-  work.submit(request({ constraints: { resource_scope: 'search', failure_policy: 'stop' } }));
-  await wait(() => work.active.state === 'cancelled');
-  assert.equal(link.body.current.id, 42);
-  assert.equal(link.calls.length, 0);
-  work.close();
-});
-
-test('a newer body command during planning is never cancelled by the follow handoff', async () => {
-  const { link, work } = fixture();
-  link.body.current = { id: 42, skill: 'follow' };
-  link.stop = () => assert.fail('must not stop newer command');
-  link.plan = async () => {
-    link.body.current = { id: 43, skill: 'goto' };
-    return { inventory: {}, steps: [{ kind: 'craft', item: 'stone_pickaxe', count: 1 }] };
-  };
-  work.submit(request());
-  await wait(() => work.active.state === 'failed');
-  assert.equal(work.active.reason, 'body_changed');
-  assert.equal(link.calls.length, 0);
-  work.close();
-});
-
-test('unconfirmed follow stop refuses work execution and retains ownership', async () => {
-  const { link, work } = fixture();
-  link.body.current = { id: 42, skill: 'follow' };
-  link.stop = id => assert.equal(id, 42);
-  work.submit(request());
-  await wait(() => work.active.reason === 'stop_unconfirmed');
-  assert.equal(work.active.state, 'cancelling');
-  assert.equal(link.calls.length, 0);
-  assert.equal(work.submit(request({ request_id: 'two' })).status, 'busy');
-  work.close();
-});
-
-test('defense, pending commands and other operations are not mistaken for replaceable follow', () => {
-  for (const patch of [{ owner: 'defending' }, { pending: { id: 43 } }, { blocked: true },
-    { current: { id: 42, skill: 'craft' } }]) {
-    const { link, work } = fixture();
-    link.body = { ...link.body, current: { id: 42, skill: 'follow' }, ...patch };
-    assert.equal(work.submit(request()).status, 'busy');
-    work.close();
+test('success needs inventory, return and physical idle evidence',async()=>{
+  for(const note of [{}, {goal:{item:'stone_pickaxe'},target:1,inventory:{},returned:true},
+    {goal:{item:'stone_pickaxe'},target:1,inventory:{stone_pickaxe:1},returned:false}]) {
+    const {link,work}=fixture();link.runSkill=async()=>({ok:true,note});work.submit(request());
+    await wait(()=>work.active.state==='needs_decision');assert.equal(work.active.reason,'objective_unverified');work.close();
   }
+});
+
+test('runtime errors are surfaced without an outer recipe repair loop',async()=>{
+  const {link,work}=fixture();link.runSkill=async()=>({ok:false,reason:'execution_error',note:{action:'collectBlocks'}});
+  work.submit(request());await wait(()=>work.active.state==='needs_decision');
+  assert.equal(work.view().reason,'execution_error');
+  assert.equal((await work.answer(work.active.id,'stale','retry')).reason,'stale_decision');
+  const deadline=work.active.deadline,id=work.active.id;
+  await work.answer(id,work.active.decision.decision_id,'retry');await wait(()=>work.active.state==='needs_decision');
+  assert.equal(work.active.deadline,deadline);assert.equal(work.active.id,id);work.close();
+});
+
+test('follow stops before handing a goal to Mindcraft; pending or blocked bodies refuse work',async()=>{
+  const {link,work}=fixture();work.stopMs=1000;link.body.current={id:42,skill:'follow',phase:'running'};
+  link.stop=id=>assert.equal(id,42);work.submit(request());
+  await new Promise(r=>setTimeout(r,10));assert.equal(link.calls.length,0);
+  link.body.current=null;await wait(()=>work.active.state==='succeeded');work.close();
+  for(const patch of [{blocked:true},{pending:{id:2}},{owner:'defending'},{current:{id:1,skill:'pursue'}}]) {
+    const f=fixture();Object.assign(f.link.body,patch);assert.equal(f.work.submit(request()).status,'busy');f.work.close();
+  }
+});
+
+test('stop suppresses late success and holds ownership until physical idle',async()=>{
+  const {link,work}=fixture();let release;
+  link.runSkill=()=>new Promise(r=>{release=r;});work.submit(request());await wait(()=>release);
+  link.body.blocked=true;assert.equal((await work.cancel(work.active.id)).reason,'stop_unconfirmed');
+  assert.equal(work.submit(request({request_id:'other'})).status,'busy');
+  link.body.blocked=false;assert.equal((await work.cancel(work.active.id)).state,'cancelled');
+  release({ok:true,note:{goal:{item:'stone_pickaxe'},target:1,inventory:{stone_pickaxe:1},returned:true}});
+  await new Promise(r=>setImmediate(r));assert.equal(work.active.state,'cancelled');work.close();
+});
+
+test('deadline stops work and explicit shortage policy remains a confirmed stop',async()=>{
+  const f=fixture();f.link.runSkill=()=>new Promise(()=>{});f.work.submit(request({budget_ms:100}));
+  await wait(()=>f.work.active.state==='failed');assert.equal(f.work.active.reason,'deadline');f.work.close();
+  const {link,work}=fixture();link.runSkill=async()=>({ok:false,reason:'not_found',note:{goal:{item:'stone_pickaxe',failure_policy:'stop'}}});
+  work.submit(request());await wait(()=>work.active.state==='cancelled');assert.equal(work.active.reason,'not_found');work.close();
+});
+
+test('activity updates match the running operation and cannot revive terminal work',async()=>{
+  const {link,work}=fixture();link.runSkill=()=>new Promise(()=>{});work.submit(request());await wait(()=>work.active.operation);
+  work.activity({request_id:'old',stage:'thinking'});assert.equal(work.active.evidence.activity,undefined);
+  work.activity({request_id:work.active.operation,stage:'executing',command:'!collectBlocks'});
+  assert.equal(work.active.evidence.activity.command,'!collectBlocks');
+  await work.cancel(work.active.id);const rev=work.active.revision;
+  work.activity({request_id:work.active.operation,stage:'thinking'});assert.equal(work.active.revision,rev);work.close();
 });
 
 test('construction validates plan before replacing follow', async () => {
@@ -103,100 +107,6 @@ test('construction validates plan before replacing follow', async () => {
   assert.equal(stops, 1);
   work.close();
 });
-test('work verifies final inventory, deduplicates a retry and rejects a conflicting request', async () => {
-  const { link, work } = fixture();
-  const a = work.submit(request()), b = work.submit(request());
-  assert.equal(a.task_id, b.task_id);
-  assert.equal(work.submit(request({ arguments: { item: 'oak_log', quantity: 1, quantity_mode: 'gain' } })).reason, 'request_id_conflict');
-  await wait(() => work.active.state === 'succeeded');
-  assert.equal(link.calls.length, 1);
-  assert.equal(work.view().evidence.inventory.stone_pickaxe, 1);
-  work.close();
-});
-test('skill ok without objective evidence is not success', async () => {
-  const { link, work } = fixture();
-  link.runSkill = async () => ({ ok: true });
-  work.submit(request());
-  await wait(() => work.active.state === 'needs_decision');
-  assert.equal(work.view().reason, 'objective_unverified');
-  assert.equal((await work.answer(work.active.id, 'old', 'retry')).reason, 'stale_decision');
-  work.close();
-});
-test('nearby scope does not escalate into find; decision cannot extend deadline', async () => {
-  const { link, work } = fixture();
-  link.plan = async () => ({ steps: [{ kind: 'gather', item: 'oak_log', count: 3 }], inventory: {} });
-  link.runSkill = async (skill) => { link.calls.push(skill); return { ok: false, reason: 'not_found' }; };
-  work.submit(request({ constraints: { resource_scope: 'nearby', failure_policy: 'ask' } }));
-  await wait(() => work.active.state === 'needs_decision');
-  const deadline = work.active.deadline;
-  await work.answer(work.active.id, work.active.decision.decision_id, 'retry');
-  await wait(() => work.active.state === 'needs_decision');
-  assert.equal(work.active.deadline, deadline);
-  assert.ok(!link.calls.includes('find'));
-  work.close();
-});
-test('cancellation suppresses delayed plan and permits no new skill', async () => {
-  const { link, work } = fixture();
-  let resolve;
-  link.plan = () => new Promise(r => { resolve = r; });
-  work.submit(request());
-  const result = await work.cancel(work.active.id);
-  assert.equal(result.state, 'cancelled');
-  resolve({ steps: [{ kind: 'craft', item: 'stone_pickaxe', count: 1 }], inventory: {} });
-  await new Promise(r => setImmediate(r));
-  assert.equal(link.calls.length, 0);
-  assert.equal(work.active.state, 'cancelled');
-  work.close();
-});
-test('unconfirmed stop retains ownership and refuses overlapping work', async () => {
-  const { link, work } = fixture();
-  link.runSkill = () => new Promise(() => {});
-  work.submit(request());
-  link.body.blocked = true;
-  const result = await work.cancel(work.active.id);
-  assert.equal(result.state, 'cancelling');
-  assert.equal(result.reason, 'stop_unconfirmed');
-  assert.equal(work.submit(request({ request_id: 'two' })).status, 'busy');
-  work.close();
-});
-test('deadline stops pending planning without a client and rejects malformed conditions', async () => {
-  const { link, work } = fixture();
-  assert.equal(work.submit(request({ constraints: { resource_scope: 'anywhere' } })).reason, 'invalid_request');
-  assert.equal(work.submit(request({ arguments: { item: 'x', quantity: true, quantity_mode: 'gain' } })).reason, 'invalid_request');
-  link.plan = () => new Promise(() => {});
-  work.submit(request({ budget_ms: 100 }));
-  await wait(() => work.active.state === 'failed');
-  assert.equal(work.active.reason, 'deadline');
-  work.close();
-});
-
-test('execution shortage is repaired even when a fresh plan has unchanged labels', async () => {
-  const { link, work } = fixture();
-  let crafts = 0;
-  link.runSkill = async (skill, args) => {
-    link.calls.push([skill, args]);
-    if (skill === 'craft' && crafts++ === 0) return { ok: false, reason: 'no_table', note: { needs: { oak_log: 1 } } };
-    if (skill === 'collect') return { ok: true, note: { gained: { oak_log: 1 } } };
-    link.state.inventory.stone_pickaxe = 1;
-    return { ok: true };
-  };
-  work.submit(request());
-  await wait(() => work.active.state === 'succeeded');
-  assert.deepEqual(link.calls.map(([name]) => name), ['craft', 'collect', 'craft']);
-  work.close();
-});
-
-test('an explicitly requested practical stop confirms idle body and reports the missing resource', async () => {
-  const { link, work } = fixture();
-  link.runSkill = async () => ({ ok: false, reason: 'missing_materials', note: { needs: { oak_log: 3 } } });
-  work.submit(request({ constraints: { resource_scope: 'nearby', failure_policy: 'stop' } }));
-  await wait(() => work.active.state === 'cancelled');
-  assert.equal(work.view().reason, 'missing_materials');
-  assert.match(work.view().message, /原木/);
-  assert.deepEqual(link.calls, []);
-  work.close();
-});
-
 test('prepared construction verifies physical evidence and deduplicates work',async()=>{
   const {link,work}=fixture(),plan_id='11111111-1111-4111-8111-111111111111';
   let claimed=false;

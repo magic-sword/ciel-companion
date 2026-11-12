@@ -17,8 +17,10 @@ class CoreSession:
     async def respond(self, request):
         if self.closed:
             raise web.HTTPGone()
-        if not isinstance(request, dict) or set(request) != {'request_id', 'messages'}:
+        if not isinstance(request, dict) or set(request) != {'request_id', 'messages', 'response_format'}:
             raise web.HTTPBadRequest(reason='invalid_request')
+        if request['response_format'] not in ('text','json'):
+            raise web.HTTPBadRequest(reason='invalid_response_format')
         ident, messages = request['request_id'], request['messages']
         if not isinstance(ident, str) or not 1 <= len(ident) <= 128:
             raise web.HTTPBadRequest(reason='invalid_request_id')
@@ -43,7 +45,7 @@ class CoreSession:
             async with asyncio.timeout(120):
                 # The host supplies persona, permitted memory and current conversation.
                 context = copy.deepcopy(await self.context())
-                result = await self.infer(context, copy.deepcopy(messages))
+                result = await self.infer(context, copy.deepcopy(messages), response_format=request['response_format'])
                 if self.closed or asyncio.current_task().cancelling():
                     raise asyncio.CancelledError()
                 if not isinstance(result, str):

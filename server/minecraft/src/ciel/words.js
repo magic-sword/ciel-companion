@@ -3,6 +3,9 @@
 
 // うまくいかなかった理由（体の done・error の reason）。（ ）の前が付箋の短いひとこと
 export const WHY_FAILED = {
+  core_unavailable: 'シエルの判断APIに接続できない',
+  execution_error: 'ゲームの実行処理でエラーが起きた',
+  goal_unclear: '依頼の完了条件を確認したい',
   invalid_spec:'施工する範囲・材質・条件を確認してほしい',
   ambiguous_region:'作業対象を一つに確定してほしい',
   invalid_level:'残す地面の高さと除去上限を確認してほしい',
@@ -109,6 +112,7 @@ export const facingJa = (f) => FACING[f] ?? '';
 export function title(skill, args = {}) {
   const who = args.player ?? '持ち主';
   switch (skill) {
+    case 'pursue': return String(args.request ?? '依頼された物を用意する').slice(0,100);
     case 'pointed_action': return ({move:'指した場所へ行く',recover:'選んだ作業台を回収する',clear:'選んだ範囲を除去する',floor:'選んだ範囲へ床を敷く'})[args.action] ?? '指し示した場所で作業する';
     case 'follow': return `${who}についていく`;
     case 'come': return `${who}のそばへ行く`;

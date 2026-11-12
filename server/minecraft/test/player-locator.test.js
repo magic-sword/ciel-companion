@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { Vec3 } from 'vec3';
-import { PlayerLocator } from '../src/player-locator.js';
+import { PlayerLocator, approachTrackedPlayer } from '../src/player-locator.js';
 import { Runner } from '../src/skills.js';
 
 const require = createRequire(import.meta.url);
@@ -11,6 +11,20 @@ const registry = require('prismarine-registry')('1.21.11');
 const { createSerializer, createDeserializer } = require('minecraft-protocol');
 const uuid = '00000000-0000-4000-8000-000000000001';
 const other = '00000000-0000-4000-8000-000000000002';
+
+test('Mindcraft locator approach uses bounded steps and requires a visible player', async () => {
+  const bot = {players:{Owner:{}},entity:{position:new Vec3(0,64,0)},
+    playerLocator:{hint:()=>({x:100,z:0,source:'vec3i'})},pathfinder:{setGoal(){}}};
+  const moves=[];
+  await approachTrackedPlayer(bot,'Owner',{cancelled:false},async(x,z)=>{
+    moves.push([x,z]);bot.players.Owner.entity={position:new Vec3(100,64,0)};
+  });
+  assert.deepEqual(moves,[[16,0]]);
+  delete bot.players.Owner.entity;
+  bot.playerLocator.hint=()=>null;
+  await assert.rejects(approachTrackedPlayer(bot,'Owner',{cancelled:false},()=>assert.fail('must not move')),/player_not_visible/);
+  await assert.rejects(approachTrackedPlayer(bot,'Owner',{cancelled:true,reason:'stopped'},()=>assert.fail('must not move')),/stopped/);
+});
 
 function fixture() {
   const bot = new EventEmitter();

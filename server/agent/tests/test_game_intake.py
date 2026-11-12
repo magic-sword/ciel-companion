@@ -62,6 +62,33 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(await self.intake.handle(llm.ChatMessage(role='user', content=['Do it'])))
         self.runner.start.assert_not_awaited()
 
+    async def test_natural_handoff_preserves_input_and_uses_only_intent_inference(self):
+        capability=self.runner.env.profile['work']['capabilities'][0]
+        capability.update(arguments={'type':'object','additionalProperties':False,'required':['request'],
+            'properties':{'request':{'type':'string','maxLength':2000}}},
+            constraints={'type':'object','additionalProperties':False,'properties':{}},
+            handoff={'version':1,'argument':'request','constraints':{},'seconds':120})
+        self.respond({'operation':'select','capability':'1'})
+        text='手近な材料で石のつるはしを作って。難しければ中止して。'
+        item=llm.ChatMessage(role='user',content=[text])
+        await self.intake.handle(item)
+        await self.intake.handle(item)
+        self.create.assert_awaited_once()
+        self.runner.start.assert_awaited_once()
+        self.assertEqual(self.runner.start.await_args.args,('puzzle.solve',{'request':text}))
+        self.assertEqual(self.runner.start.await_args.kwargs['constraints'],{})
+        self.assertLessEqual(self.runner.start.await_args.kwargs['seconds'],120)
+
+    async def test_natural_handoff_does_not_skip_intent_or_authorization(self):
+        capability=self.runner.env.profile['work']['capabilities'][0]
+        capability['handoff']={'version':1,'argument':'request','constraints':{},'seconds':120}
+        self.respond({'operation':'none'})
+        await self.intake.handle(llm.ChatMessage(role='user',content=['作る方法を教えて']))
+        self.runner.start.assert_not_awaited()
+        self.intake.authorized=lambda:False
+        await self.intake.handle(llm.ChatMessage(role='user',content=['作って']))
+        self.create.assert_awaited_once()
+
     async def test_reference_is_frozen_across_selection_and_argument_generation(self):
         self.tool()
         env=self.runner.env

@@ -10,12 +10,13 @@ export class CielModel {
     this.url = url.replace(/\/$/, '');
     this.token = token;
     this.transport = transport;
-    this.pending = new Set();
+    this.pending = new Map();
   }
 
-  async sendRequest(turns, systemMessage) {
+  async sendRequest(turns, systemMessage, responseFormat = 'text') {
     const id = randomUUID();
-    this.pending.add(id);
+    const controller = new AbortController();
+    this.pending.set(id, controller);
     try {
       const messages = [
         { role: 'user', content: JSON.stringify({ type: 'execution_context', text: systemMessage }) },
@@ -23,8 +24,8 @@ export class CielModel {
           content: turn.role === 'system' ? JSON.stringify({ type: 'execution_observation', text: turn.content }) : turn.content })),
       ];
       const response = await this.transport(`${this.url}/v1/respond`, {
-        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages }),
-        signal: AbortSignal.timeout(125000),
+        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, response_format: responseFormat }),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(125000)]),
       });
       if (!response.ok) throw new Error(`CIEL inference failed: ${response.status}`);
       const result = await response.json();
@@ -37,7 +38,8 @@ export class CielModel {
   headers() { return { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' }; }
 
   async cancel() {
-    const ids = [...this.pending];
+    const ids = [...this.pending.keys()];
+    for (const controller of this.pending.values()) controller.abort(new Error('CIEL request cancelled'));
     this.pending.clear();
     await Promise.all(ids.map(async id => {
       const response = await this.transport(`${this.url}/v1/requests/${id}`, {

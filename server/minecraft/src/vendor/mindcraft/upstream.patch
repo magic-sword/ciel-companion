@@ -31,15 +31,18 @@
  
      return true;
  }
-@@ -451,6 +451,7 @@
- 
-     for (let i=0; i<num; i++) {
-         let blocks = world.getNearestBlocksWhere(bot, block => {
-+            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
+@@ -454,6 +454,10 @@
              if (!blocktypes.includes(block.name)) {
                  return false;
              }
-@@ -1165,7 +1166,7 @@
++            // Mineflayer first calls matching with palette entries without positions.
++            // Only filter by type there; safety/exclusions require an actual world block.
++            if (!block.position) return true;
++            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
+             if (exclude) {
+                 for (let position of exclude) {
+                     if (block.position.x === position.x && block.position.y === position.y && block.position.z === position.z) {
+@@ -1165,7 +1169,7 @@
                       block.name.includes('fence_gate') ||
                       block.name.includes('trapdoor'))) 
                  {
@@ -58,6 +61,17 @@
  
  async function say(agent, message) {
      agent.bot.modes.behavior_log += message + '\n';
+@@ -124,8 +123,8 @@
+                 this.stuck_time = 0;
+                 execute(this, agent, async () => {
+                     const crashTimeout = setTimeout(() => { agent.cleanKill("Got stuck and couldn't get unstuck") }, 10000);
+-                    await skills.moveAway(bot, 5);
+-                    clearTimeout(crashTimeout);
++                    try { await skills.moveAway(bot, 5); }
++                    finally { clearTimeout(crashTimeout); }
+                     say(agent, 'I\'m free.');
+                 });
+             }
 @@ -322,7 +321,7 @@
  
      if (should_reprompt) {

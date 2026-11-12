@@ -5,7 +5,7 @@ const key = p => `${p.x},${p.y},${p.z}`;
 export function protectWorld(bot) {
   const placed = new Set(), permitted = new Set();
   const allowed = block => Boolean(block && (NATURAL.test(block.name) || /_ore$/.test(block.name)
-    || placed.has(key(block.position)) || permitted.has(key(block.position))));
+    || (block.position && (placed.has(key(block.position)) || permitted.has(key(block.position))))));
   bot.cielCanBreak = allowed;
   const constrain = movements => {
     // Preserve Mindcraft's digging, towers, scaffold choices and cost policy.

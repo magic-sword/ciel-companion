@@ -1,7 +1,7 @@
 // Read-only instrumentation of the real Runner; no alternate movement or locator logic.
 import { writeFileSync, renameSync, readFileSync, existsSync } from 'node:fs';
 import { Vec3 } from 'vec3';
-import { Runner } from '../src/skills.js';
+import { MindcraftRunner as Runner } from '../src/mindcraft/runtime.js';
 import pathfinderPkg from 'mineflayer-pathfinder';
 import {carefulMovements} from '../src/movements.js';
 const attach = Runner.prototype.attach;

@@ -5,8 +5,11 @@ import { BodyCommands } from '../body-command.js';
 import { executeRegion } from '../spatial.js';
 import { protectWorld } from './protection.js';
 import { ActionScope } from './action-scope.js';
+import { alignPlayerCollision } from '../player-physics.js';
+import { confirmedCrafting } from '../craft-sync.js';
+import { approachTrackedPlayer } from '../player-locator.js';
 import { CielModel } from './ciel-model.js';
-import { pursueItem } from './brain.js';
+import { pursueItem, resolveItemGoal } from './brain.js';
 import { setSettings } from '../vendor/mindcraft/src/agent/settings.js';
 import { initBot } from '../vendor/mindcraft/src/utils/mcdata.js';
 import { ActionManager } from '../vendor/mindcraft/src/agent/action_manager.js';
@@ -14,9 +17,11 @@ import { initModes } from '../vendor/mindcraft/src/agent/modes.js';
 import * as skills from '../vendor/mindcraft/src/agent/library/skills.js';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+export const atReturnPosition = (position, origin) =>
+  Math.abs(position.y-origin.y)<0.75 && position.distanceTo(origin)<=1.5;
 const inventory = bot => {
   const counts = {};
-  for (const item of bot.inventory.items()) counts[item.name] = (counts[item.name] ?? 0) + item.count;
+  for (const item of bot?.inventory?.items() ?? []) counts[item.name] = (counts[item.name] ?? 0) + item.count;
   return counts;
 };
 class Failed extends Error {
@@ -29,19 +34,28 @@ export function createMindcraftBot(options) {
 
 export class MindcraftRunner extends BodyCommands {
   bindCore(url, token) { this.coreModel = new CielModel(null, url, {token}); }
-  async unbindCore() { const model=this.coreModel; this.coreModel=null; await model?.cancel(); }
+  async unbindCore() {
+    const model=this.coreModel; this.coreModel=null;
+    // Revocation already aborts local inference and rejects late results. The
+    // conversation API can legitimately have closed before the MCP disconnect.
+    try { await model?.cancel(); }
+    catch (e) { console.warn('CIEL session closed before cancellation acknowledgement'); }
+  }
   constructor(report, owner) {
     super({ report, available: () => Boolean(this.bot?.entity), run: c => this.execute(c),
-      halt: () => this.halt() });
+      halt: () => this.haltExecution() });
     this.owner = owner;
     this.bot = null;
     this.modeActions = new Set();
+    this.goalContexts = new Map();
   }
 
   attach(bot) {
     clearInterval(this.timer);
     this.bot = bot;
     if (!bot) return;
+    alignPlayerCollision(bot);
+    confirmedCrafting(bot);
     this.blocked = false;
     this.protection = protectWorld(bot);
     this.actionScope = new ActionScope(bot);
@@ -79,7 +93,14 @@ export class MindcraftRunner extends BodyCommands {
         return Promise.resolve({ success: false, interrupted: true });
       const mode = label.startsWith('mode:');
       if (mode) { this.defending = true; this._defenseAt = Date.now(); this.changed(); }
-      const promise = runAction(label, () => this.actionScope.run(fn), { ...options, timeout: -1 });
+      const promise = runAction(label, () => this.actionScope.run(fn), { ...options, timeout: -1 })
+        .then(result => {
+          // Native command wrappers return text only. Preserve a runtime exception
+          // as failure before it becomes another model-guided exploration attempt.
+          if (label.startsWith('action:') && !result.success && !result.interrupted)
+            throw new Failed('execution_error', { action: label, detail: result.message?.slice(0, 500) });
+          return result;
+        });
       if (mode) {
         this.modeActions.add(promise);
         void promise.finally(() => {
@@ -113,11 +134,11 @@ export class MindcraftRunner extends BodyCommands {
     void Promise.resolve(bot.collectBlock.cancelTask()).catch(() => {});
   }
 
-  async halt() {
-    await this.coreModel?.cancel();
+  async haltExecution() {
     this.agent?.actions.cancelResume();
     this.interrupt();
-    await this.agent?.actions.stop();
+    // Physical interruption must not wait for the inference server's acknowledgement.
+    await Promise.all([this.coreModel?.cancel(), this.agent?.actions.stop()]);
     await this.waitModes();
     await this.actionScope?.settle();
     this.interrupt();
@@ -134,55 +155,67 @@ export class MindcraftRunner extends BodyCommands {
     return c ? { id: c.id, skill: c.skill, args: c.args } : null;
   }
 
-  plan(item, count) {
-    if (!this.bot?.entity) return { error: 'not_spawned' };
-    if (!this.bot.registry.itemsByName[item]) return { error: 'unknown_item' };
-    return { steps: [{ kind: 'obtain', item, count }], inventory: inventory(this.bot) };
-  }
 
   async action(label, run, c) {
     await this.waitModes();
     if (c.token.cancelled) throw new Failed(c.token.reason);
-    let value;
-    const result = await this.agent.actions.runAction(label, async () => { value = await run(); });
+    let value, failure;
+    const result = await this.agent.actions.runAction(label, async () => {
+      try { value = await run(); } catch(e) { failure=e; throw e; }
+    });
     await this.waitModes();
     if (c.token.cancelled) throw new Failed(c.token.reason);
+    if (failure) throw failure;
     if (!result.success || result.interrupted) throw new Failed(result.interrupted ? 'interrupted' : 'cannot_continue');
     if (value === false) throw new Failed('objective_unverified');
     return value;
   }
 
-  async obtain(c) {
-    const bot = this.bot, { item, count, resource_scope } = c.args;
-    const before = inventory(bot), target = (before[item] ?? 0) + count;
-    const origin = bot.entity.position.clone();
-    this.agent.resource_scope = resource_scope;
-    let failures = 0;
-    // Recheck after return: scaffold consumption must not be reported as delivered materials.
-    while (!c.token.cancelled) {
-      await this.waitModes();
-      if (c.token.cancelled) break;
-      if ((inventory(bot)[item] ?? 0) >= target) {
-        await this.action('ciel:return', () => skills.goToPosition(bot, origin.x, origin.y, origin.z, 2), c);
-        if ((inventory(bot)[item] ?? 0) >= target)
-          return { gained: { [item]: inventory(bot)[item] - (before[item] ?? 0) }, returned: true };
-      }
-      if (!this.coreModel) throw new Failed('core_unavailable');
-      const beforeCount=inventory(bot)[item] ?? 0;
-      await pursueItem(this,c,target);
-      const progressed=(inventory(bot)[item] ?? 0)>beforeCount;
-      await this.waitModes();
-      if (c.token.cancelled) break;
-      failures = progressed ? 0 : failures + 1;
-      if (failures >= 3) throw new Failed('not_found', { inventory: inventory(bot), target });
-      await pause(25);
+
+  async pursue(c) {
+    if (!this.coreModel) throw new Failed('core_unavailable');
+    let context = this.goalContexts.get(c.args.goal_id);
+    if (!context) {
+      this.activity(c, 'thinking');
+      const before = inventory(this.bot), origin = this.bot.entity.position.clone();
+      const goal = await resolveItemGoal(this, c.args.request);
+      if (c.token.cancelled) throw new Failed(c.token.reason);
+      if (goal.clarification) throw new Failed('goal_unclear', goal);
+      context = {goal,before,origin,target:goal.quantity+(goal.quantity_mode==='gain'?(before[goal.item]??0):0)};
+      this.goalContexts.set(c.args.goal_id,context);
+      if(this.goalContexts.size>512)this.goalContexts.delete(this.goalContexts.keys().next().value);
     }
-    throw new Failed(c.token.reason ?? 'stopped');
+    const {goal,target,origin}=context;
+    const command={...c,args:{item:goal.item,resource_scope:goal.resource_scope}};
+    let first=context.started?'':goal.command;
+    context.started=true;
+    try {
+      while(!c.token.cancelled) {
+        await pursueItem(this,command,target,first); first='';
+        if(c.token.cancelled)break;
+        this.activity(c, 'returning');
+        // A radius of two also accepts the tunnel directly below the starting
+        // point. Reach the original standing cell before claiming a return.
+        await this.action('ciel:return',()=>skills.goToPosition(this.bot,origin.x,origin.y,origin.z,0),c);
+        const observed=inventory(this.bot);
+        if((observed[goal.item]??0)>=target && atReturnPosition(this.bot.entity.position,origin))
+          return {goal,target,inventory:observed,returned:true};
+      }
+      throw new Failed(c.token.reason??'stopped');
+    } catch(e) {
+      const note={...e.note,goal,target,inventory:inventory(this.bot),returned:false};
+      throw new Failed(e instanceof Failed?e.message:e.goalReason??'execution_error',note);
+    }
+  }
+
+  activity(c, stage, command = '') {
+    if(!c.token.cancelled)this.report('activity',{id:c.id,request_id:c.request_id,
+      command_scope:c.scope??'',stage,command});
   }
 
   async execute(c) {
     try {
-      if (c.skill === 'obtain') return { ok: true, note: await this.obtain(c) };
+      if (c.skill === 'pursue') return { ok: true, note: await this.pursue(c) };
       const note = await this.action(`ciel:${c.skill}`, () => this.perform(c), c);
       return { ok: true, note };
     } catch (e) {
@@ -200,10 +233,15 @@ export class MindcraftRunner extends BodyCommands {
     const player = a.player ?? this.owner;
     if (['follow', 'come', 'give'].includes(c.skill) || a.player) {
       if (!player) throw new Failed('no_owner');
-      if (!bot.players[player]?.entity) throw new Failed('player_not_visible');
+      if (!bot.players[player]?.entity) {
+        try { await approachTrackedPlayer(bot,player,c.token,
+          (x,z)=>skills.goToGoal(bot,new pf.goals.GoalNearXZ(x,z,2))); }
+        catch(e) { throw new Failed(e.message); }
+      }
     }
     switch (c.skill) {
-      case 'follow': return skills.followPlayer(bot, player, 3);
+      // GoalFollow works on block cells; leave margin for the continuous 3-block arrival contract.
+      case 'follow': return skills.followPlayer(bot, player, 2);
       case 'come': return skills.goToPlayer(bot, player, 2);
       case 'go_to':
         if (a.player) return skills.goToPlayer(bot, player, 2);
@@ -226,16 +264,27 @@ export class MindcraftRunner extends BodyCommands {
       case 'find': return skills.goToNearestBlock(bot, a.block, 2, 64);
       case 'edit_region': {
         const plan = bot.regionPlans.start(bot, a.plan_id, c.scope);
-        // Region validation/verification is a CIEL extension; physical actions use Mindcraft.
+        // A verified construction plan owns exact stances and placement faces.
+        // Native general-purpose skills may dig/scaffold/reposition, invalidating
+        // that plan. Keep the region executor's careful movements and exact edits.
         return executeRegion(bot, plan, c.token, { Failed, watched: (_bot, run) => run(),
-          move: s => skills.goToGoal(bot, new pf.goals.GoalBlock(s.x, s.y, s.z)),
-          dig: p => skills.breakBlockAt(bot, p.x, p.y, p.z),
-          place: (p, block) => skills.placeBlock(bot, block, p.x, p.y, p.z),
+          move: s => this.regionMove(bot,s,c),
         }, a.budget_ms);
       }
       case 'pointed_action': return this.pointed(c);
       default: throw new Failed('unsupported_skill');
     }
+  }
+
+  async regionMove(bot, stance, c) {
+    let previous=bot.entity.position.clone(), last=Date.now();
+    const timer=setInterval(()=>{
+      const p=bot.entity.position;
+      if(p.distanceTo(previous)>0.1){previous=p.clone();last=Date.now();}
+      if(c.token.cancelled || Date.now()-last>2000)bot.pathfinder.setGoal(null);
+    },100);
+    try {return await bot.pathfinder.goto(new pf.goals.GoalBlock(stance.x,stance.y,stance.z));}
+    finally {clearInterval(timer);}
   }
 
   async pointed(c) {
@@ -256,7 +305,12 @@ export class MindcraftRunner extends BodyCommands {
     if (c.token.cancelled) return;
     check();
     await this.protection.permit([p], () => skills.breakBlockAt(bot, p.x, p.y, p.z));
-    await skills.pickupNearbyItems(bot);
+    // Item entities and inventory packets arrive after the block removal packet.
+    for(let attempt=0;attempt<10 && !c.token.cancelled && (inventory(bot).crafting_table??0)<=before;attempt++) {
+      await skills.wait(bot,200);
+      if(c.token.cancelled)break;
+      await skills.pickupNearbyItems(bot);
+    }
     if ((inventory(bot).crafting_table ?? 0) <= before) throw new Failed('objective_unverified');
     return { selection_id: selection.id, recovered: 1 };
   }

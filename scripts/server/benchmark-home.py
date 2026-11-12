@@ -114,7 +114,7 @@ def stage():
 
 
 def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared', all_tasks=False, failure_streak=3,
-          distractors=0, distractor_surface='both'):
+          distractors=0, distractor_surface='both', run_seconds=600):
     # Use a new result directory, and only the dedicated compose project/services.
     code = '''
 from pathlib import Path
@@ -144,10 +144,11 @@ for attempt in range(90):
     time.sleep(1)
 else:
     raise SystemExit('Benchmark bot did not join')
-run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE',TASK_ARGS'--failure-streak','FAILURE_STREAK',
+run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE',TASK_ARGS'--failure-streak','FAILURE_STREAK','--run-seconds','RUN_SECONDS',
     '--seed','11','--repeats','1',TIME_ARGS'--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
 '''
-    code=code.replace('MODE_BUILD',(", 'agent-bench'" + (", 'llm-bench'" if llm_service=='dedicated' else '')) if mode=='conversation' else '')
+    code=code.replace('MODE_BUILD',(", 'agent-bench'" if mode=='conversation' else '')
+        + (", 'llm-bench'" if llm_service=='dedicated' else ''))
     code=code.replace('MODE_UP',"run('up','-d','--force-recreate','agent-bench')" if mode=='conversation' else '')
     code=code.replace('LLM_START', '''run('up','-d','llm-bench')
 for attempt in range(180):
@@ -159,20 +160,20 @@ for attempt in range(180):
         time.sleep(1)
 else:
     raise SystemExit('Dedicated CPU LLM did not become ready')
-''' if mode=='conversation' and llm_service=='dedicated' else ('''with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as response:
+''' if llm_service=='dedicated' else ('''with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as response:
     status=json.load(response)
 with urllib.request.urlopen('http://127.0.0.1:8094/props',timeout=5) as response:
     props=json.load(response)
 if not status.get('ready') or status.get('mode')!='gpu' or props['default_generation_settings']['n_ctx']<32768:
     raise SystemExit('Shared GPU API must be ready with at least 32768 context; no dedicated CPU fallback')
 print('Shared inference API:',json.dumps(status))
-''' if mode=='conversation' else ''))
+''' if mode in ('conversation','body') else ''))
     code=code.replace('SERVICE_VALUE',llm_service).replace('PORT_VALUE','8094' if llm_service=='shared' else '8096').replace('CONTROL_VALUE','8095' if llm_service=='shared' else '8097')
     code=code.replace('DISTRACTOR_COUNT_VALUE',str(distractors)).replace('DISTRACTOR_SURFACE_VALUE',distractor_surface)
     time_args = "'--seconds',"+repr(str(seconds))+"," if seconds is not None else ''
     selected_tasks = [task_id] if isinstance(task_id, str) else task_id
     task_args = '' if all_tasks else ''.join("'--task',"+repr(name)+',' for name in selected_tasks)
-    code=code.replace('TASK_ARGS',task_args).replace('FAILURE_STREAK',str(failure_streak))
+    code=code.replace('TASK_ARGS',task_args).replace('FAILURE_STREAK',str(failure_streak)).replace('RUN_SECONDS',str(run_seconds))
     if all_tasks: code=code.replace('smoke-MODE_VALUE-', 'suite-MODE_VALUE-')
     remote(code.replace('MODE_VALUE',mode).replace('TIME_ARGS',time_args))
 
@@ -183,6 +184,7 @@ if __name__ == '__main__':
     ap.add_argument('--task',choices=[t['id'] for t in load_tasks()],action='append',help='May repeat; default gather_logs')
     ap.add_argument('--run',action='append',default=[],help='Pull only this result directory name; may repeat')
     ap.add_argument('--all',action='store_true',help='Measure every supported task once, seed 11, whole-run budget 600s')
+    ap.add_argument('--run-seconds',type=int,default=600,help='Prospective whole-suite budget (1..3600); task deadlines remain unchanged')
     ap.add_argument('--failure-streak',type=int,default=3,help='Consecutive task failure guard; 0 explicitly measures all failures')
     ap.add_argument('--seconds',type=int,help='Optional stricter cap on the practical task budget')
     ap.add_argument('--distractors',type=int,default=0,choices=range(101),metavar='0..100')
@@ -197,6 +199,8 @@ if __name__ == '__main__':
         ap.error('--run must be a single result directory name')
     if args.failure_streak < 0:
         ap.error('--failure-streak must be nonnegative')
+    if not 1 <= args.run_seconds <= 3600:
+        ap.error('--run-seconds must be between 1 and 3600')
     if args.seconds is not None and not 1 <= args.seconds <= 3600:
         ap.error('--seconds must be between 1 and 3600')
     if args.action=='inspect':
@@ -273,4 +277,4 @@ subprocess.run(['docker','compose','--env-file','.env.benchmark','-f','compose.b
 ''')
     else:
         smoke(args.action,args.task or ['gather_logs'],args.seconds,args.llm_service,args.all,args.failure_streak,
-              args.distractors,args.distractor_surface)
+              args.distractors,args.distractor_surface,args.run_seconds)

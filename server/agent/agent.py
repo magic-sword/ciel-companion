@@ -425,10 +425,15 @@ class Ciel(Agent):
         p = self.persona
         return {'quiet': p.talk_quiet_instructions, 'chatty': p.talk_chatty_instructions}.get(talk, '')
 
-    def instructions_for(self, talk: str, presence: str) -> str:
+    def instructions_for(self, talk: str, presence: str, *, execution: bool = False) -> str:
         """会話のしかた（mode.py）ごとの指示。その場にいる人（presence_*.md、覚えていることの出し方）と、
         おしゃべり度（ひかえめ talk_quiet.md・おしゃべり talk_chatty.md。ふつうは足さない）を最後に足す。"""
         p = self.persona
+        if execution:
+            # Identity and permitted context are shared; speech formatting and
+            # voice turn-taking do not govern an external action response.
+            return '\n\n'.join(t for t in (p.instructions,p.self_instructions,self.grown,
+                                           self._presence_text(presence)) if t)
         parts = [p.instructions + (p.emotion_instructions if VOICE == 'irodori' else ''),
                  p.self_instructions,    # シエル自身の好み・苦手・こだわり（ciel_self.md）
                  self.grown,             # 出来事から育った好み（growth.py）

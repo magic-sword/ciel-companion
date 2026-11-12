@@ -93,7 +93,6 @@ function command(raw) {
     else send('error', { reason: 'not_spawned' });
   } else if (cmd.type === 'state') send('state', state());
   else if (cmd.type === 'look') look(cmd.id);
-  else if (cmd.type === 'plan') plan(cmd);
 }
 
 // MCP の会話の受け持ち（src/ciel/hub.js・mcp.js）
@@ -130,17 +129,6 @@ async function look(id) {
   }
   log(`景色を撮った（${r.jpeg.length} バイト、${Date.now() - started} ms）`);
   send('seen', { id, jpeg: r.jpeg.toString('base64'), width: r.width, height: r.height, facing: facing(bot) });
-}
-
-// 目的（物を作る）を、今の持ち物と近くの作業台から段の一覧にする（goal-plan.js。会話サーバーの目的の係が使う）
-function plan({ id, item, count }) {
-  if (!bot?.entity) {
-    send('error', { id, reason: 'not_spawned' });
-    return;
-  }
-  const r = runner.plan(item, count);
-  if (r.error) send('error', { id, reason: r.error });
-  else send('planned', { id, ...r });
 }
 
 let blocks = {};

@@ -119,6 +119,7 @@ class GameIntake:
                             arguments=copy.deepcopy(d.get('arguments', {})),
                             constraints=copy.deepcopy(d.get('constraints', {})),
                             **({'preparation': copy.deepcopy(d['preparation'])} if d.get('preparation') else {}),
+                            **({'handoff': copy.deepcopy(d['handoff'])} if d.get('handoff') else {}),
                             interpretation=d.get('interpretation', ''))
                        for d in (env.profile.get('work') or {}).get('capabilities', [])]
         for fn in getattr(env, 'tools', []):
@@ -327,11 +328,21 @@ class GameIntake:
                     return '今回の対象を特定できません。座標を一組で指定するか、指示棒で選び直してください。'
                 debug_log.record('work_capability_selected', capability=definition['name'], capability_kind=definition['kind'],
                     version=hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest()[:12])
-                action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
-                    'confirmed_request':confirmed_request,
-                    'capability': model_definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
-                    'targets': targets.targets,
-                    'references': model_references if definition.get('reference_argument') else None}, started)
+                handoff = definition.get('handoff')
+                if handoff:
+                    if handoff.get('version') != 1 or definition['kind'] != 'work':
+                        raise ValueError('Unsupported handoff')
+                    # Intent was decided by the model. Preserve the original request,
+                    # including constraints; the service owns its interpretation.
+                    action = {'operation': 'submit', 'arguments': {handoff['argument']: text},
+                              'constraints': copy.deepcopy(handoff['constraints']),
+                              'seconds': handoff['seconds'], 'title': text[:100]}
+                else:
+                    action = await self._infer({'stage': 'arguments', 'input': text, 'id': selected,
+                        'confirmed_request':confirmed_request,
+                        'capability': model_definition, 'current': self.runner.status(), 'body': getattr(env, '_body', {}),
+                        'targets': targets.targets,
+                        'references': model_references if definition.get('reference_argument') else None}, started)
         except (ValueError, TypeError, KeyError, asyncio.TimeoutError):
             return '依頼の操作を確認できませんでした。'
         except Exception as e:

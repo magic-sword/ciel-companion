@@ -6,13 +6,29 @@ from ciel_core import CielCore
 
 
 class CoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_response_format_is_required_and_validated_before_inference(self):
+        core = CielCore()
+        seen = []
+        async def context(): return []
+        async def infer(ctx, messages, *, response_format):
+            seen.append(response_format)
+            return '{}'
+        token = core.bind(context=context, infer=infer)
+        bound = core.sessions[token]
+        payload = {'request_id':'format','messages':[{'role':'user','content':'observe'}]}
+        for invalid in (payload, {**payload,'response_format':'xml'}):
+            with self.assertRaises(web.HTTPBadRequest): await bound.respond(invalid)
+        await bound.respond({**payload,'response_format':'json'})
+        self.assertEqual(seen, ['json'])
+        await core.release(token)
+
     async def test_http_authentication_and_response(self):
         core = CielCore()
         async def context(): return {'persona': 'CIEL'}
-        async def infer(ctx, messages): return ctx['persona']
+        async def infer(ctx, messages, *, response_format): return ctx['persona']
         token = core.bind(context=context, infer=infer)
         async with TestClient(TestServer(core.application())) as client:
-            payload = {'request_id': 'http', 'messages': [{'role': 'user', 'content': 'hello'}]}
+            payload = {'response_format':'text', 'request_id': 'http', 'messages': [{'role': 'user', 'content': 'hello'}]}
             response = await client.post('/v1/respond', json=payload)
             self.assertEqual(response.status, 401)
             response = await client.post('/v1/respond', json=payload, headers={'Authorization': 'Bearer ' + token})
@@ -25,13 +41,13 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
         state = {'persona': 'CIEL', 'memory': 'first'}
         seen = []
         async def context(): return state
-        async def infer(ctx, messages):
+        async def infer(ctx, messages, *, response_format):
             seen.append(ctx)
             ctx['persona'] = 'local copy'
             return ctx['memory']
         token = core.bind(context=context, infer=infer)
         session = core.sessions[token]
-        def request(i): return {'request_id': i, 'messages': [{'role': 'user', 'content': 'observe'}]}
+        def request(i): return {'response_format':'text', 'request_id': i, 'messages': [{'role': 'user', 'content': 'observe'}]}
         self.assertEqual((await session.respond(request('1')))['text'], 'first')
         state['memory'] = 'second'
         self.assertEqual((await session.respond(request('2')))['text'], 'second')
@@ -45,13 +61,13 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
         core = CielCore()
         started = asyncio.Event()
         async def context(): return {}
-        async def infer(ctx, messages):
+        async def infer(ctx, messages, *, response_format):
             started.set()
             try: await asyncio.sleep(100)
             except asyncio.CancelledError: return 'late action'
         token = core.bind(context=context, infer=infer)
         session = core.sessions[token]
-        response = asyncio.create_task(session.respond({'request_id': 'stop', 'messages': [{'role': 'user', 'content': 'go'}]}))
+        response = asyncio.create_task(session.respond({'response_format':'text', 'request_id': 'stop', 'messages': [{'role': 'user', 'content': 'go'}]}))
         await started.wait()
         await session.cancel('stop')
         with self.assertRaises(asyncio.CancelledError): await response

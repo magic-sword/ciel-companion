@@ -82,6 +82,9 @@ services:
       - ./.env.benchmark
     environment:
       CIEL_DB_URL: ''
+      CIEL_LLM_BACKEND: local
+      CIEL_OPENAI_ROLES: ''
+      CIEL_LOCAL_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8094/v1}
       CIEL_BENCH_DISTRACTORS: ${CIEL_BENCH_DISTRACTORS:-0}
       CIEL_BENCH_DISTRACTOR_SURFACE: ${CIEL_BENCH_DISTRACTOR_SURFACE:-both}
       CIEL_BENCH_LLM_SERVICE: ${CIEL_BENCH_LLM_SERVICE:-shared}

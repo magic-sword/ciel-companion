@@ -37,6 +37,8 @@ scripts/server/debug-log.sh pull --dev        # 会話の記録（.local/debug-l
 
 ## 3. Ciel_Debug で同じ技を試す
 
+**Mindcraft移行後の注意**：以下の`run.sh`は旧`src/skills.js`のRunnerを使うため、現在の体の再現・配布確認には使用しない。現行のMindcraftRunnerと中核APIは専用ベンチマークのbody/conversationで確認する。旧Runnerで成功した結果を現行版へ転用しない。稼働中の調査はまずログとMCPの状態を読み取る。
+
 ```bash
 .claude/skills/ciel-minecraft-debug/scripts/run.sh <技> '<引数の JSON>' [--tp "x y z"] [--clear] [--give "item 数"]... [--seconds 60]
 # 例

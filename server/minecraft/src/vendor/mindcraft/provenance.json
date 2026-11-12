@@ -76,7 +76,7 @@
       "upstream_sha256": "ef52fe70e640c079a38f5b319582f356cd782149358f32a93117d38df0f5e32e"
     },
     "src/agent/library/skills.js": {
-      "sha256": "66b8aadbb058af8efd15a4b9c70e573ba54da760d24dcede985e6c2e8d412483",
+      "sha256": "c76e16a191791b053cbc6b7bdc47f3eb81944221b1e09800d9ac78dcad289168",
       "upstream_sha256": "723041242575d78f54c7bfa44daa4f04c8ceac80deab524039fe9c769e3cd0b0"
     },
     "src/agent/library/world.js": {
@@ -92,7 +92,7 @@
       "upstream_sha256": "e227614d01d515fab129a6e7ea3d085072f43851738eb9156bce41b08e778cdf"
     },
     "src/agent/modes.js": {
-      "sha256": "db80fec9d179f5840abd207cfad2a7b46092fd5549309271bcdc256a720f1e46",
+      "sha256": "7e3e43582a02b13589d94db82fed4a4ca02cbb6a71e8f79a991d2ebcfd51c656",
       "upstream_sha256": "09d856b8b1f982b1abf7fc73386366fc1337f6fc7870a0ebbe17ec84ad076d4c"
     },
     "src/agent/npc/build_goal.js": {
@@ -316,7 +316,7 @@
       "upstream_sha256": "234e5116029eb785517f151b64b3675fe37cd9bf810ed5f876dab197205d7eec"
     },
     "upstream.patch": {
-      "sha256": "e2c815d71e7eb76fc01738a2ff307bebc478f9be061c2b7a979fcb859003a1a9"
+      "sha256": "d39fff0303813241fac30d4abbc1e9286210c64af3aa8eb8b97672b0a5709cd8"
     }
   }
 }

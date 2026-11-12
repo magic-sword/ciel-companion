@@ -8,7 +8,6 @@ import { LoggingMessageNotificationSchema, ResourceUpdatedNotificationSchema } f
 import { makeHub } from '../src/ciel/hub.js';
 import { startHttp } from '../src/ciel/mcp.js';
 import { doneFor, eventFor, stateText } from '../src/ciel/words.js';
-import { repair, skillFor, stepResult, stepsFrom } from '../src/ciel/goals.js';
 
 const STATE = { type: 'state', connected: true, pos: { x: 1, y: 64, z: 2 }, health: 20, food: 20, night: true, raining: false,
   inventory: { oak_log: 3 }, players: [{ name: 'Hakase', distance: 2.1 }], hostiles: [{ name: 'zombie', distance: 6 }],
@@ -27,7 +26,7 @@ function fakeBody() {
       reply({ type: 'started', id: m.id });
       setTimeout(() => {
         if (m.args.item) link.state.inventory[m.args.item] = (link.state.inventory[m.args.item] ?? 0) + m.args.count;
-        reply({ type: 'done', id: m.id, ok: true, note: { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } });
+        reply({ type: 'done', id: m.id, ok: true, note: m.skill==='pursue' ? {goal:{item:'wooden_pickaxe'},target:1,inventory:{wooden_pickaxe:1},returned:true} : { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } });
       }, 30);
     } else if (m.type === 'plan') reply({ type: 'planned', id: m.id, inventory: { ...link.state.inventory }, steps: [{ kind: 'gather', item: 'oak_log', count: 3 }, { kind: 'craft', item: 'wooden_pickaxe', count: 1 }] });
     else if (m.type === 'look') reply({ type: 'seen', id: m.id, jpeg: Buffer.from('jpeg').toString('base64'), facing: 'north' });
@@ -105,18 +104,18 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
     assert.equal(r.status, 'started');
     await until(() => events.some(e => e.kind === 'task_done'));
     assert.equal(events.find(e => e.kind === 'task_done').task, r.task);
-    const denied = await call(b, 'minecraft_task_submit', { request_id: 'r', capability: 'minecraft.obtain_item',
-      arguments: { item: 'oak_log', quantity: 2, quantity_mode: 'gain' }, budget_ms: 1000, constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    const denied = await call(b, 'minecraft_task_submit', { request_id: 'r', capability: 'minecraft.pursue_goal',
+      arguments: { request: 'Collect two logs' }, budget_ms: 1000, constraints: {} });
     assert.equal(denied.status, 'unavailable');
-    const requested = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.obtain_item',
-      arguments: { item: 'wooden_pickaxe', quantity: 1, quantity_mode: 'inventory_target' }, budget_ms: 10000,
-      constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    const requested = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.pursue_goal',
+      arguments: { request: 'Make a wooden pickaxe' }, budget_ms: 10000,
+      constraints: {} });
     await until(() => events.some(e => e.kind === 'work_state' && e.work.state === 'succeeded'));
     const verified = await call(a, 'minecraft_task_status', { task_id: requested.task_id });
     assert.equal(verified.evidence.inventory.wooden_pickaxe, 1);
-    const again = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.obtain_item',
-      arguments: { item: 'wooden_pickaxe', quantity: 1, quantity_mode: 'inventory_target' }, budget_ms: 10000,
-      constraints: { resource_scope: 'search', failure_policy: 'ask' } });
+    const again = await call(a, 'minecraft_task_submit', { request_id: 'work-request', capability: 'minecraft.pursue_goal',
+      arguments: { request: 'Make a wooden pickaxe' }, budget_ms: 10000,
+      constraints: {} });
     assert.equal(again.task_id, verified.task_id);
 
     // 景色の絵は MCP の絵で返る
@@ -150,19 +149,6 @@ test('言葉：出来事の選び方と、技の終わり', () => {
   assert.match(stateText(null, null, false), /つながっていない/);
 });
 
-test('目的の段：数が足りない・別の物を数えた・探す段を足す・同じ計画なら直さない', () => {
-  const [gather] = stepsFrom([{ kind: 'gather', item: 'cobblestone', count: 3 }]);
-  const part = stepResult({ ...gather, progress: [0, 3] }, { ok: true, note: { gained: { cobblestone: 1, dirt: 2 } } });
-  assert.equal(part.ok, false);
-  assert.equal(part.reason, 'not_found');
-  assert.deepEqual(part.progress, [1, 3]);
-  const fixed = repair({ spec: { make: 'stone_pickaxe' }, step: gather, result: { reason: 'not_found' }, remaining: [gather] }, () => ({}));
-  assert.equal(fixed.steps[0].kind, 'find');
-  const same = repair({ spec: { make: 'stone_pickaxe' }, step: gather, result: { reason: 'missing_materials' }, remaining: [gather] },
-    () => ({ steps: [{ kind: 'gather', item: 'cobblestone', count: 3 }] }));
-  assert.equal(same, null);
-});
-
 test('振り分けの例文：心に渡す道具と、相手の発言で呼ぶ目的の道具には、きっかけがある', async () => {
   // 道具を足したら、きっかけも書く（スキルのトリガーと同じ。書き忘れると、その頼みは意味では心へ回らない）
   const body = fakeBody();
@@ -180,25 +166,4 @@ test('振り分けの例文：心に渡す道具と、相手の発言で呼ぶ�
     await c.close();
     http.close();
   }
-});
-
-test('目的の段：2 本で見える所に無くなったら、探してから残りだけ集める', () => {
-  const [gather, craft] = stepsFrom([{ kind: 'gather', item: 'oak_log', count: 3 }, { kind: 'craft', item: 'wooden_pickaxe', count: 1 }]);
-  const r = stepResult(gather, { ok: true, note: { gained: { oak_log: 2 }, short: 'not_found' } });
-  assert.equal(r.complete, false);
-  assert.deepEqual(r.progress, [2, 3]);
-  const kept = { ...gather, progress: r.progress };
-  const fixed = repair({ spec: { make: 'wooden_pickaxe' }, step: kept, result: r, remaining: [kept, craft] }, () => ({}));
-  assert.deepEqual(fixed.steps.map((s) => s.kind), ['find', 'gather', 'craft']);
-  assert.equal(fixed.text, 'オークの原木が見える所に無いので、探す段を足した');
-  assert.deepEqual(skillFor(fixed.steps[1]), ['collect', { block: 'oak_log', count: 1 }]);
-});
-
-test('必要数を掘れていても帰還失敗を完了や再計画で隠さない',()=>{
-  const [step]=stepsFrom([{kind:'gather',item:'cobblestone',count:30}]);
-  const result=stepResult(step,{ok:false,reason:'no_path',note:{gained:{cobblestone:30},returned:false}});
-  assert.equal(result.complete,false);
-  assert.equal(result.ok,false);
-  assert.equal(repair({spec:{make:'cobblestone'},step,result,remaining:[step]},()=>{throw Error('must not replan');}),null);
-  assert.equal(stepResult(step,{ok:true,note:{gained:{cobblestone:30},returned:true}}).complete,true);
 });

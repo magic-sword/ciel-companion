@@ -40,8 +40,12 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 
 | モード | 入力 | 評価する範囲 |
 |---|---|---|
-| `body` | 構造化した目的・直接操作 | 採集・製作はGoalRunner → MCP work → ゲーム側の計画・実行 → 体。移動は会話でも公開される直接操作を呼ぶ。LLMを呼ばず、心の判断が必要なら `needs_mind` で失敗 |
+| `body` | 自然文の目的・直接操作 | 会話受付を省き、GoalRunner → MCP work → Mindcraft → 体を評価。採集・製作は中核APIと共有ローカルLLMを使う。移動は公開の直接操作を呼ぶ |
 | `conversation` | 課題の日本語の依頼を `lk.chat` へ送る | 普段の pipeline による解釈・道具選択・目的実行。ローカル LLM が既定。Irodori の読み上げ・LiveKit も使う |
+
+Mindcraft移行後はbodyもLLMを使用するため、旧版のLLMなしbody成績と直接比較しない。両モードでモデルと共有推論環境を記録する。helperの`--all --failure-streak 0 --run-seconds 3600`は全課題向けで、予定課題数と全体予算を先に定める。課題ごとのpractical-v1期限は延ばさない。
+
+自然文pursueのwork_actionは依頼受付であり、初回操作とは数えない。work_activityで移動・採集・製作などの命令を発行した時刻を使い、thinkingやレシピ照会は除外する。表示の更新で不進行期限は延長しない。旧評価器のfirst_action_secondsと直接比較しない。
 
 [MineDojo の課題設計](https://docs.minedojo.org/sections/core_api/sim.html)にある初期条件・資源・技術ツリーの考え方と、[Voyager](https://github.com/MineDojo/Voyager)の段階的な到達・失敗からの修正を参考にした。環境・行動単位・Minecraft の版が違うため、論文のスコアと直接比較するものではない。
 

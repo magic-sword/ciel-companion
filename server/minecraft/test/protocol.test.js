@@ -27,9 +27,7 @@ test('探す技', () => {
   assert.equal(p({ v: 1, type: 'do', id: 3, skill: 'find', args: { block: 'stone', how: 'dig', max: 99 } }).error, 'bad_args');
 });
 test('目的の計画を頼む', () => {
-  assert.deepEqual(p({ v: 1, type: 'plan', id: 9, item: 'stone_pickaxe' }).cmd, { type: 'plan', id: 9, item: 'stone_pickaxe', count: 1 });
-  assert.equal(p({ v: 1, type: 'plan', item: 'stone_pickaxe' }).error, 'bad_id');
-  assert.equal(p({ v: 1, type: 'plan', id: 9, item: '../x' }).error, 'bad_args');
+  assert.equal(p({v:1,type:'plan',id:9,item:'stone_pickaxe'}).error,'unknown_type');
 });
 test('形の違う引数は動かさない', () => {
   const bad = [

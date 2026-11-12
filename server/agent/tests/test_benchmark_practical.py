@@ -33,6 +33,31 @@ class Driver:
         return False
 
 class PracticalTest(unittest.IsolatedAsyncioTestCase):
+    def test_body_core_events_have_timestamps_during_execution(self):
+        from benchmark.drivers import BodyDriver
+        with tempfile.TemporaryDirectory() as directory:
+            trace=Trace(Path(directory)/'trace.jsonl')
+            trace.started_at=time.time()-1
+            trace.phase='execution'
+            driver=BodyDriver('unused',trace)
+            driver.record_core('core_request',id='request')
+            driver.record_core('model_response',id='request',seconds=0.2)
+            self.assertEqual([r['event']['kind'] for r in trace.execution()],['model_request','model_response'])
+            self.assertTrue(all(r['event']['t']>=trace.started_at for r in trace.execution()))
+
+    def test_natural_goal_handoff_and_queries_are_not_physical_actions(self):
+        watch=Progress(state(),load_tasks()[0])
+        watch.event({'kind':'work_action','id':'goal','skill':'pursue','arguments':{'request':'gather logs'}},2)
+        watch.event({'kind':'work_activity','stage':'thinking'},4)
+        watch.event({'kind':'work_activity','stage':'executing','command':'!getCraftingPlan'},5)
+        self.assertIsNone(watch.first_action)
+        self.assertEqual(watch.reason(30,budget(load_tasks()[0])),'first_action_timeout')
+        watch.event({'kind':'work_activity','stage':'executing','command':'!collectBlocks'},6)
+        self.assertEqual(watch.first_action,6)
+        self.assertIn(('call','goal'),watch.pending)
+        watch.event({'kind':'work_action_result','id':'goal','result':{'ok':True}},7)
+        self.assertNotIn(('call','goal'),watch.pending)
+
     def test_pointing_action_counts_as_first_action_without_extending_progress(self):
         watch=Progress(state(),load_tasks()[0])
         watch.event({'kind':'game_call','id':'p','name':'minecraft_pointed_action',
@@ -178,7 +203,7 @@ class RunBudgetTest(unittest.IsolatedAsyncioTestCase):
     async def check_run(self,run_seconds,streak):
         now=[0]
         with tempfile.TemporaryDirectory() as folder:
-            args=parser().parse_args(['--mode','body','--task','gather_logs','--seed','11','--repeats','5',
+            args=parser().parse_args(['--mode','body','--model-id','test-model','--task','gather_logs','--seed','11','--repeats','5',
                                       '--run-seconds',str(run_seconds),'--failure-streak',str(streak),'--output',folder+'/result'])
             async def assess(*a,**kw):
                 now[0]+=kw['seconds']
