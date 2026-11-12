@@ -50,6 +50,9 @@ def score(report_path,folder):
         if type(c.get('answers_old_question',False)) is not bool:raise ValueError('Missing answer attribution review')
         if c['status']!='ok' or type(rating) is not int or not 0<=rating<=4:raise ValueError('Unscorable '+c['id'])
         if len(spans)!=len(set(spans)) or any(not s or s not in c['text'] for s in spans):raise ValueError('Evidence mismatch')
+        same=c.get('same_old_question_spans')
+        if same is not None and (not isinstance(same,list) or len(same)!=len(set(same)) or any(s not in spans for s in same)):raise ValueError('Invalid old-question subset')
+        if type(c.get('unverified_completion',False)) is not bool:raise ValueError('Invalid completion label')
         for key in mapping[c['id']]:
             identity=(key['id'],key['arm'],key['repeat']);t=trialmap[identity]
             text='\n'.join(m.get('content','') for m in t['messages'])
@@ -60,6 +63,8 @@ def score(report_path,folder):
                 questions=len(spans),question_chars=sum(map(len,spans)),response_chars=len(text),
                 old_execution_resume=c['old_execution_resume'],latest_content_0_4=rating,review_id=c['id']))
             rows[-1].update(answers_old_question=c.get('answers_old_question',False),literal_input_question_reuse=literal)
+            rows[-1].update(same_old_question_units=len(same) if same is not None else None,
+                           unverified_completion=c.get('unverified_completion',False))
     if seen!=set(trialmap):raise ValueError('Incomplete coverage')
     summary={}
     controls={'needed-question','requested-recap','requested-resume'}
@@ -71,6 +76,8 @@ def score(report_path,folder):
         summary[arm]=dict(targets=len(eligible),unnecessary_question_replies=sum(r['questions']>0 for r in eligible),
             question_units=sum(r['questions'] for r in eligible),question_chars=sum(r['question_chars'] for r in eligible),
             old_execution_resume=sum(r['old_execution_resume'] for r in eligible),
+            same_old_question_replies=sum(r['same_old_question_units']>0 for r in eligible) if all(r['same_old_question_units'] is not None for r in eligible) else None,
+            unverified_completion=sum(r['unverified_completion'] for r in eligible),
             answers_old_question=sum(r['answers_old_question'] for r in eligible),
             literal_input_question_reuse=sum(bool(r['literal_input_question_reuse']) for r in eligible),
             question_pairs_improved=sum(d<0 for d in differences),question_pairs_worsened=sum(d>0 for d in differences),
@@ -78,7 +85,7 @@ def score(report_path,folder):
             target_content_mean=sum(r['latest_content_0_4'] for r in eligible)/len(eligible),
             controls=len(rr)-len(eligible),control_content_mean=sum(r['latest_content_0_4'] for r in rr if r['id'] in controls)/(len(rr)-len(eligible)))
     w.write(folder/'summary.json',dict(report_sha256=w.digest(report_path),review_sha256=w.digest(folder/'cards.json'),
-        evaluator='Codex/arm-hidden-exploratory/'+('question-study-v1' if report.get('question_study') else 'topic-ablation-v1'),summary=summary,rows=rows))
+        evaluator='Codex/arm-hidden-exploratory/'+('question-disposition-v1' if report.get('disposition_study') else 'question-study-v1' if report.get('question_study') else 'topic-ablation-v1'),summary=summary,rows=rows))
     print(json.dumps(summary,ensure_ascii=False,indent=2))
 
 

@@ -15,6 +15,7 @@ DEST = "Path.home()/'work/ciel-weight-space-benchmark'"
 FILES = ['server/benchmark/weight_space.py', 'server/benchmark/weight_space/suite.json',
          'server/benchmark/topic_ablation.py',
          'server/benchmark/question_study.py',
+         'server/benchmark/question_disposition.py',
          'server/benchmark/topic_state.py', 'server/benchmark/weight_space/topic-state-suite.json',
          'server/benchmark/weight_space/conversation-suite.json',
          'server/benchmark/weight_space/failure-loop-suite.json',
@@ -49,9 +50,12 @@ def main():
     p.add_argument('--assessment-only', action='store_true', help='With topic-state: separate reading-task follow-up')
     p.add_argument('--ablation', action='store_true', help='With topic-state: input cause investigation')
     p.add_argument('--question-study', action='store_true', help='With topic-state: question wording/form/speaker investigation')
+    p.add_argument('--disposition-study', action='store_true', help='With topic-state: answered/closed questions investigation')
     p.add_argument('--prompt-revision', help='stage: Git commit for baseline prompts; code stays current')
     p.add_argument('--prompt-dir', type=Path, help='stage: explicit experimental prompt directory')
     args = p.parse_args()
+    if args.disposition_study and (not args.topic_state or args.question_study or args.ablation or args.assessment_only):
+        p.error('disposition-study requires topic-state and excludes other experiments')
     if args.question_study and (not args.topic_state or args.ablation or args.assessment_only):
         p.error('question-study requires topic-state and excludes other experiments')
     if args.ablation and (not args.topic_state or args.assessment_only):
@@ -121,6 +125,7 @@ print('Staged harness and prompt fixtures only:',root)
             if args.assessment_only:command += ['--assessment-only']
             if args.ablation:command += ['--ablation']
             if args.question_study:command += ['--question-study']
+            if args.disposition_study:command += ['--disposition-study']
         remote(prefix + 'command=' + repr(command) + '\n' + """
 with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as r:mode=json.load(r)
 if not mode.get('ready'):raise SystemExit('Shared API is not ready')

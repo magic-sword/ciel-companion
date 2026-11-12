@@ -26,11 +26,26 @@ def summarize(report):
     return out
 
 
+def summarize_need(report):
+    out={}
+    for arm in ('need_probe','answered_need_probe','closed_need_probe'):
+        out[arm]={}
+        for group in ('targets','controls'):
+            ts=[t for t in report['trials'] if t['arm']==arm and
+                (t['id'] in ('pending','seeded','recap-control'))==(group=='targets')]
+            valid=[t for t in ts if t['judgment']['valid']]
+            out[arm][group]=dict(total=len(ts),scorable=len(valid),missing=len(ts)-len(valid),
+                all_correct=sum(t['judgment']['all_correct'] for t in valid),
+                mean_score=sum(t['judgment']['field_score'] for t in valid)/len(valid) if valid else None,
+                fields={k:sum(t['judgment']['fields'][k] for t in valid) for k in ('answered','necessary_now','ask_now')})
+    return out
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('report',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
     report=w.read(a.report)
     if report['completion']!='complete':raise ValueError('Incomplete run')
-    result=dict(report_sha256=w.digest(a.report),summary=summarize(report))
+    result=dict(report_sha256=w.digest(a.report),summary=(summarize_need if report.get('disposition_study') else summarize)(report))
     w.write(a.output,result);print(json.dumps(result['summary'],indent=2))
 
 
