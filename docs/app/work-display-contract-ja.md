@@ -6,7 +6,7 @@
 
 ## 表示する事実
 
-Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのmessageに判断中・実行中・帰還中を反映し、Unityは既存のmessage表示を使う。活動通知だけで成功扱いにせず、所持品と帰還・停止が確認された終端状態を待つ。
+Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのmessageに判断中・実行中を反映する。上流Agentの応答終了は目的達成を保証しないため、succeededの見出しは「処理終了」とし、本文へ「成果は未検証」とMindcraftの応答を表示する。evidenceのnative_finished=true・objective_verified=falseを、所持数や帰還の検証成功へ読み替えない。Unity側の文言変更も必要であり、旧アプリの「できた！」表示で検証済みと判断しない。
 
 作業の正本はサービスのwork 1。シエルは計画・レシピ・修復手順を複製せず、依頼名、状態、サービスの説明、判断待ちの内容、残り実行予算を表示する。空の段一覧から0/0や進捗率を作らない。予算は完了予測ではない。サービスの状態を確認できない間は予算を表示しない。
 
@@ -16,7 +16,7 @@ Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのm
 | running | 実行中 | 止める |
 | needs_decision | 判断待ち。サービスからの説明 | 止める／確認済みの判断に再試行する |
 | cancelling | 停止確認中 | 再開・再試行を表示しない |
-| succeeded | できた！ | なし |
+| succeeded | 処理終了。目的達成の確認範囲はサービスの説明に従う | なし |
 | failed | 完了できませんでした | なし |
 | cancelled | 停止を確認しました | なし |
 

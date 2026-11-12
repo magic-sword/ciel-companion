@@ -12,7 +12,7 @@ Java版MinecraftとMineflayerの体を別サービスとして動かす。`serve
 |---|---|
 | MCPと接続profile 2 | `src/ciel/mcp.js` |
 | work 1の依頼・状態・取消 | `src/ciel/tasks.js` |
-| 目標解釈・命令選択 | `src/mindcraft/brain.js`と`prompts/goal.md` |
+| 目標解釈・命令選択・結果再入力 | 上流`Agent.handleMessage`と`Prompter`・`History` |
 | 低水準の所有権・切替 | `src/body-command.js`と`MindcraftRunner` |
 | 表示文・日本語名 | `src/ciel/words.js` |
 | 知識の検索と取得 | `src/knowledge/` |
@@ -23,11 +23,15 @@ Java版MinecraftとMineflayerの体を別サービスとして動かす。`serve
 
 ## 利用者の依頼
 
-会話ホストは依頼意図と能力を選び、`minecraft.pursue_goal`へ元の自然文を渡す。Mindcraftがゲーム観測と合わせて最終目標・数量・制約を解釈し、上流の命令と技で実行する。旧obtain_item・plan/step/repairと直接の採集・製作MCPツールは公開しない。追従・移動・観察等の公開範囲は`mcp.js`とprofileを確認する。
+会話ホストは依頼意図と能力を選び、`minecraft.pursue_goal`へ元の自然文を渡す。上流Agent.handleMessageが標準プロンプト、実行履歴、観測、命令結果から判断・実行する。SelfPrompterとNPCも本物の上流クラスを使用する。CIEL独自の目標JSON・brain・材料計画・自動帰還は使用しない。失敗時は既存技へ代替せず、結果と未対応範囲を報告する。旧obtain_item・plan/step/repair・edit_regionと直接の採集・製作MCPツールは公開しない。
+
+統合のため、Agent.startの部品初期化をinitializeComponentsへ抽出し、Prompterにモデル注入、Agentに命令の観測フックを追加した。判断ループとプロンプト本文は上流のまま。standaloneのMindServer、公開ゲームチャット受付、独立TTS、vision、任意コード生成は起動しない。Bot接続と再接続、認証、明示停止、取消後のI/O遮断、アプリ通知はCIELが担当する。Paper/Mineflayerの衝突幅・製作同期の互換修正は残す。上流との差分はvendorのupstream.patchとprovenance.jsonで確認する。
 
 不足材料・未発見・道具不足等は制約に従って探索、判断待ち、中止へ進む。無期限探索をしない。失敗の説明と実際の停止確認を別に扱い、依頼の完了はゲームの実状態から報告する。停止後に遅い段や推論で再開しない。
 
 ## 主要タスクの拡張計画
+
+以下の独自施工・対象指定の計画と実装は、現在のMindcraft標準構成では実行経路に使用しない。施工は自然文を標準Agentへ渡した場合の対応範囲で試し、厳密な座標・保存範囲・完成セルの保証は未対応。旧実装の詳細を現行機能の保証と解釈しない。
 
 [MineDojo](https://docs.minedojo.org/sections/core_api/sim.html)の採集・生存・戦闘・技術ツリーと創作課題の区別、[CraftAssist](https://github.com/facebookresearch/craftassist)の建築・掘削・埋め戻し・停止、[TeamCraft](https://arxiv.org/html/2412.05255v1)の建築・整地・農業・精錬の課題群を参考にする。シエルは単体の共同作業者なので、まず範囲と完成状態を確定できる作業を実装し、複数エージェントや外観の良さを同じスコアに混ぜない。
 
@@ -161,6 +165,8 @@ flowchart LR
 
 ## 採集・製作の実行と再利用
 
+現在は上流Agentの命令選択と採集・製作skillsをそのまま使う。以下の旧CIEL方式の目標固定・帰還後補充・修復は実行しない。標準動作の使用感を確認するまでは独自方式へ戻さない。
+
 採集・移動・製作はMindcraftのnative skillsを使う。ブロック配置や積み上げ移動は維持し、建物の保護は`protection.js`で適用する。旧Runnerの採掘計画・土4個の事前調達・階段掘りは現在の実行経路ではなく、Mindcraftの動作として保証しない。
 
 座標施工は例外として、CIELの検証済み計画の立ち位置・設置面・carefulMovementsを維持する。Mindcraftの汎用goToGoal/placeBlockでこれを上書きすると、移動中の掘削・足場設置が計画外の変更になるため、region executorから同じMineflayerの原子的な移動・採掘・配置を使う。通常の採集・移動にこの施工制限を適用しない。遠距離の持ち主はLocator Barの通知を短い移動目標へ変換してMindcraftの移動へ渡し、実体が見えてから接近する。
@@ -174,6 +180,8 @@ work開始時の所持数・帰還地点・最終目標を固定する。帰還�
 その製作中に自分で仮置きした作業台だけは、完成後に回収を試み、次の製作へ携行する。既存の作業台は回収しない。回収時の採掘許可はその1座標に限定し、取消後には開始しない。回収できない場合は結果に残す。これは物の調達・製作の内部処理であり、範囲施工へ材料の自動調達を追加するものではない。
 
 ## 指示棒と目線による対象指定
+
+対象の観測情報は保持するが、独自pointed_actionの実行ツールは現在非公開。標準Agentへ座標を伝える自然文の依頼は可能であり、以下の厳密な対象検証付き実行契約は現行の保証に含めない。
 
 `server/minecraft-pointing/`のPaperプラグインと、体の`src/pointing.js`を追加した。プレイヤーの画面中央の照準を最大32ブロックのray traceで調べ、最初に当たるブロック・面・選択時刻を取得する。画像認識やLLMで座標を推測しない。既存Vanillaへの自動導入はせず、導入用の`server/compose.pointing.yaml`を明示して使う。現在の配布範囲と実測は[確認状況](../../testing/verification-status-ja.md)を参照する。
 
@@ -195,6 +203,8 @@ work開始時の所持数・帰還地点・最終目標を固定する。帰還�
 照準の観測は目線指定中に毎250ms、会話への受け渡しは短い`references`だけ。固定指示や能力一覧を視線ごとに更新せず、追加のLLM判定も行わない。持ち主との対応は既存のMC_OWNERと会話側の所有者権限に従い、複数の会話利用者を自動対応させる機能ではない。
 
 ## プレイヤーの方向探索
+
+現行の移動・追従は上流命令を使用し、旧PlayerLocatorによる接近処理は接続しない。遠距離で相手が見えない場合の探索成功は未保証。以下の独自探索処理は保持している旧実装の説明。
 
 `minecraft_come_here`と`minecraft_follow_me`は、相手のentityを取得できないとき、Locator Bar用の`tracked_waypoint`通知を手掛かりに探す。追従中に相手を見失ったときも同じ探索へ戻る。`src/player-locator.js`が接続直後から通知を受信し、プレイヤー一覧のUUIDで相手を照合する。色・表示順・別プレイヤーの印から持ち主を推測しない。
 

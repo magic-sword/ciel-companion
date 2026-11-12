@@ -9,6 +9,7 @@ RUN npm ci --omit=dev \
  && npx playwright install --with-deps --only-shell chromium \
  && rm -rf /var/lib/apt/lists/* /root/.npm
 COPY src/ ./src/
+RUN mkdir -p /app/bots && chown node:node /app/bots
 
 USER node
 CMD ["node", "src/main.js"]

@@ -1,8 +1,10 @@
 # 公開リポジトリと第三者依存関係
 
-Minecraft基盤としてMindcraftのコミット `e1c1fc3ffa481506c2445fc639e16dba504b5920`（https://github.com/mindcraft-bots/mindcraft、MIT、Copyright (c) 2024 Kolby Nottingham）を固定した。`server/minecraft/src/vendor/mindcraft/`に上流src全体・settings・packageメタデータ・LICENSE全文を保持する。出典と原本／改変後SHA-256はprovenance.json、上流との差分はupstream.patchに記録し、`scripts/server/check-mindcraft-vendor.py`で検査する。Dockerのsrcコピーで許諾表示も同梱する。現在の起動経路はMindcraftの身体実行部分を使用し、上流の会話・コード生成・クラウド接続はまだ起動しない。実行依存はCIEL側package-lock.jsonで固定する。単独関数の部分移植は撤去した。
+Minecraft基盤としてMindcraftのコミット `e1c1fc3ffa481506c2445fc639e16dba504b5920`（https://github.com/mindcraft-bots/mindcraft、MIT、Copyright (c) 2024 Kolby Nottingham）を固定した。`server/minecraft/src/vendor/mindcraft/`に上流src全体・profiles・botsのテンプレート・settings・packageメタデータ・LICENSE全文を保持する。出典と原本／改変後SHA-256はprovenance.json、上流との差分はupstream.patchに記録し、`scripts/server/check-mindcraft-vendor.py`で検査する。Dockerのsrcコピーで許諾表示も同梱する。上流Agent・Prompter・History・SelfPrompter・NPCと身体実行を使用し、モデルにはCIELを注入する。上流クラウド接続・独立TTS・vision・任意コード生成は有効化しない。Agentの静的依存であるses 1.9.1、eslint 9.13.0、google-translate-api-x 10.7.1もCIEL側package-lock.jsonで固定する。ゲーム履歴の生成先botsはGit管理外とする。
 
 > 責務：SDK・モデル・素材の依存と利用許諾、リポジトリへ含める範囲。
+
+vendorのテキストはLFに固定し、検証用hashとGitからの配布バイトを揃える。provenanceのnormalization_only_filesは改行だけが上流と異なるファイルを示す。upstream.patchは上流原本への適用検査を行い、末尾改行の有無も記録する。差分中の上流の空白は保持する。
 
 確認日: 2026-10-05。これは採用構成の記録であり、第三者の利用条件を置き換えるものではありません。
 

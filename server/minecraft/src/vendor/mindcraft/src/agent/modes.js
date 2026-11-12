@@ -1,6 +1,7 @@
 import * as skills from './library/skills.js';
 import * as world from './library/world.js';
 import * as mc from '../utils/mcdata.js';
+import convoManager from './conversation.js';
 import settings from './settings.js'
 
 async function say(agent, message) {
@@ -321,7 +322,7 @@ async function execute(mode, agent, func, timeout=-1) {
 
     if (should_reprompt) {
         // auto prompt to respond to the interruption
-        let role = 'system'; // CIEL owns conversation; no second chat/LLM runtime.
+        let role = convoManager.inConversation() ? agent.last_sender : 'system';
         let logs = agent.bot.modes.flushBehaviorLog();
         agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
         Your behavior log: ${logs}\nRespond accordingly.`);

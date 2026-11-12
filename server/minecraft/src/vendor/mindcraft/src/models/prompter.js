@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class Prompter {
-    constructor(agent, profile) {
+    constructor(agent, profile, models=null) {
         this.agent = agent;
         this.profile = profile;
         const defaults_dir = path.join(__dirname, '../../profiles/defaults');
@@ -56,6 +56,12 @@ export class Prompter {
         if (this.profile.max_tokens)
             max_tokens = this.profile.max_tokens;
 
+        if (models) {
+            this.chat_model = models.chat;
+            this.code_model = models.code ?? models.chat;
+            this.vision_model = models.vision ?? models.chat;
+            this.embedding_model = models.embedding ?? null;
+        } else {
         let chat_model_profile = selectAPI(this.profile.model);
         this.chat_model = createModel(chat_model_profile);
 
@@ -89,6 +95,8 @@ export class Prompter {
         }
         else {
             this.embedding_model = createModel({api: chat_model_profile.api});
+        }
+
         }
 
         this.skill_libary = new SkillLibrary(agent, this.embedding_model);

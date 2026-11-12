@@ -321,7 +321,6 @@ export class ItemGoal {
 
             // If the bot has failed to obtain the block before, explore
             if (this.failed.includes(next.name)) {
-                if (this.agent.resource_scope === 'nearby') return false;
                 this.failed = this.failed.filter((item) => item !== next.name);
                 await this.agent.actions.runAction('itemGoal:explore', async () => {
                     await skills.moveAway(this.agent.bot, 8);

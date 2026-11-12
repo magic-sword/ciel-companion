@@ -24,9 +24,9 @@
 }
 ```
 
-採集・製作では元の自然文（1〜2000字）を変更せず渡す。能力の`handoff={version:1,argument:"request",constraints:{},seconds:120}`に従い、ホストは依頼意図と権限を確認した後、引数生成の追加推論を行わない。Mindcraft側が最新の所持品・周辺資源と合わせて最終アイテム、数量1〜64、所持目標／増分、探索可否、不能時の判断待ち／停止を解釈する。材料を最終目標へ置き換えない。解釈できない場合は確認へ戻す。
+元の自然文（1〜2000字）を変更せず渡す。能力の`handoff={version:1,argument:"request",constraints:{},seconds:120}`に従い、ホストは依頼意図と権限を確認した後、引数生成の追加推論を行わない。依頼は上流Agent.handleMessageへ入り、Prompter・History・SelfPrompter・NPCと標準命令で処理する。CIEL独自の目標JSON、命令選択プロンプト、材料計画を重ねない。対応できない依頼や失敗は標準動作の結果として報告する。
 
-目標・開始時所持数・帰還地点はwork IDに結び付けて固定し、retryで増分目標を積み増さない。開始時の立ち位置のセルへ戻り、高さの差0.75未満・距離1.5以内、実所持数、体の停止を確認して成功にする。真下の坑道は帰還に含めない。足場の設置は禁止せず、移動で目的物を消費したら必要数まで補充する。`nearby`は探索命令を制限する指定であり、厳密な距離境界を保証するものではない。旧`minecraft.obtain_item`は受け付けない。
+CIEL側で数量目標を固定したり、自動帰還・不足分の補充を実施したりしない。これらは依頼内容とMindcraftの判断に委ねる。上流Agentの応答終了かつ身体がidleになった場合、native_finished=true・objective_verified=falseを証拠としてworkをsucceededへ進める。これは応答処理の終了であり、成果の検証成功ではない。本文に未検証であることを明示し、実際の目的達成はゲーム観測・ベンチマーク・利用者の確認で判定する。retryは元の依頼を上流Agentへ再送し、同じ目標所持数を保証する独自処理は挟まない。旧minecraft.obtain_itemとminecraft.edit_regionは受け付けない。
 
 `budget_ms` は受付時の残り時間で100〜120000ms。サーバーの単調時計で期限を固定し、再送・修復・判断回答では更新しない。シエル側は依頼の解釈時間も差し引く。終了処理の余裕を予約し、サーバー単独でも期限で中止へ移る。
 
@@ -57,6 +57,8 @@
 Unityへは[作業・会話の表示契約](../app/work-display-contract-ja.md)の `goal.state v2` で送る。元のstate、session/task_id/revision、判断ID、確認の有効期間、残り予算を保持する。操作は `goal.control v2` で表示対象を固定する。空の段一覧、旧pausedへの集約、can_resumeは撤去した。画面と配信が同じ表示モデルを使い、会話・リアクションは作業と並行して示す。
 
 ## 施工能力の追加設計
+
+現在のMindcraft標準構成では、この節の独自prepare→edit_region実行経路を公開しない。minecraft_prepare_regionとminecraft_pointed_actionも非公開。以下は保持している旧実装の契約であり、現行Agentの施工保証ではない。再導入は使用感を確認してから別途判断する。
 
 現行work 1の状態・予算・取消・判断APIは維持し、Minecraftの能力として`minecraft.edit_region`を提供する。施工の対象・完成条件・準備は[Minecraftの段階1設計](minecraft/minecraft-design-ja.md#段階1を完了するための設計)が所有する。`tasks.js`はpursue_goalとedit_regionを能力別に検証・実行する。
 

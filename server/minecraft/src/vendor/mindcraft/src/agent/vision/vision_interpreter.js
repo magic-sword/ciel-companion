@@ -1,5 +1,6 @@
 import { Vec3 } from 'vec3';
-import { Camera } from "./camera.js";
+import settings from '../settings.js';
+const { Camera } = settings.allow_vision ? await import('./camera.js') : {};
 import fs from 'fs';
 
 export class VisionInterpreter {

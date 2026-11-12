@@ -40,9 +40,9 @@ export class NPCContoller {
 
     init() {
         try {
-            for (let file of readdirSync('src/agent/npc/construction')) {
+            for (let file of readdirSync(new URL('./construction/', import.meta.url))) {
                 if (file.endsWith('.json')) {
-                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync('src/agent/npc/construction/' + file, 'utf8'));
+                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync(new URL('./construction/' + file, import.meta.url), 'utf8'));
                 }
             }
         } catch (e) {

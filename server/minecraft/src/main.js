@@ -2,7 +2,7 @@
 // - 会話とは別に動き続ける。会話サーバーは MCP（http://BODY_HOST:CIEL_PORT/mcp、src/ciel/mcp.js）でつなぐ。
 //   以前の WebSocket（ws://BODY_HOST:BODY_PORT）も、移り終えるまで残す（docs/games/game-environment-mcp-design-ja.md の 10 章）。
 //   体を動かせる会話は、どちらの入口でも合わせて 1 つだけ。
-// - 会話モデルは使わない。MCP では、出来事をシエル向けの言葉にして、話すものだけを知らせる（src/ciel/words.js）。
+// - MindcraftのAgentがCIEL中核APIをモデルとして使う。出来事と実行状態はMCPで会話ホストへ知らせる。
 // - ゲームのチャットの中身はログに出さない（会話と同じ扱い）。
 import { createMindcraftBot, MindcraftRunner } from './mindcraft/runtime.js';
 import { randomUUID } from 'node:crypto';
@@ -14,7 +14,6 @@ import { message, parseCommand } from './protocol.js';
 import { Eye } from './eye.js';
 import { PlayerLocator } from './player-locator.js';
 import { Pointing } from './pointing.js';
-import { RegionPlans } from './spatial.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 
 const env = process.env;
@@ -28,7 +27,6 @@ const MC = {
 };
 const OWNER = env.MC_OWNER || null;
 const pointing = new Pointing(env.CIEL_POINTING_FILE, OWNER);
-const regionPlans = new RegionPlans();
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
 const CIEL_PORT = Number(env.CIEL_PORT ?? 8771);   // MCP の入口（src/ciel/mcp.js）。BODY_HOST だけで開く
@@ -36,7 +34,6 @@ const CIEL_IDLE_MS = Number(env.CIEL_IDLE_MS ?? 60000);
 const EYE_PORT = Number(env.EYE_PORT ?? 3007);   // 目（eye.js）の視点のページ。BODY_HOST だけで開く
 const STATE_EVERY_MS = 2000;
 const BLOCKS_EVERY_MS = 10000;
-const PATH_THINK_MS = 10000;   // 道を決めるのに使ってよい時間（既定の 5 秒では、木の多い森で決めきれなかった）
 const RETRY_MIN_MS = 5000;
 const RETRY_MAX_MS = 60000;
 
@@ -104,13 +101,10 @@ const hub = makeHub({
     l.bindCore = (url, token) => runner.bindCore(url, token);
     link = l;
     l.bodyScope = randomUUID();
-    l.prepareRegion = r => regionPlans.prepare(bot, r, l.bodyScope);
-    l.claimRegion = (id, task) => regionPlans.claim(id, l.bodyScope, task);
     send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
   },
   onRelease: (l) => {
     void runner.unbindCore();
-    regionPlans.clear(l.bodyScope);
     runner.stop('unlinked');   // 会話を切ったら、その場で待つ（ログアウトしない）
     if (link === l) link = null;
   },
@@ -151,7 +145,6 @@ let retry = RETRY_MIN_MS;
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
   const b = createMindcraftBot(MC);
-  b.regionPlans = regionPlans;
   b.pointing = pointing;
   b.playerLocator = new PlayerLocator(b);
   bot = b;
@@ -162,7 +155,6 @@ function connect() {
     retry = RETRY_MIN_MS;
     runner.attach(b);
     eye.attach(b);
-    b.pathfinder.thinkTimeout = PATH_THINK_MS;
     log('入った');
     send('event', { kind: 'spawned' });
   });
@@ -172,7 +164,6 @@ function connect() {
     health = b.health;
   });
   b.on('death', () => {
-    if (link?.bodyScope) regionPlans.clear(link.bodyScope);
     log('倒れた');
     runner.stop('died');
     health = null;
@@ -200,7 +191,6 @@ function connect() {
   b.on('kicked', (reason) => log('サーバーから外された', typeof reason === 'string' ? reason.slice(0, 200) : ''));
   b.on('error', (err) => log('マイクラの接続のエラー', err?.code ?? err?.name ?? err));
   b.on('end', () => {
-    if (link?.bodyScope) regionPlans.clear(link.bodyScope);
     if (bot === b) {
       runner.stop('disconnected');
       runner.attach(null);

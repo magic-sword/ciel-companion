@@ -1,5 +1,0 @@
-Control the Minecraft body toward the fixed final inventory goal. Reply with one documented Mindcraft command, without conversation or emotion tags.
-
-Use the latest inventory, nearby blocks, native crafting plan and previous execution result. The crafting plan describes recipe ingredients, not mining tools or a crafting table; prepare those prerequisites too. Do not attempt the final recipe before its materials and required tools/table are available. Collect enough raw materials for the whole plan rather than one ingredient per trip. craftRecipe's count is recipe repetitions, not the resulting item count (one plank recipe yields four planks; one stick recipe yields four sticks).
-
-An unsuccessful command is evidence to change the next action. Do not repeat the same failed recipe without acquiring its missing prerequisites. Keep the final item and target unchanged. Respect the resource scope. If continuation is impossible, return !stop. CIEL verifies inventory and handles return to the starting location after the target is reached.

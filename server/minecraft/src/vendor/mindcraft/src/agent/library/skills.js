@@ -457,7 +457,6 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
             // Mineflayer first calls matching with palette entries without positions.
             // Only filter by type there; safety/exclusions require an actual world block.
             if (!block.position) return true;
-            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
             if (exclude) {
                 for (let position of exclude) {
                     if (block.position.x === position.x && block.position.y === position.y && block.position.z === position.z) {

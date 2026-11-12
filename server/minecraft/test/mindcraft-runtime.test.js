@@ -1,19 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ActionScope } from '../src/mindcraft/action-scope.js';
-import { MindcraftRunner, atReturnPosition } from '../src/mindcraft/runtime.js';
+import { MindcraftRunner } from '../src/mindcraft/runtime.js';
 import { protectWorld } from '../src/mindcraft/protection.js';
 import { Vec3 } from 'vec3';
 import { parseCommand } from '../src/protocol.js';
 import minecraftData from 'minecraft-data';
 import { collectBlock } from '../src/vendor/mindcraft/src/agent/library/skills.js';
 
-test('return verification rejects a tunnel beneath the original standing cell', () => {
-  const origin=new Vec3(0.5,64,0.5);
-  assert.equal(atReturnPosition(new Vec3(0.57,62.024,0.499),origin),false);
-  assert.equal(atReturnPosition(new Vec3(0.5,63,0.5),origin),false);
-  assert.equal(atReturnPosition(new Vec3(0.6,64,0.5),origin),true);
-  assert.equal(atReturnPosition(new Vec3(3.5,64,0.5),origin),false);
+test('binding a conversation resets native game history and remembered places',async()=>{
+  const runner=new MindcraftRunner(()=>{},null);
+  runner.agent={name:'SessionTest',history:{turns:[{content:'previous owner'}]},
+    memory_bank:{private:true},npc:{data:{goals:[{name:'stone'}],curr_goal:{name:'wood'}}}};
+  await runner.bindCore('http://127.0.0.1:12345','x'.repeat(32));
+  assert.deepEqual(runner.agent.history.turns,[]);
+  assert.equal(runner.agent.history.memory,'');
+  assert.equal(runner.agent.memory_bank.private,undefined);
+  assert.deepEqual(runner.agent.npc.data.goals,[]);
+  assert.equal(runner.agent.npc.data.curr_goal,null);
 });
 
 test('closing a core session still detaches locally when the remote host has already closed', async () => {
@@ -21,15 +25,6 @@ test('closing a core session still detaches locally when the remote host has alr
   runner.coreModel = {cancel:async()=>{throw new Error('ECONNREFUSED');}};
   await runner.unbindCore();
   assert.equal(runner.coreModel,null);
-});
-
-test('CIEL action failures survive the native action manager result wrapper', async () => {
-  const runner=new MindcraftRunner(()=>{},null);
-  runner.agent={actions:{async runAction(label,fn) {
-    try {await fn();return {success:true};}catch{return {success:false};}
-  }}};
-  const error=new Error('objective_unverified');
-  await assert.rejects(runner.action('ciel:test',async()=>{throw error;},{token:{cancelled:false}}),e=>e===error);
 });
 
 test('a late equip completion cannot start digging after an interrupt', async () => {
@@ -96,9 +91,6 @@ test('native collection tolerates Mineflayer palette entries before checking act
       searches++;
       assert.equal(matching({ name: 'oak_planks', position: null }), false);
       assert.equal(matching({ name: 'oak_log', position: null }), true);
-      // A real world block must still pass the CIEL permission check.
-      bot.cielCanBreak = () => false;
-      assert.equal(matching({ name: 'oak_log', position: new Vec3(1, 64, 1) }), false);
       return [];
     } };
   protectWorld(bot);

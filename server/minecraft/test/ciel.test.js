@@ -26,7 +26,7 @@ function fakeBody() {
       reply({ type: 'started', id: m.id });
       setTimeout(() => {
         if (m.args.item) link.state.inventory[m.args.item] = (link.state.inventory[m.args.item] ?? 0) + m.args.count;
-        reply({ type: 'done', id: m.id, ok: true, note: m.skill==='pursue' ? {goal:{item:'wooden_pickaxe'},target:1,inventory:{wooden_pickaxe:1},returned:true} : { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } });
+        reply({ type: 'done', id: m.id, ok: true, note: m.skill==='pursue' ? {native_finished:true,objective_verified:false,response:'Done',inventory:{wooden_pickaxe:1}} : { gained: { [m.args.block ?? 'x']: m.args.count ?? 1 } } });
       }, 30);
     } else if (m.type === 'plan') reply({ type: 'planned', id: m.id, inventory: { ...link.state.inventory }, steps: [{ kind: 'gather', item: 'oak_log', count: 3 }, { kind: 'craft', item: 'wooden_pickaxe', count: 1 }] });
     else if (m.type === 'look') reply({ type: 'seen', id: m.id, jpeg: Buffer.from('jpeg').toString('base64'), facing: 'north' });

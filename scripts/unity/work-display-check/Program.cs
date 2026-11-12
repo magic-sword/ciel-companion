@@ -101,7 +101,7 @@ class Program
         Check(CielAudienceCardState.From(g,a,true,false).current.Contains("材料"), "decision evidence");
         g.task.state="succeeded";
         a=new CielConversation.ActivityState {mind="listening", detail_version=1, body=new CielConversation.ActivityBody {version=1,phase="idle"}};
-        Check(CielAudienceCardState.From(g,a,true,true).heading.Contains("できた"), "recent completion");
+        Check(CielAudienceCardState.From(g,a,true,true).heading.Contains("処理終了"), "processing completion does not claim objective achievement");
         Check(CielAudienceCardState.From(g,a,true,false).phase=="idle", "completion expires");
         Receive(c, "{\"v\":1,\"type\":\"goal.state\"}");
         Check(c.Goal.protocolError && !CielWorkPresentation.From(c.Goal).canRetry, "old version unknown");

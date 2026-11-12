@@ -13,7 +13,7 @@ function fixture() {
   const link = { session: 'session', state: { inventory: {} }, body: { current: null, pending: null, blocked: false },
     events: [], playing: () => true, changed() {}, notice(e) { this.events.push(e); }, calls: [],
     async plan() { return { steps: [{ kind: 'craft', item: 'stone_pickaxe', count: 1 }], inventory: { ...this.state.inventory } }; },
-    async runSkill(skill, args) { this.calls.push([skill, args]); this.state.inventory.stone_pickaxe = 1; return { ok: true, note: {goal:{item:'stone_pickaxe'},target:1,inventory:{stone_pickaxe:1},returned:true} }; },
+    async runSkill(skill, args) { this.calls.push([skill, args]); this.state.inventory.stone_pickaxe = 1; return { ok: true, note: {native_finished:true,objective_verified:false,response:'Done',inventory:{stone_pickaxe:1}} }; },
     stop() { this.body.current = null; } };
   const work = new GameTasks(link, { stopMs: 30 });
   return { link, work };
@@ -37,7 +37,7 @@ test('old structured requests and malformed natural requests are rejected',()=>{
   work.close();
 });
 
-test('success needs inventory, return and physical idle evidence',async()=>{
+test('processing completion requires a native result and never verifies the objective',async()=>{
   for(const note of [{}, {goal:{item:'stone_pickaxe'},target:1,inventory:{},returned:true},
     {goal:{item:'stone_pickaxe'},target:1,inventory:{stone_pickaxe:1},returned:false}]) {
     const {link,work}=fixture();link.runSkill=async()=>({ok:true,note});work.submit(request());
@@ -91,37 +91,9 @@ test('activity updates match the running operation and cannot revive terminal wo
   work.activity({request_id:work.active.operation,stage:'thinking'});assert.equal(work.active.revision,rev);work.close();
 });
 
-test('construction validates plan before replacing follow', async () => {
-  const { link, work } = fixture();
-  link.body.current = { id: 42, skill: 'follow' };
-  let stops = 0;
-  link.stop = id => { assert.equal(id, 42); stops++; link.body.current = null; };
-  const r = request({ capability: 'minecraft.edit_region', arguments: { plan_id: '11111111-1111-4111-8111-111111111111' }, constraints: { failure_policy: 'stop' } });
-  link.claimRegion = () => ({ error: 'expired_plan' });
-  assert.equal(work.submit(r).reason, 'expired_plan');
-  assert.equal(stops, 0);
-  link.claimRegion = () => ({ plan: { spec: {}, total: 1, actions: [1] } });
-  link.runSkill = async () => ({ ok: true, note: { completed: true, total: 1, verified: 1, changed: 1 } });
-  work.submit(r);
-  await wait(() => work.active.state === 'succeeded');
-  assert.equal(stops, 1);
-  work.close();
-});
-test('prepared construction verifies physical evidence and deduplicates work',async()=>{
-  const {link,work}=fixture(),plan_id='11111111-1111-4111-8111-111111111111';
-  let claimed=false;
-  link.claimRegion=()=>claimed?{error:'plan_already_used'}:(claimed=true,{plan:{spec:{},summary:'指定した床',total:9,actions:[1,2]}});
-  link.runSkill=async(skill,args)=>{link.calls.push([skill,args]);return{ok:true,note:{completed:true,total:9,verified:9,changed:2,summary:'指定した床'}};};
-  const r=request({capability:'minecraft.edit_region',arguments:{plan_id},constraints:{failure_policy:'stop'}});
-  const a=work.submit(r);assert.equal(work.submit(r).task_id,a.task_id);
-  await wait(()=>work.active.state==='succeeded');
-  assert.equal(link.calls[0][0],'edit_region');assert.match(work.view().message,/2マス変更/);
-  assert.equal(work.submit({...r,request_id:'two'}).reason,'plan_already_used');work.close();
-});
-test('construction ok without verified completion is stopped, never succeeded',async()=>{
-  const {link,work}=fixture();
-  link.claimRegion=()=>({plan:{spec:{},summary:'壁',total:9,actions:[1]}});
-  link.runSkill=async()=>({ok:true,note:{changed:1}});
-  work.submit(request({capability:'minecraft.edit_region',arguments:{plan_id:'11111111-1111-4111-8111-111111111111'},constraints:{failure_policy:'stop'}}));
-  await wait(()=>work.active.state==='cancelled');assert.equal(work.view().reason,'objective_unverified');work.close();
+test('legacy construction is not advertised or substituted for native Agent execution',()=>{
+  const {work,link}=fixture();
+  assert.equal(CAPABILITIES.some(c=>c.name==='minecraft.edit_region'),false);
+  const result=work.submit(request({capability:'minecraft.edit_region',arguments:{plan_id:'11111111-1111-4111-8111-111111111111'},constraints:{failure_policy:'stop'}}));
+  assert.equal(result.reason,'unsupported_skill');assert.equal(link.calls.length,0);work.close();
 });

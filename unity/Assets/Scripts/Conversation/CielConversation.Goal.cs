@@ -112,7 +112,7 @@ namespace Ciel.Conversation
             p.phase = w?.state ?? "unknown";
             p.status = p.phase switch {
                 "accepted" => "受付済み・開始待ち", "running" => "実行中", "needs_decision" => "判断待ち",
-                "cancelling" => "停止確認中", "succeeded" => "できた！", "failed" => "完了できませんでした",
+                "cancelling" => "停止確認中", "succeeded" => "処理終了", "failed" => "完了できませんでした",
                 "cancelled" => "停止を確認しました", _ => "状態不明"
             };
             p.attention = p.phase == "needs_decision" || p.phase == "failed" || p.phase == "cancelling";

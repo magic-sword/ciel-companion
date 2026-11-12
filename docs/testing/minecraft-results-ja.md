@@ -6,6 +6,22 @@
 
 ## 現在の判断
 
+上流Agent版へ切り替えた。標準Agent.handleMessage、Prompterの上流プロンプトと例、Historyの結果再入力・要約、SelfPrompter・NPC・ActionManagerを使い、モデルとしてCIEL中核APIを注入する。standaloneのMindServer・公開ゲームチャット受付・独立TTSは起動しない。独自brain・目標JSON・帰還ループ・旧施工への代替は撤去した。失敗時は標準動作の制約として報告し、利用者が使用感を確かめてから拡張する。
+
+初回body試験`smoke-body-1794523100852495819`はgather_logs・wooden_pickaxe・stop_collectingを予定し、seed11各1回・全体600秒・課題期限90秒、共有Qwen GPU ready・context32768/parallel2・通常サービス稼働。原木8個は67.820秒で成功。次の製作は以前のゲーム履歴が残って誤った所持を参照し、取消中の非同期記憶要約がHTTP409で未処理例外となった。正式結果は製作infrastructure_error / cleanup_RuntimeError、停止課題は未実施。製作能力の成否には使わない。結果は`server/benchmark/data/home-import-1794523371110093300/results/smoke-body-1794523100852495819/`、ソースは`server/benchmark/data/native-agent-sources/initial-evaluated-source.tar.gz`。
+
+接続・取消の境界だけを修正したbody試験`smoke-body-1794523456434082591`は木のつるはしと採集中断、seed11各1回・全体600秒、同じ共有GPU条件。木のつるはしは85.543秒でbody_cannot_continue、原木6・板材0・道具0、所定のwork期限で停止した。独自の材料計画や期限延長で補わない。採集中断は25.733秒でstopped_and_stayed、停止遅延0.835秒。接続障害0・未実施0で、プロセス停止は再発しなかった。結果は`server/benchmark/data/home-import-1794523620670605900/results/smoke-body-1794523456434082591/`、source SHA-256は`e5e9301192898adef453fc3a9b28a32d80aa41528038d854acfb5446cde18797`、ソースは同sources内の`body-cancellation-fix-source.tar.gz`。この時点では後続の未使用施工接続除去・vision無効時初期化を含まないため、最終版の全課題確認とは扱わない。
+
+新しい版では、workのsucceededは上流の応答処理終了であり、目的達成の検証成功を意味しない。native_finished=true・objective_verified=falseと応答を保持し、Unityの見出しを「処理終了」へ変更した。ゲームの実所持数・位置は引き続き外部の採点器が検証する。原木課題の成功だけで帰還や自然な完了報告の成功を主張しない。上流Agent内の処理を使う実クラス結合、会話履歴分離、取消の試験を追加し、Node142成功・既存1skip、通常回帰820件、能力結合、Unity表示契約35項目が成功した。
+
+最終のconversation試験`smoke-conversation-1794523661923890991`は原木採集と採集中断、seed11各1回・全体600秒、同じ共有Qwen GPU条件。原木は30.334秒でfirst_action_timeout、採集中断は41.436秒で成功・停止遅延0.506秒。環境障害0・未実施0。失敗の救済や期限延長は行っていない。結果は`server/benchmark/data/home-import-1794523937903525700/results/smoke-conversation-1794523661923890991/`、source SHA-256は`635d580a4222dc7f4c93e209e328d74f75c6de821c058ba45f044078484681ac`、評価ソースは`server/benchmark/data/native-agent-sources/conversation-evaluated-source.tar.gz`。保存後にvendorの改行をLFへ統一し、上流差分を適用検査できるpatchへ再生成した。改行を除いて評価ソースとの差がprovenance.jsonとupstream.patchだけであることを照合した。source digestの異なる試行を合算した成功率は示さない。
+
+この照合後、MCPの追従・呼び寄せの説明2件から旧方向探索の保証も除去し、未対応を明示した。能力結合検査は再確認したが、この説明修正後の実機再評価は行っていない。
+
+通常ワールドでの使用感・実音声・Unity実画面・全41課題は未確認。独自の座標施工・保護範囲の保証・指差し実行・遠距離PlayerLocator接近・自動帰還は現行経路に含まない。標準動作が未達の箇所は利用者へ報告し、別方式への置換は使用感を確認してから検討する。専用サービスは停止済み。通常body・開発agent・本番agent・Minecraft・共有LLMは旧配布イメージと起動時刻を維持し、この作業版は未配布。
+
+### 直前の混成実装の測定
+
 自然文handoffへの改修を実装した。開発ワールドの原木採集失敗は、Mineflayerの検索が渡すposition=nullのパレット要素を建物保護の座標検査へ渡していた例外を確認した。停止の再帰呼び出し、終了済み中核APIへの取消失敗、旧Runnerを監視していた評価器も修正した。音声の表情タグが実行JSONへ混ざるため、共通人格と音声専用指示を分離した。通常サービスには未配布。
 
 対象別の修正版確認は`smoke-conversation-1794500027920238686`、14課題・seed11・各1回、全体1800秒、課題期限は変更なし。共有Qwen GPU ready・32768/2枠、通常サービス稼働。7成功・7失敗、環境障害0・未実施0。原木採集53.976秒、遠距離誘導54.274秒、方位誘導74.094秒、追従と停止28.278秒、採集中断25.23秒、指した作業台の回収12.665秒、外部編集時の停止15.47秒が成功した。原木課題は所持数の採点であり、この結果だけで帰還成功とは扱わない。床64セル・埋め戻し18セルは全セル一致し、workのsucceededも記録されたが、音声の最終報告が期限に入らず両方missing_final_report。停止後の再施工はbody_no_path、木のつるはしはno_progress、石のつるはしは不能時の報告不足、材料なし製作はno_progress。取得先は`server/benchmark/data/home-import-1794500835908478800/results/smoke-conversation-1794500027920238686/`、source SHA-256は`5d478d9e64830000bd2cd6a579ca99f908cea6fd77db19203c6cedb6041dfde0`、suiteは全41課題と同じ。途中版の全体成績とは合算しない。

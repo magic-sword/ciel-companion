@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Agent } from '../src/vendor/mindcraft/src/agent/agent.js';
+import { History } from '../src/vendor/mindcraft/src/agent/history.js';
+import { SelfPrompter } from '../src/vendor/mindcraft/src/agent/self_prompter.js';
+import { NPCContoller } from '../src/vendor/mindcraft/src/agent/npc/controller.js';
+import { setSettings } from '../src/vendor/mindcraft/src/agent/settings.js';
+import defaults from '../src/vendor/mindcraft/settings.js';
+import { VisionInterpreter } from '../src/vendor/mindcraft/src/agent/vision/vision_interpreter.js';
+
+test('native Agent uses its own history and feeds native command results back to the injected model',async()=>{
+  setSettings({...defaults,max_messages:30});
+  const requests=[],responses=['!inventory','Finished checking inventory.'];
+  const model={async sendRequest(turns,prompt){requests.push({turns:structuredClone(turns),prompt});return responses.shift();}};
+  const agent=new Agent();
+  await agent.initializeComponents({name:'NativeTest',model:'ciel',conversing:'$COMMAND_DOCS\n$INVENTORY\n$MEMORY'}, {chat:model});
+  assert.ok(agent.history instanceof History);
+  assert.ok(agent.self_prompter instanceof SelfPrompter);
+  assert.ok(agent.npc instanceof NPCContoller);
+  const vision=new VisionInterpreter(agent,false);
+  assert.match(await vision.lookAtPlayer('Owner','front'),/Vision is disabled/);
+  agent.task={data:null,taskStartTime:Date.now()};
+  agent.blocked_actions=[];
+  agent.bot={game:{gameMode:'survival'},inventory:{slots:[{name:'oak_log',count:2}]},modes:{flushBehaviorLog:()=>''}};
+  const spoken=[];agent.openChat=async text=>spoken.push(text);
+  await agent.handleMessage('Owner','Check what you are carrying.');
+  assert.equal(requests.length,2);
+  assert.ok(requests[1].turns.some(t=>t.role==='system'&&t.content.includes('oak_log')));
+  assert.ok(agent.history.turns.some(t=>t.role==='user'&&t.content.includes('Check what you are carrying.')));
+  assert.ok(spoken.includes('Finished checking inventory.'));
+});

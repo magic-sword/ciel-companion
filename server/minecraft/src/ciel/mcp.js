@@ -79,7 +79,7 @@ export function makeServer(hub, sessionId) {
     const endpoint = new URL(url);
     if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || endpoint.username || endpoint.password)
       return json({status:'invalid_endpoint'});
-    l.bindCore(url, token);
+    await l.bindCore(url, token);
     return json({status:'ready'});
   });
   server.registerTool('minecraft_link', {
@@ -95,21 +95,9 @@ export function makeServer(hub, sessionId) {
   });
 
   // ---- 体の技（以前の tools/minecraft.py） ----
-  server.registerTool('minecraft_pointed_action', {
-    title: '指し示した場所で作業する',
-    description: '指示棒または目線の1地点へ移動、または選んだ作業台1個を回収する。範囲の施工はminecraft.edit_regionを使う。',
-    inputSchema: { selection_id:z.string().uuid(), action:z.enum(['move','recover']) },
-    ...ACT('minecraft_pointed_action', { 'ciel/long_running':true, 'ciel/reference_argument':'selection_id',
-      'ciel/target_binding': { kind:'reference', argument:'selection_id' } }),
-  }, args => body(l => l.do('pointed_action',args)));
-  server.registerTool('minecraft_prepare_region',{
-    description:'基盤用：施工仕様を検証して計画IDを発行する。ワールドは編集しない。',
-    inputSchema:{request_id:z.string().min(1).max(160),draft_revision:z.number().int().min(1),spec:z.record(z.string(),z.any())},
-    _meta:{'ciel/role':'prepare'},
-  },r=>body(l=>l.prepareRegion?.(r)??{status:'unavailable'}));
-  server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'マイクラで、持ち主についていく（止めるまで続く）。相手が遠い・見失ったときは、方向表示の手掛かりがあれば最大60秒探す。', inputSchema: {},
+  server.registerTool('minecraft_follow_me', { title: 'ついていく', description: 'Mindcraftの標準命令で持ち主についていく（止めるまで続く）。相手がゲーム内で認識できない場合の接近は未対応。', inputSchema: {},
     ...ACT('minecraft_follow_me', { 'ciel/long_running': true }) }, () => body((l) => l.do('follow')));
-  server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'マイクラで、持ち主のそばまで行く（着いたら止まる）。相手が遠いときは、方向表示の手掛かりがあれば最大60秒探してから近づく。', inputSchema: {},
+  server.registerTool('minecraft_come_here', { title: 'そばへ行く', description: 'Mindcraftの標準命令で持ち主のそばへ行く。相手がゲーム内で認識できない場合の接近は未対応。', inputSchema: {},
     ...ACT('minecraft_come_here', { 'ciel/long_running': true }) }, () => body((l) => l.do('come')));
   server.registerTool('minecraft_go_to_place', { title: '場所へ行く', description: 'マイクラで、座標（x, z）の場所へ歩いて行く（着いたら止まる）。',
     inputSchema: { x: z.number().int(), z: z.number().int() }, ...ACT('minecraft_go_to_place', { 'ciel/long_running': true,

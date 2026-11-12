@@ -1,24 +1,17 @@
 // Mindcraft owns the body. This adapter translates CIEL's ownership/result contract.
-import pf from 'mineflayer-pathfinder';
-import { Vec3 } from 'vec3';
 import { BodyCommands } from '../body-command.js';
-import { executeRegion } from '../spatial.js';
-import { protectWorld } from './protection.js';
 import { ActionScope } from './action-scope.js';
 import { alignPlayerCollision } from '../player-physics.js';
 import { confirmedCrafting } from '../craft-sync.js';
-import { approachTrackedPlayer } from '../player-locator.js';
 import { CielModel } from './ciel-model.js';
-import { pursueItem, resolveItemGoal } from './brain.js';
+import { SessionModel } from './session-model.js';
+import { executeCommand, blacklistCommands } from '../vendor/mindcraft/src/agent/commands/index.js';
+import defaultSettings from '../vendor/mindcraft/settings.js';
 import { setSettings } from '../vendor/mindcraft/src/agent/settings.js';
 import { initBot } from '../vendor/mindcraft/src/utils/mcdata.js';
-import { ActionManager } from '../vendor/mindcraft/src/agent/action_manager.js';
 import { initModes } from '../vendor/mindcraft/src/agent/modes.js';
-import * as skills from '../vendor/mindcraft/src/agent/library/skills.js';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-export const atReturnPosition = (position, origin) =>
-  Math.abs(position.y-origin.y)<0.75 && position.distanceTo(origin)<=1.5;
 const inventory = bot => {
   const counts = {};
   for (const item of bot?.inventory?.items() ?? []) counts[item.name] = (counts[item.name] ?? 0) + item.count;
@@ -28,12 +21,24 @@ class Failed extends Error {
   constructor(reason, note) { super(reason); this.note = note; }
 }
 export function createMindcraftBot(options) {
-  setSettings({ ...options, minecraft_version: options.version, narrate_behavior: false });
+  setSettings({ ...defaultSettings, ...options, minecraft_version: options.version });
   return initBot(options.username);
 }
 
 export class MindcraftRunner extends BodyCommands {
-  bindCore(url, token) { this.coreModel = new CielModel(null, url, {token}); }
+  async bindCore(url, token) {
+    await this.ready;
+    const old=this.coreModel;
+    if(old) {await this.stop('rebound');this.coreModel=null;await old.cancel();}
+    if(this.agent) {
+      const { History }=await import('../vendor/mindcraft/src/agent/history.js');
+      const { MemoryBank }=await import('../vendor/mindcraft/src/agent/memory_bank.js');
+      this.agent.history=new History(this.agent);
+      this.agent.memory_bank=new MemoryBank();
+      this.agent.npc.data.goals=[];this.agent.npc.data.curr_goal=null;
+    }
+    this.coreModel = new CielModel(null, url, {token});
+  }
   async unbindCore() {
     const model=this.coreModel; this.coreModel=null;
     // Revocation already aborts local inference and rejects late results. The
@@ -47,7 +52,6 @@ export class MindcraftRunner extends BodyCommands {
     this.owner = owner;
     this.bot = null;
     this.modeActions = new Set();
-    this.goalContexts = new Map();
   }
 
   attach(bot) {
@@ -57,7 +61,6 @@ export class MindcraftRunner extends BodyCommands {
     alignPlayerCollision(bot);
     confirmedCrafting(bot);
     this.blocked = false;
-    this.protection = protectWorld(bot);
     this.actionScope = new ActionScope(bot);
     bot.output = '';
     bot.interrupt_code = false;
@@ -72,54 +75,57 @@ export class MindcraftRunner extends BodyCommands {
     });
     bot.autoEat.options = { ...bot.autoEat.options, priority: 'foodPoints', startAt: 14,
       bannedFood: ['rotten_flesh', 'spider_eye', 'poisonous_potato', 'pufferfish', 'chicken'] };
-    const agent = this.agent = {
-      bot, shut_up: true,
-      self_prompter: { isActive: () => false, stopLoop() {} },
-      prompter: { getInitModes: () => ({ hunting: false, torch_placing: false, elbow_room: false,
-        item_collecting: false, cheat: false, cowardice: false }) },
-      npc: { getBuiltPositions: () => [] },
-      history: { add() {} },
-      isIdle: () => !agent.actions.executing,
-      clearBotLogs: () => { bot.output = ''; bot.interrupt_code = Boolean(this.current?.token.cancelled); },
-      requestInterrupt: () => this.interrupt(bot),
-      cleanKill: () => { this.blocked = true; bot.quit('Mindcraft action did not stop'); },
-      // CIEL already receives structured damage/work notifications; never start a second conversation.
-      handleMessage() {}, openChat() {},
-    };
-    agent.actions = new ActionManager(agent);
-    const runAction = agent.actions.runAction.bind(agent.actions);
-    agent.actions.runAction = (label, fn, options = {}) => {
-      if (this.bot !== bot || this.current?.token.cancelled)
-        return Promise.resolve({ success: false, interrupted: true });
-      const mode = label.startsWith('mode:');
-      if (mode) { this.defending = true; this._defenseAt = Date.now(); this.changed(); }
-      const promise = runAction(label, () => this.actionScope.run(fn), { ...options, timeout: -1 })
-        .then(result => {
-          // Native command wrappers return text only. Preserve a runtime exception
-          // as failure before it becomes another model-guided exploration attempt.
-          if (label.startsWith('action:') && !result.success && !result.interrupted)
-            throw new Failed('execution_error', { action: label, detail: result.message?.slice(0, 500) });
-          return result;
-        });
-      if (mode) {
-        this.modeActions.add(promise);
-        void promise.finally(() => {
-          this.modeActions.delete(promise);
-          this.defending = this.modeActions.size > 0;
-          this.changed();
-        });
-      }
-      return promise;
+    this.ready = this.initializeAgent(bot);
+    // Attachment is synchronous for the connection layer; command execution
+    // awaits component initialization and receives any startup error.
+    this.ready.catch(e => console.warn('Mindcraft initialization failed:', e.message));
+  }
+
+  async initializeAgent(bot) {
+    const { Agent } = await import('../vendor/mindcraft/src/agent/agent.js');
+    const { Task } = await import('../vendor/mindcraft/src/agent/tasks/tasks.js');
+    const agent = new Agent();
+    const provider = new SessionModel(()=>({model:this.bot===bot?this.coreModel:null,token:this.current?.token}),
+      ()=>{if(this.current)this.activity(this.current,'thinking');});
+    await agent.initializeComponents({name:bot.username,model:'ciel'}, {chat:provider});
+    if(this.bot!==bot)return;
+    this.agent=agent;
+    agent.bot=bot;
+    agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};
+    agent.task=new Task(agent,null,Date.now());
+    const { VisionInterpreter }=await import('../vendor/mindcraft/src/agent/vision/vision_interpreter.js');
+    agent.vision_interpreter=new VisionInterpreter(agent,false);
+    agent.blocked_actions=[...defaultSettings.blocked_actions];
+    blacklistCommands(agent.blocked_actions);
+    // Transport and process lifecycle belong to CIEL; planning belongs to Agent.
+    agent.openChat=async message=>{this.nativeResponse=String(message).trim();};
+    agent.cleanKill=()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');};
+    const requestInterrupt=agent.requestInterrupt.bind(agent);
+    agent.requestInterrupt=()=>{requestInterrupt();this.actionScope.interrupt();};
+    const nativeRun=agent.actions.runAction.bind(agent.actions);
+    agent.actions.runAction=(label,fn,options={})=>{
+      const c=this.current;
+      if(!this.coreModel || c?.token.cancelled)return Promise.resolve({success:false,interrupted:true});
+      // Keep upstream results and timeout choices intact. Only revoke stale I/O.
+      const pending=nativeRun(label,()=>this.actionScope.run(fn),options);
+      this.modeActions.add(pending);
+      pending.then(()=>this.modeActions.delete(pending),()=>this.modeActions.delete(pending));
+      return pending;
     };
     initModes(agent);
-    let ticking = false;
-    this.timer = setInterval(async () => {
-      if (ticking || this.bot !== bot || !bot.entity || this.current?.token.cancelled || this.blocked) return;
-      ticking = true;
-      try { await bot.modes.update(); }
-      catch (e) { console.warn('Mindcraft mode failed:', e.message); }
-      finally { ticking = false; }
-    }, 250);
+    agent.npc.init();
+    bot.on('idle',()=>{
+      if(this.coreModel&&!agent.shut_up){bot.clearControlStates();bot.modes.unPauseAll();}
+    });
+    let ticking=false,previous=Date.now();
+    this.timer=setInterval(async()=>{
+      if(ticking || this.bot!==bot || !this.coreModel || !bot.entity || this.current?.token.cancelled)return;
+      ticking=true;
+      const now=Date.now();
+      try {await agent.update(now-previous);}
+      catch(e){console.warn('Mindcraft update failed:',e.message);}
+      finally{previous=now;ticking=false;}
+    },300);
     this.timer.unref?.();
   }
 
@@ -135,10 +141,13 @@ export class MindcraftRunner extends BodyCommands {
   }
 
   async haltExecution() {
+    this.agent?.shutUp?.();
+    if(this.agent?.npc){this.agent.npc.data.goals=[];this.agent.npc.data.curr_goal=null;}
     this.agent?.actions.cancelResume();
     this.interrupt();
     // Physical interruption must not wait for the inference server's acknowledgement.
-    await Promise.all([this.coreModel?.cancel(), this.agent?.actions.stop()]);
+    await Promise.all([this.coreModel?.cancel(), this.agent?.actions.stop(), this.agent?.self_prompter?.stop()]);
+    await this.agent?.self_prompter?.stopLoop();
     await this.waitModes();
     await this.actionScope?.settle();
     this.interrupt();
@@ -156,56 +165,18 @@ export class MindcraftRunner extends BodyCommands {
   }
 
 
-  async action(label, run, c) {
-    await this.waitModes();
-    if (c.token.cancelled) throw new Failed(c.token.reason);
-    let value, failure;
-    const result = await this.agent.actions.runAction(label, async () => {
-      try { value = await run(); } catch(e) { failure=e; throw e; }
-    });
-    await this.waitModes();
-    if (c.token.cancelled) throw new Failed(c.token.reason);
-    if (failure) throw failure;
-    if (!result.success || result.interrupted) throw new Failed(result.interrupted ? 'interrupted' : 'cannot_continue');
-    if (value === false) throw new Failed('objective_unverified');
-    return value;
-  }
-
-
   async pursue(c) {
-    if (!this.coreModel) throw new Failed('core_unavailable');
-    let context = this.goalContexts.get(c.args.goal_id);
-    if (!context) {
-      this.activity(c, 'thinking');
-      const before = inventory(this.bot), origin = this.bot.entity.position.clone();
-      const goal = await resolveItemGoal(this, c.args.request);
-      if (c.token.cancelled) throw new Failed(c.token.reason);
-      if (goal.clarification) throw new Failed('goal_unclear', goal);
-      context = {goal,before,origin,target:goal.quantity+(goal.quantity_mode==='gain'?(before[goal.item]??0):0)};
-      this.goalContexts.set(c.args.goal_id,context);
-      if(this.goalContexts.size>512)this.goalContexts.delete(this.goalContexts.keys().next().value);
-    }
-    const {goal,target,origin}=context;
-    const command={...c,args:{item:goal.item,resource_scope:goal.resource_scope}};
-    let first=context.started?'':goal.command;
-    context.started=true;
-    try {
-      while(!c.token.cancelled) {
-        await pursueItem(this,command,target,first); first='';
-        if(c.token.cancelled)break;
-        this.activity(c, 'returning');
-        // A radius of two also accepts the tunnel directly below the starting
-        // point. Reach the original standing cell before claiming a return.
-        await this.action('ciel:return',()=>skills.goToPosition(this.bot,origin.x,origin.y,origin.z,0),c);
-        const observed=inventory(this.bot);
-        if((observed[goal.item]??0)>=target && atReturnPosition(this.bot.entity.position,origin))
-          return {goal,target,inventory:observed,returned:true};
-      }
-      throw new Failed(c.token.reason??'stopped');
-    } catch(e) {
-      const note={...e.note,goal,target,inventory:inventory(this.bot),returned:false};
-      throw new Failed(e instanceof Failed?e.message:e.goalReason??'execution_error',note);
-    }
+    if(!this.coreModel)throw new Failed('core_unavailable');
+    this.nativeResponse='';
+    this.agent.shut_up=false;
+    this.activity(c,'thinking');
+    // The upstream loop owns interpretation, history, commands and recovery.
+    await this.agent.handleMessage(this.owner || 'user',c.args.request);
+    while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
+        || this.agent.self_prompter.isActive())) await pause(100);
+    if(c.token.cancelled)throw new Failed(c.token.reason??'stopped');
+    return {native_finished:true,objective_verified:false,response:this.nativeResponse,
+      inventory:inventory(this.bot)};
   }
 
   activity(c, stage, command = '') {
@@ -215,8 +186,9 @@ export class MindcraftRunner extends BodyCommands {
 
   async execute(c) {
     try {
+      await this.ready;
       if (c.skill === 'pursue') return { ok: true, note: await this.pursue(c) };
-      const note = await this.action(`ciel:${c.skill}`, () => this.perform(c), c);
+      const note = await this.perform(c);
       return { ok: true, note };
     } catch (e) {
       return { ok: false, reason: c.token.reason ?? (e instanceof Failed ? e.message : 'error'),
@@ -229,89 +201,18 @@ export class MindcraftRunner extends BodyCommands {
   }
 
   async perform(c) {
-    const bot = this.bot, a = c.args;
-    const player = a.player ?? this.owner;
-    if (['follow', 'come', 'give'].includes(c.skill) || a.player) {
-      if (!player) throw new Failed('no_owner');
-      if (!bot.players[player]?.entity) {
-        try { await approachTrackedPlayer(bot,player,c.token,
-          (x,z)=>skills.goToGoal(bot,new pf.goals.GoalNearXZ(x,z,2))); }
-        catch(e) { throw new Failed(e.message); }
-      }
-    }
-    switch (c.skill) {
-      // GoalFollow works on block cells; leave margin for the continuous 3-block arrival contract.
-      case 'follow': return skills.followPlayer(bot, player, 2);
-      case 'come': return skills.goToPlayer(bot, player, 2);
-      case 'go_to':
-        if (a.player) return skills.goToPlayer(bot, player, 2);
-        return a.y === undefined
-          ? skills.goToGoal(bot, new pf.goals.GoalXZ(a.x, a.z))
-          : skills.goToPosition(bot, a.x, a.y, a.z, 1);
-      case 'give': return skills.giveToPlayer(bot, a.item, player, a.count);
-      case 'craft': {
-        const before = inventory(bot)[a.item] ?? 0;
-        await skills.craftRecipe(bot, a.item, a.count);
-        if ((inventory(bot)[a.item] ?? 0) - before < a.count) throw new Failed('missing_materials');
-        return { made: a.count };
-      }
-      case 'collect': {
-        const before = inventory(bot);
-        await skills.collectBlock(bot, a.block, a.count);
-        const after = inventory(bot);
-        return { gained: Object.fromEntries(Object.entries(after).map(([name, n]) => [name, n - (before[name] ?? 0)])) };
-      }
-      case 'find': return skills.goToNearestBlock(bot, a.block, 2, 64);
-      case 'edit_region': {
-        const plan = bot.regionPlans.start(bot, a.plan_id, c.scope);
-        // A verified construction plan owns exact stances and placement faces.
-        // Native general-purpose skills may dig/scaffold/reposition, invalidating
-        // that plan. Keep the region executor's careful movements and exact edits.
-        return executeRegion(bot, plan, c.token, { Failed, watched: (_bot, run) => run(),
-          move: s => this.regionMove(bot,s,c),
-        }, a.budget_ms);
-      }
-      case 'pointed_action': return this.pointed(c);
-      default: throw new Failed('unsupported_skill');
-    }
-  }
-
-  async regionMove(bot, stance, c) {
-    let previous=bot.entity.position.clone(), last=Date.now();
-    const timer=setInterval(()=>{
-      const p=bot.entity.position;
-      if(p.distanceTo(previous)>0.1){previous=p.clone();last=Date.now();}
-      if(c.token.cancelled || Date.now()-last>2000)bot.pathfinder.setGoal(null);
-    },100);
-    try {return await bot.pathfinder.goto(new pf.goals.GoalBlock(stance.x,stance.y,stance.z));}
-    finally {clearInterval(timer);}
-  }
-
-  async pointed(c) {
-    const bot = this.bot, a = c.args;
-    const selection = bot.pointing.resolve(bot, a.selection_id);
-    if (!selection) throw new Failed('selection_expired');
-    if (selection.points.length !== 1) throw new Failed('selection_needs_one_point');
-    const p = selection.points[0];
-    const check = () => {
-      if (!bot.pointing.resolve(bot, a.selection_id)) throw new Failed('selection_expired');
-      if (bot.blockAt(new Vec3(p.x, p.y, p.z))?.name !== p.block) throw new Failed('selection_changed');
-    };
-    check();
-    if (a.action === 'move') return skills.goToPosition(bot, p.x, p.y + 1, p.z, 2);
-    if (p.block !== 'crafting_table') throw new Failed('unsupported_selected_block');
-    const before = inventory(bot).crafting_table ?? 0;
-    await skills.goToPosition(bot, p.x, p.y, p.z, 2);
-    if (c.token.cancelled) return;
-    check();
-    await this.protection.permit([p], () => skills.breakBlockAt(bot, p.x, p.y, p.z));
-    // Item entities and inventory packets arrive after the block removal packet.
-    for(let attempt=0;attempt<10 && !c.token.cancelled && (inventory(bot).crafting_table??0)<=before;attempt++) {
-      await skills.wait(bot,200);
-      if(c.token.cancelled)break;
-      await skills.pickupNearbyItems(bot);
-    }
-    if ((inventory(bot).crafting_table ?? 0) <= before) throw new Failed('objective_unverified');
-    return { selection_id: selection.id, recovered: 1 };
+    const a=c.args,player=a.player??this.owner;
+    const command = c.skill==='follow' ? `!followPlayer(${JSON.stringify(player)}, 3)`
+      : c.skill==='come' ? `!goToPlayer(${JSON.stringify(player)}, 3)`
+      : c.skill==='go_to' ? (a.player ? `!goToPlayer(${JSON.stringify(player)}, 3)`
+        : `!goToCoordinates(${a.x}, ${a.y??this.bot.entity.position.y}, ${a.z}, 1)`)
+      : c.skill==='give' ? `!givePlayer(${JSON.stringify(player)}, ${JSON.stringify(a.item)}, ${a.count})`
+      : c.skill==='collect' ? `!collectBlocks(${JSON.stringify(a.block)}, ${a.count})`
+      : c.skill==='craft' ? `!craftRecipe(${JSON.stringify(a.item)}, ${a.count})`
+      : c.skill==='find' ? `!searchForBlock(${JSON.stringify(a.block)}, 64)` : null;
+    if(!command)throw new Failed('unsupported_skill');
+    // A system source bypasses upstream's user-forced-command shortcut; direct
+    // controls are parsed by the native command executor without a second plan.
+    return executeCommand(this.agent,command);
   }
 }

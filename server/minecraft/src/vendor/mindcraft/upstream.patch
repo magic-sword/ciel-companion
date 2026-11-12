@@ -1,3 +1,5 @@
+diff --git a/src/agent/action_manager.js b/src/agent/action_manager.js
+index 9b9d0d2..cfb38fd 100644
 --- a/src/agent/action_manager.js
 +++ b/src/agent/action_manager.js
 @@ -1,3 +1,5 @@
@@ -6,14 +8,98 @@
  export class ActionManager {
      constructor(agent) {
          this.agent = agent;
-@@ -174,4 +176,4 @@
+@@ -174,4 +176,4 @@ export class ActionManager {
          }, TIMEOUT_MINS * 60 * 1000);
      }
  
--}+}
+-}
+\ No newline at end of file
++}
+diff --git a/src/agent/agent.js b/src/agent/agent.js
+index 5f5bf31..1b4dfc6 100644
+--- a/src/agent/agent.js
++++ b/src/agent/agent.js
+@@ -1,6 +1,5 @@
+ import { History } from './history.js';
+ import { Coder } from './coder.js';
+-import { VisionInterpreter } from './vision/vision_interpreter.js';
+ import { Prompter } from '../models/prompter.js';
+ import { initModes } from './modes.js';
+ import { initBot } from '../utils/mcdata.js';
+@@ -15,18 +14,13 @@ import { addBrowserViewer } from './vision/browser_viewer.js';
+ import { serverProxy, sendOutputToServer } from './mindserver_proxy.js';
+ import settings from './settings.js';
+ import { Task } from './tasks/tasks.js';
+-import { speak } from './speak.js';
+ import { log, validateNameFormat, handleDisconnection } from './connection_handler.js';
+ 
+ export class Agent {
+-    async start(load_mem=false, init_message=null, count_id=0) {
+-        this.last_sender = null;
+-        this.count_id = count_id;
+-        this._disconnectHandled = false;
+-
++    async initializeComponents(profile=settings.profile, models=null) {
+         // Initialize components
+         this.actions = new ActionManager(this);
+-        this.prompter = new Prompter(this, settings.profile);
++        this.prompter = new Prompter(this, profile, models);
+         this.name = (this.prompter.getName() || '').trim();
+         console.log(`Initializing agent ${this.name}...`);
+         
+@@ -47,6 +41,15 @@ export class Agent {
+         convoManager.initAgent(this);
+         await this.prompter.initExamples();
+ 
++    }
++
++    async start(load_mem=false, init_message=null, count_id=0) {
++        this.last_sender = null;
++        this.count_id = count_id;
++        this._disconnectHandled = false;
++
++        await this.initializeComponents();
++
+         // load mem first before doing task
+         let save_data = null;
+         if (load_mem) {
+@@ -111,6 +114,7 @@ export class Agent {
+                 clearTimeout(spawnTimeout);
+                 addBrowserViewer(this.bot, count_id);
+                 console.log('Initializing vision intepreter...');
++                const { VisionInterpreter } = await import('./vision/vision_interpreter.js');
+                 this.vision_interpreter = new VisionInterpreter(this, settings.allow_vision);
+ 
+                 // wait for a bit so stats are not undefined
+@@ -282,6 +286,7 @@ export class Agent {
+                     // add the preceding message to the history to give context for newAction
+                     this.history.add(source, message);
+                 }
++                this.onCommand?.(user_command_name);
+                 let execute_res = await executeCommand(this, message);
+                 if (execute_res) 
+                     this.routeResponse(source, execute_res);
+@@ -359,6 +364,7 @@ export class Agent {
+                         this.routeResponse(source, pre_message);
+                 }
+ 
++                this.onCommand?.(command_name);
+                 let execute_res = await executeCommand(this, res);
+ 
+                 console.log('Agent executed:', command_name, 'and got:', execute_res);
+@@ -421,6 +427,7 @@ export class Agent {
+         }
+         else {
+             if (settings.speak) {
++                const { speak } = await import('./speak.js');
+                 speak(to_translate, this.prompter.profile.speak_model);
+             }
+             if (settings.chat_ingame) {this.bot.chat(message);}
+diff --git a/src/agent/library/skills.js b/src/agent/library/skills.js
+index a875ce7..8258836 100644
 --- a/src/agent/library/skills.js
 +++ b/src/agent/library/skills.js
-@@ -44,7 +44,7 @@
+@@ -44,7 +44,7 @@ export async function craftRecipe(bot, itemName, num=1) {
       **/
      let placedTable = false;
  
@@ -22,7 +108,7 @@
          log(bot, `${itemName} is either not an item, or it does not have a crafting recipe!`);
          return false;
      }
-@@ -109,7 +109,7 @@
+@@ -109,7 +109,7 @@ export async function craftRecipe(bot, itemName, num=1) {
  
      //Equip any armor the bot may have crafted.
      //There is probablly a more efficient method than checking the entire inventory but this is all mineflayer-armor-manager provides. :P
@@ -31,18 +117,17 @@
  
      return true;
  }
-@@ -454,6 +454,10 @@
+@@ -454,6 +454,9 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
              if (!blocktypes.includes(block.name)) {
                  return false;
              }
 +            // Mineflayer first calls matching with palette entries without positions.
 +            // Only filter by type there; safety/exclusions require an actual world block.
 +            if (!block.position) return true;
-+            if (bot.cielCanBreak && !isLiquid && !bot.cielCanBreak(block)) return false;
              if (exclude) {
                  for (let position of exclude) {
                      if (block.position.x === position.x && block.position.y === position.y && block.position.z === position.z) {
-@@ -1165,7 +1169,7 @@
+@@ -1165,7 +1168,7 @@ function startDoorInterval(bot) {
                       block.name.includes('fence_gate') ||
                       block.name.includes('trapdoor'))) 
                  {
@@ -51,17 +136,21 @@
                      break;
                  }
              }
+diff --git a/src/agent/modes.js b/src/agent/modes.js
+index fd7993e..50d2e4b 100644
 --- a/src/agent/modes.js
 +++ b/src/agent/modes.js
-@@ -2,7 +2,6 @@
+@@ -1,8 +1,8 @@
+ import * as skills from './library/skills.js';
  import * as world from './library/world.js';
  import * as mc from '../utils/mcdata.js';
- import settings from './settings.js'
--import convoManager from './conversation.js';
+-import settings from './settings.js'
+ import convoManager from './conversation.js';
++import settings from './settings.js'
  
  async function say(agent, message) {
      agent.bot.modes.behavior_log += message + '\n';
-@@ -124,8 +123,8 @@
+@@ -124,8 +124,8 @@ const modes_list = [
                  this.stuck_time = 0;
                  execute(this, agent, async () => {
                      const crashTimeout = setTimeout(() => { agent.cleanKill("Got stuck and couldn't get unstuck") }, 10000);
@@ -72,16 +161,7 @@
                      say(agent, 'I\'m free.');
                  });
              }
-@@ -322,7 +321,7 @@
- 
-     if (should_reprompt) {
-         // auto prompt to respond to the interruption
--        let role = convoManager.inConversation() ? agent.last_sender : 'system';
-+        let role = 'system'; // CIEL owns conversation; no second chat/LLM runtime.
-         let logs = agent.bot.modes.flushBehaviorLog();
-         agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
-         Your behavior log: ${logs}\nRespond accordingly.`);
-@@ -330,6 +329,8 @@
+@@ -330,6 +330,8 @@ async function execute(mode, agent, func, timeout=-1) {
  }
  
  let _agent = null;
@@ -90,7 +170,7 @@
  const modes_map = {};
  for (let mode of modes_list) {
      modes_map[mode.name] = mode;
-@@ -434,6 +435,10 @@
+@@ -434,6 +436,10 @@ class ModeController {
  
  export function initModes(agent) {
      _agent = agent;
@@ -101,9 +181,27 @@
      // the mode controller is added to the bot object so it is accessible from anywhere the bot is used
      agent.bot.modes = new ModeController();
      if (agent.task) {
+diff --git a/src/agent/npc/controller.js b/src/agent/npc/controller.js
+index 9af3f3e..79e8437 100644
+--- a/src/agent/npc/controller.js
++++ b/src/agent/npc/controller.js
+@@ -40,9 +40,9 @@ export class NPCContoller {
+ 
+     init() {
+         try {
+-            for (let file of readdirSync('src/agent/npc/construction')) {
++            for (let file of readdirSync(new URL('./construction/', import.meta.url))) {
+                 if (file.endsWith('.json')) {
+-                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync('src/agent/npc/construction/' + file, 'utf8'));
++                    this.constructions[file.slice(0, -5)] = JSON.parse(readFileSync(new URL('./construction/' + file, import.meta.url), 'utf8'));
+                 }
+             }
+         } catch (e) {
+diff --git a/src/agent/npc/item_goal.js b/src/agent/npc/item_goal.js
+index 9055f54..2be40ef 100644
 --- a/src/agent/npc/item_goal.js
 +++ b/src/agent/npc/item_goal.js
-@@ -160,7 +160,7 @@
+@@ -160,7 +160,7 @@ class ItemNode {
              await skills.smeltItem(this.manager.agent.bot, to_smelt_name, to_smelt_quantity);
          } else if (this.type === 'hunt') {
              for (let i=0; i<quantity; i++) {
@@ -112,7 +210,7 @@
                  if (!res || this.manager.agent.bot.interrupt_code)
                      break;
              }
-@@ -204,7 +204,7 @@
+@@ -204,7 +204,7 @@ class ItemWrapper {
      }
  
      createChildren() {
@@ -121,17 +219,291 @@
          if (recipes) {
              for (let recipe of recipes) {
                  let includes_blacklisted = false;
-@@ -321,6 +321,7 @@
+diff --git a/src/agent/vision/vision_interpreter.js b/src/agent/vision/vision_interpreter.js
+index a43acd2..c34ba61 100644
+--- a/src/agent/vision/vision_interpreter.js
++++ b/src/agent/vision/vision_interpreter.js
+@@ -1,5 +1,6 @@
+ import { Vec3 } from 'vec3';
+-import { Camera } from "./camera.js";
++import settings from '../settings.js';
++const { Camera } = settings.allow_vision ? await import('./camera.js') : {};
+ import fs from 'fs';
  
-             // If the bot has failed to obtain the block before, explore
-             if (this.failed.includes(next.name)) {
-+                if (this.agent.resource_scope === 'nearby') return false;
-                 this.failed = this.failed.filter((item) => item !== next.name);
-                 await this.agent.actions.runAction('itemGoal:explore', async () => {
-                     await skills.moveAway(this.agent.bot, 8);
+ export class VisionInterpreter {
+diff --git a/src/models/hyperbolic.js b/src/models/hyperbolic.js
+index f483b69..ecc8dfa 100644
+--- a/src/models/hyperbolic.js
++++ b/src/models/hyperbolic.js
+@@ -1,114 +1,114 @@
+-import { getKey } from '../utils/keys.js';
+-
+-export class Hyperbolic {
+-    static prefix = 'hyperbolic';
+-    constructor(modelName, apiUrl) {
+-        this.modelName = modelName || "deepseek-ai/DeepSeek-V3";
+-        this.apiUrl = apiUrl || "https://api.hyperbolic.xyz/v1/chat/completions";
+-
+-        // Retrieve the Hyperbolic API key from keys.js
+-        this.apiKey = getKey('HYPERBOLIC_API_KEY');
+-        if (!this.apiKey) {
+-            throw new Error('HYPERBOLIC_API_KEY not found. Check your keys.js file.');
+-        }
+-    }
+-
+-    /**
+-     * Sends a chat completion request to the Hyperbolic endpoint.
+-     *
+-     * @param {Array} turns - An array of message objects, e.g. [{role: 'user', content: 'Hi'}].
+-     * @param {string} systemMessage - The system prompt or instruction.
+-     * @param {string} stopSeq - A stopping sequence, default '***'.
+-     * @returns {Promise<string>} - The model's reply.
+-     */
+-    async sendRequest(turns, systemMessage, stopSeq = '***') {
+-        // Prepare the messages with a system prompt at the beginning
+-        const messages = [{ role: 'system', content: systemMessage }, ...turns];
+-
+-        // Build the request payload
+-        const payload = {
+-            model: this.modelName,
+-            messages: messages,
+-            max_tokens: 8192,
+-            temperature: 0.7,
+-            top_p: 0.9,
+-            stream: false
+-        };
+-
+-        const maxAttempts = 5;
+-        let attempt = 0;
+-        let finalRes = null;
+-
+-        while (attempt < maxAttempts) {
+-            attempt++;
+-            console.log(`Awaiting Hyperbolic API response... (attempt: ${attempt})`);
+-            console.log('Messages:', messages);
+-
+-            let completionContent = null;
+-
+-            try {
+-                const response = await fetch(this.apiUrl, {
+-                    method: 'POST',
+-                    headers: {
+-                        'Content-Type': 'application/json',
+-                        'Authorization': `Bearer ${this.apiKey}`
+-                    },
+-                    body: JSON.stringify(payload)
+-                });
+-
+-                if (!response.ok) {
+-                    throw new Error(`HTTP error! status: ${response.status}`);
+-                }
+-
+-                const data = await response.json();
+-                if (data?.choices?.[0]?.finish_reason === 'length') {
+-                    throw new Error('Context length exceeded');
+-                }
+-
+-                completionContent = data?.choices?.[0]?.message?.content || '';
+-                console.log('Received response from Hyperbolic.');
+-            } catch (err) {
+-                if (
+-                    (err.message === 'Context length exceeded' || err.code === 'context_length_exceeded') &&
+-                    turns.length > 1
+-                ) {
+-                    console.log('Context length exceeded, trying again with a shorter context...');
+-                    return await this.sendRequest(turns.slice(1), systemMessage, stopSeq);
+-                } else {
+-                    console.error(err);
+-                    completionContent = 'My brain disconnected, try again.';
+-                }
+-            }
+-
+-            // Check for <think> blocks
+-            const hasOpenTag = completionContent.includes("<think>");
+-            const hasCloseTag = completionContent.includes("</think>");
+-
+-            if ((hasOpenTag && !hasCloseTag)) {
+-                console.warn("Partial <think> block detected. Re-generating...");
+-                continue; // Retry the request
+-            }
+-
+-            if (hasCloseTag && !hasOpenTag) {
+-                completionContent = '<think>' + completionContent;
+-            }
+-
+-            if (hasOpenTag && hasCloseTag) {
+-                completionContent = completionContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+-            }
+-
+-            finalRes = completionContent.replace(/<\|separator\|>/g, '*no response*');
+-            break; // Valid response obtained—exit loop
+-        }
+-
+-        if (finalRes == null) {
+-            console.warn("Could not get a valid <think> block or normal response after max attempts.");
+-            finalRes = 'I thought too hard, sorry, try again.';
+-        }
+-        return finalRes;
+-    }
+-
+-    async embed(text) {
+-        throw new Error('Embeddings are not supported by Hyperbolic.');
+-    }
+-}
++import { getKey } from '../utils/keys.js';
++
++export class Hyperbolic {
++    static prefix = 'hyperbolic';
++    constructor(modelName, apiUrl) {
++        this.modelName = modelName || "deepseek-ai/DeepSeek-V3";
++        this.apiUrl = apiUrl || "https://api.hyperbolic.xyz/v1/chat/completions";
++
++        // Retrieve the Hyperbolic API key from keys.js
++        this.apiKey = getKey('HYPERBOLIC_API_KEY');
++        if (!this.apiKey) {
++            throw new Error('HYPERBOLIC_API_KEY not found. Check your keys.js file.');
++        }
++    }
++
++    /**
++     * Sends a chat completion request to the Hyperbolic endpoint.
++     *
++     * @param {Array} turns - An array of message objects, e.g. [{role: 'user', content: 'Hi'}].
++     * @param {string} systemMessage - The system prompt or instruction.
++     * @param {string} stopSeq - A stopping sequence, default '***'.
++     * @returns {Promise<string>} - The model's reply.
++     */
++    async sendRequest(turns, systemMessage, stopSeq = '***') {
++        // Prepare the messages with a system prompt at the beginning
++        const messages = [{ role: 'system', content: systemMessage }, ...turns];
++
++        // Build the request payload
++        const payload = {
++            model: this.modelName,
++            messages: messages,
++            max_tokens: 8192,
++            temperature: 0.7,
++            top_p: 0.9,
++            stream: false
++        };
++
++        const maxAttempts = 5;
++        let attempt = 0;
++        let finalRes = null;
++
++        while (attempt < maxAttempts) {
++            attempt++;
++            console.log(`Awaiting Hyperbolic API response... (attempt: ${attempt})`);
++            console.log('Messages:', messages);
++
++            let completionContent = null;
++
++            try {
++                const response = await fetch(this.apiUrl, {
++                    method: 'POST',
++                    headers: {
++                        'Content-Type': 'application/json',
++                        'Authorization': `Bearer ${this.apiKey}`
++                    },
++                    body: JSON.stringify(payload)
++                });
++
++                if (!response.ok) {
++                    throw new Error(`HTTP error! status: ${response.status}`);
++                }
++
++                const data = await response.json();
++                if (data?.choices?.[0]?.finish_reason === 'length') {
++                    throw new Error('Context length exceeded');
++                }
++
++                completionContent = data?.choices?.[0]?.message?.content || '';
++                console.log('Received response from Hyperbolic.');
++            } catch (err) {
++                if (
++                    (err.message === 'Context length exceeded' || err.code === 'context_length_exceeded') &&
++                    turns.length > 1
++                ) {
++                    console.log('Context length exceeded, trying again with a shorter context...');
++                    return await this.sendRequest(turns.slice(1), systemMessage, stopSeq);
++                } else {
++                    console.error(err);
++                    completionContent = 'My brain disconnected, try again.';
++                }
++            }
++
++            // Check for <think> blocks
++            const hasOpenTag = completionContent.includes("<think>");
++            const hasCloseTag = completionContent.includes("</think>");
++
++            if ((hasOpenTag && !hasCloseTag)) {
++                console.warn("Partial <think> block detected. Re-generating...");
++                continue; // Retry the request
++            }
++
++            if (hasCloseTag && !hasOpenTag) {
++                completionContent = '<think>' + completionContent;
++            }
++
++            if (hasOpenTag && hasCloseTag) {
++                completionContent = completionContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
++            }
++
++            finalRes = completionContent.replace(/<\|separator\|>/g, '*no response*');
++            break; // Valid response obtained—exit loop
++        }
++
++        if (finalRes == null) {
++            console.warn("Could not get a valid <think> block or normal response after max attempts.");
++            finalRes = 'I thought too hard, sorry, try again.';
++        }
++        return finalRes;
++    }
++
++    async embed(text) {
++        throw new Error('Embeddings are not supported by Hyperbolic.');
++    }
++}
+diff --git a/src/models/prompter.js b/src/models/prompter.js
+index d24b88b..2023c27 100644
+--- a/src/models/prompter.js
++++ b/src/models/prompter.js
+@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
+ const __dirname = path.dirname(__filename);
+ 
+ export class Prompter {
+-    constructor(agent, profile) {
++    constructor(agent, profile, models=null) {
+         this.agent = agent;
+         this.profile = profile;
+         const defaults_dir = path.join(__dirname, '../../profiles/defaults');
+@@ -56,6 +56,12 @@ export class Prompter {
+         if (this.profile.max_tokens)
+             max_tokens = this.profile.max_tokens;
+ 
++        if (models) {
++            this.chat_model = models.chat;
++            this.code_model = models.code ?? models.chat;
++            this.vision_model = models.vision ?? models.chat;
++            this.embedding_model = models.embedding ?? null;
++        } else {
+         let chat_model_profile = selectAPI(this.profile.model);
+         this.chat_model = createModel(chat_model_profile);
+ 
+@@ -91,6 +97,8 @@ export class Prompter {
+             this.embedding_model = createModel({api: chat_model_profile.api});
+         }
+ 
++        }
++
+         this.skill_libary = new SkillLibrary(agent, this.embedding_model);
+         mkdirSync(`./bots/${name}`, { recursive: true });
+         writeFileSync(`./bots/${name}/last_profile.json`, JSON.stringify(this.profile, null, 4), (err) => {
+diff --git a/src/utils/mcdata.js b/src/utils/mcdata.js
+index 2dd2ea5..94d6930 100644
 --- a/src/utils/mcdata.js
 +++ b/src/utils/mcdata.js
-@@ -53,6 +53,7 @@
+@@ -53,6 +53,7 @@ export const WOOL_COLORS = [
  
  
  export function initBot(username) {

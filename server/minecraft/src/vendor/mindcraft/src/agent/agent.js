@@ -1,6 +1,5 @@
 import { History } from './history.js';
 import { Coder } from './coder.js';
-import { VisionInterpreter } from './vision/vision_interpreter.js';
 import { Prompter } from '../models/prompter.js';
 import { initModes } from './modes.js';
 import { initBot } from '../utils/mcdata.js';
@@ -15,18 +14,13 @@ import { addBrowserViewer } from './vision/browser_viewer.js';
 import { serverProxy, sendOutputToServer } from './mindserver_proxy.js';
 import settings from './settings.js';
 import { Task } from './tasks/tasks.js';
-import { speak } from './speak.js';
 import { log, validateNameFormat, handleDisconnection } from './connection_handler.js';
 
 export class Agent {
-    async start(load_mem=false, init_message=null, count_id=0) {
-        this.last_sender = null;
-        this.count_id = count_id;
-        this._disconnectHandled = false;
-
+    async initializeComponents(profile=settings.profile, models=null) {
         // Initialize components
         this.actions = new ActionManager(this);
-        this.prompter = new Prompter(this, settings.profile);
+        this.prompter = new Prompter(this, profile, models);
         this.name = (this.prompter.getName() || '').trim();
         console.log(`Initializing agent ${this.name}...`);
         
@@ -46,6 +40,15 @@ export class Agent {
         this.self_prompter = new SelfPrompter(this);
         convoManager.initAgent(this);
         await this.prompter.initExamples();
+
+    }
+
+    async start(load_mem=false, init_message=null, count_id=0) {
+        this.last_sender = null;
+        this.count_id = count_id;
+        this._disconnectHandled = false;
+
+        await this.initializeComponents();
 
         // load mem first before doing task
         let save_data = null;
@@ -111,6 +114,7 @@ export class Agent {
                 clearTimeout(spawnTimeout);
                 addBrowserViewer(this.bot, count_id);
                 console.log('Initializing vision intepreter...');
+                const { VisionInterpreter } = await import('./vision/vision_interpreter.js');
                 this.vision_interpreter = new VisionInterpreter(this, settings.allow_vision);
 
                 // wait for a bit so stats are not undefined
@@ -282,6 +286,7 @@ export class Agent {
                     // add the preceding message to the history to give context for newAction
                     this.history.add(source, message);
                 }
+                this.onCommand?.(user_command_name);
                 let execute_res = await executeCommand(this, message);
                 if (execute_res) 
                     this.routeResponse(source, execute_res);
@@ -359,6 +364,7 @@ export class Agent {
                         this.routeResponse(source, pre_message);
                 }
 
+                this.onCommand?.(command_name);
                 let execute_res = await executeCommand(this, res);
 
                 console.log('Agent executed:', command_name, 'and got:', execute_res);
@@ -421,6 +427,7 @@ export class Agent {
         }
         else {
             if (settings.speak) {
+                const { speak } = await import('./speak.js');
                 speak(to_translate, this.prompter.profile.speak_model);
             }
             if (settings.chat_ingame) {this.bot.chat(message);}
