@@ -78,7 +78,7 @@ print(json.dumps(compare_inventory(actual,expected)))""".replace('EXPECTED', rep
     source = release / 'server/agent'
     tag = 'ciel-dev-agent:' + request['commit'][:12]
     with (dest / 'build.log').open('w') as log:
-        subprocess.run(['docker', 'build', '--label', 'org.opencontainers.image.revision=' + request['commit'],
+        subprocess.run(['docker', 'build', '--network', 'host', '--label', 'org.opencontainers.image.revision=' + request['commit'],
                         '-t', tag, str(source)], stdout=log, stderr=subprocess.STDOUT, check=True)
     print('Built complete committed agent ' + request['commit'][:12], flush=True)
     # A new agent may perform startup schema maintenance. Preserve the shared database first.
