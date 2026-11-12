@@ -10,6 +10,7 @@ import re
 import time
 from types import SimpleNamespace
 from . import weight_space as w
+from . import topic_ablation
 
 ARMS=('reply','diagnose','oracle_reply','stale_reply','stale_diagnose')
 ASSESSMENT_ARMS=('assess','stale_assess')
@@ -84,16 +85,20 @@ def main():
     p.add_argument('--output',type=Path)
     p.add_argument('--rounds',type=int,default=2)
     p.add_argument('--assessment-only',action='store_true',help='Follow-up reading task without persona; not ordinary conversation')
+    p.add_argument('--ablation',action='store_true',help='Fixed eight-arm input cause investigation')
     a=p.parse_args();suite=load_suite(a.suite)
+    if a.assessment_only and a.ablation:p.error('Choose one experiment')
     arms=ASSESSMENT_ARMS if a.assessment_only else ARMS
+    if a.ablation:arms=topic_ablation.ARMS
     if a.mode=='validate':
         print(json.dumps(dict(cases=len(suite['cases']),requests=len(suite['cases'])*len(arms)*a.rounds)));return
     if not a.conditions or not a.output or not 1<=a.rounds<=2:p.error('conditions, new output and 1..2 rounds required')
     a.output.mkdir(parents=True,exist_ok=False)
     sources=a.output/'sources';sources.mkdir()
-    for path in [Path(__file__),Path(w.__file__),a.suite]+[w.ROOT/'server/agent/config/prompts'/f'{name}.md' for name in w.PROMPTS]:
+    for path in [Path(__file__),Path(w.__file__),Path(topic_ablation.__file__),a.suite]+[w.ROOT/'server/agent/config/prompts'/f'{name}.md' for name in w.PROMPTS]:
         (sources/path.name).write_bytes(path.read_bytes())
     system='\n'.join((sources/f'{name}.md').read_text(encoding='utf-8') for name in w.PROMPTS)
+    parts={name:(sources/f'{name}.md').read_text(encoding='utf-8') for name in w.PROMPTS}
     args=SimpleNamespace(timeout=suite['timeout'],model='local',temperature=0,max_tokens=suite['max_tokens'],thinking=False,base_url='http://127.0.0.1:8094/v1')
     before=w.probe('http://127.0.0.1:8095','/mode')
     if not before.get('ready') or before.get('mode')!='gpu':raise RuntimeError('Require shared GPU ready')
@@ -102,7 +107,7 @@ def main():
         prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
         source_hashes={path.name:w.digest(path) for path in sources.iterdir()},
         sampling=dict(temperature=0,max_tokens=args.max_tokens,timeout=args.timeout,seed=1729,thinking=False),
-        rounds=a.rounds,arms=arms,assessment_only=a.assessment_only,completion='running',trials=[])
+        rounds=a.rounds,arms=arms,assessment_only=a.assessment_only,ablation=a.ablation,completion='running',trials=[])
     w.write(a.output/'report.json',report)
     deadline=time.monotonic()+suite['wall_seconds']
     try:
@@ -111,9 +116,10 @@ def main():
             random.Random(1729+repeat).shuffle(jobs)
             for case,arm in jobs:
                 if time.monotonic()+args.timeout>deadline:raise TimeoutError('Registered wall budget')
-                c,prompt=branch(case,arm,system)
+                c,prompt=topic_ablation.branch(case,arm,parts) if a.ablation else branch(case,arm,system)
                 row=w.run_case(c,prompt,args,1729+repeat)
                 row.update(arm=arm,repeat=repeat)
+                row['input']=dict(system=prompt,context=c['context'],messages=c['messages'])
                 if arm.endswith(('diagnose','assess')):row['judgment']=judgment_score(row,case['expected'])
                 report['trials'].append(row)
                 w.write(a.output/'report.json',report)

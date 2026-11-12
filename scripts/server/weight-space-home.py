@@ -13,6 +13,7 @@ home = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(home)
 DEST = "Path.home()/'work/ciel-weight-space-benchmark'"
 FILES = ['server/benchmark/weight_space.py', 'server/benchmark/weight_space/suite.json',
+         'server/benchmark/topic_ablation.py',
          'server/benchmark/topic_state.py', 'server/benchmark/weight_space/topic-state-suite.json',
          'server/benchmark/weight_space/conversation-suite.json',
          'server/benchmark/weight_space/failure-loop-suite.json',
@@ -45,9 +46,12 @@ def main():
     p.add_argument('--stream-replay', action='store_true', help='Run stream-derived task-switch probes')
     p.add_argument('--topic-state', action='store_true', help='Run all paired state/reply diagnostic cases')
     p.add_argument('--assessment-only', action='store_true', help='With topic-state: separate reading-task follow-up')
+    p.add_argument('--ablation', action='store_true', help='With topic-state: input cause investigation')
     p.add_argument('--prompt-revision', help='stage: Git commit for baseline prompts; code stays current')
     p.add_argument('--prompt-dir', type=Path, help='stage: explicit experimental prompt directory')
     args = p.parse_args()
+    if args.ablation and (not args.topic_state or args.assessment_only):
+        p.error('ablation requires topic-state and excludes assessment-only')
     if args.assessment_only and not args.topic_state:
         p.error('assessment-only requires topic-state')
     if sum((args.conversation, args.failure_loop, args.topic_loop, args.stream_replay, args.topic_state)) > 1:
@@ -111,6 +115,7 @@ print('Staged harness and prompt fixtures only:',root)
             command = ['python3','-B','-m','server.benchmark.topic_state','run',
                        '--conditions','conditions.json','--output','results/'+args.label,'--rounds',str(args.rounds)]
             if args.assessment_only:command += ['--assessment-only']
+            if args.ablation:command += ['--ablation']
         remote(prefix + 'command=' + repr(command) + '\n' + """
 with urllib.request.urlopen('http://127.0.0.1:8095/mode',timeout=5) as r:mode=json.load(r)
 if not mode.get('ready'):raise SystemExit('Shared API is not ready')
