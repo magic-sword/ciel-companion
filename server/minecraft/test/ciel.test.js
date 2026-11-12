@@ -80,6 +80,10 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
     assert.equal(profile.speech_vocabulary.language, 'ja');
     assert.ok(profile.speech_vocabulary.terms.includes('原木'));
     assert.ok(profile.speech_vocabulary.terms.includes('整地'));
+    assert.ok(profile.speech_vocabulary.terms.includes('石のシャベル'));
+    assert.ok(profile.speech_vocabulary.terms.includes('石のツルハシ'));
+    assert.ok(profile.speech_vocabulary.terms.length <= 64);
+    assert.ok(profile.speech_vocabulary.terms.join('').length <= 512);
     assert.ok(new RegExp(profile.route_words).test('ついてきて'));
     assert.ok((await a.getPrompt({ name: 'play' })).messages[0].content.text.includes('minecraft_facts'));
 

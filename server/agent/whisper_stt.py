@@ -1,6 +1,7 @@
 """CPU Whisper recognition; LiveKit StreamAdapter supplies VAD-delimited speech."""
 import asyncio
 import time
+import hashlib
 
 import numpy as np
 from livekit import rtc
@@ -40,6 +41,8 @@ class WhisperSTT(stt.STT):
         result = await asyncio.to_thread(whisper_engine.recognize, self.model_path, audio, prompt,
                                          vad_filter=False)
         debug_log.record('local_stt_result', final=True, model=self.model,
+                         game_vocabulary_count=len(words),
+                         prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
                          audio_seconds=round(len(audio)/16000, 3),
                          compute_ms=round((time.perf_counter()-started)*1000, 2))
         return stt.SpeechEvent(type=stt.SpeechEventType.FINAL_TRANSCRIPT,
