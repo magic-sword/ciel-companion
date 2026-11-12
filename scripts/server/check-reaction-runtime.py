@@ -85,18 +85,24 @@ async def main():
         output.clear()
         envelope = voice.reactions.envelope('game', 'game.damage', {})
         envelope['ttl_ms'] = 40
-        expired = voice.reactions.receive('game', envelope, why='game', kwargs={'instructions': 'old damage'})
+        ongoing = voice.reactions.receive('game', envelope, why='game', kwargs={'instructions': 'old damage'})
         await asyncio.sleep(.25)
-        assert expired.status == 'expired'
-        assert not output
-        assert expired.handle.interrupted
-        session.current_speech = expired.handle
+        assert ongoing.status == 'spoken'
+        assert output == ['pain reaction']
+        assert not ongoing.handle.interrupted
+        # User interruption still gates late model output and audio.
+        output.clear()
+        envelope = voice.reactions.envelope('game', 'game.damage', {})
+        interrupted = voice.reactions.receive('game', envelope, why='game')
+        await asyncio.sleep(.06)
+        interrupted.handle.interrupt(force=True)
+        session.current_speech = interrupted.handle
         async def audio():
             yield 'old audio'
-        assert [frame async for frame in agent._reaction_audio(audio(), expired.handle.id)] == []
+        assert [frame async for frame in agent._reaction_audio(audio(), interrupted.handle.id)] == []
     await voice.reactions.close()
     await asyncio.gather(*tasks)
-    print('passed: damage survives pending work notice; expired generation/audio blocked; speech interrupted')
+    print('passed: damage survives notification TTL; user interruption still blocks late audio')
 
 
 if __name__ == '__main__':

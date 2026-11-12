@@ -31,7 +31,7 @@ class Reaction:
     key: tuple
     kind: str
     priority: int
-    deadline: float
+    deadline: float | None
     why: str
     kwargs: dict
     ready_at: float
@@ -40,6 +40,13 @@ class Reaction:
     result: asyncio.Future | None = None
     output_seen: bool = False
     quiet_seconds: float = 0.
+
+    @property
+    def conversation(self):
+        return self.key[0] in ('game', 'work')
+
+    def expired(self, now):
+        return self.deadline is not None and now >= self.deadline
 
 
 class Reactions:
@@ -119,6 +126,9 @@ class Reactions:
             return self.reject(source, 'expired')
         now = self.clock()
         event = Reaction(key, kind, priority, now + remaining, why, dict(kwargs or {}), now + max(0, settle))
+        if event.conversation:
+            # Freshness is checked at ingestion. Accepted facts wake ordinary conversation.
+            event.deadline = None
         event.quiet_seconds = max(0, settle)
         self.last_seq[source] = seq
         self.seen[key] = event
@@ -149,14 +159,14 @@ class Reactions:
             if old.key[0] == source and old.kind == kind:
                 self.finish(old, 'superseded')
         if len(self.queue) >= self.LIMIT:
-            victim = min(self.queue.values(), key=lambda e: (e.priority, e.deadline))
+            victim = min(self.queue.values(), key=lambda e: (e.priority, e.ready_at))
             if victim.priority > priority:
                 event.status = 'overflow'
                 self.trace(event, 'overflow')
                 return event
             self.finish(victim, 'overflow')
         self.queue[key] = event
-        if self.active and priority > self.active.priority:
+        if self.active and not self.active.conversation and priority > self.active.priority:
             self.finish(self.active, 'preempted')
             self.interrupt(self.active)
         self.start()
@@ -209,14 +219,14 @@ class Reactions:
     def allowed(self, speech_id):
         event = self.speeches.get(speech_id)
         return event is None or (not self.closed and event.status == 'generating' and
-                                 not getattr(event.handle, 'interrupted', False) and self.clock() < event.deadline)
+                                 not getattr(event.handle, 'interrupted', False) and not event.expired(self.clock()))
 
     def current(self):
         return self.speeches.get(getattr(getattr(self.mouth.session, 'current_speech', None), 'id', None))
 
     def take(self, source):
         for event in list(self.queue.values()):
-            if event.deadline <= self.clock():
+            if event.expired(self.clock()):
                 self.finish(event, 'expired')
             elif event.key[0] == source:
                 self.queue.pop(event.key, None)
@@ -261,7 +271,7 @@ class Reactions:
             while not self.closed and (self.queue or self.active):
                 now = self.clock()
                 for event in list(self.queue.values()):
-                    if event.deadline <= now:
+                    if event.expired(now):
                         self.finish(event, 'expired')
                 blocked = self.mouth.busy() or self.singing()
                 if blocked:
@@ -288,7 +298,10 @@ class Reactions:
                             self.speeches.popitem(last=False)
                     if inspect.isawaitable(handle):
                         playout = asyncio.ensure_future(handle)
-                        await asyncio.wait_for(asyncio.shield(playout), max(.001, event.deadline - self.clock()))
+                        if event.conversation:
+                            await asyncio.shield(playout)
+                        else:
+                            await asyncio.wait_for(asyncio.shield(playout), max(.001, event.deadline - self.clock()))
                     if event.status == 'generating':
                         self.finish(event, 'cancelled' if getattr(handle, 'interrupted', False) else
                                     'spoken' if event.output_seen else 'unconfirmed')

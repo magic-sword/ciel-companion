@@ -104,7 +104,7 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_expiry_drops_speech_but_keeps_immediate_expression(self):
         self.session.user_state = 'speaking'
-        event = self.emit(expression='teary')
+        event = self.emit('touch', 'touch.pull', expression='teary')
         self.now += 6
         await self.until(lambda: event.status == 'expired')
         self.assertEqual(len(self.outputs), 1)
@@ -151,12 +151,41 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_expiry_interrupts_generation_without_marking_spoken(self):
         self.session.complete = False
-        envelope = self.hub.envelope('game', 'game.damage', {})
+        envelope = self.hub.envelope('comment', 'comment.received', {})
         envelope['ttl_ms'] = 60
-        event = self.hub.receive('game', envelope, why='game')
+        event = self.hub.receive('comment', envelope, why='comment')
         await self.until(lambda: event.status == 'expired')
         self.assertTrue(event.handle.interrupted)
         self.assertFalse(self.hub.allowed(event.handle.id))
+
+    async def test_game_and_work_wait_and_finish_without_notification_deadline(self):
+        for source, kind in [('game', 'game.damage'), ('game', 'game.notice'), ('work', 'work.result')]:
+            self.session.user_state = 'speaking'
+            self.session.complete = False
+            event = self.emit(source, kind, expression='teary')
+            self.now += 60
+            await asyncio.sleep(.06)
+            self.assertEqual(event.status, 'queued')
+            self.assertLess(self.hub.lease_until, self.now)
+            self.session.user_state = 'listening'
+            await self.until(lambda: event.handle is not None)
+            self.now += 120
+            self.assertTrue(self.hub.allowed(event.handle.id))
+            self.assertFalse(event.handle.interrupted)
+            event.output_seen = True
+            event.handle.done.set_result(None)
+            await self.until(lambda: event.status == 'spoken')
+
+    async def test_new_game_event_does_not_preempt_conversation_but_user_can(self):
+        self.session.complete = False
+        work = self.emit('work', 'work.result')
+        await self.until(lambda: work.handle is not None)
+        self.emit('game', 'game.damage')
+        self.assertEqual(work.status, 'generating')
+        self.assertFalse(work.handle.interrupted)
+        work.handle.interrupt(force=True)
+        self.assertFalse(self.hub.allowed(work.handle.id))
+        await self.until(lambda: work.status == 'cancelled')
 
     async def test_touch_context_does_not_duplicate_speech_and_cancel_is_not_spoken(self):
         self.session.user_state = 'speaking'

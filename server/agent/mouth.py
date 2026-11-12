@@ -80,7 +80,7 @@ class Mouth:
         if merge and kwargs.get('instructions'):
             previous = next((event for event in self.reactions.queue.values()
                              if event.key[0] == why and event.kind == kind and
-                             event.deadline > self.reactions.clock()), None)
+                             not event.expired(self.reactions.clock())), None)
             if previous:
                 kwargs = {**kwargs, 'instructions': previous.kwargs.get('instructions', '') + '\n' + kwargs['instructions']}
         envelope = self.reactions.envelope(why, kind, {'fact': kwargs.get('instructions', '')})
@@ -89,7 +89,7 @@ class Mouth:
 
     def waiting(self) -> dict[str, str]:
         pending = [event for event in self.reactions.queue.values()
-                   if event.deadline > self.reactions.clock() and event.key[0] in ('minutes', 'research', 'image', 'game', 'work')]
+                   if not event.expired(self.reactions.clock()) and event.key[0] in ('minutes', 'research', 'image', 'game', 'work')]
         speech_id = getattr(getattr(self.session, 'current_speech', None), 'id', None)
         result = {}
         for event in pending:
