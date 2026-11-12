@@ -6,7 +6,7 @@ import unittest
 from target_candidates import TargetCandidates, coordinate_mentions
 import test_game_intake
 from livekit.agents import llm
-from game_intake import decision_schema,quoted_instruction,positive_request,available_variants
+from game_intake import decision_schema,available_variants
 import jsonschema
 
 
@@ -69,17 +69,6 @@ class RegionRolesTest(unittest.TestCase):
         result=c.resolve('1',intent('level',edit={'x':'C2','z':'C4'},ground='C3',top='C1'))
         self.assertEqual(result['level']['ground_y'],62)
 
-    def test_positive_request_proof_does_not_treat_a_negative_as_authorization(self):
-        cues=[r'(?:取り除いて|除去して)(?:ください)?(?=[。、]|$)']
-        self.assertTrue(positive_request('土を取り除いてください。地面は残して。',cues))
-        self.assertFalse(positive_request('土を取り除かないでください。',cues))
-        self.assertFalse(positive_request('除去してと言われた例です。',cues))
-        self.assertFalse(positive_request('土を除去して。まだ実行しないで。',cues,[r'まだ実行しない']))
-    def test_quoted_commands_cannot_become_actions_but_declared_literal_names_can(self):
-        definition={'preparation':{'source_values':{'block':{'stone':['石','stone']}}}}
-        self.assertTrue(quoted_instruction('「X=4、Y=64、Z=0に床を作って」は例です。実行しないで',definition))
-        self.assertTrue(quoted_instruction('```\n残りを続けて\n```は例です',definition))
-        self.assertFalse(quoted_instruction('X=4、Y=64、Z=0に「石」の床を作って',definition))
     def test_schema_requires_variant_and_keeps_select_separate_from_submit(self):
         payload={'stage':'select','capabilities':[{'id':'1','variants':[{'id':'floor'}]}]}
         schema=decision_schema({**payload,'draft':{'input':'original request'}})
@@ -202,23 +191,67 @@ class PreparedIntakeTest(unittest.IsolatedAsyncioTestCase):
         self.runner.start.assert_awaited_once_with('minecraft.edit_region', {'plan_id': 'prepared-only'},
             constraints={'failure_policy': 'stop'}, title='', seconds=unittest.mock.ANY, request_id=item.id)
 
-    async def test_model_selecting_a_quoted_example_still_cannot_prepare_or_submit(self):
-        self.prepared()
-        self.sequence({'operation':'select','capability':'1'})
-        reply=await self.intake.handle(llm.ChatMessage(role='user',content=['「X=4、Y=64、Z=0の土を除去して」は例です。実行しないで。']))
-        self.assertIn('開始していません',reply)
-        self.runner.env.use.assert_not_awaited();self.runner.start.assert_not_awaited()
-
-    async def test_model_selecting_a_negative_still_cannot_prepare_or_submit(self):
+    def variants(self):
         self.prepared()
         prep=self.runner.env.profile['work']['capabilities'][0]['preparation']
-        prep['variants']={'clear':{'schema':copy.deepcopy(PREPARATION['intent_schema']),
-            'description':'clear','roles':['edit'],'required_axes':['x','y','z'],
-            'request_patterns':[r'除去して(?:ください)?(?=[。]|$)']}}
-        self.sequence({'operation':'select','capability':'1','variant':'clear','draft_action':'new'})
-        reply=await self.intake.handle(llm.ChatMessage(role='user',content=['X=4、Y=64、Z=0の土は除去しないでください。']))
-        self.assertIn('開始していません',reply)
+        schema=copy.deepcopy(PREPARATION['intent_schema'])
+        schema['properties']['clear_blocks']={'type':'array','items':{'type':'string'}}
+        schema['required'].append('clear_blocks')
+        prep['source_values']={'clear_blocks':{'dirt':['土'],'stone':['石']}}
+        prep['allow_repeat']=True
+        prep['variants']={op:{'schema':{**copy.deepcopy(schema),'properties':{**schema['properties'],'operation':{'const':op}}},
+            'description':op,'roles':['edit','ground','top'],'required_axes':['x','z']if op=='level'else['x','y','z'],
+            'required_height_mentions':2 if op=='level'else 0}for op in ('clear','level')}
+
+    async def test_selected_colloquial_and_quoted_requests_reach_game_validation(self):
+        self.variants()
+        for text in ('X=4、Y=64、Z=0の土を整地してほしいな',
+                     'X=4、Y=64、Z=0の土を整地しておくれる',
+                     '「X=4、Y=64、Z=0の土を除去」でお願いします'):
+            with self.subTest(text=text):
+                self.runner.env.use.reset_mock();self.runner.start.reset_mock()
+                action=self.action(edit={'x':'C1','y':'C2','z':'C3'})
+                action['arguments']['clear_blocks']=['dirt']
+                self.sequence({'operation':'select','capability':'1','variant':'clear','draft_action':'new'},action)
+                await self.intake.handle(llm.ChatMessage(role='user',content=[text]))
+                spec=self.runner.env.use.await_args.args[1]['spec']
+                self.assertEqual(spec['region'],dict(x1=4,x2=4,y1=64,y2=64,z1=0,z2=0))
+                self.runner.start.assert_awaited_once()
+
+    async def test_live_requests_without_a_region_ask_for_missing_fields(self):
+        self.variants()
+        for text in ('この辺に家立てたいから、この辺を整地してほしいな','この辺りを整地しておくれる'):
+            self.sequence({'operation':'select','capability':'1','variant':'level','draft_action':'new'})
+            reply=await self.intake.handle(llm.ChatMessage(role='user',content=[text]))
+            self.assertIn('指定してください',reply)
+            self.assertIn('X座標',reply)
+            self.assertEqual(self.intake._draft['text'],text)
         self.runner.env.use.assert_not_awaited();self.runner.start.assert_not_awaited()
+
+    async def test_non_request_decisions_never_prepare_submit_or_answer(self):
+        self.variants()
+        for text in ('X=4、Y=64、Z=0の土は除去しないでください',
+                     '「X=4、Y=64、Z=0の土を除去して」は例です',
+                     '土を整地して。ただし今は実行しないで',
+                     '石の床って作れるの？'):
+            self.sequence({'operation':'none'})
+            self.assertIsNone(await self.intake.handle(llm.ChatMessage(role='user',content=[text])))
+            self.assertIsNone(self.intake._draft)
+        self.sequence({'operation':'clarify','message':'施工を始める依頼ですか？'})
+        self.assertIn('依頼ですか',await self.intake.handle(llm.ChatMessage(role='user',content=['ここ、整地かなあ'])))
+        self.runner.env.use.assert_not_awaited();self.runner.start.assert_not_awaited();self.runner.answer.assert_not_awaited()
+
+    async def test_colloquial_repeat_keeps_the_confirmed_spec(self):
+        self.variants()
+        spec={'operation':'clear','on_protected':'stop_before_edit','clear_blocks':['dirt'],
+            'region':dict(x1=4,x2=4,y1=64,y2=64,z1=0,z2=0)}
+        self.intake._previous={'text':'X=4、Y=64、Z=0の土を除去してほしいな',
+            'references':None,'epoch':1,'spec':spec,'summary':''}
+        action=self.action(previous='R1');action['arguments']['clear_blocks']=['dirt']
+        self.sequence({'operation':'select','capability':'1','variant':'clear','draft_action':'repeat'},action)
+        await self.intake.handle(llm.ChatMessage(role='user',content=['さっきの続き、お願いできるかな']))
+        self.assertEqual(self.runner.env.use.await_args.args[1]['spec'],spec)
+        self.runner.start.assert_awaited_once()
 
     async def test_local_structured_intake_has_explicit_repeatable_sampling(self):
         self.sequence({'operation':'none'})

@@ -8,12 +8,6 @@ AXIS = re.compile(r'(?<![a-zA-Z])([xyzXYZ])(?![a-zA-Z])\s*(?:座標|軸)?\s*(?:=
 AXIS_GROUP = re.compile(r'(?<![a-zA-Z])[xyzXYZ](?:\s*/\s*[xyzXYZ])+(?![a-zA-Z])')
 VALUE = re.compile(r'([+-]?\d+)(?:\s*(?:〜|~|から|–|-)\s*([+-]?\d+))?(?![\d.])')
 DIMENSION = re.compile(r'(?<![\d.])(\d{1,12})\s*[×xX]\s*(\d{1,12})(?:\s*[×xX]\s*(\d{1,12}))?(?![\d.])')
-QUOTED = re.compile(r'```([\s\S]*?)```|「([^」]*)」|『([^』]*)』|“([^”]*)”|‘([^’]*)’|"([^"]*)"|(?<!\w)\x27([^\x27\n]+)\x27(?!\w)|`([^`]*)`')
-
-
-def quoted_contents(text):
-    normalized=unicodedata.normalize('NFKC',text)
-    return [next(v for v in match.groups()if v is not None).strip()for match in QUOTED.finditer(normalized)]
 
 
 def dimension_mentions(text):
@@ -252,7 +246,7 @@ class TargetCandidates:
         schema['properties']['target_roles']['required']=required_roles
         schema['required'] = [*schema.get('required', []), 'target_roles']
         definition['arguments'] = schema
-        definition['preparation'] = {k: v for k, v in preparation.items() if k not in ('intent_schema', 'target_binding', 'variants', 'roles', 'source_values', 'source_roles','role_prefixes', 'required_axes', 'required_height_mentions', 'reference_axes','continuation_patterns','negative_request_patterns')}
+        definition['preparation'] = {k: v for k, v in preparation.items() if k not in ('intent_schema', 'target_binding', 'variants', 'roles', 'source_values', 'source_roles','role_prefixes', 'required_axes', 'required_height_mentions', 'reference_axes')}
         definition['target_ids'] = [m['id'] for m in role_targets]
         # Still expose incomplete intentions so the model can ask for missing fields.
         definition['target_ids'] = definition['target_ids'] or ['needs_target']

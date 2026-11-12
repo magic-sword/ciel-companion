@@ -2,17 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameTasks, CAPABILITIES } from '../src/ciel/tasks.js';
 
-test('construction request proof accepts compound preservation and rejects negative examples', () => {
-  const preparation=CAPABILITIES.find(c=>c.name==='minecraft.edit_region').preparation;
-  const matches=text=>preparation.variants.clear.request_patterns.some(p=>new RegExp(p).test(text));
-  assert.equal(matches('土を全部除去し、Y=63の地面は残してください。'),true);
-  assert.equal(matches('土を全部除いて平らにして。地面は残してね。'),true);
-  assert.equal(matches('平らにしないでください。'),false);
-  assert.equal(matches('土を取り除かないでください。'),false);
-  assert.equal(matches('土を除去しないでください。'),false);
-  assert.equal(matches('土を除去してと言われた例です。'),false);
-});
-
 const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.obtain_item',
   arguments: { item: 'stone_pickaxe', quantity: 1, quantity_mode: 'inventory_target' },
   budget_ms: 10000, constraints: { resource_scope: 'search', failure_policy: 'ask' }, ...extra });

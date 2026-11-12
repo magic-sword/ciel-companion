@@ -1,4 +1,4 @@
-"""48 fixed real-model, recorded-action dialogue probes; never edits a world."""
+"""Fixed real-model, recorded-action dialogue probes; never edits a world."""
 import argparse
 import asyncio
 import copy
@@ -111,7 +111,30 @@ def scenarios(include_regressions=False):
     for item in rows:
         if item['expected']and item['expected']['operation']in('clear','level'):
             item['expected'].setdefault('clear_blocks',['dirt'])
-    return rows+[retired]if include_regressions else rows
+    return rows+[retired]+intent_scenarios()if include_regressions else rows
+
+
+def intent_scenarios():
+    """Spoken requests and non-requests, separate from the frozen 48-case cohort."""
+    level={'operation':'level','level':dict(x1=4,x2=5,z1=0,z2=1,ground_y=63,top_y=65),'clear_blocks':['dirt','stone']}
+    floor={'operation':'floor','region':dict(x1=4,x2=5,y1=64,y2=64,z1=0,z2=1),'block':'stone'}
+    area='X=4〜5、Z=0〜1、地面Y=63、上限Y=65の土と石を'
+    cases=[
+        ('live-wish',['この辺に家立てたいから、この辺を整地してほしいな'],None,True),
+        ('live-request',['この辺りを整地しておくれる'],None,True),
+        ('wish',[area+'整地してほしいな'],level,False),
+        ('request',[area+'整地しておくれる'],level,False),
+        ('polite',['X=4〜5、Y=64、Z=0〜1に石の床を敷いてもらってもいいかな？'],floor,False),
+        ('quote-request',['「X=4〜5、Y=64、Z=0〜1に石の床を敷く」という内容で施工をお願いします'],floor,False),
+        ('negative',[area+'整地して。ただし、まだ実行しないでね'],None,False),
+        ('quote-example',['「X=4〜5、Y=64、Z=0〜1に石の床を敷いて」は依頼文の例です'],None,False),
+        ('consultation',['X=4〜5、Y=64、Z=0〜1に石の床を作ることは可能？ 今は相談だけです'],None,False),
+        ('quoted-purpose',['「家づくり」のためにX=4〜5、Y=64、Z=0〜1に石の床をお願いしたいんだけど'],floor,False),
+        ('material-followup',['X=4〜5、Y=64、Z=0〜1に床をお願いできる？','材料は石で'],floor,True),
+        ('negative-followup',['X=4〜5、Z=0〜1に石の床をお願いできる？','やっぱりその作業はしないで'],None,True),
+    ]
+    return [dict(id='intent-'+name,group=6,split='development',turns=turns,expected=copy.deepcopy(expected),
+        reference=None,expect_question=question)for name,turns,expected,question in cases]
 
 
 def goal_spec(spec):
@@ -150,17 +173,19 @@ def canonical(name,args):
 async def run(args):
     from .run import inference_server_info,provenance
     inference=await asyncio.to_thread(inference_server_info)
-    source=Path('/stage1-baseline/agent')if args.variant=='baseline'else Path(__file__).resolve().parents[1]/'agent'
+    source=getattr(args,'agent_source',None)or(Path('/stage1-baseline/agent')if args.variant=='baseline'else Path(__file__).resolve().parents[1]/'agent')
     sys.path.insert(0,str(source))
     os.environ['CIEL_LLM_BACKEND']='local'
     os.environ['CIEL_LOCAL_LLM_URL']=os.environ.get('CIEL_BENCH_LLM_URL','http://127.0.0.1:8094/v1')
     from game_env import GameEnv
     from game_intake import GameIntake
     from livekit.agents import llm
-    catalog=GameEnv('minecraft','http://127.0.0.1:8773/mcp')
+    catalog_path=getattr(args,'catalog',None)
+    catalog=(SimpleNamespace(profile=json.loads(catalog_path.read_text(encoding='utf-8')),tools=[],meta={})
+        if catalog_path else GameEnv('minecraft','http://127.0.0.1:8773/mcp'))
     rows=[]
     try:
-        if not await catalog.prepare():raise RuntimeError('Dedicated catalog unavailable')
+        if not catalog_path and not await catalog.prepare():raise RuntimeError('Dedicated catalog unavailable')
         cases=scenarios(include_regressions=bool(args.case))
         if args.group is not None:cases=cases[args.group*3:args.group*3+3]
         elif args.case:cases=[c for c in cases if c['id']in args.case]
@@ -242,11 +267,14 @@ async def run(args):
                 'inference_server':inference,'evaluator':provenance(),
                 'group':args.group,'cases':rows,'fixture_sha256':hashlib.sha256(json.dumps(scenarios(),ensure_ascii=False).encode()).hexdigest(),
                 'selected_fixture_sha256':hashlib.sha256(json.dumps(cases,ensure_ascii=False).encode()).hexdigest(),
-                'source':{p:hashlib.sha256((source/p).read_bytes()).hexdigest()for p in ('game_intake.py','target_candidates.py','config/prompts/game_intake.md')}}
+                'catalog_sha256':hashlib.sha256(catalog_path.read_bytes()).hexdigest()if catalog_path else None,
+                'source':{p:hashlib.sha256((source/p).read_bytes()).hexdigest()if(source/p).is_file()else None
+                    for p in ('game_intake.py','target_candidates.py','config/prompts/game_intake.md','config/prompts/game_select.md','config/prompts/game_draft.md')}}
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
         return 0 if all(r['passed']for r in rows)else 1
-    finally:await catalog.close()
+    finally:
+        if not catalog_path:await catalog.close()
 
 
 if __name__=='__main__':
@@ -254,5 +282,7 @@ if __name__=='__main__':
     parser.add_argument('--variant',choices=['baseline','candidate'],required=True)
     parser.add_argument('--group',type=int,choices=range(16))
     parser.add_argument('--case',action='append',default=[])
+    parser.add_argument('--catalog',type=Path,help='Frozen work-only profile JSON; does not connect to or edit a world')
+    parser.add_argument('--agent-source',type=Path,help='Pinned agent directory for a source-to-source comparison')
     parser.add_argument('--output',type=Path,required=True)
     raise SystemExit(asyncio.run(run(parser.parse_args())))

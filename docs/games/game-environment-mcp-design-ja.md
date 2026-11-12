@@ -47,7 +47,7 @@ workは依頼と結果、bodyは低水準の実行・停止と所有権を表す
 - 草案はrequest_id・revision・話者・接続世代・期限・不足項目を持つ。補足の返答、訂正、取消、失効を扱い、同一依頼を通常会話側から再実行しない。確認内容の数値と寸法はサービスの正規化結果を使う。本文の自然な表現はLLMが担当しても、仕様の数値を変更しない。
 - 準備が必要な能力は、版付き任意メタデータ`preparation.version=1`に`tool`、`intent_schema`、候補のbinding、結果IDからwork.argumentsへの対応を宣言する設計とする。Minecraftはprepareツール名`minecraft_prepare_region`と、返却plan_id→work.arguments.plan_idを宣言する。未対応の準備版はその能力を利用不可とし、準備なしの直接実行へ戻さない。
 - 能力選択・引数生成後、基盤が宣言に従ってprepareを呼び、readyなら残り予算とともにworkへ送る。prepareとsubmitの間に追加LLM判断を必須にしない。needs_clarificationなら草案へ不足点を返し、refusedなら理由を報告する。対象を読むだけの準備でも所有権・入力schema・予算を検証する。
-- `source_values`・`source_roles`で発言中の材質と保存指定を制約する。variantの`request_patterns`、準備定義の`continuation_patterns`・`negative_request_patterns`で肯定依頼・再開・実行否定の根拠を照合する。動詞はゲームが宣言し、共通ホストへMinecraftの単語表を置かない。引用命令は施工へ渡さず、停止はこの肯定依頼検査の対象外とする。
+- `source_values`・`source_roles`で発言中の材質と保存指定を制約する。variantは意味・仕様・必須項目を宣言する。実行依頼・再開・相談・否定・引用例の区別は選択段階のLLMが文脈から行い、語尾や引用符の一致検査はしない。範囲・材質の不足は草案で確認し、出典・対象・引数・権限・期限はコードで検証する。明示停止は推論を待たず処理する。
 - 利用者向けの能力候補は施工目的を一つとして公開し、prepareを別の作業候補に数えない。prepareは基盤が宣言から呼ぶMCP入口として扱い、実行側のplan_idは準備結果から基盤が結ぶ。LLMに新しいIDの転記をさせない。
 - 通常の`load_capabilities`/`execute_capability`とゲーム受付の両方が同じ準備契約を使う。モデルがplan_idや数値を捏造して迂回できないよう、最終検証はサービスでも行う。
 

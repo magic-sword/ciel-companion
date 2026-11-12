@@ -9,7 +9,7 @@ import uuid
 import debug_log
 import models
 import jsonschema
-from target_candidates import TargetCandidates,quoted_contents
+from target_candidates import TargetCandidates
 
 STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*(?:(?:その場で待ってください|こちらが頼むまで再開しないでください)[。\s、]*)*$')
 
@@ -39,25 +39,14 @@ def decision_schema(payload):
     else:
         definition=payload['capability']
         if payload.get('confirmed_request'):
-            # This path is reached only after game-declared intent proof and
-            # missing-field checks. Geometry conflicts belong to preparation.
+            # Selection has established the request's meaning and required
+            # source fields are present. Geometry belongs to preparation.
             alternatives=[]
         properties={'operation':{'const':payload['required_operation']},'arguments':definition['arguments']}
         if definition['kind']=='work':
             properties.update(constraints=definition['constraints'],title={'type':'string'},seconds={'type':'integer','minimum':1,'maximum':120})
         alternatives.append(obj(properties))
     return {'anyOf':alternatives}
-
-
-def quoted_instruction(text,definition=None):
-    values=(definition or{}).get('preparation',{}).get('source_values',{})
-    literals={alias.casefold()for choices in values.values()for aliases in choices.values()for alias in aliases}
-    return any(value and value.casefold()not in literals for value in quoted_contents(text))
-
-
-def positive_request(text,patterns,denials=()):
-    return (isinstance(patterns,list)and bool(patterns)and not any(re.search(p,text,re.I)for p in denials)
-            and any(re.search(p,text,re.I)for p in patterns))
 
 
 def available_variants(definition,mentions,source_roles=None):
@@ -296,9 +285,6 @@ class GameIntake:
                 if not isinstance(selected, str) or selected not in definitions:
                     raise ValueError('Unknown capability')
                 definition = definitions[selected]
-                if quoted_instruction(text,definition):
-                    self._draft=None
-                    return '引用文として受け取りました。作業は開始していません。'
                 source = draft if action.get('draft_action') == 'continue' else self._previous if action.get('draft_action') == 'repeat' else None
                 if action.get('draft_action') in ('continue', 'repeat'):
                     if not source or source['epoch'] != epoch:
@@ -319,12 +305,6 @@ class GameIntake:
                     variant = variants.get(action.get('variant'))
                     if variant is None:
                         return '施工の種類を確認できませんでした。'
-                    preparation=definition['preparation']
-                    patterns=preparation.get('continuation_patterns')if action.get('draft_action')=='repeat'else variant.get('request_patterns')
-                    if patterns is None:
-                        return '依頼の確認方式に対応していません。ゲーム側の更新が必要です。'
-                    if not positive_request(text,patterns,preparation.get('negative_request_patterns',[])):
-                        return '作業は開始していません。'
                     confirmed_request = True
                     narrowed = copy.deepcopy(definitions)
                     narrowed[selected]['preparation'].update(intent_schema=variant['schema'], roles=variant['roles'],
@@ -363,9 +343,6 @@ class GameIntake:
         if op == 'none':
             self._draft = None
             return None
-        if op == 'answer'and quoted_instruction(text):
-            self._draft=None
-            return '引用文として受け取りました。作業は開始していません。'
         if op == 'clarify':
             question = str(action.get('message') or 'どの作業をするか教えてください。')[:200]
             self._draft = {'text': text, 'references': copy.deepcopy(references), 'epoch': epoch,

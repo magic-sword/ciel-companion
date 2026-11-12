@@ -27,17 +27,6 @@ export const CAPABILITIES = [{
       on_protected:{const:'stop_before_edit'}}},target_binding:{kind:'region_roles'}},
 }];
 const regionPreparation=CAPABILITIES[1].preparation;
-const requestEnd=String.raw`(?:ください|下さい|ほしい(?:です)?|欲しい(?:です)?|くれる|くれますか|もらえる|もらえますか|もらいたい(?:です)?|いただけますか)?(?:ね|よ)?(?=[。！？!?.\n、,;；]|$)`;
-const removalRequest=String.raw`(?:取り除いて|除いて|除去して|整地して|平らにして|空気にして|掘って|取って|片付けて|片づけて|除去をお願い(?:します)?|整地をお願い(?:します)?)`;
-const compoundRemoval=String.raw`(?:取り除き|除去し|整地し)[、,][^。！？!?\n]*(?:残して|保護して|維持して)`;
-const requestForms={clear:removalRequest,level:removalRequest,
-  floor:String.raw`(?:敷いて|敷設して|作って|作ろう|作りましょう|設置して|置いて|床をお願い(?:します)?)`,
-  wall:String.raw`(?:建てて|建てよう|建てましょう|建築して|作って|作ろう|作りましょう|設置して|壁をお願い(?:します)?)`,
-  backfill:String.raw`(?:埋めて|埋めよう|埋め戻して|埋め戻そう|埋め戻しましょう|埋め戻しをお願い(?:します)?)`};
-regionPreparation.continuation_patterns=[String.raw`(?:続けて|再開して|再開|続行|残りをお願い(?:します)?|続きをお願い(?:します)?)`+requestEnd];
-regionPreparation.negative_request_patterns=[
-  String.raw`(?:まだ|今は|今回は)(?:実行|開始|着手|施工|作業|操作)(?:は|を)?(?:しない|不要|禁止)`,
-  String.raw`(?:^|[。！？!?\n、,])\s*(?:(?:ただし|でも)[、,]?)?\s*(?:(?:これ|それ|この依頼|この作業)(?:は|を)?)?\s*(?:実行|開始|着手|施工|作業|操作)(?:は|を)?(?:しない|するな|不要|禁止)`];
 regionPreparation.source_roles={preserve:['残す','残し','残せ','残さ','残る','保存','保護','維持','そのまま','触ら','壊さ','keep','preserve','protect']};
 regionPreparation.role_prefixes={ground:['地面','残す地面','ground'],top:['上限','除去上限','top']};
 const materialAliases={dirt:['土','dirt'],grass_block:['草ブロック','grass_block'],stone:['石','stone'],
@@ -47,7 +36,7 @@ regionPreparation.source_values=Object.fromEntries(['block','clear_blocks'].map(
 regionPreparation.variants=Object.fromEntries(Object.entries({clear:'指定範囲の材質を取り除く',level:'残す地面の高さと上限から整地する',
   floor:'水平な床を敷く',wall:'垂直な壁を建てる',backfill:'穴の空気だけを埋め戻す'}).map(([operation,description])=>{
     const build=['floor','wall','backfill'].includes(operation),properties=regionPreparation.intent_schema.properties;
-    return [operation,{description,request_patterns:[requestForms[operation]+requestEnd,...(['clear','level'].includes(operation)?[compoundRemoval+requestEnd]:[])],schema:{type:'object',additionalProperties:false,
+    return [operation,{description,schema:{type:'object',additionalProperties:false,
       required:['operation','on_protected',build?'block':'clear_blocks'],properties:{operation:{const:operation},
         on_protected:properties.on_protected,...(build?{block:properties.block}:{clear_blocks:properties.clear_blocks})}},
       roles:operation==='level'?['edit','reference','preserve','ground','top','dimensions']:['edit','reference','preserve','dimensions'],
