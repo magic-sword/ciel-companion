@@ -5,7 +5,7 @@
   "fork_branch": "ciel",
   "fork_commit": "63014c0bd487b1df0829a94554e29fe3c7ef21a8",
   "license": "MIT",
-  "scope": "Upstream src, profiles, templates, settings and package metadata. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
+  "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
     "src/agent/action_manager.js",
     "src/agent/agent.js",
@@ -424,6 +424,14 @@
     "src/utils/translator.js": {
       "sha256": "234e5116029eb785517f151b64b3675fe37cd9bf810ed5f876dab197205d7eec",
       "upstream_sha256": "234e5116029eb785517f151b64b3675fe37cd9bf810ed5f876dab197205d7eec"
+    },
+    "tasks/basic/single_agent.json": {
+      "sha256": "2e0909c89e734fc94886379089fc34f365431a2834b5118b7baf5e1255786693",
+      "upstream_sha256": "2e0909c89e734fc94886379089fc34f365431a2834b5118b7baf5e1255786693"
+    },
+    "tasks/single_agent/crafting_train.json": {
+      "sha256": "d0620432876846c57fbb2f832ab607b09f791a4cc678f079787ea439ab68a44d",
+      "upstream_sha256": "d0620432876846c57fbb2f832ab607b09f791a4cc678f079787ea439ab68a44d"
     }
   }
 }
