@@ -46,6 +46,7 @@ export function profile() {
     route_words: ROUTE_WORDS,
     speech_vocabulary: JSON.parse(readFileSync(new URL('./speech-vocabulary.json', import.meta.url), 'utf8')),
     link_tool: 'minecraft_link', stop_tool: 'minecraft_stop_moving',
+    inference: { version: 1, bind_tool: 'minecraft_bind_core' },
     work: { version: TASK_VERSION, submit: 'minecraft_task_submit', status: 'minecraft_task_status',
       answer: 'minecraft_task_answer', cancel: 'minecraft_task_cancel', capabilities: CAPABILITIES },
     talker_examples: ROUTES.talker ?? [],
@@ -68,6 +69,19 @@ export function makeServer(hub, sessionId) {
   };
 
   // ---- 受け持つ ----
+  server.registerTool('minecraft_bind_core', {
+    description: 'Host-only: bind the owning conversation to CIEL inference.',
+    inputSchema: { url: z.string(), token: z.string().min(32) },
+    _meta: { 'ciel/role': 'link' },
+  }, async ({url, token}) => {
+    const l = mine();
+    if (!l) return json({status:'unavailable'});
+    const endpoint = new URL(url);
+    if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || endpoint.username || endpoint.password)
+      return json({status:'invalid_endpoint'});
+    l.bindCore(url, token);
+    return json({status:'ready'});
+  });
   server.registerTool('minecraft_link', {
     description: '体を受け持つ（on=true）・離す（on=false）。会話サーバーが、アプリの設定に合わせて呼ぶ（心には渡さない）',
     inputSchema: { on: z.boolean() },

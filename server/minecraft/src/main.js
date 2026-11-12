@@ -102,6 +102,7 @@ const hub = makeHub({
   owner: OWNER,
   isBusy: () => link !== null && link !== hub.link,   // WebSocket の会話が使っている
   onClaim: (l) => {
+    l.bindCore = (url, token) => runner.bindCore(url, token);
     link = l;
     l.bodyScope = randomUUID();
     l.prepareRegion = r => regionPlans.prepare(bot, r, l.bodyScope);
@@ -109,6 +110,7 @@ const hub = makeHub({
     send('hello', { username: MC.username, version: MC.version, owner: OWNER, state: state() });
   },
   onRelease: (l) => {
+    void runner.unbindCore();
     regionPlans.clear(l.bodyScope);
     runner.stop('unlinked');   // 会話を切ったら、その場で待つ（ログアウトしない）
     if (link === l) link = null;

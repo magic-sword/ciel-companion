@@ -708,6 +708,11 @@ async def entrypoint(ctx: JobContext) -> None:
                                eyes=seeing, self_image=agent.persona.self_image)
         agent.mind.goals = goal_runner
         if body is not None:
+            from core_host import CoreHost
+            core_host = CoreHost(agent, book)
+            body.core_endpoint = await core_host.start()
+            ctx.add_shutdown_callback(core_host.close)
+        if body is not None:
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
             agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions,

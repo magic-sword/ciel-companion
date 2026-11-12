@@ -348,6 +348,14 @@ class GameEnv:
             if session is not self._session or (self._stop_event is not None and self._stop_event.is_set()):
                 return
         self.linked = status == 'linked'
+        bind_tool = self.profile.get('inference', {}).get('bind_tool')
+        if self.linked and bind_tool and getattr(self, 'core_endpoint', None):
+            core_url, core_token = self.core_endpoint
+            bound = await self._call(bind_tool, {'url': core_url, 'token': core_token})
+            if bound.get('status') != 'ready':
+                await self._call(self.profile.get('link_tool') or f'{self.game}_link', {'on': False})
+                self.linked = False
+                status = 'unavailable'
         self.reason = '' if self.linked else ('busy' if status == 'busy' else 'off' if not on else 'connecting')
         if self.linked:
             log.info('ゲーム（%s）の体を受け持った', self.game)
@@ -399,7 +407,8 @@ class GameEnv:
             return {'status': 'unavailable'}
         session = self._session
         call_id = uuid.uuid4().hex
-        debug_log.record('game_call', id=call_id, name=name, arguments=args)
+        debug_log.record('game_call', id=call_id, name=name,
+                         arguments={k: ('[redacted]' if k == 'token' else v) for k,v in args.items()})
         try:
             r = await self._session.call_tool(name, args, read_timeout_seconds=timedelta(seconds=timeout))
         except Exception as e:

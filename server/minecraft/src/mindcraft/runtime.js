@@ -5,11 +5,12 @@ import { BodyCommands } from '../body-command.js';
 import { executeRegion } from '../spatial.js';
 import { protectWorld } from './protection.js';
 import { ActionScope } from './action-scope.js';
+import { CielModel } from './ciel-model.js';
+import { pursueItem } from './brain.js';
 import { setSettings } from '../vendor/mindcraft/src/agent/settings.js';
 import { initBot } from '../vendor/mindcraft/src/utils/mcdata.js';
 import { ActionManager } from '../vendor/mindcraft/src/agent/action_manager.js';
 import { initModes } from '../vendor/mindcraft/src/agent/modes.js';
-import { ItemGoal } from '../vendor/mindcraft/src/agent/npc/item_goal.js';
 import * as skills from '../vendor/mindcraft/src/agent/library/skills.js';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -27,6 +28,8 @@ export function createMindcraftBot(options) {
 }
 
 export class MindcraftRunner extends BodyCommands {
+  bindCore(url, token) { this.coreModel = new CielModel(null, url, {token}); }
+  async unbindCore() { const model=this.coreModel; this.coreModel=null; await model?.cancel(); }
   constructor(report, owner) {
     super({ report, available: () => Boolean(this.bot?.entity), run: c => this.execute(c),
       halt: () => this.halt() });
@@ -111,6 +114,7 @@ export class MindcraftRunner extends BodyCommands {
   }
 
   async halt() {
+    await this.coreModel?.cancel();
     this.agent?.actions.cancelResume();
     this.interrupt();
     await this.agent?.actions.stop();
@@ -152,7 +156,6 @@ export class MindcraftRunner extends BodyCommands {
     const bot = this.bot, { item, count, resource_scope } = c.args;
     const before = inventory(bot), target = (before[item] ?? 0) + count;
     const origin = bot.entity.position.clone();
-    const goal = new ItemGoal(this.agent);
     this.agent.resource_scope = resource_scope;
     let failures = 0;
     // Recheck after return: scaffold consumption must not be reported as delivered materials.
@@ -164,7 +167,10 @@ export class MindcraftRunner extends BodyCommands {
         if ((inventory(bot)[item] ?? 0) >= target)
           return { gained: { [item]: inventory(bot)[item] - (before[item] ?? 0) }, returned: true };
       }
-      const progressed = await goal.executeNext(item, Math.max(1, target - (inventory(bot)[item] ?? 0)));
+      if (!this.coreModel) throw new Failed('core_unavailable');
+      const beforeCount=inventory(bot)[item] ?? 0;
+      await pursueItem(this,c,target);
+      const progressed=(inventory(bot)[item] ?? 0)>beforeCount;
       await this.waitModes();
       if (c.token.cancelled) break;
       failures = progressed ? 0 : failures + 1;
