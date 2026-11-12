@@ -8,6 +8,12 @@ from server.benchmark import topic_ablation_review as r,weight_space as w
 
 
 class ReviewTests(unittest.TestCase):
+    def test_literal_signal_does_not_confuse_marker_removal_with_no_copy(self):
+        for previous in ('準備はいいですか？','準備はいいですか。','（シエルから利用者への過去の質問）準備はいいですか？'):
+            history=[dict(content=previous),dict(content='latest')]
+            self.assertTrue(r.literal_question_reuse(history,'準備はいいですか？'))
+            self.assertFalse(r.literal_question_reuse(history,'着手できる状態でしょうか？'))
+
     def test_binding_missing_and_deduplication(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);report=root/'report.json';out=root/'review'
