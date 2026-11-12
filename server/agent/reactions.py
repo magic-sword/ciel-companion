@@ -16,7 +16,7 @@ log = logging.getLogger('ciel-agent.reactions')
 
 POLICY = {  # trusted source -> kind -> (priority, maximum lifetime)
     'touch': {'touch.pull': (90, 5), 'touch.contact': (30, 5)},
-    'game': {'game.damage': (90, 5), 'game.notice': (40, 30)},
+    'game': {'game.damage': (90, 5), 'game.died': (90, 5), 'game.notice': (40, 30)},
     'work': {'work.result': (50, 30)},
     'comment': {'comment.received': (10, 30)},
     'song': {'song.change': (10, 3)},
@@ -141,7 +141,8 @@ class Reactions:
                 from conversation import Conversation
                 history = self.mouth.session.userdata.history = Conversation()
             history.event(source=source, event_id=f'{epoch}:{identifier}', occurred_at=at,
-                          kind=kind, fact=envelope['payload'].get('fact', ''))
+                          kind=kind, fact=envelope['payload'].get('fact', ''),
+                          subject=envelope['payload'].get('subject'), observation=envelope['payload'].get('observation'))
             # Facts are durable conversation events; generation is only a wake-up.
             event.kwargs.pop('instructions', None)
         if expression:

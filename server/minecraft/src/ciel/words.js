@@ -175,6 +175,18 @@ export function fingerprint(s) {
 // 体の出来事を、シエルへの知らせにする。言わないものは null（様子に入るだけ）。
 // urgency：urgent（すぐの切れ目で短く）・normal（相手がだまったら）。key は間引きの鍵。memorable は日記に残す一文
 export function eventFor(m, owner) {
+  const event = bodyEventFor(m, owner);
+  if (!event) return null;
+  const isOwner = m.kind === 'owner_died';
+  event.subject = { role: isOwner ? 'owner' : 'self', name: isOwner ? (owner ?? '持ち主') : 'シエル', body: 'minecraft' };
+  event.observation = { kind: m.kind };
+  if (m.kind === 'hurt') Object.assign(event.observation, { damage: m.amount ?? 0, health_after: m.health ?? 0 });
+  if (m.kind === 'flee') Object.assign(event.observation, { from: m.from, health_after: m.health });
+  if (m.kind === 'defeated') event.observation.target_name = m.name;
+  return event;
+}
+
+function bodyEventFor(m, owner) {
   switch (m.kind) {
     case 'died':
       return { kind: 'died', urgency: 'urgent', key: 'died', memorable: 'マイクラで倒れた',
@@ -186,7 +198,7 @@ export function eventFor(m, owner) {
     case 'hurt': {
       const amount = m.amount ?? 0, health = m.health ?? 0;
       if (amount >= BIG_HURT || (health <= LOW_HEALTH && amount > 0)) {
-        return { kind: 'hurt', urgency: 'urgent', key: 'hurt', say: `[マイクラ：${amount} のダメージを受けた（体力 ${health}/20）]` };
+        return { kind: 'hurt', urgency: 'urgent', key: 'hurt', say: `[マイクラ：シエル自身の体が ${amount} のダメージを受けた（体力 ${health}/20）]` };
       }
       return null;
     }

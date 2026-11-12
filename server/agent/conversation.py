@@ -64,7 +64,8 @@ class Conversation:
             self._chars += len(turn.text)
             self._trim()
 
-    def event(self, *, source: str, event_id: str, occurred_at: float, kind: str, fact: str) -> Turn:
+    def event(self, *, source: str, event_id: str, occurred_at: float, kind: str, fact: str,
+              subject: dict | None = None, observation: dict | None = None) -> Turn:
         """Accepted service facts share the conversation timeline, independently of speech completion."""
         identity = f'{source}:{event_id}'
         previous = next((t for t in reversed(self.turns) if t.role == 'event' and t.source_id == identity), None)
@@ -73,7 +74,8 @@ class Conversation:
         turn = self.reserve(at=occurred_at, role='event')
         turn.source_id = identity
         self.complete(turn, json.dumps(dict(source=source, event_id=event_id,
-            occurred_at=occurred_at, kind=kind, fact=fact), ensure_ascii=False), label=source)
+            occurred_at=occurred_at, kind=kind, fact=fact,
+            **({'subject': subject, 'observation': observation} if subject is not None else {})), ensure_ascii=False), label=source)
         return turn
 
     def _trim(self) -> None:

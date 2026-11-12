@@ -136,6 +136,11 @@ test('言葉：出来事の選び方と、技の終わり', () => {
   assert.equal(eventFor({ kind: 'hurt', amount: 5, health: 12 }).urgency, 'urgent');
   assert.equal(eventFor({ kind: 'defeated', name: 'zombie' }).memorable, 'マイクラで zombie を倒した');
   assert.equal(eventFor({ kind: 'night' }), null);
+  const hurt = eventFor({ kind: 'hurt', amount: 5, health: 12 });
+  assert.deepEqual(hurt.subject, { role: 'self', name: 'シエル', body: 'minecraft' });
+  assert.deepEqual(hurt.observation, { kind: 'hurt', damage: 5, health_after: 12 });
+  assert.equal(eventFor({kind:'died'}).subject.role, 'self');
+  assert.equal(eventFor({kind:'owner_died'}, 'Hakase').subject.role, 'owner');
   const stopped = doneFor({ ok: false, reason: 'stopped' }, '持ち主についていく');
   assert.equal(stopped.say, undefined);
   assert.equal(stopped.card_note, 'やめた');

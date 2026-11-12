@@ -73,6 +73,12 @@ class EnvCase(unittest.IsolatedAsyncioTestCase):
 
 
 class PrepareTest(EnvCase):
+    async def test_body_notice_without_subject_is_rejected(self):
+        await self.link()
+        self.env._tell('hurt', '[被害]', 0, event={'input_v': 1, 'event_id': 'invalid',
+            'source_epoch': 'fake', 'seq': 99, 'occurred_at': __import__('time').time()})
+        self.assertFalse(self.said.calls)
+
     async def test_profile_tools_prompt_and_seeds_are_read(self):
         env = self.env
         self.assertEqual(env.label, 'テスト')

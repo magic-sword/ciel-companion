@@ -110,14 +110,18 @@ class Mouth:
     def react_latest(self, why, *, instructions, settle=0., merge=False, reaction_kind=None, reaction_event=None):
         source = 'work' if reaction_kind == 'work.result' else 'game'
         kind = ('work.result' if source == 'work' else
+                'game.died' if reaction_kind == 'died' else
                 'game.damage' if reaction_kind in ('hurt', 'died', 'flee') else 'game.notice')
-        envelope = self.reactions.envelope(source, kind, {'fact': instructions},
+        payload = {'fact': instructions}
+        if reaction_event and 'subject' in reaction_event:
+            payload.update(subject=reaction_event['subject'], observation=reaction_event['observation'])
+        envelope = self.reactions.envelope(source, kind, payload,
             event_id=reaction_event.get('event_id') if reaction_event else None)
         if reaction_event:
             envelope['occurred_at'] = reaction_event['occurred_at']
         event = self.reactions.receive(source, envelope, why=why,
             kwargs={'instructions': instructions}, settle=settle,
-            expression='teary' if kind == 'game.damage' else None)
+            expression='teary' if kind in ('game.damage', 'game.died') else None)
         if event is not None and reaction_kind == 'died' and self.reactions.emergency:
             self.reactions.emergency()
         return event

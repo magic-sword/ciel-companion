@@ -63,3 +63,21 @@ class EventHistoryTests(unittest.IsolatedAsyncioTestCase):
             text = '\n'.join(m.text_content or '' for m in brain.build(chat).items)
         self.assertEqual(text.count('作業完了'), 1)
         self.assertEqual(brain.handed, 'game')
+
+    async def test_subject_and_event_type_reach_model_context(self):
+        for role, kind in [('self','hurt'), ('self','died'), ('owner','owner_died')]:
+            subject = dict(role=role, name='シエル' if role == 'self' else '持ち主', body='minecraft')
+            event = self.mouth.react_latest('game', instructions='体の出来事', reaction_kind=kind,
+                reaction_event=dict(subject=subject, observation=dict(kind=kind), event_id=kind,
+                                    occurred_at=self.mouth.reactions.wall()))
+            record = json.loads(self.history.turns[-1].text)
+            self.assertEqual(record['subject'], subject)
+            self.assertEqual(record['observation']['kind'], kind)
+            if kind == 'died': self.assertEqual(event.kind, 'game.died')
+        chat = llm.ChatContext()
+        chat.add_message(role='system', content='固定指示')
+        messages = local_context(Mind(self.history).build(chat)).items
+        text = '\n'.join(json.loads(m.text_content.split('\n',1)[1])['text']
+                         for m in messages if (m.text_content or '').startswith('[内部補足'))
+        self.assertIn('"role": "self"', text)
+        self.assertIn('"role": "owner"', text)

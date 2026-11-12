@@ -116,6 +116,10 @@ class FakeGame:
         """出来事の知らせ（notifications/message、logger ciel.event）"""
         self.event_seq += 1
         import time
+        if event.get('kind') in ('hurt', 'died', 'owner_died', 'flee', 'defeated'):
+            event = {'subject': {'role': 'owner' if event['kind'] == 'owner_died' else 'self',
+                                 'name': '持ち主' if event['kind'] == 'owner_died' else 'シエル', 'body': 'test'},
+                     'observation': {'kind': event['kind']}, **event}
         event = {'input_v': 1, 'event_id': f'fake:{self.event_seq}', 'source_epoch': 'fake',
                  'seq': self.event_seq, 'occurred_at': time.time(), **event}
         await self.session.send_log_message(level='info', data=event, logger='ciel.event')

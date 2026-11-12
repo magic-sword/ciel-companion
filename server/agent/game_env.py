@@ -671,6 +671,16 @@ class GameEnv:
             debug_log.record('reaction_rejected', source='game', reason='unsupported_game_input')
             log.warning('ゲーム（%s）の通知形式が未対応。ゲーム側MCPをinput_v 1へ更新してください', self.game)
             return
+        if kind in ('hurt', 'died', 'owner_died', 'flee', 'defeated'):
+            subject, observation = event.get('subject'), event.get('observation')
+            expected_role = 'owner' if kind == 'owner_died' else 'self'
+            if (not isinstance(subject, dict) or subject.get('role') != expected_role
+                    or not isinstance(subject.get('name'), str) or not subject['name']
+                    or not isinstance(subject.get('body'), str) or not subject['body']
+                    or not isinstance(observation, dict) or observation.get('kind') != kind):
+                debug_log.record('reaction_rejected', source='game', reason='missing_or_invalid_subject')
+                log.warning('ゲーム（%s）の体感通知に主体情報がありません。ゲーム側MCPを更新してください', self.game)
+                return
         if not 1 <= len(event['event_id']) <= 160 or not 1 <= len(event['source_epoch']) <= 160:
             return
         seq, at = event.get('seq'), event.get('occurred_at')
