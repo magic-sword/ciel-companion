@@ -16,8 +16,11 @@ def main():
               if actual.get(name) != expected.get(name, {}).get('sha256')]
     if errors:
         raise SystemExit('Mindcraft vendor drift: ' + ', '.join(errors))
-    print(f"Mindcraft {manifest['commit']}: {len(actual)} files verified; "
-          f"{len(manifest['patched_files'])} explicit upstream patches")
+    for key in ('commit', 'fork', 'fork_commit'):
+        if not manifest.get(key):
+            raise SystemExit(f'Mindcraft provenance lacks {key}; rebuild with update-mindcraft-vendor.py')
+    print(f"Mindcraft {manifest['commit'][:12]} + fork {manifest['fork_commit'][:12]}: "
+          f"{len(actual)} files verified; {len(manifest['patched_files'])} patched upstream files")
 
 
 if __name__ == '__main__':

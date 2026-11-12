@@ -25,7 +25,7 @@ Java版MinecraftとMineflayerの体を別サービスとして動かす。`serve
 
 会話ホストは依頼意図と能力を選び、`minecraft.pursue_goal`へ元の自然文を渡す。上流Agent.handleMessageが標準プロンプト、実行履歴、観測、命令結果から判断・実行する。SelfPrompterとNPCも本物の上流クラスを使用する。CIEL独自の目標JSON・brain・材料計画・自動帰還は使用しない。失敗時は既存技へ代替せず、結果と未対応範囲を報告する。旧obtain_item・plan/step/repair・edit_regionと直接の採集・製作MCPツールは公開しない。
 
-統合のため、Agent.startの部品初期化をinitializeComponentsへ抽出し、Prompterにモデル注入、Agentに命令の観測フックを追加した。判断ループとプロンプト本文は上流のまま。standaloneのMindServer、公開ゲームチャット受付、独立TTS、vision、任意コード生成は起動しない。Bot接続と再接続、認証、明示停止、取消後のI/O遮断、アプリ通知はCIELが担当する。Paper/Mineflayerの衝突幅・製作同期の互換修正は残す。上流との差分はvendorのupstream.patchとprovenance.jsonで確認する。
+統合のため、Agent.startの部品初期化をinitializeComponentsへ抽出し、Prompterにモデル注入、Agentに命令の観測フックを追加した。判断ループとプロンプト本文は上流のまま。standaloneのMindServer、公開ゲームチャット受付、独立TTS、vision、任意コード生成は起動しない。Bot接続と再接続、認証、明示停止、取消後のI/O遮断、アプリ通知はCIELが担当する。Paper/Mineflayerの衝突幅・製作同期の互換修正は残す。上流との差分はforkの`ciel`ブランチのコミットとvendorのprovenance.jsonで確認する（取り込み手順は[第三者依存](../../project/third-party-dependencies.md)）。
 
 不足材料・未発見・道具不足等は制約に従って探索、判断待ち、中止へ進む。無期限探索をしない。失敗の説明と実際の停止確認を別に扱い、依頼の完了はゲームの実状態から報告する。停止後に遅い段や推論で再開しない。
 

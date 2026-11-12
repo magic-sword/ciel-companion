@@ -22,4 +22,3 @@ unity/Assets/Characters/Ciel/Ciel.asset filter=lfs diff=lfs merge=lfs -text
 *.sh text eol=lf
 # Pinned vendor digests and upstream diff context require exact source bytes.
 server/minecraft/src/vendor/mindcraft/** text eol=lf whitespace=-blank-at-eol
-server/minecraft/src/vendor/mindcraft/upstream.patch -text whitespace=cr-at-eol,-blank-at-eol

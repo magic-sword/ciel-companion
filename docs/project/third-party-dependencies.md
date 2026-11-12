@@ -1,10 +1,12 @@
 # 公開リポジトリと第三者依存関係
 
-Minecraft基盤としてMindcraftのコミット `e1c1fc3ffa481506c2445fc639e16dba504b5920`（https://github.com/mindcraft-bots/mindcraft、MIT、Copyright (c) 2024 Kolby Nottingham）を固定した。`server/minecraft/src/vendor/mindcraft/`に上流src全体・profiles・botsのテンプレート・settings・packageメタデータ・LICENSE全文を保持する。出典と原本／改変後SHA-256はprovenance.json、上流との差分はupstream.patchに記録し、`scripts/server/check-mindcraft-vendor.py`で検査する。Dockerのsrcコピーで許諾表示も同梱する。上流Agent・Prompter・History・SelfPrompter・NPCと身体実行を使用し、モデルにはCIELを注入する。上流クラウド接続・独立TTS・vision・任意コード生成は有効化しない。Agentの静的依存であるses 1.9.1、eslint 9.13.0、google-translate-api-x 10.7.1もCIEL側package-lock.jsonで固定する。ゲーム履歴の生成先botsはGit管理外とする。
+Minecraft基盤としてMindcraftのコミット `e1c1fc3ffa481506c2445fc639e16dba504b5920`（https://github.com/mindcraft-bots/mindcraft、MIT、Copyright (c) 2024 Kolby Nottingham）を固定した。CIELの改変はfork https://github.com/magic-sword/mindcraft の`ciel`ブランチに目的別のコミットとして積み、上流`develop`へrebaseして追従する。`server/minecraft/src/vendor/mindcraft/`はforkの`ciel-vendor`ブランチを`git subtree --squash`で取り込んだもので、上流src全体・profiles・botsのテンプレート・settings・packageメタデータ（`package.upstream.json`へ改名）・LICENSE全文を保持する。vendorを直接編集しない。出典・forkのコミット・原本／改変後SHA-256はprovenance.jsonに記録し、`scripts/server/check-mindcraft-vendor.py`で検査する。Dockerのsrcコピーで許諾表示も同梱する。上流Agent・Prompter・History・SelfPrompter・NPCと身体実行を使用し、モデルにはCIELを注入する。上流クラウド接続・独立TTS・vision・任意コード生成は有効化しない。Agentの静的依存であるses 1.9.1、eslint 9.13.0、google-translate-api-x 10.7.1もCIEL側package-lock.jsonで固定する。ゲーム履歴の生成先botsはGit管理外とする。
 
 > 責務：SDK・モデル・素材の依存と利用許諾、リポジトリへ含める範囲。
 
-vendorのテキストはLFに固定し、検証用hashとGitからの配布バイトを揃える。provenanceのnormalization_only_filesは改行だけが上流と異なるファイルを示す。upstream.patchは上流原本への適用検査を行い、末尾改行の有無も記録する。差分中の上流の空白は保持する。
+vendorのテキストはLFに固定し、検証用hashとGitからの配布バイトを揃える。provenanceのnormalization_only_filesは改行だけが上流と異なるファイル、patched_filesはforkの`ciel`で上流から変更したファイルを示す。改変の内容は`git log <commit>..ciel`でforkから確認する。
+
+Mindcraftの更新は、forkの手元cloneで`git fetch upstream`と`git rebase upstream/develop ciel`を行い、衝突をfork側で解決して`git push --force-with-lease origin ciel`する。その後、ciel-companionのきれいな作業ツリーで`python scripts/server/update-mindcraft-vendor.py --fork-dir <forkのclone>`を実行する。スクリプトが`ciel-vendor`を作成・pushし、subtreeの取り込みとvendor検査まで行う。新しい依存が増えた場合は`package.upstream.json`の差分を見てCIEL側package.jsonへ反映する。上流の更新は振る舞いの変更として、回帰テストとMinecraftベンチマークを新旧両版で比較する。上流へ出せる汎用の改変は上流PRにして、forkの差分を減らす。
 
 確認日: 2026-10-05。これは採用構成の記録であり、第三者の利用条件を置き換えるものではありません。
 
