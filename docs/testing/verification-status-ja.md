@@ -2,13 +2,17 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+2026-11-12 19:50 JSTの開発実会話で、同一返答のLLM受信SSEに4文の並びが77周期続く反復を確認した。約330秒・10,056文字の途中snapshotと実送信入力を保全。同じ入力の再送5回は全て短くstopで終了し、長いループは未再現。完了済み依頼を再提案する内的な考えからの自発発話と、生成上限の欠如を確認したが、発症の直接条件は未特定。今回の作業は調査・再送・記録のみで、予防修正や配布はしていない。[原因の切り分け・条件・証拠](weight-space-results-ja.md#実会話の推論トレースによる反復調査)。
+
 開発のローカル会話LLMに推論再現ログを反映した（2026-11-12）。HTTP送信body、SSE逐次出力、要求/発話/HTTP/TTSのID、model manifestとmode/propsを`agent/data/debug/traces/`へ保存する。unit806件成功、配布イメージ内の専用5テスト成功。実SDKから32token上限・fixture tool付きの要求を送り、messages/tools/上限/出力/DONE/ID対応/JSON書出し、実TTS合成と対応IDを確認した。音声再生・ゲーム操作は行っていない。health200・worker登録・再起動回数0。本番・共用Ciel・ワールドのID/image/起動時刻は不変。[条件と証拠](weight-space-results-ja.md#開発の推論再現ログ)。録音や音声認識・背景推論全体のリプレイではない。
 
 単一返答内の反復ベンチマークを追加し、途中終了でも重複量とSSEを保持する。感度テスト5件成功。現行Qwenで実ログ由来自発発話・話題切替・反復依頼対照を各1回測定し、全てstopで終了。対象2条件では今回の長い反復は再現せず、完全な実送信入力がない近似再構成の限界が残る。WSP比較の感度確立とは扱わない。[測定結果](weight-space-results-ja.md#単一返答の反復プローブ)。通常サービス・重みは変更していない。
 
 通常の開発接続を本番と同じCiel（8771）へ変更し、2026-11-12に反映した。開発agentは既存イメージのまま設定を再作成し、CIEL_DEBUG_LOG=1と書込可能なログvolume、worker登録、health 200、共有先のMCP profile 2/work 1を確認。旧Ciel_Devコンテナは停止した。本番各コンテナのID・image・起動時刻は不変。証拠は`~/work/ciel-companion-dev/server/data/deployments/shared-ciel-20261112-175822/`の設定退避・before/after/verification JSON。実音声による操作・新ログの内容確認は未実施。Ciel_Debugの明示起動経路は設定とwhitelistの2テストで確認し、今回は起動していない。通常の`--dev`と検証用`--dev --minecraft`の使い分けは[実行設定](../operations/local-runtime-ja.md)を参照する。
 
-ゲームprofileの`speech_vocabulary`をリンク中だけWhisperへ追加する機構をローカル実装。Minecraftの語彙21語をゲーム側へ置き、通常ヒントから分離した。unit801件・MCP読取等Node5件・能力結合が成功。配布・実音声の精度比較は未実施。[条件と未確認範囲](voice-results-ja.md#現在の判断)を参照する。
+ゲームprofileの`speech_vocabulary`をリンク中だけWhisperへ追加する機構と35語を、`30722b8`のソースで開発agent・共有Cielの体へ反映した。unit806件・Node5件・能力結合が成功。実MCPで35語を読み取り、配布済みSTTへ保存済み合成音声を入力し、模擬リンク状態で適用35語→解除0語と「石のシャベル」の認識を確認。実利用者のマイク・実会話内のリンク切替の確認は未実施。合成8文の比較で改善は確認できなかった。[条件と未確認範囲](voice-results-ja.md#minecraft語彙の同一音声比較)を参照する。
+
+開発imageは`47a128389c0d771553f97807b11c857d80e9f3b03520744c05d93163425929a4`、共有bodyは`5d066b73b82195071a0a095deb492929d63662e7b02ffef202eb7060b0f51449`。対象7ファイルのコンテナ内指紋をローカルソースと照合。開発worker登録・開発/本番health 200を確認。本番会話agent・ワールド等のID/image/開始時刻を維持した。本番会話側へ語彙連携を有効化した確認ではない。証拠は開発サーバー`server/data/deployments/game-vocabulary-30722b8-v2/verification.json`と`smoke.json`、ローカル`.local/vocabulary-deployment-output.txt`・`.local/vocabulary-smoke.txt`。推論再現ログのruntime manifestは`6243cfb18e1461ebf3ade5ef4fe36b8fd8b782162dbe296099544151b484513e`。
 
 追従中のwork受付を一律busyから切り替え可能へ修正し、2026-11-12 18:50 JSTに開発・本番が共用するCielへ反映した。関連28テストがローカルとサーバー側で通過。稼働ソース一致、Cielの再入場、MCP再接続、再起動回数0、体以外のコンテナ不変を確認した。実ゲーム内の追従から原木取得までの確認は未実施。[配布証拠と検証範囲](minecraft-results-ja.md#追従から作業への切り替え)。
 

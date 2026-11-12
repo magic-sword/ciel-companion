@@ -3,7 +3,7 @@ import argparse,base64,importlib.util,json,re,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 def main():
- p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--pull-only',action='store_true');p.add_argument('--reuse-audio');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--pull-only',action='store_true');p.add_argument('--reuse-audio');p.add_argument('--baseline-ref',default='HEAD');a=p.parse_args()
  if not re.fullmatch('[A-Za-z0-9_-]+',a.label):p.error('Invalid label')
  if a.reuse_audio and not re.fullmatch('[A-Za-z0-9_-]+',a.reuse_audio):p.error('Invalid reuse-audio label')
  s=importlib.util.spec_from_file_location('h',Path(__file__).with_name('weight-space-home.py'));h=importlib.util.module_from_spec(s);s.loader.exec_module(h)
@@ -11,7 +11,10 @@ def main():
  if not a.pull_only:
   sources={'game_vocabulary_probe.py':'server/stt/game_vocabulary_probe.py','speech_vocabulary.py':'server/agent/speech_vocabulary.py','voice_benchmark.py':'server/agent/voice_benchmark.py','expanded.json':'server/minecraft/src/ciel/speech-vocabulary.json'}
   data={n:base64.b64encode((ROOT/f).read_bytes()).decode() for n,f in sources.items()}
-  data['baseline.json']=base64.b64encode(subprocess.check_output(['git','-c','safe.directory='+str(ROOT).replace('\\','/'),'show','HEAD:server/minecraft/src/ciel/speech-vocabulary.json'],cwd=ROOT)).decode()
+  git=['git','-c','safe.directory='+ROOT.as_posix()]
+  revision=subprocess.check_output([*git,'rev-parse','--verify','--end-of-options',a.baseline_ref+'^{commit}'],cwd=ROOT,text=True).strip()
+  data['baseline.json']=base64.b64encode(subprocess.check_output([*git,'show',revision+':server/minecraft/src/ciel/speech-vocabulary.json'],cwd=ROOT)).decode()
+  data['baseline_commit.txt']=base64.b64encode(revision.encode()).decode()
   h.remote(prefix+'reuse='+repr(a.reuse_audio)+'\ndata='+repr(data)+'''
 root.mkdir(parents=True,exist_ok=False)
 for name,value in data.items():(root/name).write_bytes(base64.b64decode(value))

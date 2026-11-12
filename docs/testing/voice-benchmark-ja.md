@@ -31,6 +31,17 @@ Whisper単体は配置済みモデルと同じコーパスを`benchmark-whisper.
 
 `benchmark-conversation-tools.py --catalog-position trailing`は能力一覧を変動する補足の後ろへ戻して、`fixed`（既定）の配置と同じ実pipeline・本文・道具で比較する。初期能力選択と、能力ロード後の続きの時間を分けて読む。速さだけで権限・同意・操作の正確さを合格にしない。
 
+## ゲーム語彙の比較
+
+`server/stt/game_vocabulary_probe.py`は、保存した同一WAVをゲーム語彙なし・旧21語・現在の語彙で認識する小規模な合成音声試験。自宅サーバーの既存開発agent内でCPU Whisperを実行し、条件の順序を文ごとに回す。Irodoriで生成した音声をスピーカーへ流すことはなく、ゲーム操作も行わない。基本ヒントは実行中のpersona設定から取得する。実行器、語彙、基本ヒント、モデル、音声の指紋を保存して比較し、条件が変わった結果は分ける。
+
+```powershell
+python scripts/server/game-vocabulary-home.py --label vocabulary-new --baseline-ref '30722b8^'
+python scripts/server/game-vocabulary-home.py --label vocabulary-repeat --baseline-ref '30722b8^' --reuse-audio vocabulary-new
+```
+
+`--baseline-ref`は旧21語が入ったコミットを明示する（省略時HEAD）。`--reuse-audio`はサーバー上に残した測定のWAVを使い、新規合成を避ける。ラベルは毎回新規にする。結果と録音は`server/benchmark/data/<label>/`へ回収される。対象語の一致と全文CERを併記し、漢数字と算用数字の差を隠さない。雑談・否定3文を対照にするが、人のマイク・雑音・発話確定・会話応答の評価を代替しない。ヒントが現在のWhisperの223token枠を超える場合は測定を失敗させる。この検査は評価器のものであり、実行時のヒント切り詰め処理ではない。
+
 ## 評価の根拠
 
 ローカルLLMの重み変更を比べる場合は[人格・身体性・ツール・一般性能の評価](weight-space-benchmark-ja.md)も併用する。正解テキストとSTT認識文を分けてLLMへ入力し、CERの変化と意味の保持、推論遅延と本返答音声遅延を区別する。
