@@ -327,6 +327,8 @@ class Mind:
                 if any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 out.add_message(role='user', content=f'{t.name}：{self._marked(text)}')
+            elif t.role == 'event':
+                out.add_message(role='system', content='[出来事（利用者の発言・依頼ではありません）]\n' + text)
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None, memory=turn.get('memory'))
@@ -337,7 +339,8 @@ class Mind:
             waiting = self._waiting()
             if waiting:
                 self.handed, text = next(iter(waiting.items()))
-                notes = '\n\n'.join(x for x in (notes, f'[まだ伝えていない知らせ]\n{text}') if x)
+                if text:
+                    notes = '\n\n'.join(x for x in (notes, f'[まだ伝えていない知らせ]\n{text}') if x)
         if notes:
             out.add_message(role='system', content=notes)
         if talker_instructions is None and self.eyes is not None:
@@ -352,7 +355,7 @@ class Mind:
         return out
 
     def _waiting(self) -> dict[str, str]:
-        return {w: t for w, t in (self.waiting() if self.waiting is not None else {}).items() if w in DEEP_WHY and t}
+        return {w: t for w, t in (self.waiting() if self.waiting is not None else {}).items() if w in DEEP_WHY}
 
     def _mark_item(self, item):
         """今回の発言の、付箋になった頼みを付箋の印に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）"""
@@ -374,7 +377,7 @@ class Mind:
     def _recent(self, n: int):
         if self.history is None:
             return []
-        rows = [t for t in self.history.turns if t.ready.is_set() and t.text and t.role in ('user', 'assistant')]
+        rows = [t for t in self.history.turns if t.ready.is_set() and t.text and t.role in ('user', 'assistant', 'event')]
         return rows[-n:]
 
     def _notes(self, deep: bool, memory: str | None = None) -> str:

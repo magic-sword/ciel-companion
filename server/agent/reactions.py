@@ -125,6 +125,15 @@ class Reactions:
         while len(self.seen) > self.REMEMBER:
             self.seen.popitem(last=False)
         self.trace(event, 'received')
+        if source in ('game', 'work'):
+            history = getattr(getattr(self.mouth.session, 'userdata', None), 'history', None)
+            if history is None:
+                from conversation import Conversation
+                history = self.mouth.session.userdata.history = Conversation()
+            history.event(source=source, event_id=f'{epoch}:{identifier}', occurred_at=at,
+                          kind=kind, fact=envelope['payload'].get('fact', ''))
+            # Facts are durable conversation events; generation is only a wake-up.
+            event.kwargs.pop('instructions', None)
         if expression:
             if local_expression:
                 if now >= self.lease_until or priority >= self.lease_priority:

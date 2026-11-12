@@ -1,5 +1,6 @@
 """接続中だけの共通会話履歴。音声・本文をファイルや DB には保存しない。"""
 import asyncio
+import json
 from dataclasses import dataclass, field
 import re
 import time
@@ -26,6 +27,8 @@ class Turn:
 
     @property
     def name(self) -> str:
+        if self.role == 'event':
+            return self.label
         if self.role == 'assistant':
             return 'シエル'
         if self.speaker is None:
@@ -60,6 +63,18 @@ class Conversation:
         if turn.id > self.dropped_through:
             self._chars += len(turn.text)
             self._trim()
+
+    def event(self, *, source: str, event_id: str, occurred_at: float, kind: str, fact: str) -> Turn:
+        """Accepted service facts share the conversation timeline, independently of speech completion."""
+        identity = f'{source}:{event_id}'
+        previous = next((t for t in reversed(self.turns) if t.role == 'event' and t.source_id == identity), None)
+        if previous is not None:
+            return previous
+        turn = self.reserve(at=occurred_at, role='event')
+        turn.source_id = identity
+        self.complete(turn, json.dumps(dict(source=source, event_id=event_id,
+            occurred_at=occurred_at, kind=kind, fact=fact), ensure_ascii=False), label=source)
+        return turn
 
     def _trim(self) -> None:
         while self.turns and (len(self.turns) > self.max_turns or self._chars > self.max_chars):
@@ -98,7 +113,7 @@ class Conversation:
 
     def personal_lines(self, through: int | None = None):
         return [(t.owner, t.name, t.text) for t in self.between(through=through)
-                if t.ready.is_set() and t.text]
+                if t.ready.is_set() and t.text and t.role in ('user', 'assistant')]
 
     def search(self, query: str, first_id: int = 0, last_id: int = 0) -> dict:
         """日本語の部分一致と文字 bigram。外部送信・追加のモデル呼び出しはしない。"""

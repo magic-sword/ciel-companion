@@ -89,13 +89,12 @@ class Mouth:
 
     def waiting(self) -> dict[str, str]:
         pending = [event for event in self.reactions.queue.values()
-                   if event.deadline > self.reactions.clock() and event.key[0] in ('minutes', 'research', 'image', 'game')
-                   and event.kind != 'game.damage']
+                   if event.deadline > self.reactions.clock() and event.key[0] in ('minutes', 'research', 'image', 'game', 'work')]
         speech_id = getattr(getattr(self.session, 'current_speech', None), 'id', None)
         result = {}
         for event in pending:
-            if event.kwargs.get('instructions'):
-                result[event.why] = event.kwargs['instructions']
+            if event.key[0] in ('game', 'work') or event.kwargs.get('instructions'):
+                result[event.why] = event.kwargs.get('instructions', '')
                 self._handed[(speech_id, event.why)] = event.key
         while len(self._handed) > self.reactions.REMEMBER:
             self._handed.popitem(last=False)

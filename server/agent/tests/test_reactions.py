@@ -71,7 +71,8 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
         event = self.emit(expression='teary')
         self.assertEqual(self.outputs[0]['expression'], 'teary')
         await self.until(lambda: event.status == 'spoken')
-        self.assertEqual(self.session.calls, [{'instructions': 'game.damage'}])
+        self.assertEqual(self.session.calls, [{}])
+        self.assertIn('observed', self.session.userdata.history.turns[0].text)
 
     async def test_damage_precedes_work_and_comment(self):
         self.session.user_state = 'speaking'
@@ -80,7 +81,7 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
         pain = self.emit()
         self.session.user_state = 'listening'
         await self.until(lambda: work.status == 'spoken')
-        self.assertEqual(self.session.calls[0]['instructions'], 'game.damage')
+        self.assertEqual(self.session.calls[0], {})
         self.assertEqual(pain.status, 'spoken')
 
     async def test_deduplication_epoch_and_sequence_validation(self):

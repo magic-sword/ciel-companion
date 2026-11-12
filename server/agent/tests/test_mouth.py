@@ -86,7 +86,10 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.03)
             s.user_state = 'listening'
             await asyncio.sleep(0.05)
-        self.assertEqual(s.calls, [{'instructions': '[降りられた]' + chr(10) + '[スケルトンを倒した]'}])
+        self.assertEqual(s.calls, [{}])
+        self.assertEqual(len(s.userdata.history.turns), 2)
+        self.assertIn('[降りられた]', s.userdata.history.turns[0].text)
+        self.assertIn('[スケルトンを倒した]', s.userdata.history.turns[1].text)
 
     async def test_a_notice_told_in_a_reply_is_not_said_again(self):
         s = FakeSession()

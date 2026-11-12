@@ -43,9 +43,7 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.runner.accept({**self.remote, 'revision': 2, 'state': 'succeeded', 'message': 'Verified'}))
         self.assertEqual(len(self.lines), 1)
         self.assertFalse(self.runner.accept({**self.remote, 'revision': 2, 'state': 'succeeded'}))
-        self.assertEqual(self.runner.report(), 'Verified')
-        self.runner.reported()
-        self.assertIsNone(self.runner.notice)
+        self.assertIn('Verified', self.lines[0]['instructions'])
 
     async def test_cancelling_is_not_stopped_and_decision_needs_matching_id(self):
         await self.runner.start('puzzle.solve', {})

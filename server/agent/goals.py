@@ -22,8 +22,6 @@ class GoalRunner:
         self._watch = None
         self._deadline = 0
         self._notified = set()
-        self.notice = None
-        self.spoken_notice = None
         self._stream_id = uuid.uuid4().hex
         self._display_revision = 1
         self._confirmed_at = 0
@@ -100,8 +98,9 @@ class GoalRunner:
             key = (w['task_id'], w['state'], (w.get('decision') or {}).get('decision_id'))
             if key not in self._notified:
                 self._notified.add(key)
-                self.notice = (key, w.get('message') or w.get('reason') or w['state'])
-                self.say('game', settle=0.2, instructions=json.dumps({'work_result': w, 'title': self.title}, ensure_ascii=False), merge=True)
+                # Inventory/evidence remain in the current-state supplement, not the event timeline.
+                fact = {k: w.get(k) for k in ('task_id', 'state', 'message', 'reason', 'decision')}
+                self.say('game', settle=0.2, instructions=json.dumps({'work_result': fact, 'title': self.title}, ensure_ascii=False), merge=True)
         return True
 
     async def _poll(self, task_id):
@@ -146,15 +145,6 @@ class GoalRunner:
 
     def status(self):
         return self.work or {'status': 'no_task'}
-
-    def report(self):
-        self.spoken_notice = self.notice
-        return self.notice[1] if self.notice else None
-
-    def reported(self):
-        if self.spoken_notice == self.notice:
-            self.notice = None
-        self.spoken_notice = None
 
     def state(self, unknown=False):
         if unknown:

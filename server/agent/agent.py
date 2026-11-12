@@ -281,10 +281,6 @@ class Ciel(Agent):
         reaction = reactions.current() if reactions else None
         if reactions and not reactions.allowed(speech_id):
             return
-        if work is not None and work.notice is not None and self.mind.reply_origin in ('game', 'initiative') and reaction is not None and reaction.kind == 'work.result':
-            self.mind.handed = 'game'
-            yield work.report()
-            return
         if work is not None and work.body_step() and self.mind.reply_origin == 'initiative':
             yield '[silent]'
             return
@@ -731,8 +727,6 @@ async def entrypoint(ctx: JobContext) -> None:
                 return
             if not getattr(item, 'interrupted', False) and (item.text_content or '').strip():
                 voice.drop(agent.mind.handed)
-                if goal_runner is not None and agent.mind.handed == 'game':
-                    goal_runner.reported()
             agent.mind.handed = None
         session.on('conversation_item_added', on_said)
         agent.replies, agent.style = replies, style

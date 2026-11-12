@@ -716,7 +716,7 @@ def packets(state: dict, seq: int) -> list[dict]:
 def conversation(lines: list[Line]) -> list[dict]:
     return [{'id': t.id, 'time': f'{datetime.fromtimestamp(t.at, JST):%H:%M:%S}',
              'speaker': speaker_name(t), 'text': t.text if t.ready.is_set() else '（書き起こし未完了・内容不明）'}
-            for t in lines if t.text or not t.ready.is_set()]
+            for t in lines if t.role in ('user', 'assistant') and (t.text or not t.ready.is_set())]
 
 
 def speaker_name(turn: Turn) -> str:

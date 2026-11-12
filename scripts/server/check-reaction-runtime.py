@@ -39,7 +39,7 @@ async def main():
     agent.mind = Mind(Conversation())
     report = Mock(return_value='work result')
     agent.mind.goals = Obj(notice=object(), report=report, context=lambda: None, body_step=lambda: False)
-    state = State(history=Conversation())
+    state = State(history=agent.mind.history)
     session = Obj(userdata=state, current_speech=None, agent_state='listening', user_state='listening')
     voice = state.mouth = Mouth(session)
     voice.before_say = agent.mind.on_say
@@ -47,6 +47,8 @@ async def main():
     delay = 0.
 
     async def model_stub(agent, context, functions, settings):
+        if not delay:
+            assert any('observed damage' in (i.text_content or '') for i in context.items)
         await asyncio.sleep(delay)
         yield 'pain reaction'
 
@@ -58,7 +60,8 @@ async def main():
             try:
                 chat = llm.ChatContext()
                 chat.add_message(role='system', content=agent.instructions)
-                chat.add_message(role='system', content=kwargs['instructions'])
+                if kwargs.get('instructions'):
+                    chat.add_message(role='system', content=kwargs['instructions'])
                 chunks = [chunk async for chunk in agent._pipeline_llm(chat, agent.tools, {})]
                 output.extend(chunks)
                 if chunks:
