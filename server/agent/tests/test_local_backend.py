@@ -13,12 +13,44 @@ import models
 
 
 class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
+    async def test_default_preserves_fixed_system_and_trailing_state(self):
+        import mind
+        ctx=llm.ChatContext()
+        ctx.add_message(role='system',content='fixed')
+        ctx.add_message(role='user',content='hello')
+        ctx.add_message(role='system',content='state')
+        messages,_=mind.local_context(ctx).to_provider_format('openai')
+        self.assertEqual([m['role'] for m in messages],['system','user','user'])
+        self.assertEqual(messages[0]['content'],'fixed')
+        self.assertEqual(json.loads(messages[-1]['content'].split('\n',1)[1])['text'],'state')
+
+    async def test_changing_notes_preserves_fixed_system_and_recovers_real_request(self):
+        import mind
+        original = llm.ChatContext()
+        original.add_message(role='user',content='original request')
+        systems=[]
+        for note in ('state version 1','state version 2'):
+            ctx=llm.ChatContext()
+            ctx.add_message(role='system',content='fixed persona')
+            ctx.add_message(role='system',content=note)
+            call=llm.FunctionCall(call_id='c',name='status',arguments='{}')
+            result=llm.FunctionCallOutput(call_id='c',name='status',output='{}',is_error=False)
+            ctx.items.extend([call,result]);before=ctx.to_dict()
+            out=mind.local_context(ctx,source=original,trailing_notes=True)
+            systems.append(out.items[0].text_content)
+            self.assertEqual(out.items[1].text_content,'original request')
+            self.assertIn(note,out.items[2].text_content)
+            self.assertEqual(json.loads(out.items[2].text_content.split('\n',1)[1]),{'type':'context_data','text':note})
+            self.assertEqual(out.items[-2:],[call,result])
+            self.assertEqual(ctx.to_dict(),before)
+        self.assertEqual(systems,['fixed persona','fixed persona'])
+
     async def test_local_new_turn_without_notice_does_not_repeat_user_request(self):
         import mind
         ctx = llm.ChatContext()
         ctx.add_message(role='user',content='原木を集めて')
         ctx.add_message(role='assistant',content='確認します')
-        messages,_ = mind.local_context(ctx).to_provider_format('openai')
+        messages,_ = mind.local_context(ctx,trailing_notes=True).to_provider_format('openai')
         self.assertEqual([m['role'] for m in messages],['user','assistant','user'])
         self.assertEqual(messages[-1]['content'],'')
         self.assertEqual(ctx.items[-1].role,'assistant')
@@ -52,7 +84,7 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
                                    http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)))
         model = lk_openai.LLM(**models.reply_options('none'),client=client)
         try:
-            async with model.chat(chat_ctx=mind.local_context(ctx),conn_options=APIConnectOptions(max_retry=0)) as stream:
+            async with model.chat(chat_ctx=mind.local_context(ctx,trailing_notes=True),conn_options=APIConnectOptions(max_retry=0)) as stream:
                 chunks = [chunk async for chunk in stream]
             self.assertTrue(chunks)
             self.assertEqual(len(requests),1)
@@ -67,9 +99,10 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         ctx.add_message(role='system',content='persona')
         ctx.add_message(role='system',content='[internal notice] greet the newly connected person')
         before = ctx.to_dict()
-        out = mind.local_context(ctx, source=ctx)
+        out = mind.local_context(ctx, source=ctx,trailing_notes=True)
         self.assertEqual(out.items[-1].role,'user')
-        self.assertEqual(out.items[-1].text_content,'[internal notice] greet the newly connected person')
+        self.assertIn('[internal notice] greet the newly connected person',out.items[-1].text_content)
+        self.assertIn('利用者の発言・依頼ではありません',out.items[-1].text_content)
         self.assertEqual(ctx.to_dict(),before)
 
     async def test_local_assistant_merge_keeps_tool_boundaries(self):
@@ -83,11 +116,11 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         ctx.add_message(role='assistant',content='原木がありました')
         ctx.add_message(role='assistant',content='集めます')
         ctx.add_message(role='system',content='[内部通知] 続きを確認する番')
-        out = mind.local_context(ctx)
-        self.assertEqual(out.items[3:5],[call,result])
+        out = mind.local_context(ctx,trailing_notes=True)
+        self.assertEqual(out.items[2:4],[call,result])
         self.assertEqual(out.items[-1].role,'user')
-        self.assertEqual(out.items[-1].text_content,'[内部通知] 続きを確認する番')
-        self.assertEqual(len(out.items),7)
+        self.assertIn('[内部通知] 続きを確認する番',out.items[-1].text_content)
+        self.assertEqual(len(out.items),6)
         self.assertEqual(len(ctx.items),7)
 
     async def test_local_tool_continuation_recovers_unrecorded_text_request(self):
@@ -99,12 +132,12 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         call = llm.FunctionCall(call_id='call1',name='minecraft_status',arguments='{}')
         result = llm.FunctionCallOutput(call_id='call1',name='minecraft_status',output='{}',is_error=False)
         prepared.items.extend([call,result])
-        out = mind.local_context(prepared,source=original)
+        out = mind.local_context(prepared,source=original,trailing_notes=True)
         self.assertEqual(out.items[1].text_content,'原木を8個集めて')
         self.assertEqual(out.items[-2:],[call,result])
         self.assertEqual(len(prepared.items),3)
 
-    async def test_local_context_merges_system_notes_and_preserves_tool_continuation(self):
+    async def test_local_context_keeps_fixed_system_and_note_position_and_tool_continuation(self):
         import mind
         ctx = llm.ChatContext()
         ctx.add_message(role='system',content='instructions')
@@ -114,11 +147,13 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         result = llm.FunctionCallOutput(call_id='call1',name='minecraft_status',output='{}',is_error=False)
         ctx.items.extend([call,result])
         original = list(ctx.items)
-        out = mind.local_context(ctx)
+        out = mind.local_context(ctx,trailing_notes=True)
         systems = [i for i in out.items if isinstance(i,llm.ChatMessage) and i.role == 'system']
         self.assertEqual(len(systems),1)
         self.assertIs(out.items[0],systems[0])
-        self.assertEqual(systems[0].text_content,'instructions\n\ncurrent game state')
+        self.assertEqual(systems[0].text_content,'instructions')
+        self.assertEqual(out.items[2].role,'user')
+        self.assertIn('current game state',out.items[2].text_content)
         self.assertEqual(out.items[-2:],[call,result])
         self.assertEqual(ctx.items,original)
 

@@ -200,8 +200,9 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(chat.items[-1].text_content,suffix)
         prefix=agent.instructions_for('normal','solo')+'\n\n'+agent.capabilities.summary()
         for ctx,suffix in zip(seen,('state-A','state-B')):
-            self.assertTrue(ctx.items[0].text_content.startswith(prefix))
-            self.assertIn(suffix,ctx.items[0].text_content[len(prefix):])
+            self.assertEqual(ctx.items[0].text_content,prefix)
+            self.assertEqual(ctx.items[-1].role,'user')
+            self.assertEqual(json.loads(ctx.items[-1].text_content.split('\n',1)[1])['text'],suffix)
             self.assertEqual(ctx.items[0].text_content.count(agent.capabilities.summary()),1)
 
     async def test_executor_refuses_definition_changed_after_discovery(self):

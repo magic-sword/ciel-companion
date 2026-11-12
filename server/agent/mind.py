@@ -517,26 +517,32 @@ def latest_user_text(chat_ctx) -> str:
     return next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
 
 
-def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None) -> llm.ChatContext:
-    """Qwen 用に system と連続する assistant の発言をまとめる。道具の順序と元の記録は変えない。"""
+def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None, *, trailing_notes: bool = True) -> llm.ChatContext:
+    """固定systemと時系列の内部補足を送る。Falseは従来方式との比較用。元の記録は変えない。"""
     out = llm.ChatContext()
-    instructions = [i.text_content for i in ctx.items if isinstance(i,llm.ChatMessage) and i.role == 'system']
-    if instructions:
-        out.add_message(role='system',content='\n\n'.join(instructions))
-    out.items.extend(i for i in ctx.items if not (isinstance(i,llm.ChatMessage) and i.role == 'system'))
-    if not any(_is_user(i) for i in out.items) and source is not None:
+    # Recover the real request before converting notes: an internal event must
+    # not masquerade as evidence that the original user request is present.
+    missing_user = not any(_is_user(i) for i in ctx.items)
+    if trailing_notes:
+        for index, item in enumerate(ctx.items):
+            if index > 0 and isinstance(item,llm.ChatMessage) and item.role == 'system':
+                out.add_message(role='user',content='[内部補足（利用者の発言・依頼ではありません）]\n'+json.dumps(
+                    {'type':'context_data','text':item.text_content or ''},ensure_ascii=False))
+            else:
+                out.items.append(item)
+    else:
+        instructions=[i.text_content for i in ctx.items if isinstance(i,llm.ChatMessage) and i.role=='system']
+        if instructions:out.add_message(role='system',content='\n\n'.join(instructions))
+        out.items.extend(i for i in ctx.items if not (isinstance(i,llm.ChatMessage) and i.role=='system'))
+    if missing_user and source is not None:
         # 文字入力の記録が確定するより先に道具の結果が戻ることがある。
         # Qwen の tool continuation にも、LiveKit が持つ元の依頼を添える。
         latest = next((i for i in reversed(source.items) if _is_user(i)),None)
         if latest is not None:
-            out.items.insert(1 if instructions else 0,latest)
+            out.items.insert(1 if out.items and getattr(out.items[0],'role',None)=='system' else 0,latest)
     if not any(_is_user(i) for i in out.items):
-        # A greeting or service notice can precede the first human utterance.
-        # Preserve the real internal notice as the query required by Qwen.
-        notice = next((i.text_content for i in reversed(ctx.items)
-                       if isinstance(i,llm.ChatMessage) and i.role == 'system' and i.text_content), None)
-        if notice:
-            out.add_message(role='user', content=notice)
+        notice=next((i.text_content for i in reversed(ctx.items) if isinstance(i,llm.ChatMessage) and i.role=='system' and i.text_content),None)
+        out.add_message(role='user',content='' if trailing_notes else notice or '')
     # 自分から話す番では、最近の返答が複数続いた末尾になることがある。
     # Qwen は末尾の assistant が2件以上あると400を返す。内容を順に残し、
     # 送信用の写しだけをまとめる。FunctionCall/Output の境界は越えない。
