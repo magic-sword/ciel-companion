@@ -2,6 +2,12 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+2026-11-12、ゲーム通知の主体をMCPから共通履歴まで保持する`9fc80bf5d4f7748e8ba9b080ec1e1db100596404`を共有Minecraft bodyと開発agentへ配布した。bodyの34ソースとagentの187ファイルがコミットと一致。body/開発agent以外のコンテナは各配布前後で不変、Minecraft本体・ワールドは再起動していない。agentはHTTP200・worker登録・再起動回数0。unit816件、Nodeの通知5テスト、配布agentイメージ内の関連58テスト成功。稼働bodyのhub/linkから模擬生成したhurt・died・owner_diedを稼働agentの受信処理へ渡し、self・self・ownerと元の出来事種別が履歴に保持されることを確認した。実ゲームで被害を起こした試験ではない。
+
+body imageは`a1e53f1f600ff475e36a75833b7337682aa46391dc2ec0cf088a86233deaf9e8`、開発agent imageは`524d7b3acefb535c7ff9fe1919a7553050375ef22fdef79dd150dd68c58e7f0a`、runtime manifestは`e68813bfeac48312f39a02b24da401c51bd48b318a5f5f980fca0595365e98ef`。証拠は共有serverの`data/deployments/body-subject-9fc80bf/`と開発serverの`data/deployments/agent-9fc80bf5d4f7-1794485757173381815/`。共有bodyのimage指定は`compose.body-release.json`に保存している。主体情報はMCPと会話内だけの変更で、Unityのcharacter.expression v2・goal.state v2のフィールドと受信処理への変更は不要。Unityの修正・再ビルドは行っていない。本番agentは未更新。
+
+共有Qwenで、固定5promptと短い内部通知を用いた変更前後の3条件（自己被害・自己死亡・持ち主死亡）を各1回、temperature0・seed1729・192token上限で診断した。全6応答がstop。被害条件は変更前に「あなた、怪我をしたのですか」、変更後に「シエル、1のダメージを受けてしまいました」と返し、主体の改善を観測した。変更後の自己死亡と持ち主死亡も対象を区別したが、自己被害への返答末尾に「あなた、大丈夫ですか」が残る。実会話全体の再現や不要確認の解消・一般的な正答率の証明ではない。入力・出力は開発serverの`data/subject-probe-03/report.json`。先行のprobe-01は通知文字列の文字化け、probe-02は実行環境不備があり、評価から除外した。
+
 ゲーム通知・作業結果を通常会話と同じライフサイクルで扱う修正を開発へ反映した。受信後の待機・生成・音声再生を通知TTLで打ち切らず、新しい通知で進行中のゲーム由来の返答を強制中断しない。古い通知の受信拒否、表情の表示時間、利用者の割り込み、接続解除・会話終了、その他の入力の既存期限は維持する。unit814件と会話入口のオフライン結合チェックが成功。仮想時計で受信後60秒の待機と生成中120秒経過、短い通知TTLを超えた返答完了、利用者中断後の音声遮断を確認した。回帰記録は`.local/regression/20261112T115735Z-9918d6/`。実モデル・実音声による中断改善の確認は未実施。[現在の期限の契約](../conversation/service-events-and-reactions-ja.md#優先順位と混雑時の規則)を参照する。
 
 2026-11-12、`deploy-agent.py --dev`でコミット`bd8c83cd6202e7c8084c9c1fce71613ed93fb972`一式を開発agentへ配布した。187ファイルすべて欠落0・余分0・バイト差0、配布イメージ内の関連47テスト成功、HTTP200、worker登録、再起動回数0を確認。本番・ゲーム・共有LLMなど他コンテナは不変。本番会話サーバーへの反映は未実施。imageは`e6b38dd82fd3d30e571789452a258e0d7184011035e25046ec4e24fe33e98dd3`、runtime manifestは`42db67e7bd9a2b7bea25ceccb852fbd180abb07c715f8e1afd888c0605dba5d9`。証拠・退避・配布元は開発ホストの`~/work/ciel-companion-dev/server/data/deployments/agent-bd8c83cd6202-1794484784234952068/`。
