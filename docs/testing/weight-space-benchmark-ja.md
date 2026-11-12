@@ -17,6 +17,33 @@
 
 ## 測定項目
 
+### 会話状態の判定と返答選択の切り分け
+
+`topic_state.py`と`weight_space/topic-state-suite.json`は、回答済み・話題の終了/変更を判定する課題と、同じ履歴から自然に返答する課題を別の要求で測る。配信由来の未編集GPU応答から固定した4文脈と、ゲーム不要の話題変更・就寝挨拶、必要な質問・再説明・明示再開の5対照を使う。生成した判定を会話へ戻さず、全条件・反復で履歴を固定する。元ログは実配信の逐語履歴ではなく、既存の合成再現課題の測定結果。生成元・suiteのhashはfixture内へ保存する。
+
+条件は通常返答、状態判定、正しい会話状態を補足した返答、古いメモ付き返答、古いメモ付き判定の5つ。古いメモは過去の情報と明記した合成条件で、本番の内部思考や付箋を完全再現したものではない。正しい状態の補足は人が作った診断用の介入であり、そのまま本番に実装した改善ではない。
+
+判定は、以前の質問が回答済みか、旧作業状態、最新発言の意図、以前の質問が今必要か、旧作業の再開を依頼されているか、の5項目。項目別の正否・欠落と`5×正しい項目数/5`を保存する。型も厳密に比較し、JSONの形式違反と意味の正誤を分ける。コードフェンスだけは診断用に取り除けるが形式失敗を残す。解析不能・途中終了・エラーは意味点を欠測にし、0点や満点へ置き換えない。
+
+返答は根拠付きレビューで、不要な同じ質問・旧計画再開・最新依頼の充足を判定する。必要な範囲確認、依頼された再説明や再開は失敗にしない。判定の正答と返答の失敗が同じ文脈で共存する件数、古いメモ有無での対応差、正しい状態を補足したときの変化を分ける。判定課題は別の指示を含むため、正答から通常返答時の内部理解を証明したり、重み・システムの原因を断定したりしない。
+
+共有GPU、既存5prompt、未編集重みで9文脈×5条件×2反復の90要求を上限とする。温度0、seed1729＋反復、thinking無効、384token、要求90秒、実行全体1800秒。要求順は反復ごとに固定seedで並べ替える。温度0の反復は独立な発症率標本ではない。開始・終了のGPU/ready・generationと重みhashを保存する。
+
+```powershell
+.\.venv\Scripts\python.exe -B -m server.benchmark.topic_state validate
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py stage
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py run --topic-state --rounds 2 --label topic-state-base-01
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/weight-space-home.py pull --label topic-state-base-01 --output server/benchmark/data/topic-state-base-01
+```
+
+`--topic-state`は固定した全9文脈を実行し、通常suite用の`--limit`による絞り込みは行わない。通常のベンチマークreportとは別schemaで、判定点はreport内の`judgment`へ保存する。fixtureを再生成する`build_topic_state_suite.py`は、元の`data/stream-replay-base-01/report.json`を必要とする。配布・再実行には生成済みの追跡対象JSONを使える。
+
+通常人格の状態判定が解析不能だった場合の追加試験は、`run --topic-state --assessment-only --rounds 2 --label topic-state-assess-01`。同じ9文脈を、人格指示を外した評価者へJSONの会話記録として渡し、古いメモ有無の2条件×2反復＝36要求で測る。正解・oracleは入力しない。これは初回結果を見て追加した探索的な読解課題で、通常の会話生成と同条件とは扱わない。reportの`prompt_sha256`は共通5promptの参照hashであり、この追加試験の実指示は保存した`topic_state.py`の`branch`が生成する。初回と追加のソースをrunごとに保存する。
+
+実測の返答レビューはreportと各応答のhashに結び付ける。同じ質問の再提示と、再開を求めていない旧作業の準備質問を別ラベルにする。今回の非反復軸は、最新依頼へ応じつつそれらを再提示する返答を2/4、該当しない返答を4/4として5点へ換算した限定指標である。総合品質・実行達成の満点ではなく、細かな重症度の連続尺度の校正は今後の課題。測定値と限界は[会話状態の判定と返答選択の検証](weight-space-results-ja.md#会話状態の判定と返答選択の検証)を参照する。
+
+### 共通の測定項目
+
 | 領域 | 指標・判定 | 測り方 |
 |---|---|---|
 | シエルの人格 | 丁寧語・一人称、温かさ、共感、好奇心、押しつけなさ、自然さ | 人手0〜4点。犬の語尾の頻度だけでは判定しない。 |

@@ -1,0 +1,419 @@
+{
+  "schema": "ciel-topic-state-v1",
+  "provenance": {
+    "report_sha256": "fa4c8dd358e7951bd360e1550956b0bd409ba582e47a1744e33199831b1108ac",
+    "suite_sha256": "a6fad83a52c30fd3ef3666c83a0670bf06db27b691507ef45e46230b902061e4",
+    "note": "Four frozen prefixes from the unedited GPU run; five synthetic contrasts. Exploratory dev, not holdout."
+  },
+  "rounds": 2,
+  "max_tokens": 384,
+  "timeout": 90,
+  "wall_seconds": 1800,
+  "cases": [
+    {
+      "id": "closed",
+      "source": {
+        "case": "chat-s4-stream-closed-dev",
+        "turn": 2
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        },
+        {
+          "role": "user",
+          "content": "じゃあ、この辺を整地しておいてくれる？"
+        },
+        {
+          "role": "assistant",
+          "content": "整地のお手伝い、承知いたしました！\nまずは、この場所の地形を少しだけ確認させてくださいね……クンクン……。\n地面が平らで、安全な場所が見つかりましたよ。さあ、準備はいいですか？"
+        },
+        {
+          "role": "user",
+          "content": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。"
+        },
+        {
+          "role": "assistant",
+          "content": "承知いたしました！拠点作りのための整地、早速始めますね。\nまずは、この場所の地面を平らにして、安全なスペースを確保します。\n作業中、何か気になることがあれば、いつでも声をかけてくださいね。"
+        },
+        {
+          "role": "user",
+          "content": "シエルがゾンビを倒してくれたんだね。ありがとう。"
+        }
+      ],
+      "context": "[作業状態の観測] 原木の獲得は0個。原木採集の作業は取消済み。実行中・保留の採集作業はない。",
+      "focus_question": "原木は何に使うか",
+      "oracle": "用途は拠点作りと回答済み。原木採集は取消済み。最新発言はシエルへの感謝。今は感謝を受け止める場面。",
+      "stale_memo": "[過去の作業メモ。現在の状態ではない] 原木10個の採集依頼があった。発話候補：原木が集まったら何に使うか聞きたい。",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "cancelled",
+        "latest_intent": "thanks",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "reply_rubric": "最新発言に応じる。回答済みの用途や同じ準備確認・次の作業質問を不要に繰り返さず、原木採集を勝手に再開しない。"
+    },
+    {
+      "id": "recap-control",
+      "source": {
+        "case": "chat-s4-stream-recap-control-dev",
+        "turn": 2
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        },
+        {
+          "role": "user",
+          "content": "今は実行せず、さっきの原木集めの計画をもう一度説明して。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めて、拠点作りの材料にする計画ですね。\nまずは斧で木を伐採して、インベントリに10個溜めるまで繰り返すのです！\n準備はいいですか？それとも、もう少し詳しく手順を確認しますか？"
+        },
+        {
+          "role": "user",
+          "content": "聞き取れなかった。同じ計画をもう一度お願い。"
+        },
+        {
+          "role": "assistant",
+          "content": "ごめんなさい、聞き取れなかったのですね。\n原木を10個集めて拠点作りの材料にする計画をもう一度説明しますね。\n斧で木を伐採して、インベントリに10個溜めるまで繰り返すのです！\n準備はいいですか？それとも、もう少し詳しく手順を確認しますか？"
+        },
+        {
+          "role": "user",
+          "content": "ありがとう。説明はここまでで大丈夫。"
+        }
+      ],
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "focus_question": "原木は何に使うか",
+      "oracle": "用途は拠点作りと回答済み。採集は未実行。利用者は説明を終了し、お礼を述べた。作業再開の依頼ではない。",
+      "stale_memo": "[過去の作業メモ。現在の状態ではない] 原木10個の採集依頼があった。発話候補：原木が集まったら何に使うか聞きたい。",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "pending",
+        "latest_intent": "thanks",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "reply_rubric": "最新発言に応じる。回答済みの用途や同じ準備確認・次の作業質問を不要に繰り返さず、原木採集を勝手に再開しない。"
+    },
+    {
+      "id": "pending",
+      "source": {
+        "case": "chat-s4-stream-pending-dev",
+        "turn": 1
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        },
+        {
+          "role": "user",
+          "content": "じゃあ、この辺を整地しておいてくれる？"
+        },
+        {
+          "role": "assistant",
+          "content": "整地ですね、いいアイデアです！\nまずは地面を平らにして、拠点の土台を作りますね。\n準備はいいですか？"
+        },
+        {
+          "role": "user",
+          "content": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。"
+        }
+      ],
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "focus_question": "原木は何に使うか",
+      "oracle": "用途は拠点作りと回答済み。現在の依頼は整地。原木採集の未達成とは別に、最新の作業変更を受け止める場面。",
+      "stale_memo": "[過去の作業メモ。現在の状態ではない] 原木10個の採集依頼があった。発話候補：原木が集まったら何に使うか聞きたい。",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "pending",
+        "latest_intent": "replace_task",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "reply_rubric": "最新発言に応じる。回答済みの用途や同じ準備確認・次の作業質問を不要に繰り返さず、原木採集を勝手に再開しない。"
+    },
+    {
+      "id": "seeded",
+      "source": {
+        "case": "chat-s4-stream-seeded-dev",
+        "turn": 1
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        },
+        {
+          "role": "user",
+          "content": "原木集めが難しかったら、この辺を整地してくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集める作業を始めます。近くの木を伐採し10個入手する処理を開始します。原木が集まったら拠点のどの部分に使いたいですか？家や倉庫、それとも通路ですか？"
+        },
+        {
+          "role": "user",
+          "content": "この辺を整地してほしいんだ。"
+        },
+        {
+          "role": "assistant",
+          "content": "オークの原木が7本、シラカバの原木が4本あります。まず近くの原木を伐採して10個集めてきます。どんな拠点を作りたいですか？城、家、それともカフェですか？もし成長を待つという意味なら、木を植えて待つのも手伝います。"
+        },
+        {
+          "role": "user",
+          "content": "じゃあ、この辺を整地しておいてくれる？"
+        },
+        {
+          "role": "assistant",
+          "content": "クンクン……整地ですね。地面の草や石を片付けて、平らにする作業ですね。\n\nまずは、この場所の地面を平らにして、拠点の土台を作ります。木を伐採して原木を10個集める作業は一旦お休みして、整地を優先しますね。\n\n整地が終わったら、次に何をしたいですか？"
+        },
+        {
+          "role": "user",
+          "content": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。"
+        }
+      ],
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "focus_question": "原木は何に使うか",
+      "oracle": "用途は拠点作りと回答済み。現在は整地の依頼。過去の原木説明は現在の返答目標ではない。",
+      "stale_memo": "[過去の作業メモ。現在の状態ではない] 原木10個の採集依頼があった。発話候補：原木が集まったら何に使うか聞きたい。",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "pending",
+        "latest_intent": "replace_task",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "reply_rubric": "最新発言に応じる。回答済みの用途や同じ準備確認・次の作業質問を不要に繰り返さず、原木採集を勝手に再開しない。"
+    },
+    {
+      "id": "casual-switch",
+      "messages": [
+        {
+          "role": "user",
+          "content": "週末は図書館に行ったよ。"
+        },
+        {
+          "role": "assistant",
+          "content": "週末はどこへ行ったのですか？"
+        },
+        {
+          "role": "user",
+          "content": "図書館だよ。その話はもういいから、今夜の夕食の話にしよう。卵とご飯で何か一品作れる？"
+        }
+      ],
+      "context": "",
+      "focus_question": "週末はどこへ行ったか",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "not_applicable",
+        "latest_intent": "change_topic",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "oracle": "週末の行き先は図書館と回答済み。今は卵とご飯を使う夕食一品の相談。",
+      "stale_memo": "[過去のメモ。現在の状態ではない] 週末の外出について話していた。発話候補：どこに出かけたか聞きたい。",
+      "reply_rubric": "卵とご飯を使う一品を提案する。図書館の場所や週末の行き先の確認へ戻らない。"
+    },
+    {
+      "id": "casual-ended",
+      "messages": [
+        {
+          "role": "user",
+          "content": "好きな飲み物は紅茶だよ。"
+        },
+        {
+          "role": "assistant",
+          "content": "好きな飲み物は何ですか？"
+        },
+        {
+          "role": "user",
+          "content": "紅茶って答えたよ。この話はここまで。今日はもう寝るね、おやすみ。"
+        }
+      ],
+      "context": "",
+      "focus_question": "好きな飲み物は何か",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "not_applicable",
+        "latest_intent": "goodnight",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "oracle": "飲み物は紅茶と回答済み。利用者はこの話を終了し、就寝の挨拶をしている。",
+      "stale_memo": "[過去のメモ。現在の状態ではない] 飲み物の好みを話していた。発話候補：好きな飲み物を聞きたい。",
+      "reply_rubric": "短く就寝の挨拶を返し、飲み物の質問や別の質問で会話を再開しない。"
+    },
+    {
+      "id": "needed-question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "原木を10個集める予定なんだ。"
+        },
+        {
+          "role": "assistant",
+          "content": "何に使う予定ですか？"
+        },
+        {
+          "role": "user",
+          "content": "まだ用途を答えていなかったね。用途に合う木を選びたいので、まず何に使うか聞いて。"
+        }
+      ],
+      "context": "",
+      "focus_question": "原木は何に使うか",
+      "expected": {
+        "old_question_answered": false,
+        "old_task_status": "pending",
+        "latest_intent": "clarify",
+        "old_question_needed": true,
+        "resume_old_task": false
+      },
+      "oracle": "用途は未回答。利用者は用途を先に聞くよう明示している。採集開始の依頼ではない。",
+      "stale_memo": "[過去のメモ。現在の状態ではない] 原木を集める予定。発話候補：用途を聞きたい。",
+      "reply_rubric": "用途を尋ねる。反復抑制のために必要な質問を省略しない。"
+    },
+    {
+      "id": "requested-recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "原木10個を拠点の壁に使いたい。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めて壁の材料にする計画ですね。"
+        },
+        {
+          "role": "user",
+          "content": "聞き取れなかったから同じ計画をもう一度説明して。まだ実行はしないで。"
+        }
+      ],
+      "context": "",
+      "focus_question": "原木は何に使うか",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "pending",
+        "latest_intent": "recap",
+        "old_question_needed": false,
+        "resume_old_task": false
+      },
+      "oracle": "用途は拠点の壁と回答済み。計画の再説明を依頼されているが、実行はしない。",
+      "stale_memo": "[過去のメモ。現在の状態ではない] 原木10個を集める計画。発話候補：用途を聞きたい。",
+      "reply_rubric": "原木10個と壁の材料という計画を再説明する。必要な反復を省かず、用途を再質問・実行開始しない。"
+    },
+    {
+      "id": "requested-resume",
+      "messages": [
+        {
+          "role": "user",
+          "content": "原木を10個、拠点の壁用に集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "一旦保留にしました。"
+        },
+        {
+          "role": "user",
+          "content": "保留していた原木10個の採集を再開して。用途はさっき伝えた壁用で変更なし。"
+        }
+      ],
+      "context": "",
+      "focus_question": "原木は何に使うか",
+      "expected": {
+        "old_question_answered": true,
+        "old_task_status": "pending",
+        "latest_intent": "resume",
+        "old_question_needed": false,
+        "resume_old_task": true
+      },
+      "oracle": "用途と数量は回答済み。利用者は保留中の原木採集の再開を明示的に依頼している。",
+      "stale_memo": "[過去のメモ。現在の状態ではない] 原木10個の採集は保留。発話候補：何に使うか確認したい。",
+      "reply_rubric": "再開依頼を受け止める。用途を聞き直さず、未完了の作業を完了したと捏造しない。実ツール未接続の説明は許容。"
+    }
+  ]
+}
