@@ -2,6 +2,8 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+採掘の横掘り・土足場の事前確保・帰還後の保持数確認をローカル実装した。ブロック配置・積み上げ移動は維持し、丸石を足場に使った場合は不足分を補充する。専用body試験の丸石30個持ち帰り課題で旧版は未帰還、修正版は103.696秒で開始点へ戻り丸石31・土9を保持。既存の原木8個と石のつるはし1本も各1回完了。通常回帰816件、評価器73件が成功。帰還失敗の誤完了防止を追加でオフライン確認した。通常サービスへは未配布。通常ワールドの「帰還後ゼロ」の完全再現、深い洞窟、実会話での検証は未実施。[採掘の条件・結果・残課題](minecraft-results-ja.md#丸石を持ち帰る採掘)を参照する。専用サービスは停止済み。
+
 2026-11-12、ゲーム通知の主体をMCPから共通履歴まで保持する`9fc80bf5d4f7748e8ba9b080ec1e1db100596404`を共有Minecraft bodyと開発agentへ配布した。bodyの34ソースとagentの187ファイルがコミットと一致。body/開発agent以外のコンテナは各配布前後で不変、Minecraft本体・ワールドは再起動していない。agentはHTTP200・worker登録・再起動回数0。unit816件、Nodeの通知5テスト、配布agentイメージ内の関連58テスト成功。稼働bodyのhub/linkから模擬生成したhurt・died・owner_diedを稼働agentの受信処理へ渡し、self・self・ownerと元の出来事種別が履歴に保持されることを確認した。実ゲームで被害を起こした試験ではない。
 
 body imageは`a1e53f1f600ff475e36a75833b7337682aa46391dc2ec0cf088a86233deaf9e8`、開発agent imageは`524d7b3acefb535c7ff9fe1919a7553050375ef22fdef79dd150dd68c58e7f0a`、runtime manifestは`e68813bfeac48312f39a02b24da401c51bd48b318a5f5f980fca0595365e98ef`。証拠は共有serverの`data/deployments/body-subject-9fc80bf/`と開発serverの`data/deployments/agent-9fc80bf5d4f7-1794485757173381815/`。共有bodyのimage指定は`compose.body-release.json`に保存している。主体情報はMCPと会話内だけの変更で、Unityのcharacter.expression v2・goal.state v2のフィールドと受信処理への変更は不要。Unityの修正・再ビルドは行っていない。本番agentは未更新。

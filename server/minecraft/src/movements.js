@@ -67,3 +67,15 @@ export function collectMovements(bot, target) {
   }
   return movements;
 }
+
+// Keep ordinary building/travel available, preferring dirt over the requested harvest.
+export function miningMovements(bot, target = null, supports = new Set(), harvest = new Set()) {
+  const m = target ? collectMovements(bot, target) : playerMovements(bot);
+  m.scafoldingBlocks.sort((a,b) => Number(harvest.has(bot.registry.items[a]?.name)) - Number(harvest.has(bot.registry.items[b]?.name)));
+  const safe = m.safeToBreak.bind(m);
+  m.safeToBreak = block => !supports.has(block.position.toString())
+    && !(block.position.x === Math.floor(bot.entity.position.x)
+      && block.position.z === Math.floor(bot.entity.position.z)
+      && block.position.y === Math.floor(bot.entity.position.y) - 1) && safe(block);
+  return m;
+}

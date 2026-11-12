@@ -57,6 +57,7 @@ function fixture(inventory = {}) {
       },
     },
     dig: async block => {
+      if (resources.some(p=>p.equals(block.position))) return bot.collectBlock.collect(block);
       actions.push(['dig', block.name, bot.heldItem?.name]);
       // 最初の探索用採掘を確認したら終了する（地下探索の距離はこの試験の対象外）。
       runner.current.token.cancelled = true;
@@ -89,12 +90,46 @@ test('木のツルハシだけなら、鉄の探索前に石のツルハシを�
 test('道具がなければ原木と石から木・石のツルハシを作って探索する', async () => {
   const f = fixture();
   for (let x = 1; x <= 3; x++) f.add(x, 64, 2, 'oak_log');
-  for (let x = 1; x <= 3; x++) f.add(x, 63, -2, 'stone');
+  // Exposed wall at foot height: this test isolates tool preparation, not stair movement.
+  for (let x = 1; x <= 3; x++) f.add(x, 64, -2, 'stone');
   await f.run();
   assert.equal(f.inv.stone_pickaxe, 1, JSON.stringify({ events: f.events, actions: f.actions, inv: f.inv }));
   assert.ok(f.actions.some(a => a[0] === 'craft' && a[1] === 'wooden_pickaxe'));
   assert.equal(f.actions.filter(a => a[0] === 'collect' && a[1] === 'cobblestone').length, 3);
   assert.deepEqual(f.actions.at(-1), ['dig', 'stone', 'stone_pickaxe']);
+});
+
+test('石は足元より横の露出面から集め、帰還で使った分を補充する', async () => {
+  const f = fixture({wooden_pickaxe:1});
+  f.add(0,63,0,'stone');
+  for(let x=1;x<=4;x++)f.add(x,64,-2,'stone');
+  const collect=f.bot.collectBlock.collect;
+  f.bot.collectBlock.collect=async block=>{
+    assert.ok(block.position.y>=Math.floor(f.bot.entity.position.y),'must not mine the floor');
+    return collect(block);
+  };
+  let returns=0;
+  f.bot.pathfinder.goto=async ()=>{
+    if(returns++===0)f.inv.cobblestone--;
+  };
+  await f.run('collect',{block:'cobblestone',count:3});
+  const done=f.events.at(-1);
+  assert.equal(done.ok,true,JSON.stringify(done));
+  assert.equal(f.inv.cobblestone,3);
+  assert.equal(done.note.gained.cobblestone,3);
+  assert.equal(done.note.returned,true);
+  assert.equal(f.actions.filter(a=>a[0]==='collect').length,4);
+});
+
+test('石を掘る前に足場用の土を確保する',async()=>{
+  const f=fixture({wooden_pickaxe:1});
+  for(let x=1;x<=4;x++)f.add(x,64,2,'dirt');
+  f.add(1,64,-2,'stone');
+  await f.run('collect',{block:'cobblestone',count:1});
+  assert.equal(f.events.at(-1).ok,true,JSON.stringify(f.events.at(-1)));
+  assert.equal(f.inv.dirt,4);
+  const collected=f.actions.filter(a=>a[0]==='collect').map(a=>a[1]);
+  assert.deepEqual(collected,['dirt','dirt','dirt','dirt','cobblestone']);
 });
 
 test('作成ができなければ探索用の石を素手で掘らず失敗を返す', async () => {

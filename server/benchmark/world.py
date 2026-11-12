@@ -244,6 +244,8 @@ class World:
 
 def achieved(task, initial, current):
     item = task['item']
+    if task.get('return_to_start') and math.dist(initial['position'], current['position']) > 1:
+        return False
     return current['inventory'].get(item, 0) - initial['inventory'].get(item, 0) >= task['count']
 
 

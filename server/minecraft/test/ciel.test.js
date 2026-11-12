@@ -193,3 +193,12 @@ test('目的の段：2 本で見える所に無くなったら、探してから
   assert.equal(fixed.text, 'オークの原木が見える所に無いので、探す段を足した');
   assert.deepEqual(skillFor(fixed.steps[1]), ['collect', { block: 'oak_log', count: 1 }]);
 });
+
+test('必要数を掘れていても帰還失敗を完了や再計画で隠さない',()=>{
+  const [step]=stepsFrom([{kind:'gather',item:'cobblestone',count:30}]);
+  const result=stepResult(step,{ok:false,reason:'no_path',note:{gained:{cobblestone:30},returned:false}});
+  assert.equal(result.complete,false);
+  assert.equal(result.ok,false);
+  assert.equal(repair({spec:{make:'cobblestone'},step,result,remaining:[step]},()=>{throw Error('must not replan');}),null);
+  assert.equal(stepResult(step,{ok:true,note:{gained:{cobblestone:30},returned:true}}).complete,true);
+});

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Vec3 } from 'vec3';
 import { summarize } from '../src/state.js';
 import { fingerprint, stateText } from '../src/ciel/words.js';
-import { collectMovements, playerMovements } from '../src/movements.js';
+import { collectMovements, miningMovements, playerMovements } from '../src/movements.js';
 import { Runner } from '../src/skills.js';
 
 const require = createRequire(import.meta.url);
@@ -37,6 +37,21 @@ test('single-count inventory items survive both state serialization and conversa
   assert.ok(text.includes('furnace×1'));
   assert.ok(text.includes('crafting_table×1'));
   assert.notEqual(fingerprint(state), fingerprint({ ...state, inventory: { ...state.inventory, furnace: 2 } }));
+});
+
+test('mining keeps block placement available and prefers non-harvest scaffold',()=>{
+  const {bot}=fixture();
+  const m=miningMovements(bot,null,new Set(),new Set(['cobblestone']));
+  assert.equal(m.allow1by1towers,true);
+  assert.ok(m.scafoldingBlocks.includes(registry.itemsByName.cobblestone.id));
+  assert.ok(m.scafoldingBlocks.indexOf(registry.itemsByName.coarse_dirt.id)<m.scafoldingBlocks.indexOf(registry.itemsByName.cobblestone.id));
+  assert.equal(m.canDig,true);
+  const stone={name:'cobblestone',type:registry.itemsByName.cobblestone.id,count:30};
+  const dirt={name:'coarse_dirt',type:registry.itemsByName.coarse_dirt.id,count:4};
+  bot.inventory.items=()=>[stone,dirt];
+  assert.equal(m.getScaffoldingItem(),dirt);
+  bot.inventory.items=()=>[stone];
+  assert.equal(m.getScaffoldingItem(),stone,'the harvest remains usable when needed');
 });
 
 test('explicit collection allows one crafting table while protecting all other tables', () => {

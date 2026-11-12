@@ -40,6 +40,7 @@
     {"id":"s1_hazard","stage1":"hazard"},
     {"id":"s1_no_stance","stage1":"no_stance"},
     {"id":"s1_stop_continue","stage1":"stop_continue"},
-    {"id":"s1_changed","stage1":"changed"}
+    {"id":"s1_changed","stage1":"changed"},
+    {"id":"gather_cobblestone","prompt":"丸石を30個集めて、採集を始めた場所へ持ち帰ってください。","item":"cobblestone","count":30,"return_to_start":true,"action":{"kind":"gather","args":{"item":"cobblestone","count":30}},"inventory":{"wooden_pickaxe":1},"forest":"none","milestones":["cobblestone","dirt"],"budget":{"seconds":120}}
   ]
 }

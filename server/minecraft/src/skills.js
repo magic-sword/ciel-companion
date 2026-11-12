@@ -13,14 +13,15 @@ import { guarded } from './guard.js';
 import { planCraft } from './craft-plan.js';
 import { planGoal } from './goal-plan.js';
 import { blocksFor } from './names.js';
-import { knows, remember, rememberAround } from './sight.js';
-import { collectMovements, escapeMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
+import { canSee, knows, remember, rememberAround } from './sight.js';
+import { collectMovements, escapeMovements, miningMovements, NATURAL, playerMovements, SCAFFOLD } from './movements.js';
 
 const { goals } = pathfinderPkg;
 const FOLLOW_RANGE = 2;     // ついていくときに空ける距離
 const COME_RANGE = 2;
 const SEARCH_DISTANCE = 48; // 集めるブロックを探す距離
 const FIND_COUNT = 64;
+const MINING_ORIGINS = new WeakMap();
 const TRIES_PER_ITEM = 3;   // 1 個あたりに試すブロックの数（掘れないものが続いたらあきらめる）
 const PATH_ERRORS = /Timeout|NoPath|No path|decide path|GoalChanged|PathStopped|Stuck/i;
 const STILL_MS = 8000;      // 歩く・集めるあいだ、動かず・掘らず・置かずがこれだけ続いたら、行き先を取り消す（watched）
@@ -230,7 +231,7 @@ export function groundedDig(bot, log = console.log) {
 
 // 掘ったブロックのまわり（PICKUP_RANGE）に落ちている物を拾いに行く。collectblock は、掘ったブロックの真ん中から 0.5 以内に
 // 落ちた物しか拾わず、少しずれて落ちた原木や、高い所から落ちた原木を拾わなかった（4 本掘って 0 本。2026-11-06）
-export async function pickUpNear(bot, pos, guard, token) {
+export async function pickUpNear(bot, pos, guard, token, movements = playerMovements) {
   const center = pos.offset(0.5, 0.5, 0.5);
   await bot.waitForTicks(PICKUP_SETTLE_TICKS);   // 落ちきるのを待つ
   for (let i = 0; i < PICKUP_MAX && !token.cancelled; i++) {
@@ -241,7 +242,7 @@ export async function pickUpNear(bot, pos, guard, token) {
     if (!item) return;
     try {
       await guarded(guard, token, () => {
-        bot.pathfinder.setMovements(playerMovements(bot));
+        bot.pathfinder.setMovements(movements(bot));
         const p = item.position;
         return watched(bot, () => bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 1)));
       });
@@ -309,21 +310,25 @@ export function scaffoldCount(bot) {
 }
 
 // 足場が無ければ、近くの見えている土・石を掘って集める（石は掘れる道具があるときだけ）。集めた数を返す
-export async function gatherScaffold(bot, guard, token) {
-  if (scaffoldCount(bot) >= SCAFFOLD_WANT) return 0;
-  const sources = SCAFFOLD_SOURCES.map((n) => bot.registry.blocksByName[n]).filter((b) => b && harvestable(bot, b));
-  const start = scaffoldCount(bot);
+export async function gatherScaffold(bot, guard, token, { dirtOnly = false, want = SCAFFOLD_WANT, supports = new Set() } = {}) {
+  const dirt = ['dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt', 'podzol'];
+  const count = () => dirtOnly ? bot.inventory.items().filter(i => dirt.includes(i.name)).reduce((n,i) => n+i.count,0) : scaffoldCount(bot);
+  if (count() >= want) return 0;
+  const sources = (dirtOnly ? dirt : SCAFFOLD_SOURCES).map((n) => bot.registry.blocksByName[n]).filter((b) => b && harvestable(bot, b));
+  const start = count();
   const tried = new Set();
-  while (!token.cancelled && scaffoldCount(bot) < SCAFFOLD_WANT && tried.size < SCAFFOLD_WANT * TRIES_PER_ITEM) {
+  while (!token.cancelled && count() < want && tried.size < want * TRIES_PER_ITEM) {
     const pos = bot.findBlocks({ matching: sources.map((b) => b.id), maxDistance: SCAFFOLD_SEARCH, count: FIND_COUNT })
-      .find((p) => !tried.has(p.toString()) && knows(bot, p));
+      .find((p) => !tried.has(p.toString()) && knows(bot, p)
+        && !supports.has(p.toString())
+        && (!dirtOnly || p.x !== Math.floor(bot.entity.position.x) || p.z !== Math.floor(bot.entity.position.z)));
     if (!pos) break;
     tried.add(pos.toString());
     const target = bot.blockAt(pos);
     if (!target) continue;
     try {
       await guarded(guard, token, () => {
-        bot.collectBlock.movements = playerMovements(bot);
+        bot.collectBlock.movements = dirtOnly ? miningMovements(bot, target, supports) : playerMovements(bot);
         return watched(bot, () => bot.collectBlock.collect(target));
       });
       await pickUpNear(bot, pos, guard, token);
@@ -331,7 +336,7 @@ export async function gatherScaffold(bot, guard, token) {
       if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
     }
   }
-  return scaffoldCount(bot) - start;
+  return count() - start;
 }
 
 const TOSS_RANGE = 2;      // 渡すときに近づく距離（3 では投げた物が相手を越えて落ちることがあった）
@@ -448,19 +453,23 @@ const SKILL_RUN = {
       if (token.cancelled) return;
     }
     const start = bot.entity.position.clone();
+    const found = result => {
+      if (underground && result) MINING_ORIGINS.set(bot.entity, { position: start.floored(), names: blocks.map(b=>b.name), at:Date.now() });
+      return result;
+    };
     const seen = () => {
       const p = bot.findBlocks({ matching: ids, maxDistance: FIND_NEAR, count: FIND_COUNT }).find((q) => knows(bot, q));
       return p ? { found: bot.blockAt(p)?.name, at: { x: p.x, y: p.y, z: p.z } } : null;
     };
     const first = seen();
-    if (first) return { ...first, how, already: true };
+    if (first) return found({ ...first, how, already: true });
     if (how === 'dig') {
       if (auto) {   // 先に近くを歩いて見回す（1 つめの輪だけ）
         const hit = await walkToFind(bot, AUTO_WALK_RINGS, token, guard, seen, start);
         if (token.cancelled) return undefined;
-        if (hit) return { ...hit, how: 'walk' };
+        if (hit) return found({ ...hit, how: 'walk' });
       }
-      return digSomewhere(bot, args.max ?? DIG_MAX, token, guard, seen);
+      return found(await digSomewhere(bot, args.max ?? DIG_MAX, token, guard, seen));
     }
     const hit = await walkToFind(bot, WALK_RINGS, token, guard, seen, start);
     if (token.cancelled) return undefined;
@@ -524,6 +533,7 @@ const SKILL_RUN = {
     // 数えるのは、そのブロックから取れる物だけ（石なら丸石）。道を作るときに掘れた土などは数えない
     // （丸石 2 個と土 1 個で「3 個集めた」と終わり、目的の係が丸石 2/3 で止まった。2026-11-07）
     const wanted = dropsOf(bot.registry, blocks);
+    if (blocks.some(b => b.harvestTools)) return collectMining(bot, args, token, guard, blocks, wanted);
     const total = (g) => Object.entries(g).reduce((n, [k, v]) => n + (wanted.has(k) ? v : 0), 0);
     const before = counts(bot);
     let got = {};
@@ -656,10 +666,11 @@ const NOT_GROUND = /_leaves$|_log$|_wood$|^(snow|vine|short_grass|tall_grass|fer
 
 // feet に立って dir へ 1 段目を掘り始められるか：水・溶岩に触れない・降りた先に足場がある・自然のブロックだけ
 // （湖の上に張り出した薄い地面では、どの向きも降りた先が空っぽ。2026-11-07）
-function canStartDig(bot, feet, dir) {
+function canStartDig(bot, feet, dir, supports = new Set()) {
   const front = feet.plus(dir);
   const step = front.offset(0, -1, 0);
   const targets = [front.offset(0, 1, 0), front, step];
+  if (targets.some(p => supports.has(p.toString()))) return false;
   for (const p of targets) {
     const around = [p, p.offset(1, 0, 0), p.offset(-1, 0, 0), p.offset(0, 0, 1), p.offset(0, 0, -1), p.offset(0, 1, 0)];
     if (around.some((q) => FLUIDS.test(bot.blockAt(q)?.name ?? ''))) return false;
@@ -673,12 +684,12 @@ function canStartDig(bot, feet, dir) {
 }
 
 // feet から掘り始められる向き（向いている方から順に 4 方向）。どれも駄目なら null
-function digDirection(bot, feet) {
+function digDirection(bot, feet, supports = new Set()) {
   const yaw = ((bot.entity.yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   const first = Math.round(yaw / (Math.PI / 2)) % 4;
   for (let k = 0; k < 4; k++) {
     const dir = DIRS[(first + k) % 4];
-    if (canStartDig(bot, feet, dir)) return dir;
+    if (canStartDig(bot, feet, dir, supports)) return dir;
   }
   return null;
 }
@@ -742,7 +753,7 @@ async function digSomewhere(bot, max, token, guard, seen) {
 
 // dir へ、階段状に掘り下げながら探す。1 段ごとに：前の足の高さ・頭の高さ・前の 1 段下を掘り、そこへ降りる。
 // 自然のブロックだけ掘る。水・溶岩に当たりそうなら止める（danger）。必要な道具を用意し、装備してから掘る。
-async function digToFind(bot, max, token, guard, seen, start, dir) {
+async function digToFind(bot, max, token, guard, seen, start, dir, movements = playerMovements) {
   let dug = 0;
   for (let i = 0; i < max && !token.cancelled; i++) {
     if (guard?.active) await guard.idle(token);
@@ -775,7 +786,7 @@ async function digToFind(bot, max, token, guard, seen, start, dir) {
     }
     try {
       await guarded(guard, token, () => {
-        bot.pathfinder.setMovements(playerMovements(bot));
+        bot.pathfinder.setMovements(movements(bot));
         return watched(bot, () => bot.pathfinder.goto(new goals.GoalBlock(step.x, step.y, step.z)));
       });
     } catch (err) {
@@ -786,6 +797,113 @@ async function digToFind(bot, max, token, guard, seen, start, dir) {
   }
   if (token.cancelled) return undefined;
   throw new Failed('not_found', { how: 'dig', dug, descended: Math.round(start.y - bot.entity.position.y) });
+}
+
+// Stone/ore collection keeps a walkable exit and reports the inventory after returning.
+async function collectMining(bot, args, token, guard, blocks, wanted) {
+  const search = MINING_ORIGINS.get(bot.entity);
+  MINING_ORIGINS.delete(bot.entity);
+  const entry = search && Date.now()-search.at < 120000 && search.names.some(n=>blocks.some(b=>b.name===n))
+    && search.position.distanceTo(bot.entity.position)<=SEARCH_DISTANCE ? search.position : bot.entity.position.floored();
+  const before = counts(bot), supports = new Set(), tried = new Set();
+  const ids = blocks.map(b => b.id), names = new Set(blocks.map(b => b.name));
+  const total = () => Object.entries(gained(before, counts(bot)))
+    .reduce((n, [name, count]) => n + (wanted.has(name) ? count : 0), 0);
+  const protect = p => supports.add(new Vec3(Math.floor(p.x), Math.floor(p.y) - 1, Math.floor(p.z)).toString());
+  const path = result => { for (const p of result.path ?? []) protect(p); };
+  const travel = b => miningMovements(b, null, supports, wanted);
+  const candidate = () => bot.findBlocks({ matching: ids, maxDistance: SEARCH_DISTANCE, count: FIND_COUNT })
+    .filter(p => p.y >= Math.floor(bot.entity.position.y) && p.y <= Math.floor(bot.entity.position.y) + 1
+      && !supports.has(p.toString()) && !tried.has(p.toString()) && knows(bot, p))
+    .sort((a, b) => a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position))[0];
+  protect(entry);
+  bot.on?.('path_update', path);
+  let unreachable = 0, stairs = 0, short = null, returned = false;
+  try {
+    await gatherScaffold(bot, guard, token, { dirtOnly: true, supports });
+    for (let trip = 0; trip < 3 && !token.cancelled; trip++) {
+      const returnReserve = () => Math.max(0, entry.y - Math.floor(bot.entity.position.y)
+        - bot.inventory.items().filter(i => SCAFFOLD.includes(i.name) && !wanted.has(i.name)).reduce((n,i) => n+i.count,0));
+      while (!token.cancelled && total() < args.count + returnReserve() && tried.size < (args.count + DIG_MAX) * TRIES_PER_ITEM) {
+        protect(bot.entity.position);
+        const pos = candidate();
+        if (!pos) {
+          // Prefer dirt for the return before opening another level of the staircase.
+          await gatherScaffold(bot, guard, token, { dirtOnly: true, want: Math.min(16, stairs + 4), supports });
+          if (token.cancelled) break;
+          // A single stair exposes a face to mine horizontally. Never excavate a vertical shaft.
+          if (stairs >= Math.min(DIG_MAX, Math.ceil(args.count / 2) + 1)) { short = 'not_found'; break; }
+          const dir = digDirection(bot, bot.entity.position.floored(), supports);
+          if (!dir) { short = 'cannot_dig'; break; }
+          const old = bot.entity.position.floored();
+          try {
+            await digToFind(bot, 1, token, guard, () => candidate() ? { found: true } : null,
+              bot.entity.position.clone(), dir, travel);
+          } catch (err) {
+            if (!(err instanceof Failed)) throw err;
+            short = err.message;
+          }
+          stairs++;
+          protect(bot.entity.position);
+          if (token.cancelled) break;
+          if (bot.entity.position.floored().equals(old)) { short ??= 'no_path'; break; }
+          // Stair excavation can itself supply stone. Refresh inventory before more mining.
+          await pickUpNear(bot, bot.entity.position.floored(), guard, token, travel);
+          if (short && short !== 'not_found') break;
+          short = null;
+          continue;
+        }
+        tried.add(pos.toString());
+        const target = bot.blockAt(pos);
+        if (!target) continue;
+        try {
+          await guarded(guard, token, async () => {
+            await equipForDig(bot, target, token, guard);
+            if (token.cancelled) return;
+            bot.collectBlock.movements = miningMovements(bot, target, supports, wanted);
+            if (bot.canDigBlock(target) && canSee(bot, pos)
+                && bot.collectBlock.movements.safeToBreak(target)) {
+              // Mine the exposed face from here; do not walk onto every block before digging.
+              await bot.dig(target, true);
+            } else {
+              await watched(bot, () => bot.collectBlock.collect(target));
+            }
+          });
+          rememberAround(bot, pos, n => names.has(n));
+          await pickUpNear(bot, pos, guard, token, travel);
+        } catch (err) {
+          if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+          unreachable++;
+        }
+      }
+      if (!token.cancelled) {
+        try {
+          await guarded(guard, token, () => {
+            bot.pathfinder.setMovements(travel(bot));
+            return watched(bot, () => bot.pathfinder.goto(new goals.GoalBlock(entry.x, entry.y, entry.z)));
+          });
+        } catch (err) {
+          if (!PATH_ERRORS.test(`${err?.name} ${err?.message}`)) throw err;
+          short = 'no_path';
+        }
+        returned = bot.entity.position.floored().equals(entry);
+        if (!returned) short = 'no_path';
+      }
+      if (token.cancelled || !returned || total() >= args.count || short) break;
+      // Returning may have consumed some stone. Replenish and recheck at the entry.
+    }
+  } finally {
+    bot.removeListener?.('path_update', path);
+    bot.collectBlock.movements = playerMovements(bot);
+    if (!guard?.active) bot.pathfinder.setMovements(bot.collectBlock.movements);
+  }
+  const note = { gained: gained(before, counts(bot)), wanted: args.count, unreachable,
+    mining: 'horizontal_with_stairs', stairs, returned };
+  if (token.cancelled) return note;
+  if (!returned) throw new Failed('no_path', note);
+  if (total() < args.count) note.short = short ?? (unreachable ? 'no_path' : 'not_found');
+  if (total() === 0) throw new Failed(note.short, note);
+  return note;
 }
 
 // 足元を depth ブロック掘って降りる（技 dig_down）。

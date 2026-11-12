@@ -51,7 +51,8 @@ export function stepResult(step, done) {
   if (step.kind === 'gather') {
     const got = Math.min(got0 + Number(note.gained?.[a.item] ?? 0), a.count);
     r.progress = [got, a.count];
-    r.complete = got >= a.count;
+    r.complete = got >= a.count && note.returned !== false;
+    if (note.returned === false) r = { ...r, ok: false, reason: 'no_path' };
   } else {
     r.progress = step.progress ?? null;
     r.complete = Boolean(r.ok);
@@ -64,6 +65,8 @@ const sameLabels = (a, b) => a.length === b.length && a.every((x, i) => x === b[
 
 // 決まった直し方。{steps, text} か null（直せない：心に相談）。plan は (item, count) → {steps} か {error}
 export function repair({ spec, step, result, remaining }, plan) {
+  // Having the items underground is not a successful return. Do not replan it away.
+  if (result?.note?.returned === false) return null;
   const reason = result?.reason;
   // 集める物が見える所に無い：先に探す段を足す（探しても無ければ、探す段の失敗として心に相談する）
   if (reason === 'not_found' && step.kind === 'gather') {
