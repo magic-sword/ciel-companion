@@ -13,17 +13,20 @@ ROOT=Path(__file__).resolve().parents[2]
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--label',required=True);p.add_argument('--smoke',action='store_true')
     p.add_argument('--split',choices=('dev','validation'),default='dev');p.add_argument('--rounds',type=int,default=3)
+    p.add_argument('--suite',choices=('repetition-suite','prevention-suite'),default='repetition-suite')
     p.add_argument('--sampling',choices=('production','deterministic'),default='production');p.add_argument('--pull-only',action='store_true');a=p.parse_args()
     if not re.fullmatch('[A-Za-z0-9_-]+',a.label) or not 1<=a.rounds<=10:p.error('Invalid label or rounds')
     if a.smoke and a.split!='dev':p.error('Smoke uses dev controls')
     spec=importlib.util.spec_from_file_location('home',Path(__file__).with_name('weight-space-home.py'));h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
     files=['server/benchmark/'+n for n in ('weight_space.py','repetition.py','repetition_review.py','weight_space/repetition-suite.json')]
+    files.append('server/benchmark/weight_space/'+a.suite+'.json')
     payload={name:base64.b64encode((ROOT/name).read_bytes()).decode() for name in files}
     prefix='from pathlib import Path\nimport json,base64,subprocess,hashlib,urllib.request,platform\nlabel='+repr(a.label)+"\nroot=Path.home()/'work/ciel-repetition-evaluation'/label\n"
     if not a.pull_only:
         command=['python','-B','-m','server.benchmark.repetition','run','--agent-dir','/app','--prompt-dir','/app/config/prompts',
                  '--conditions','conditions.json','--output','output','--split',a.split,'--rounds',str(1 if a.smoke else a.rounds),'--sampling',a.sampling]
         if a.smoke:command+=['--case','necessary-question-control','--case','requested-recap-control']
+        command+=['--suite','server/benchmark/weight_space/'+a.suite+'.json']
         h.remote(prefix+'payload='+repr(payload)+'\ncommand='+repr(command)+'''
 root.mkdir(parents=True,exist_ok=False)
 for name,value in payload.items():

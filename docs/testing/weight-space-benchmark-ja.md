@@ -17,9 +17,30 @@
 
 ## 測定項目
 
+### 発生予防を主評価とする会話系列
+
+主評価は`build_prevention_suite.py`が生成する`weight_space/prevention-suite.json`。初期履歴は空で、assistant文も作業失敗の通知も注入しない。全返答を各モデルが生成し、そのモデル自身の履歴へ戻す。dev4会話・公開validation2会話、各8ターン×3系列、計144返答を初期測定とする。食事・片付け・雑談・予定取消をdev、休日相談・案内文をvalidationへ分離する。音声/STT・実セッションの記憶や通知を含まないテキストモデル評価であり、合成音声で採取した実ログとは呼ばない。
+
+利用者の目的と切替時点は固定し、直前の生成応答の質問文が定義済み条件に一致した場合だけ回答/訂正の言い方を変える。条件に合わなければ単に新情報を伝え、存在しない質問へ「もう答えた」と抗議しない。最初に一致した分岐を選び、実発話・分岐ID・根拠文を保存する。正規表現は利用者役のルーティングだけに使い、反復の採点は意味レビューで行う。レビューの`branch_valid`を全分岐対象で確認し、不適切な分岐・未確認は系列の完了スコアを欠測とする。結果を見て台本を変えた場合は新しいsuite版で全候補を測り直す。
+
+反復の初発ターン（0始まり）、観測期間内の発生有無、対象ターン率・意味単位数・該当文字数・最長連続を主指標とする。未発生は`first_repeat_turn=null/onset_censored=true`で、無限に反復しないとは扱わない。`macro_series_incidence`は系列→会話→familyで等重みの発生率。必要な質問・自分の直前の案の再説明・求められた話題再開は対照として別採点し、反復率の分母に入れない。内容点と対照保持点を反復減少と相殺しない。質問停止の直後/後続ターンでの遵守も原文根拠から別集計する。実行失敗・打切り・空応答は改善に数えない。
+
+既存の固定反復履歴は回復診断として保持する。発生予防と回復の得点を合算しない。WSP候補は同一初期状態・利用者方針・seedで比較するが、assistant履歴と利用者分岐は候補ごとに変わる。これを改善効果に含める。現行の固定ログだけで発生予防を証明しない。改善候補の最終確認では実会話サーバーを通した複数往復が必要。
+
+設計の参考は[MultiChallenge](https://arxiv.org/abs/2501.17399)の履歴と課題別基準、[Lost in Conversation](https://arxiv.org/abs/2505.06120)の自分の初期回答に引きずられる現象、[τ-bench](https://arxiv.org/abs/2406.12045)の複数試行による信頼性、[MT-Benchの評価研究](https://arxiv.org/abs/2306.05685)の採点者の偏り。独自の日本語課題であり、各論文の公式ベンチマーク実装/公式スコアではない。各3系列は探索基準値で、独立評価者との一致、有意差、Qwen固有の原因を証明しない。同一会話の隣接ターンを開発と最終評価へ分けない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -m server.benchmark.build_prevention_suite
+.\.venv\Scripts\python.exe -B -m server.benchmark.repetition validate --suite server/benchmark/weight_space/prevention-suite.json
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/repetition-home.py --suite prevention-suite --label prevention-baseline-dev-01
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/repetition-home.py --suite prevention-suite --split validation --label prevention-baseline-validation-01
+```
+
+採点は下記`repetition_review`を使い、`--suite`へ当該runの`sources/prevention-suite.json`を指定する。保存ログは後続の1応答回復診断にも利用できる。採点器の版変更前の旧結果と直接差を取らない。
+
 ### 現行の会話構造で測る複数往復の反復評価
 
-`repetition.py`・`repetition_review.py`と`weight_space/repetition-suite.json`を現行の反復評価の入口とする。12会話（dev9、公開validation3）。既存の配信由来4・12往復雑談2を引き継ぎ、必要な質問・再説明・明示再開の対照3、別系列の資料作成・献立変更・趣味の話題変更3を加えた。validationはdevと別の話題系列だが公開課題であり、秘密のholdoutとは呼ばない。段階4の限定評価であり、段階5の評価完了ではない。生成前の固定履歴は発症数へ含めない。
+`repetition.py`・`repetition_review.py`と`weight_space/repetition-suite.json`は固定履歴からの回復・既存条件との比較に使う。発生予防の主評価は前節の`prevention-suite.json`。こちらは12会話（dev9、公開validation3）。既存の配信由来4・12往復雑談2を引き継ぎ、必要な質問・再説明・明示再開の対照3、別系列の資料作成・献立変更・趣味の話題変更3を加えた。validationはdevと別の話題系列だが公開課題であり、秘密のholdoutとは呼ばない。段階4の限定評価であり、段階5の評価完了ではない。生成前の固定履歴は発症数へ含めない。
 
 現行`mind.local_context`とLiveKit SDKで毎ターンの実送信JSONを組み立て、固定system・後方の内部データ・利用者/assistantのroleを維持する。生成したassistant返答を次のターンへ戻す。初期履歴と現在の状態は合成fixtureであり、実セッションの`Mind.build`、要約生成、通知の発生順、音声、実ツールの統合再現ではない。MCP・Minecraftには操作を発行しない。モデルがtoolを出した場合は失敗にし、その返答を後続へ渡さない。
 

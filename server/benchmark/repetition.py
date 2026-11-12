@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 from pathlib import Path
 import random
+import re
 import sys
 import time
 from types import SimpleNamespace
@@ -22,10 +23,24 @@ def load(path):
     for c in suite['cases']:
         if c['id'] in ids or not c['dialogue'] or not c.get('family'):raise ValueError('Invalid case')
         ids.add(c['id'])
+        if suite.get('purpose')=='prevention' and c['messages']:raise ValueError('Prevention starts without scripted history')
         if c['split'] not in ('dev','validation'):raise ValueError('Invalid split')
         for t in c['dialogue']:
             if t['phase'] not in ('target','control') or type(t['switch']) is not bool or not t['rubric']:raise ValueError('Invalid turn')
+            for b in t.get('branches',[]):
+                if not b.get('id') or not b.get('user'):raise ValueError('Invalid branch')
+                re.compile(b['pattern'])
     return suite
+
+
+def user_turn(spec,history):
+    """First matching question rule wins. Routing is not a quality judgement."""
+    previous=history[-1].get('content','') if history and history[-1]['role']=='assistant' else ''
+    questions=[s for s in re.split(r'(?<=[。！？!?.\n])',previous) if re.search(r'[？?]|(?:教えて|聞かせて)(?:ください|下さい|ほしい|欲しい|ね|。|$)',s)]
+    for b in spec.get('branches',[]):
+        evidence=next((s for s in questions if re.search(b['pattern'],s)),None)
+        if evidence is not None:return b['user'],dict(id=b['id'],evidence=evidence)
+    return spec['user'],dict(id='default',evidence=None)
 
 
 def renderer(agent_dir):
@@ -52,11 +67,12 @@ def series(case,system,args,seed,render,chat=w.stream_chat):
         return chat(url,payload,timeout)
     for i,t in enumerate(case['dialogue']):
         if time.monotonic()+args.timeout>args.deadline:break
-        history.append(dict(role='user',content=t['user']))
+        user,branch=user_turn(t,history)
+        history.append(dict(role='user',content=user))
         wire=render(system,history,case.get('context',''))
         child=dict(id=case['id'],category='repetition',context='',messages=wire[1:],checks=[dict(type='no_calls')])
         row=w.run_case(child,wire[0]['content'],args,seed+i,chat=sampled)
-        turns.append(dict(index=i,input=wire,phase=t['phase'],switch=t['switch'],rubric=t['rubric'],
+        turns.append(dict(index=i,input=wire,user=user,branch=branch,phase=t['phase'],switch=t['switch'],rubric=t['rubric'],
                           response=row['messages'],status=row['status'],calls=row['calls'],measurements=row['measurements']))
         if row['status']!='ok' or row['calls'] or not any(m.get('content','').strip() for m in row['messages']):break
         history.extend(copy.deepcopy(row['messages']))

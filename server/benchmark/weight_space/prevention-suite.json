@@ -1,0 +1,464 @@
+{
+  "schema": "ciel-repetition-v1",
+  "version": 2,
+  "purpose": "prevention",
+  "note": "Scripted user goals, no assistant seed. First matching question branch wins; audit routing separately from semantic scoring. Text/model evaluation, not captured live voice sessions. Public validation.",
+  "cases": [
+    {
+      "id": "meal-prevention",
+      "family": "meal-prevention",
+      "split": "dev",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "夕食の簡単なサラダを考えたい。まず必要なら人数を聞いて。",
+          "rubric": "相談を受け止め、未提示の条件を必要に応じ確認する。質問の一律抑制はしない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "二人分だよ。簡単な案を一つ教えて。",
+          "rubric": "提示条件を使って具体的な案を一つ示す。同じ条件を聞き直さない。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "answer-requested",
+              "pattern": "何人|人数|何名",
+              "user": "質問への答えは、二人分だよ。簡単な案を一つ教えて。"
+            }
+          ]
+        },
+        {
+          "user": "ありがとう。その案の要点をもう一度、一文で教えて。",
+          "rubric": "自分が直前に生成した案を再説明する。必要な反復を抑制しない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "料理の相談はここまで。今日は公園を歩いて気持ちよかった。",
+          "rubric": "明示された話題変更に応じ、旧相談の質問や説明へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "近所の公園を一周したよ。",
+          "rubric": "新話題の具体情報を受け止め、回答済み情報を再質問しない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "少し疲れたから、これからは質問せず聞いていて。",
+          "rubric": "質問を止めて寄り添う。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日の出来事を伝えられて、少しほっとしたよ。",
+          "rubric": "感想を受け止め、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "今は質問せず聞いていてほしい。今日の出来事を伝えられて、少しほっとしたよ。"
+            }
+          ]
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "rubric": "別れに応じて終了する。新しい質問や旧相談を始めない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "desk-prevention",
+      "family": "desk-prevention",
+      "split": "dev",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "机の片付けの手順を相談したい。まず必要なら片付ける物を聞いて。",
+          "rubric": "相談を受け止め、未提示の条件を必要に応じ確認する。質問の一律抑制はしない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "書類と文房具だよ。簡単な案を一つ教えて。",
+          "rubric": "提示条件を使って具体的な案を一つ示す。同じ条件を聞き直さない。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "answer-requested",
+              "pattern": "何|どんな|物|もの",
+              "user": "質問への答えは、書類と文房具だよ。簡単な案を一つ教えて。"
+            }
+          ]
+        },
+        {
+          "user": "ありがとう。その案の要点をもう一度、一文で教えて。",
+          "rubric": "自分が直前に生成した案を再説明する。必要な反復を抑制しない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "片付けの相談はここまで。今日は窓の外に鳥が来たよ。",
+          "rubric": "明示された話題変更に応じ、旧相談の質問や説明へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "小さなスズメだったよ。",
+          "rubric": "新話題の具体情報を受け止め、回答済み情報を再質問しない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "少し疲れたから、これからは質問せず聞いていて。",
+          "rubric": "質問を止めて寄り添う。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日の出来事を伝えられて、少しほっとしたよ。",
+          "rubric": "感想を受け止め、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "今は質問せず聞いていてほしい。今日の出来事を伝えられて、少しほっとしたよ。"
+            }
+          ]
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "rubric": "別れに応じて終了する。新しい質問や旧相談を始めない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "outing-prevention",
+      "family": "outing-prevention",
+      "split": "validation",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "休日の過ごし方を相談したい。まず必要なら出かけるか家にいるか聞いて。",
+          "rubric": "相談を受け止め、未提示の条件を必要に応じ確認する。質問の一律抑制はしない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "外出せず、家で小説を読むよ。簡単な案を一つ教えて。",
+          "rubric": "提示条件を使って具体的な案を一つ示す。同じ条件を聞き直さない。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "answer-requested",
+              "pattern": "外|家|どこ|過ご|出かけ",
+              "user": "質問への答えは、外出せず、家で小説を読むよ。簡単な案を一つ教えて。"
+            }
+          ]
+        },
+        {
+          "user": "ありがとう。その案の要点をもう一度、一文で教えて。",
+          "rubric": "自分が直前に生成した案を再説明する。必要な反復を抑制しない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "休日の相談はここまで。今日は温かい飲み物を用意したよ。",
+          "rubric": "明示された話題変更に応じ、旧相談の質問や説明へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "飲み物はココアだよ。",
+          "rubric": "新話題の具体情報を受け止め、回答済み情報を再質問しない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "少し疲れたから、これからは質問せず聞いていて。",
+          "rubric": "質問を止めて寄り添う。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日の出来事を伝えられて、少しほっとしたよ。",
+          "rubric": "感想を受け止め、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "今は質問せず聞いていてほしい。今日の出来事を伝えられて、少しほっとしたよ。"
+            }
+          ]
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "rubric": "別れに応じて終了する。新しい質問や旧相談を始めない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "weekend-prevention",
+      "family": "weekend-prevention",
+      "split": "dev",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "週末は家で小説を読む予定だよ。作品は決めたから、おすすめはいらない。",
+          "rubric": "家で読書と理解し、外出予定を聞き直さず作品を勧めない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日は雨の音が心地いいね。",
+          "rubric": "雨へ応じ、週末の予定確認へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": [
+            {
+              "id": "weekend-correction",
+              "pattern": "週末|予定|どこ.*行|出かけ",
+              "user": "週末は家で読書だよ。今日は雨の音が心地いいね。"
+            }
+          ]
+        },
+        {
+          "user": "窓辺で聞いているよ。",
+          "rubric": "雨音の話を受け止める。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "別の話だけど、動画で見た猫の寝顔がかわいかった。猫は飼っていないよ。",
+          "rubric": "動画の猫へ切り替え、飼い猫と誤認しない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "少し疲れたから、これからは質問せず聞いていて。",
+          "rubric": "質問を止める。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日は机を片付けられたよ。",
+          "rubric": "片付けを受け止め、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "質問はせず聞いていてね。今日は机を片付けられたよ。"
+            }
+          ]
+        },
+        {
+          "user": "最初に話した週末の予定を、一文で確認して。",
+          "rubric": "家で小説を読むと答える。依頼された話題復帰を抑制しない。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "rubric": "別れで終わり、予定確認や質問へ戻らない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "plan-change-prevention",
+      "family": "plan-change-prevention",
+      "split": "dev",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "旅行の計画を相談したい。土曜日に日帰りで京都へ行く予定だよ。",
+          "rubric": "土曜・日帰り・京都を保持して相談する。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "予算は一万円。寺を一つ訪ねて、ゆっくり散歩したい。",
+          "rubric": "予算・希望を使って無理のない案を出す。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "予定が変わって旅行は中止になった。代わりに家で映画を見ることにしたよ。",
+          "rubric": "旅行中止と映画への変更を受け止める。旅行を勧め続けない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "映画はもう決めたよ。今日は選び方の相談は大丈夫。",
+          "rubric": "作品選びの相談を終了し、候補提示や詳細質問を止める。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "昨日はよく眠れたんだ。",
+          "rubric": "睡眠の話へ応じ、旅行や映画選びに戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "うん、それだけ伝えたかった。質問はせず聞いていて。",
+          "rubric": "質問せず受け止める。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "明日も落ち着いて過ごせたらいいな。",
+          "rubric": "気持ちを受け止め、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "質問はせず聞いていてね。明日も落ち着いて過ごせたらいいな。"
+            }
+          ]
+        },
+        {
+          "user": "じゃあ、おやすみ。",
+          "rubric": "就寝挨拶で終わる。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "writing-prevention",
+      "family": "writing-prevention",
+      "split": "validation",
+      "stage": 4,
+      "messages": [],
+      "dialogue": [
+        {
+          "user": "会議の案内文を考えたい。社内向けで、金曜日の午後三時からだよ。",
+          "rubric": "社内向け・金曜15時を保持した案内を作る。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "場所は第二会議室だよ。短い文にして。",
+          "rubric": "既知情報を保持して第二会議室を含む短い案内を作る。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "answer-location",
+              "pattern": "場所|どこ|会場",
+              "user": "場所への答えは第二会議室だよ。短い文にして。"
+            }
+          ]
+        },
+        {
+          "user": "聞き取れなかった。同じ案内をもう一度お願い。",
+          "rubric": "直前の案内の日時・場所・宛先を保って再説明する。",
+          "phase": "control",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "案内の相談はこれで終わり。今日は散歩で花を見つけたよ。",
+          "rubric": "花の話へ移り、案内の確認へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "branches": []
+        },
+        {
+          "user": "黄色い花だった。名前は分からないけど、調べなくていいよ。",
+          "rubric": "黄色い花と受け止め、同定の質問を続けない。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "これからは質問せず、ただ聞いていてほしい。",
+          "rubric": "質問を止める。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        },
+        {
+          "user": "こういう小さな出来事がうれしいんだ。",
+          "rubric": "感想に応じ、質問停止を維持する。",
+          "phase": "target",
+          "switch": false,
+          "branches": [
+            {
+              "id": "stop-reminder",
+              "pattern": ".",
+              "user": "質問はせず聞いていてね。こういう小さな出来事がうれしいんだ。"
+            }
+          ]
+        },
+        {
+          "user": "また明日。",
+          "rubric": "別れで終わる。",
+          "phase": "target",
+          "switch": false,
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

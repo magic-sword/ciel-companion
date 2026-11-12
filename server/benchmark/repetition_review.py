@@ -21,6 +21,7 @@ def prepare(report,suite):
             spec=cases[row['id']]['dialogue'][t['index']]
             cards.append(dict(id=row['id'],repeat=row['repeat'],index=t['index'],response_sha256=digest(t['response']),
                 text='\n'.join(m.get('content','') for m in t['response']),phase=spec['phase'],rubric=spec['rubric'],
+                user=t.get('user',spec.get('user')),branch=t.get('branch'),branch_valid=None if spec.get('branches') else True,
                 units=None,content_0_4=None,control_0_4=None,unverified_completion=None,evidence=None))
     return dict(schema='ciel-repetition-review-v1',report_sha256=digest(report),evaluator=None,cards=cards)
 
@@ -72,7 +73,7 @@ def trial_score(spec,turns,ratings):
             delay=found-start if found is not None else None,censored=found is None,
             relapses=sum(ratings[i]['repeat_units']>0 for i in range(found+2,end)) if found is not None else None))
     controls=[v['control'] for v in ratings if v['control'] is not None]
-    return dict(complete=True,target_turns=len(target),control_turns=len(controls),repeat_turns=sum(affected),repeat_units=sum(ratings[i]['repeat_units'] for i in target),repeat_chars=sum(ratings[i]['repeat_chars'] for i in target),
+    return dict(complete=True,repeat_occurred=any(affected) if target else None,first_repeat_turn=next((i for i in target if ratings[i]['repeat_units']),None),onset_censored=not any(affected) if target else None,target_turns=len(target),control_turns=len(controls),repeat_turns=sum(affected),repeat_units=sum(ratings[i]['repeat_units'] for i in target),repeat_chars=sum(ratings[i]['repeat_chars'] for i in target),
         repeat_turn_fraction=sum(affected)/len(target) if target else None,repetition_free_0_5=5*(1-sum(affected)/len(target)) if target else None,
         longest_run=longest if target else None,recovery=recovery,content_0_5=statistics.mean(v['content'] for v in ratings)*1.25,
         control_0_5=statistics.mean(controls)*1.25 if controls else None,
@@ -93,7 +94,8 @@ def score(report,review,suite):
         for t in r['turns']:
             c=cards[(r['id'],r['repeat'],t['index'])]
             if c['phase']!=specs[r['id']]['dialogue'][t['index']]['phase']:raise ValueError('Phase changed')
-            ratings.append(turn_score(c,t))
+            if specs[r['id']]['dialogue'][t['index']].get('branches') and c.get('branch_valid') is not True:ratings.append(None)
+            else:ratings.append(turn_score(c,t))
         value=trial_score(specs[r['id']],r['turns'],ratings)
         rows.append(dict(id=r['id'],repeat=r['repeat'],family=r['family'],seed=r['seed'],metrics=value,ratings=ratings))
     expected_keys={(id,repeat) for id in report['case_ids'] for repeat in range(report['rounds'])}
@@ -109,12 +111,18 @@ def score(report,review,suite):
             if values and all(v is not None for v in values):case_means.append(statistics.mean(values))
         families[family]=statistics.mean(case_means) if case_means else None
     values=[v for v in families.values() if v is not None]
+    incidence=[]
+    if complete:
+        for family in sorted({r['family'] for r in rows}):
+            entries=[r for r in rows if r['family']==family and r['metrics'].get('repeat_occurred') is not None]
+            if entries:
+                incidence.append(statistics.mean(statistics.mean(r['metrics']['repeat_occurred'] for r in entries if r['id']==id) for id in {r['id'] for r in entries}))
     distributions={id:dict(expected_series=report['rounds'],observed_series=sum(r['id']==id for r in rows),
                           fractions=[r['metrics']['repeat_turn_fraction'] for r in rows if r['id']==id]) for id in report['case_ids']}
     return dict(schema='ciel-repetition-score-v1',report_sha256=digest(report),review_sha256=digest(review),complete=complete,
         protocol=dict(suite_sha256=report['suite_sha256'],sampling=report['sampling'],split=report['split'],scorer_sha256=w.digest(__file__)),
         context=dict(weights=report['conditions']['weights_sha256'],prompt=report['prompt_sha256'],renderer=report['renderer']),
-        family_repeat_fraction=families if complete else None,macro_repeat_fraction=statistics.mean(values) if complete and values else None,rows=rows,
+        family_repeat_fraction=families if complete else None,macro_repeat_fraction=statistics.mean(values) if complete and values else None,macro_series_incidence=statistics.mean(incidence) if incidence else None,rows=rows,
         case_distributions=distributions,
         limitations='Recovery is censored at the observation window; rounds of one case are clustered, not independent cases.')
 
@@ -127,7 +135,7 @@ def compare(base,candidate,change='weights'):
     pairs=[]
     for key in sorted(b):
         if b[key]['seed']!=c[key]['seed']:raise ValueError('Unpaired seed')
-        pairs.append(dict(id=key[0],repeat=key[1],delta={k:(c[key]['metrics'][k]-b[key]['metrics'][k]) if b[key]['metrics'].get(k) is not None and c[key]['metrics'].get(k) is not None else None for k in ('repeat_units','repeat_chars','repeat_turn_fraction','content_0_5','control_0_5','premature_followups','unverified_completions')}))
+        pairs.append(dict(id=key[0],repeat=key[1],delta={k:(c[key]['metrics'][k]-b[key]['metrics'][k]) if b[key]['metrics'].get(k) is not None and c[key]['metrics'].get(k) is not None else None for k in ('repeat_occurred','repeat_units','repeat_chars','repeat_turn_fraction','content_0_5','control_0_5','premature_followups','unverified_completions')}))
     return dict(pairs=pairs,decision='review_required',note='Inspect content/control/completion regressions separately; no automatic adoption or significance claim.')
 
 
