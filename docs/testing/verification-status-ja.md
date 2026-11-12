@@ -2,6 +2,8 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+通常の開発接続を本番と同じCiel（8771）へ変更し、2026-11-12に反映した。開発agentは既存イメージのまま設定を再作成し、CIEL_DEBUG_LOG=1と書込可能なログvolume、worker登録、health 200、共有先のMCP profile 2/work 1を確認。旧Ciel_Devコンテナは停止した。本番各コンテナのID・image・起動時刻は不変。証拠は`~/work/ciel-companion-dev/server/data/deployments/shared-ciel-20261112-175822/`の設定退避・before/after/verification JSON。実音声による操作・新ログの内容確認は未実施。Ciel_Debugの明示起動経路は設定とwhitelistの2テストで確認し、今回は起動していない。通常の`--dev`と検証用`--dev --minecraft`の使い分けは[実行設定](../operations/local-runtime-ja.md)を参照する。
+
 ゲームprofileの`speech_vocabulary`をリンク中だけWhisperへ追加する機構をローカル実装。Minecraftの語彙21語をゲーム側へ置き、通常ヒントから分離した。unit801件・MCP読取等Node5件・能力結合が成功。配布・実音声の精度比較は未実施。[条件と未確認範囲](voice-results-ja.md#現在の判断)を参照する。
 
 追従中のwork受付を一律busyから切り替え可能へ修正した。計画検証・対象ID付き停止・停止確認後の実行をローカルの回帰テストで確認。開発・本番への配布と実ゲーム内の切り替えは未確認。[検証範囲](minecraft-results-ja.md#追従から作業への切り替え)。
@@ -70,7 +72,7 @@
 
 配布根拠は両環境の`server/data/deployments/collision-5d2eb54/verification.json`・`before.json`・`after.json`・`sources-before.json`、旧skillsは`skills-before.js`。現場の`Ciel_Debug`比較では段差の座標巻き戻しが371回から0回となり、歩行目標へ到達した。Node130件成功・既存1件skip、配布した両コンテナでも衝突回帰4件ずつ成功。[条件と未確認範囲](minecraft-results-ja.md#段差での座標巻き戻し)を参照。利用者から開発`Ciel_Dev`の到着とスキン適用の報告を受けた。本番での実音声の接近・原木採集は未確認。
 
-`Ciel_Dev`だけが応答した件は、配信アプリの保存値`ciel.devServer=1`と開発agentへの命令到達を確認した。配信アプリを正常終了してこの設定だけを`0`へ戻し、再起動した。新しい会話を本番agentが受け持つことと、アプリの「ゲーム：入っている」を確認済み。本番agentは8771の`Ciel`、開発agentは8775の`Ciel_Dev`という分離を維持する。アプリはマイクOFFで再起動した。
+通常の開発・本番agentは8771の`Ciel`へ接続する。アプリの開発スイッチは会話処理とログの保存先を選び、普段のMinecraftプレイヤーを切り替えない。体の同時操作は許可せず、先の会話が接続中ならそのゲーム接続を終了してから切り替える。
 
 ### 返答生成の役目別OpenAI切替
 
@@ -116,7 +118,7 @@ commit `30951b8`を標準`deploy-server.sh --dev`、続いて`deploy-server.sh`�
 
 ## 段階1の開発用Minecraftへの先行反映
 
-利用者から開発への随時デプロイを許可され、`deploy-server.sh --dev --minecraft`を追加した。開発agentは専用body/MCPへ接続し、共用の通常Paperワールドには`Ciel_Dev`として参加する。MCPは8775、bodyは8774、eyeは3009のループバック。開発の設定・DBを退避し、既存whitelistを保持してCiel_Devを追加した。通常ワールドの初期化や本番の体の更新は行っていない。
+以下は段階1の先行版を当時のCiel_Devへ配布した証拠であり、現在の通常接続先ではない。現在は冒頭のとおり開発もCielを共用し、別体の検証時だけ`--dev --minecraft`でCiel_Debugを明示起動する。
 
 初回配布ではagent/Minecraftソース320ファイルの指紋一致、prepareを伴う`minecraft.edit_region`と`minecraft.obtain_item`の公開、既存本番8サービスのコンテナID・イメージ・起動時刻の維持を確認した。サーバーの`~/work/ciel-companion-dev/server/data/deployments/minecraft-stage1-1794367996389552605/`に前後状態・ソース照合・検証結果を保持する。`20261111-123515`と`20261111-131130`は当時の開発版の配布記録。
 

@@ -18,11 +18,16 @@ if [ "${1:-}" = dev ]; then
   ls -1t $BACKUPS/ciel-*.sql.gz | tail -n +15 | xargs -r rm -f
   echo "DB のバックアップ：$(ls -1t $BACKUPS/ciel-*.sql.gz | head -1)"
   COMPOSE=(docker compose -f compose.dev.yaml --env-file "$PROD/.env.shared" --env-file .env.dev)
+  export CIEL_DEV_MINECRAFT_URL=http://127.0.0.1:8771/mcp
   if [ "${2:-}" = minecraft ]; then
+    export CIEL_DEV_MINECRAFT_URL=http://127.0.0.1:8775/mcp
     python3 minecraft/dev-setup.py --prod-dir "$PROD"
     COMPOSE+=(--env-file "$PROD/.env.minecraft" --profile minecraft)
   fi
   "${COMPOSE[@]}" up -d --build 2>&1 | tail -8
+  if [ "${2:-}" != minecraft ]; then
+    "${COMPOSE[@]}" --profile minecraft stop minecraft-body-dev
+  fi
   exit 0
 fi
 

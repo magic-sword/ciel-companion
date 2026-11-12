@@ -106,11 +106,11 @@ docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .en
 
 ### 開発専用のMinecraftの体
 
-開発agentの接続先は`127.0.0.1:8775/mcp`。`compose.dev.yaml`のminecraftプロファイルは、本番のCielとは別プレイヤー`Ciel_Dev`を起動する。bodyは8774、目は3009でループバックだけに開く。本番のMinecraftワールドと持ち主の指示棒を共有し、体のコード・会話所有権は分離する。同じワールド内にいるため、検証する小範囲は利用者が指定する。
+通常の開発agentも本番と同じ`127.0.0.1:8771/mcp`の`Ciel`へ接続する。開発の会話・操作結果は従来どおり開発agentの`data/debug`へ保存する（CIEL_DEBUG_LOG=1、保持7日）。同じ体を受け持てる会話は一つだけで、本番と開発が同時に操作権を取得することはできない。切替時は先の会話のゲーム接続を終了する。体のコードは共用であり、開発agentの更新だけでは体の実装は更新されない。
 
-Git Bashから`scripts/server/deploy-server.sh --dev --minecraft`で、開発agentと開発専用の体をビルド・反映する。通常の`--dev`はagentだけを更新する。初回は`minecraft/dev-setup.py`が既存のEULA同意・持ち主・offline mode・whitelistを検査し、既存の登録を保持してCiel_Devのoffline UUIDを追加する。変更前のwhitelistは通常Minecraftの`ciel-config-backups/`へ保存し、whitelist reloadだけを実行する。Minecraft本体・本番の体の再作成やワールド復元は行わない。
+別の体を入れて検証するときだけ、Git Bashから`scripts/server/deploy-server.sh --dev --minecraft`を明示する。`Ciel_Debug`を起動し、その配布では開発agentを8775へ接続する（body 8774、目3009、ループバック限定）。通常の`--dev`で8771のCielへ戻り、検証用の体を停止する。Composeを直接使う場合だけ`CIEL_DEV_MINECRAFT_URL=http://127.0.0.1:8775/mcp`を指定する。初回は`minecraft/dev-setup.py`が既存のEULA同意・持ち主・offline mode・whitelistを検査し、既存登録を保持してCiel_Debugのoffline UUIDを追加する。変更前のwhitelistは通常Minecraftの`ciel-config-backups/`へ保存し、whitelist reloadだけを実行する。Minecraft本体・本番の体の再作成やワールド復元は行わない。専用ベンチマークや現場debugで同名の体を使っている間は重複起動しない。
 
-反映前後の証拠は[照合helper](../../scripts/server/verify-minecraft-dev.py)で残せる。ルートで`.venv/Scripts/python.exe -X utf8 scripts/server/verify-minecraft-dev.py before --evidence <一意の名前>`、配布後に同じ名前で`after`を実行する。既存記録の上書きは拒否する。開発ホストと実コンテナのソース、読み込まれる3種類の受付指示、MCPのprofile 2/work 1・新旧API、worker登録、開発接続先・持ち主設定・Ciel_Devの参加、通常サービスの稼働と本番のID・image・起動時刻を確認し、`~/work/ciel-companion-dev/server/data/deployments/<名前>/`の4個のJSONへ保存する。MCPの体の取得やゲーム操作は行わず、設定はmode/backend/input/STTの名前だけを記録し、資格情報は出力しない。
+反映前後の証拠は[照合helper](../../scripts/server/verify-minecraft-dev.py)で残せる。ルートで`.venv/Scripts/python.exe -X utf8 scripts/server/verify-minecraft-dev.py before --evidence <一意の名前>`、配布後に同じ名前で`after`を実行する。検証用の体へ配布した場合は`--debug-body`を付ける。既存記録の上書きは拒否する。通常は開発agentのソース・指示・worker登録、8771のMCP契約、Cielの参加、本番コンテナ不変を確認する。共用の体は手元の開発ソースとの一致判定対象外。`--debug-body`では8775のCiel_Debugと体のソースも照合する。証拠は`~/work/ciel-companion-dev/server/data/deployments/<名前>/`へ保存する。MCPの体の取得やゲーム操作は行わず、資格情報は出力しない。
 
 `.env.minecraft`は体のホスト・持ち主の設定に使い、本番の会話用`.env`は開発へ重ねない。開発からの通常ワールド検証と、専用アリーナを復元するベンチマークは別に扱う。
 

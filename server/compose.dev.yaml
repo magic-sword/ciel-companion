@@ -39,7 +39,8 @@ services:
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env.shared に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
       # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
-      - CIEL_GAMES=minecraft=http://127.0.0.1:8775/mcp
+      # 通常は本番と同じCiel。別の体の検証時だけ8775へ明示的に切り替える。
+      - CIEL_GAMES=minecraft=${CIEL_DEV_MINECRAFT_URL:-http://127.0.0.1:8771/mcp}
       # 本番と共用するローカルLLM。localでは返答・道具選択も使う。歌唱中はCPUへ切り替える
       - CIEL_LOCAL_LLM_URL=${CIEL_LOCAL_LLM_URL:-http://127.0.0.1:8094/v1}
       - CIEL_LOCAL_LLM_MODEL=${CIEL_LOCAL_LLM_MODEL:-local}
@@ -69,7 +70,7 @@ services:
       - MC_HOST=${MC_BIND:-127.0.0.1}
       - MC_PORT=25565
       - MC_VERSION=1.21.11
-      - MC_USERNAME=Ciel_Dev
+      - MC_USERNAME=Ciel_Debug
       - MC_OWNER=${MC_OWNER:-}
       - BODY_HOST=127.0.0.1
       - BODY_PORT=8774

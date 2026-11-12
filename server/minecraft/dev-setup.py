@@ -23,7 +23,7 @@ def configure(prod):
         raise RuntimeError('Development bot requires the existing offline whitelisted server')
     path=data/'whitelist.json'
     current=json.loads(path.read_text())
-    name='Ciel_Dev'
+    name='Ciel_Debug'
     identity=str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:'+name).encode()).digest(),version=3))
     if any(row.get('name')==name and row.get('uuid')!=identity for row in current):
         raise RuntimeError('Conflicting development player identity')
@@ -34,7 +34,7 @@ def configure(prod):
         temp.write_text(json.dumps([*current,{'name':name,'uuid':identity}],indent=2)+'\n')
         temp.chmod(path.stat().st_mode);temp.replace(path)
     subprocess.run(['docker','exec','ciel-minecraft-1','rcon-cli','whitelist','reload'],check=True)
-    print('Development player whitelist ready: Ciel_Dev')
+    print('Debug player whitelist ready: Ciel_Debug')
 
 
 if __name__=='__main__':
