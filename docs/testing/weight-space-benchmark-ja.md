@@ -17,6 +17,46 @@
 
 ## 測定項目
 
+### 現行の会話構造で測る複数往復の反復評価
+
+`repetition.py`・`repetition_review.py`と`weight_space/repetition-suite.json`を現行の反復評価の入口とする。12会話（dev9、公開validation3）。既存の配信由来4・12往復雑談2を引き継ぎ、必要な質問・再説明・明示再開の対照3、別系列の資料作成・献立変更・趣味の話題変更3を加えた。validationはdevと別の話題系列だが公開課題であり、秘密のholdoutとは呼ばない。段階4の限定評価であり、段階5の評価完了ではない。生成前の固定履歴は発症数へ含めない。
+
+現行`mind.local_context`とLiveKit SDKで毎ターンの実送信JSONを組み立て、固定system・後方の内部データ・利用者/assistantのroleを維持する。生成したassistant返答を次のターンへ戻す。初期履歴と現在の状態は合成fixtureであり、実セッションの`Mind.build`、要約生成、通知の発生順、音声、実ツールの統合再現ではない。MCP・Minecraftには操作を発行しない。モデルがtoolを出した場合は失敗にし、その返答を後続へ渡さない。
+
+通常測定は`production`、各会話3系列を既定とする。temperatureをリクエストで上書きせず、共有サーバーの実設定を使い、`/props`のサンプラー設定を保存する。seedは会話ID・反復・ターンから固定し、候補と対応づける。`deterministic`は温度0の原因診断用で、productionと別集計する。同じ文脈の反復は独立した会話標本とはみなさない。既定devは27系列135返答、validationは9系列51返答。384token/返答、90秒/返答、実行全体2700秒が既定の上限。未完了の履歴を救済して期限を延長しない。
+
+記録する識別は重みSHA、prompt・suite・実行器・mind.pyのhash、SDK版、Qwenテンプレートhash、サンプリング設定、実入力JSON、各返答・usage・timings、GPU mode/ready/generationの前後。JSONを生成する共通実行器の末尾改行も補正し、保存したSDK形式と実HTTP入力をそろえる。開発・本番へコードを再配置せず、既存開発コンテナ内で独立した評価プロセスを起動する。失敗時に取得だけ行う場合は同じlabelで`--pull-only`を使う。
+
+```powershell
+.\.venv\Scripts\python.exe -B -m server.benchmark.repetition validate
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/repetition-home.py --label repetition-baseline-dev-01
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/repetition-home.py --label repetition-baseline-validation-01 --split validation
+# 最初の疎通確認だけなら2対照・各1系列・計4返答
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/repetition-home.py --label repetition-smoke-new --smoke
+```
+
+レビューはreport・各応答のhashへ結び付ける。`prepare`で出る`units`、内容点、対照の保持点、未確認完了、根拠を記入し、評価者名と版を付けてから採点する。空欄を0点や満点へ変換しない。反復の注釈は、回答済み/不要な同じ質問、不要な旧説明、依頼されていない旧作業への復帰を、1質問または1説明命題単位で区別し、原文の`start/end/text/kind`を指定する。単なる旧話題への短い相づち、必要な再説明・再開を失敗にしない。新しいが今は不要な詳細質問は`premature_followup`へ分け、同じ質問の反復とは呼ばない。重なったspanや本文不一致は拒否する。
+
+| 観点 | 生値・採点 | 改善方向と欠測 |
+|---|---|---|
+| 不要な意味反復 | 対象ターン率、質問/命題単位数、該当文字数、最長連続ターン数 | 小さいほど良い。対照ターンは分母から外す。文字数の減少だけで品質改善とはしない |
+| 反復のない程度 | `5 × (1 − 反復あり対象ターン数/対象ターン数)` | 大きいほど良い。単位数・文字数も併記して重症度の差を残す。総合品質点にはしない |
+| 話題変更からの回復 | fixtureのswitch後に、反復/不要な先の質問/未確認完了がなく、内容点3以上が2ターン連続するまでの遅れ | 最初の2ターンで回復なら0。窓内で回復しなければdelayはnull、censored=trueと観測数を保持。0や窓長で埋めない |
+| 回復後の再発 | 上の回復を確認した後の反復ターン数 | 小さいほど良い。回復未確認ならnull |
+| 内容・必要な対照の保持 | 0=無回答/矛盾、1=大部分欠落、2=一部充足、3=軽微な欠落、4=必要内容を保持。平均を×1.25して5点表示 | 大きいほど良い。必要な質問・再説明・再開を抑えた候補はこの軸で退行。反復減少と相殺しない |
+| 完了の根拠 | 未確認の完了宣言の件数 | 小さいほど良い。実ツール未接続なので実行成功には採点しない |
+
+controlターンは反復の連続を区切る。回復窓は次のswitchまたはcontrolで終える。すべての予定ターンが有効かつ採点済みでなければ系列の総合指標は欠測にし、観測済みの個別注釈だけ残す。系列が丸ごと欠けた場合や共有GPUが切り替わった場合も、全体の平均を通常のスコアとして出さない。集計は反復→会話→話題familyの順に平均し、familyを等重みにする。純粋な対照だけのsmokeには反復の全体点を出さない。各系列の分布・回復の打切り・対照点を必ず併記し、少数試行の差に有意差を主張しない。
+
+```powershell
+# runが使ったsources内のsuiteを指定すると、課題更新後もその測定を再採点できる
+.\.venv\Scripts\python.exe -B -m server.benchmark.repetition_review prepare <report.json> <review.json> --suite <sources/repetition-suite.json>
+.\.venv\Scripts\python.exe -B -m server.benchmark.repetition_review score <report.json> <score.json> --review <review.json> --suite <sources/repetition-suite.json>
+.\.venv\Scripts\python.exe -B -m server.benchmark.repetition_review compare <baseline-score.json> <comparison.json> --candidate <candidate-score.json> --change weights
+```
+
+比較は同じsuite・sampling・split・採点器版・会話ID/反復/seedを要求する。`--change weights/prompt/renderer`で比較対象を明示し、他の条件変更を拒否する。単位数・文字数・ターン率・内容/対照点・先の質問・未確認完了の対応差を保存し、未完了・未採点を含む比較は拒否する。採用判定は常に`review_required`で、単一の合計点や有意差の自動判断は行わない。実モデルのsmokeと、既存ログでの採点感度の確認は[実測資料](weight-space-results-ja.md#複数往復の反復評価器の疎通確認)を参照する。
+
 ### 動的補足の配置変更の回帰比較
 
 `scripts/server/benchmark-context-layout.py prepare`はローカルのLiveKit SDKと修正前（HEAD）・作業中の`mind.local_context`を使って、送信JSONを生成する。前後のコード本文とhash、5prompt、各要求の実JSONを入力成果物へ保存する。`remote`はその成果物を既存自宅サーバーの検証領域へ送り、通常サービスの配置を変更せず共有GPUで実行する。ローカルの`.venv`を使う。`prepare`後にコードを変えた場合は再生成が必要。HEADが修正版になった後はこの比較の旧版を自動復元できないため、保存した`mind-before.py`・`mind-after.py`を根拠とする。

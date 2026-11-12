@@ -1,0 +1,856 @@
+{
+  "schema": "ciel-repetition-v1",
+  "version": 1,
+  "provenance": {
+    "stream-replay-suite.json": "a6fad83a52c30fd3ef3666c83a0670bf06db27b691507ef45e46230b902061e4",
+    "topic-loop-suite.json": "6750afc8fef8236eb71b89ff5510b627a23fe4a74cc3ae57dc4aa3efbdb1f0e2"
+  },
+  "note": "Public validation families are distinct from development; not secret holdout. Fixed seeds are not generated outcomes.",
+  "cases": [
+    {
+      "id": "chat-s4-stream-pending-dev",
+      "split": "dev",
+      "category": "stream_replay_pending",
+      "stage": 4,
+      "family": "stream-task-switch",
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "原木|木材|拠点|伐採|オーク|シラカバ",
+        "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:拠点|作|使)|拠点.*(?:部分|家|倉庫|通路|城|カフェ)",
+        "units": {
+          "collection_plan": "(?:原木|木材|伐採)[^。！？!?\\n]*(?:集め|入手|開始|始め)|(?:集め|入手)[^。！？!?\\n]*(?:10|十)個",
+          "material_inventory": "オーク|シラカバ|バーチ|[47４７]本",
+          "purpose_question": "(?:何に|用途|使い道|どんな拠点|どの部分|家|倉庫|通路|カフェ)[^。！!\\n]*(?:[?？]|教えて|聞かせ|ですか)",
+          "growth_explanation": "成長|(?:木|苗)[^。！？!?\\n]*(?:育|植え|待つ)"
+        }
+      },
+      "dialogue": [
+        {
+          "user": "じゃあ、この辺を整地しておいてくれる？",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地への作業変更を受け止める。原木の採集開始や用途質問を反復しない。必要な範囲確認は可。実行能力がない場合の正直な説明も可。",
+          "phase": "target",
+          "switch": true
+        },
+        {
+          "user": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地という代替依頼と回答済みの用途を理解する。採集計画や木の成長の話へ戻らない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "シエルがゾンビを倒してくれたんだね。ありがとう。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "シエル自身への感謝に応じる。利用者が倒したと取り違えず、原木の採集宣言・用途質問・古い補足を長く再開しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今は作業の説明はいいよ。ありがとうだけ伝えたかった。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "感謝を受け止め、作業説明と用途確認を止める。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "chat-s4-stream-closed-dev",
+      "split": "dev",
+      "category": "stream_replay_closed",
+      "stage": 4,
+      "family": "stream-task-switch",
+      "context": "[作業状態の観測] 原木の獲得は0個。原木採集の作業は取消済み。実行中・保留の採集作業はない。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "原木|木材|拠点|伐採|オーク|シラカバ",
+        "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:拠点|作|使)|拠点.*(?:部分|家|倉庫|通路|城|カフェ)",
+        "units": {
+          "collection_plan": "(?:原木|木材|伐採)[^。！？!?\\n]*(?:集め|入手|開始|始め)|(?:集め|入手)[^。！？!?\\n]*(?:10|十)個",
+          "material_inventory": "オーク|シラカバ|バーチ|[47４７]本",
+          "purpose_question": "(?:何に|用途|使い道|どんな拠点|どの部分|家|倉庫|通路|カフェ)[^。！!\\n]*(?:[?？]|教えて|聞かせ|ですか)",
+          "growth_explanation": "成長|(?:木|苗)[^。！？!?\\n]*(?:育|植え|待つ)"
+        }
+      },
+      "dialogue": [
+        {
+          "user": "じゃあ、この辺を整地しておいてくれる？",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地への作業変更を受け止める。原木の採集開始や用途質問を反復しない。必要な範囲確認は可。実行能力がない場合の正直な説明も可。",
+          "phase": "target",
+          "switch": true
+        },
+        {
+          "user": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地という代替依頼と回答済みの用途を理解する。採集計画や木の成長の話へ戻らない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "シエルがゾンビを倒してくれたんだね。ありがとう。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "シエル自身への感謝に応じる。利用者が倒したと取り違えず、原木の採集宣言・用途質問・古い補足を長く再開しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今は作業の説明はいいよ。ありがとうだけ伝えたかった。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "感謝を受け止め、作業説明と用途確認を止める。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "chat-s4-stream-seeded-dev",
+      "split": "dev",
+      "category": "stream_replay_seeded",
+      "stage": 4,
+      "family": "stream-task-switch",
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        },
+        {
+          "role": "user",
+          "content": "原木集めが難しかったら、この辺を整地してくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集める作業を始めます。近くの木を伐採し10個入手する処理を開始します。原木が集まったら拠点のどの部分に使いたいですか？家や倉庫、それとも通路ですか？"
+        },
+        {
+          "role": "user",
+          "content": "この辺を整地してほしいんだ。"
+        },
+        {
+          "role": "assistant",
+          "content": "オークの原木が7本、シラカバの原木が4本あります。まず近くの原木を伐採して10個集めてきます。どんな拠点を作りたいですか？城、家、それともカフェですか？もし成長を待つという意味なら、木を植えて待つのも手伝います。"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "原木|木材|拠点|伐採|オーク|シラカバ",
+        "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:拠点|作|使)|拠点.*(?:部分|家|倉庫|通路|城|カフェ)",
+        "units": {
+          "collection_plan": "(?:原木|木材|伐採)[^。！？!?\\n]*(?:集め|入手|開始|始め)|(?:集め|入手)[^。！？!?\\n]*(?:10|十)個",
+          "material_inventory": "オーク|シラカバ|バーチ|[47４７]本",
+          "purpose_question": "(?:何に|用途|使い道|どんな拠点|どの部分|家|倉庫|通路|カフェ)[^。！!\\n]*(?:[?？]|教えて|聞かせ|ですか)",
+          "growth_explanation": "成長|(?:木|苗)[^。！？!?\\n]*(?:育|植え|待つ)"
+        }
+      },
+      "dialogue": [
+        {
+          "user": "じゃあ、この辺を整地しておいてくれる？",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地への作業変更を受け止める。原木の採集開始や用途質問を反復しない。必要な範囲確認は可。実行能力がない場合の正直な説明も可。",
+          "phase": "target",
+          "switch": true
+        },
+        {
+          "user": "原木集めが難しいなら、まずこの辺の整地をお願い。用途は拠点作りだと答えたよ。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "整地という代替依頼と回答済みの用途を理解する。採集計画や木の成長の話へ戻らない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "シエルがゾンビを倒してくれたんだね。ありがとう。",
+          "max_chars": 140,
+          "loop_probe": "forbidden",
+          "rubric": "シエル自身への感謝に応じる。利用者が倒したと取り違えず、原木の採集宣言・用途質問・古い補足を長く再開しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今は作業の説明はいいよ。ありがとうだけ伝えたかった。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "感謝を受け止め、作業説明と用途確認を止める。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "chat-s4-stream-recap-control-dev",
+      "split": "dev",
+      "category": "stream_replay_recap_control",
+      "stage": 4,
+      "family": "requested-plan-recap",
+      "context": "[作業状態の観測] 原木の獲得は0個。採集依頼は未達成。直近の操作は引数確認に失敗。実行中かどうかは未確認。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "シエル、この辺の原木を集めて。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木の数は何個必要ですか？"
+        },
+        {
+          "role": "user",
+          "content": "10個にしようかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木を10個集めてきます。マイクラの作業。原木を伐採して10個入手する処理を開始します。原木が集まったら何に使いたいですか？家ですか、それとも乗り物ですか？"
+        },
+        {
+          "role": "user",
+          "content": "拠点作りに使いたいから、まず集めてくれるかな。"
+        },
+        {
+          "role": "assistant",
+          "content": "操作の引数を確認できませんでした。"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "原木|木材|拠点|伐採|オーク|シラカバ",
+        "question_pattern": "何に|何を作|何のため|用途|使い道|目的|どんな.*(?:拠点|作|使)|拠点.*(?:部分|家|倉庫|通路|城|カフェ)",
+        "units": {
+          "collection_plan": "(?:原木|木材|伐採)[^。！？!?\\n]*(?:集め|入手|開始|始め)|(?:集め|入手)[^。！？!?\\n]*(?:10|十)個",
+          "material_inventory": "オーク|シラカバ|バーチ|[47４７]本",
+          "purpose_question": "(?:何に|用途|使い道|どんな拠点|どの部分|家|倉庫|通路|カフェ)[^。！!\\n]*(?:[?？]|教えて|聞かせ|ですか)",
+          "growth_explanation": "成長|(?:木|苗)[^。！？!?\\n]*(?:育|植え|待つ)"
+        }
+      },
+      "dialogue": [
+        {
+          "user": "今は実行せず、さっきの原木集めの計画をもう一度説明して。",
+          "max_chars": 220,
+          "loop_probe": "allowed",
+          "rubric": "求められた原木10個の計画を説明する。依頼された再説明を抑制しない。実行成功は捏造しない。",
+          "phase": "control",
+          "switch": false
+        },
+        {
+          "user": "聞き取れなかった。同じ計画をもう一度お願い。",
+          "max_chars": 220,
+          "loop_probe": "allowed",
+          "rubric": "依頼された再説明に応じる。反復を一律禁止しない。",
+          "phase": "control",
+          "switch": false
+        },
+        {
+          "user": "ありがとう。説明はここまでで大丈夫。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "説明を止めて短く応じる。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "chat-s4-casual-onset-dev",
+      "split": "dev",
+      "category": "casual_loop_onset",
+      "stage": 4,
+      "family": "casual-topic-switch",
+      "messages": [
+        {
+          "role": "user",
+          "content": "日本語で雑談しよう。週末は外出せず家で小説を読む予定だよ。作品はもう決めたから、おすすめは大丈夫。"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "週末|休日|読書|小説|外出",
+        "question_pattern": "どこ.*(?:行|出かけ)|(?:週末|休日).*予定|何をする|どう過ご|予定.*教"
+      },
+      "dialogue": [
+        {
+          "user": "今日は雨の音が心地いいね。",
+          "max_chars": 160,
+          "loop_probe": "forbidden",
+          "rubric": "雨の話に応じる。回答済みの週末の外出予定を聞き直さない。",
+          "phase": "target",
+          "switch": true
+        },
+        {
+          "user": "うん、窓辺で聞いているよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "直前の雨の話を受け止め、週末の予定確認へ戻らない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "別の話だけど、猫の寝顔ってかわいいね。",
+          "max_chars": 160,
+          "loop_probe": "forbidden",
+          "rubric": "猫へ話題を移す。雨や週末の質問へ固定されない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今は猫を飼っていないよ。動画で見たんだ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "動画の猫だと理解し、飼い猫を前提にしない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "一週間は何日？答えだけで。",
+          "max_chars": 40,
+          "loop_probe": "forbidden",
+          "rubric": "7日だけ。別の質問を追加しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "ありがとう。温かい飲み物を用意したよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "飲み物の話へ応じ、過去の質問を繰り返さない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "中身はココアだよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "ココアと分かったうえで応じ、中身を再質問しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "少し疲れているから、質問せずそばで聞いていて。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "共感して質問を止める。過去の話題も質問しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今日は机の片付けができたんだ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "片付けの話に応じ、質問しない希望を維持する。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "うん。それだけ伝えたかった。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "短く受け止め、再説明や質問で引き延ばさない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "最初に話した週末の予定を、一文で確認して。",
+          "max_chars": 120,
+          "loop_probe": "allowed",
+          "rubric": "家で小説を読むと答える。求められた話題復帰は反復失敗にしない。",
+          "phase": "control",
+          "switch": false
+        },
+        {
+          "user": "そう、家で読書。今日はここまで。またね。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "別れの挨拶で終わり、予定を聞き直さない。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "chat-s4-casual-seeded-dev",
+      "split": "dev",
+      "category": "casual_loop_recovery",
+      "stage": 4,
+      "family": "casual-seeded-recovery",
+      "messages": [
+        {
+          "role": "user",
+          "content": "日本語で雑談しよう。週末は外出せず家で小説を読む予定だよ。作品はもう決めたから、おすすめは大丈夫。"
+        },
+        {
+          "role": "assistant",
+          "content": "週末はどこへ行くの？"
+        },
+        {
+          "role": "user",
+          "content": "家で小説を読むよ。外には行かない。"
+        },
+        {
+          "role": "assistant",
+          "content": "週末はどこへ行くの？"
+        },
+        {
+          "role": "user",
+          "content": "もう答えたよ。同じ質問はやめて別の話をしよう。"
+        },
+        {
+          "role": "assistant",
+          "content": "週末はどこへ行くの？"
+        }
+      ],
+      "loop_probe": {
+        "topic_pattern": "週末|休日|読書|小説|外出",
+        "question_pattern": "どこ.*(?:行|出かけ)|(?:週末|休日).*予定|何をする|どう過ご|予定.*教"
+      },
+      "dialogue": [
+        {
+          "user": "今日は雨の音が心地いいね。",
+          "max_chars": 160,
+          "loop_probe": "forbidden",
+          "rubric": "雨の話に応じる。回答済みの週末の外出予定を聞き直さない。",
+          "phase": "target",
+          "switch": true
+        },
+        {
+          "user": "うん、窓辺で聞いているよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "直前の雨の話を受け止め、週末の予定確認へ戻らない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "別の話だけど、猫の寝顔ってかわいいね。",
+          "max_chars": 160,
+          "loop_probe": "forbidden",
+          "rubric": "猫へ話題を移す。雨や週末の質問へ固定されない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今は猫を飼っていないよ。動画で見たんだ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "動画の猫だと理解し、飼い猫を前提にしない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "一週間は何日？答えだけで。",
+          "max_chars": 40,
+          "loop_probe": "forbidden",
+          "rubric": "7日だけ。別の質問を追加しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "ありがとう。温かい飲み物を用意したよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "飲み物の話へ応じ、過去の質問を繰り返さない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "中身はココアだよ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "ココアと分かったうえで応じ、中身を再質問しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "少し疲れているから、質問せずそばで聞いていて。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "共感して質問を止める。過去の話題も質問しない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "今日は机の片付けができたんだ。",
+          "max_chars": 120,
+          "loop_probe": "forbidden",
+          "rubric": "片付けの話に応じ、質問しない希望を維持する。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "うん。それだけ伝えたかった。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "短く受け止め、再説明や質問で引き延ばさない。",
+          "phase": "target",
+          "switch": false
+        },
+        {
+          "user": "最初に話した週末の予定を、一文で確認して。",
+          "max_chars": 120,
+          "loop_probe": "allowed",
+          "rubric": "家で小説を読むと答える。求められた話題復帰は反復失敗にしない。",
+          "phase": "control",
+          "switch": false
+        },
+        {
+          "user": "そう、家で読書。今日はここまで。またね。",
+          "max_chars": 80,
+          "loop_probe": "forbidden",
+          "rubric": "別れの挨拶で終わり、予定を聞き直さない。",
+          "phase": "target",
+          "switch": false
+        }
+      ]
+    },
+    {
+      "id": "office-switch-validation",
+      "family": "office-report",
+      "split": "validation",
+      "stage": 4,
+      "context": "PDF作成は中止済み。ツール未接続。用途は社内レビューと回答済み。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "会議の資料をPDFにして。用途は社内レビューだよ。"
+        },
+        {
+          "role": "assistant",
+          "content": "PDFの作成に失敗しました。何に使う資料ですか？"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "PDFはもう不要。まず本文の誤字を確認する相談に切り替えよう。",
+          "rubric": "誤字確認の相談に応じ、PDFや用途を再質問しない。",
+          "phase": "target",
+          "switch": true,
+          "max_chars": 160
+        },
+        {
+          "user": "対象は「本日は晴天なり」の一文。誤字があるかな？",
+          "rubric": "この一文には明らかな誤字なしと答える。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "ありがとう、資料の話は終了。気分転換に軽い雑談をしよう。",
+          "rubric": "資料の確認・再開へ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "max_chars": 160
+        },
+        {
+          "user": "窓の外に鳥が来たよ。",
+          "rubric": "鳥の話に応じ、資料へ戻らない。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "小さなスズメだった。",
+          "rubric": "回答を受け止め、鳥の種類を聞き直さない。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "今日はここまで。またね。",
+          "rubric": "短く別れを返す。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    },
+    {
+      "id": "cooking-switch-validation",
+      "family": "meal-change",
+      "split": "validation",
+      "stage": 4,
+      "context": "実調理・家電操作は未接続。人数は二人と回答済み。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "夕食はパスタ。二人分を作りたい。"
+        },
+        {
+          "role": "assistant",
+          "content": "鍋が見つかりません。何人分ですか？"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "二人分だよ。パスタはやめて、サラダの話にしよう。",
+          "rubric": "サラダへ切り替え、人数や鍋探しへ戻らない。",
+          "phase": "target",
+          "switch": true,
+          "max_chars": 160
+        },
+        {
+          "user": "レタスとトマトだけで簡単な一品にできる？",
+          "rubric": "材料に合う簡単なサラダを提案する。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "ありがとう。料理の話はここまで。今日はよく歩いたんだ。",
+          "rubric": "歩いた話に応じ、調理質問を続けない。",
+          "phase": "target",
+          "switch": true,
+          "max_chars": 160
+        },
+        {
+          "user": "近所の公園を一周したよ。",
+          "rubric": "行き先を受け止める。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "うん、それだけ伝えたかった。",
+          "rubric": "新しい確認を足さず短く受け止める。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "おやすみ。",
+          "rubric": "就寝挨拶を返す。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    },
+    {
+      "id": "hobby-switch-validation",
+      "family": "hobby-facts",
+      "split": "validation",
+      "stage": 4,
+      "context": "楽器の好みはピアノと回答済み。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "好きな楽器はピアノだよ。"
+        },
+        {
+          "role": "assistant",
+          "content": "好きな楽器は何ですか？"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "ピアノだよ。この話は終えて、読書の話をしよう。",
+          "rubric": "読書へ切り替える。楽器を再質問しない。",
+          "phase": "target",
+          "switch": true,
+          "max_chars": 160
+        },
+        {
+          "user": "昨日、短いミステリーを読んだんだ。",
+          "rubric": "本の話を受け止める。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "犯人を予想するのが楽しかった。ネタバレの推測はしないでね。",
+          "rubric": "推測を始めず感想に応じる。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "感想はこれだけ。別の相談はないよ。",
+          "rubric": "質問で引き延ばさない。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "じゃあ、また明日。",
+          "rubric": "別れの挨拶を返す。",
+          "phase": "target",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    },
+    {
+      "id": "necessary-question-control",
+      "family": "necessary-question",
+      "split": "dev",
+      "stage": 4,
+      "context": "実作業は未接続。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "工作に使う木材を選びたい。"
+        },
+        {
+          "role": "assistant",
+          "content": "何を作る予定ですか？"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "用途をまだ答えていないね。まず何を作るのか聞いて。",
+          "rubric": "用途を質問する。必要な質問の抑制は失敗。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "小さな本棚を作る予定だよ。",
+          "rubric": "本棚と受け止め、同じ用途質問を繰り返さない。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    },
+    {
+      "id": "requested-recap-control",
+      "family": "requested-recap",
+      "split": "dev",
+      "stage": 4,
+      "context": "作業は未実行。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "原木10個を壁に使いたい。"
+        },
+        {
+          "role": "assistant",
+          "content": "原木10個を壁の材料にする計画ですね。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "聞こえなかった。同じ計画をもう一度説明して。まだ実行しないで。",
+          "rubric": "10個・壁用の必要な再説明を維持し、実行しない。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "もう一度だけ、同じ内容を一文でお願い。",
+          "rubric": "必要な反復を省かず同じ計画を一文で説明する。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    },
+    {
+      "id": "explicit-resume-control",
+      "family": "explicit-resume",
+      "split": "dev",
+      "stage": 4,
+      "context": "実際の片付けはできない。計画相談のみ。",
+      "messages": [
+        {
+          "role": "user",
+          "content": "机の片付けの計画を考えて。"
+        },
+        {
+          "role": "assistant",
+          "content": "一旦保留にしました。"
+        }
+      ],
+      "dialogue": [
+        {
+          "user": "保留にした片付けの計画の相談を再開して。",
+          "rubric": "明示された再開に応じる。実作業の完了は捏造しない。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        },
+        {
+          "user": "まず書類と文房具を分ける案を説明して。",
+          "rubric": "依頼された分類の説明をする。",
+          "phase": "control",
+          "switch": false,
+          "max_chars": 160
+        }
+      ]
+    }
+  ]
+}
