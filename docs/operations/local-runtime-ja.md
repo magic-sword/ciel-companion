@@ -107,12 +107,15 @@ python3 environment.py --prod-dir "$PWD" --dev-dir ../../ciel-companion-dev/serv
 docker compose --env-file .env.shared --env-file .env -f compose.yaml up -d --build --no-deps agent
 ```
 
-開発serverで：
+既存の開発agentの通常更新は、手元のリポジトリルートで次を実行する。追跡ファイルの未コミット変更がある場合は拒否する。
 
 ```sh
-docker compose --env-file ../../ciel-companion/server/.env.shared --env-file .env.dev \
-  -f compose.dev.yaml up -d --build --no-deps agent-dev
+.venv/Scripts/python.exe scripts/server/deploy-agent.py --dev
+# 更新せず、現在のHEADとの全体照合だけを行う
+.venv/Scripts/python.exe scripts/server/deploy-agent.py --dev --check
 ```
+
+`deploy-server.sh --dev`もこの入口を使う。GitのHEADから会話サーバー一式を新しいreleaseディレクトリへ展開し、正規Dockerfileでビルドする。稼働イメージへの部分パッチは重ねない。設定・音声素材はrelease内のconfigを読み取り専用でマウントし、`compose.agent-release.json`が使用するimageとconfigを固定する。既存の.env.devと共有資格情報は維持し、推論ログのruntime識別子だけを更新する。DBを退避してからagentだけを再作成し、実行コード・設定・素材の欠落・余分・バイト差、health、worker登録、他コンテナ不変を確認する。失敗時は元のimage・config・環境設定へ戻す。証拠とreleaseは開発serverの`data/deployments/agent-<commit>-<識別子>/`。照合のみではテキストの改行差も別記し、機能差と混同しない。自動的な更新監視は行わず、配布時点の最新コミットを対象とする。初期導入や明示的な`--dev --minecraft`はサーバー一式の配布手順を使う。
 
 環境変数の編集後は対象コンテナを再作成する。単なるrestartや設定移行だけを反映済みとしない。ゲーム契約が変わる更新ではMCPの版も揃えるが、Minecraft本体・ワールドの再作成はbackend切替に含めない。共有LLMを環境ごとに追加起動しない。
 

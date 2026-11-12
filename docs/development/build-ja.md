@@ -132,6 +132,8 @@ tail -n 50 Logs/build-android.log
 
 ## サーバーへのデプロイ
 
+既存の開発会話サーバーの通常更新は`.venv/Scripts/python.exe scripts/server/deploy-agent.py --dev`、照合のみは同じコマンドに`--check`を付ける。`deploy-server.sh --dev`もこの入口へ委譲する。未コミットの追跡ファイルを拒否し、HEAD一式から新規ビルドして配布後の全ファイルを照合する。[開発agentの更新契約](../operations/local-runtime-ja.md)を参照する。以下のサーバー一式の転送は本番・初期導入・明示的なゲーム環境配布に使う。
+
 ### 前提
 
 - 自宅の GPU サーバーへ、同じネットワークなど SSH で到達できる環境から実行する。

@@ -16,6 +16,14 @@ if [ "${1:-}" = --minecraft ]; then
   shift
 fi
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+if [ "$MODE" = dev ] && [ -z "$MINECRAFT" ]; then
+  PYTHON="$ROOT/.venv/Scripts/python.exe"
+  [ -f "$PYTHON" ] || PYTHON="$ROOT/.venv/bin/python"
+  [ -f "$PYTHON" ] || PYTHON=python3
+  ARGS=(--dev)
+  if [ -n "${1:-}" ]; then ARGS+=(--host "$1"); fi
+  exec "$PYTHON" "$ROOT/scripts/server/deploy-agent.py" "${ARGS[@]}"
+fi
 source "$ROOT/scripts/server/ssh-target.sh" "${1:-}"
 
 if [ $MODE = dev ]; then
