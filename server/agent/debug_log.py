@@ -52,7 +52,8 @@ def record(kind: str, **data) -> None:
     """1 行を足す（入れていなければ何もしない）。書けなくても会話は止めない"""
     if _path is None:
         return
-    line = {'t': round(time.time(), 3), 'kind': kind, **{k: _clip(v) for k, v in data.items()}}
+    from inference_trace import redact
+    line = {'t': round(time.time(), 3), 'kind': kind, **{k: _clip(v) for k, v in redact(data).items()}}
     try:
         with _path.open('a', encoding='utf-8') as f:
             f.write(json.dumps(line, ensure_ascii=False, default=str) + '\n')
@@ -86,7 +87,7 @@ def cleanup() -> None:
     if not DIR.is_dir():
         return
     limit = time.time() - DAYS * 86400
-    for p in [*DIR.glob('*.jsonl'), *DIR.glob('*/*.wav')]:
+    for p in [*DIR.glob('*.jsonl'), *DIR.glob('traces/*.jsonl'), *DIR.glob('*/*.wav')]:
         try:
             if p.stat().st_mtime < limit:
                 p.unlink()

@@ -345,6 +345,8 @@ class Ciel(Agent):
         request_id, generation_started = uuid.uuid4().hex, time.monotonic()
         expired = False
         first_delta = True
+        import inference_trace
+        trace_token = inference_trace.correlation.set(dict(request_id=request_id, speech_id=speech, role=who))
         debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'),
                          reaction_id=reaction.key[-1] if reaction else None, speech_id=speech)
         try:
@@ -387,6 +389,7 @@ class Ciel(Agent):
                              status_code=getattr(exc, 'status_code', None))
             raise
         finally:
+            inference_trace.correlation.reset(trace_token)
             debug_log.record('model_response', id=request_id, role=who, seconds=round(time.monotonic()-generation_started,3))
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
@@ -569,6 +572,8 @@ async def entrypoint(ctx: JobContext) -> None:
             tap.attach(track)   # Unity のマイク（会議では、仮想ケーブルで届く会議の声）
     ctx.room.on('track_subscribed', on_track)
     ctx.add_shutdown_callback(voice.reactions.close)
+    import inference_trace
+    ctx.add_shutdown_callback(inference_trace.close_clients)
     session.on('conversation_item_added', voice.reactions.on_said)
 
     async def send(topic: str, *messages: dict) -> None:

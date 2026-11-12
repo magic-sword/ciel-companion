@@ -4,6 +4,18 @@
 
 同じ会話ホストを本番・開発で使い、環境の違いは設定ファイルで表す。変数名に環境名を付けない。配布コミット・稼働設定と確認範囲は[確認状況](../testing/verification-status-ja.md)で管理する。
 
+## 開発の推論再現ログ
+
+開発agentの`CIEL_INFERENCE_TRACE=1`と`CIEL_AGENT_NAME=ciel-dev`の両方が揃う場合だけ、ローカルの会話返答LLMをHTTP境界で記録する。通常debugログの開始も必要。`agent/data/debug/traces/<会話名>.jsonl`に、SDK変換後のmessages/toolsと生成条件、要求ID・発話ID・HTTP試行ID、SSEの内容・tool断片・finish_reason・usage、DONE有無、TTSへ渡す文・TTS要求IDを保存する。再生結果は通常debugのitem/speech_doneと照合する。音声波形や実際に聞こえたことの証明ではない。ゲーム受付や背景推論等の別クライアントはこのHTTP記録の対象外。
+
+HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API key/tokenキー、環境変数の秘密値、Bearer形式は秘匿化する。JSON文字列内部も対象。画像等のdata URIは省略する。文章内の未知の秘密値まで自動判定できるものではない。入力が変更された記録はredacted=trueとなり、完全リプレイには使わない。通常debugのdataイベント等にも同じ秘匿化を適用する。送信する要求や音声合成内容自体は変更しない。
+
+1イベント2MiB、1会話16MiB、trace全体256MiBを上限に、上限到達時はtrace_incompleteを残して当該プロセスの記録を止める。会話は継続する。ファイル600・ディレクトリ700で保存する。保持日数は通常debugと共通の`CIEL_DEBUG_LOG_DAYS`（既定7日）で、新しい会話開始時に期限切れを削除する。traceの上限は通常debugやWAVの容量上限ではない。
+
+`CIEL_TRACE_RUNTIME_MANIFEST`は配布時に保存したモデル実ファイルのhash等のmanifest識別子。各要求には共有APIのmode・propsと取得時刻も付ける（最大60秒キャッシュ）。省略されたsampling値はpropsから確認する。重みファイルの外部変更や要求中のGPU/CPU切替は別途検証が必要で、manifestだけで固定条件を保証しない。情報取得失敗はunavailableとして会話を継続する。
+
+サーバーのagentディレクトリで`python inference_trace.py --trace <traceファイル> --http-id <HTTP試行ID> --output <新規JSON>`により、実際の要求bodyをJSONへ書き出せる。秘匿化済み入力や不完全マーカー以降の記録は拒否する。書き出すだけでモデルや道具は実行しない。応答が途中終了しても、受信済みSSEは再現・反復採点用の部分証拠になる。
+
 ## 設定ファイルの責務
 
 ローカル音声の`CIEL_VOICE_FAST`は既定`1`。ジョブのモデル準備、背景推論の分類、短い最初の文を有効にする。`0`は同じソースで旧動作と比較するための設定。新しい`voice_warmup_file`・`voice_first_sentence_file`を持つpersona.tomlとコードを一緒に配置する。準備済み状態には世代を返す新しい制御先が必要で、ソースの更新だけで既存の共有APIへ適用されたとは扱わない。

@@ -84,7 +84,9 @@ def reply_options(reasoning_effort: str) -> dict:
     if not is_local('mind'):
         return {'model': model('mind'), 'reasoning_effort': reasoning_effort}
     import httpx
+    import inference_trace
     return {'model': LOCAL_MODEL, 'base_url': LOCAL_URL, 'api_key': 'local',
+            **inference_trace.client_options(),
             'timeout': httpx.Timeout(LOCAL_TIMEOUT), 'max_retries': 0,
             'extra_body': {'chat_template_kwargs': {'enable_thinking': False}}}
 

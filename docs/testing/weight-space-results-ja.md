@@ -8,6 +8,16 @@
 
 単一返答の長い反復用プローブを追加し、実ログから近似再構成した3条件を現行Qwenで測定した。自発発話・話題切替は正常終了し、長い反復は未再現。単一返答の採点器は整備できたが、この現象に対するWSP比較の感度はまだ未確立。[単一返答の反復プローブ](#単一返答の反復プローブ)を参照。
 
+## 開発の推論再現ログ
+
+2026-11-12、ローカル会話返答のOpenAI互換HTTP境界に開発限定の記録を実装・反映した。入力をSDK変換後のmessages/tools/samplingとして記録し、受信したSSEを途中からでも残す。既知の秘密値・認証キー・Bearerは秘匿化し、情報欠落のある入力は完全リプレイとして書き出さない。反復障害そのものの再測定はまだ行っていない。
+
+ローカルunit806件が成功。最初の全体試験は編集重複による構文エラーで10件errorとなり、修正後の全体試験で解消した。最終の5専用テストは配布イメージでも成功し、本番無効、秘匿化、長い入力と上限の欠落表示、送受信を変更しないこと、部分出力の保持、期限切れ削除、payload書出しを確認した。全体結果は`.local/regression/20261112T101253Z-e40bd4/`。
+
+配布は稼働開発イメージへ記録関係の7ファイルだけを追加・更新した。agent.pyは稼働版へ対象差分のみ適用し、未配布の音声語彙機能は混ぜていない。新imageは`7ffd6353039029d5a9470032cfeea751c0968ca438a7157b124c7d566137ae1b`。設定・ソース退避・before/after・source hash・runtime.json・verification.jsonは`~/work/ciel-companion-dev/server/data/deployments/inference-trace-20261112-191451/`。runtime manifest識別子は`d8fdf1de4e7cf3026b789f81209c7eca941c0134da35d04e99a2c5e1113c0ed0`で、実重みSHAとpropsを収録している。7ファイルのうち会話コードは既存5＋新規inference_trace.py、残りはCompose設定。
+
+実接続確認は開発コンテナからLiveKit SDK経由で共有Qwenへ32token上限の要求を送り、fixture tool定義も含めて記録・書出しを照合した。messages、tools、生成上限、SSE、DONE、発話ID、runtime記録、実TTS要求との対応が全て成立。合成音声は再生せず、toolは実行しない。証拠traceは開発ホストの`agent/data/debug/traces/20261112-101611-inference-trace-smoke.jsonl`、HTTP IDは`3e79546ad1a040f989a48d673a92bcb3`。自然な実会話の不具合を再発させた確認ではなく、次の発生時に証拠を取得する経路の確認。保持・容量・対象外経路は[運用仕様](../operations/local-runtime-ja.md#開発の推論再現ログ)を参照する。
+
 ## 単一返答の反復プローブ
 
 2026-11-12の開発セッション`20261112-094511-ciel-e9f7f6ce7f9a46d2819a4f812e062bdd.jsonl`、対象`speech_12d601355fc5`を起点にした。現場では同一speechで241文・5種類の文字数の周期が46回以上観測されたが、採取時にmind_outputは未確定であり、生成本文自体の反復を確認したわけではない。原ログのsnapshotはサーバーの`server/data/repetition-evidence/20261112-live-loop/`、今回の測定時点の原ログは`~/work/ciel-within-reply/within-reply-baseline-01/incident-original.jsonl`へ保存した。原ログSHA-256は`cc94fe0960eead5fa48ae2b33f8b08f0452d4c4de328852044cb659fca7e1c73`。認証イベントを除いた入力用ログを別に用意した。

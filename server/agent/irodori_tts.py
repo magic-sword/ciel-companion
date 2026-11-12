@@ -26,6 +26,8 @@ async def request_audio(http: aiohttp.ClientSession, body: dict, *, session_id=N
         ctx = get_job_context(required=False)
         session_id = hashlib.sha256(ctx.job.id.encode()).hexdigest()[:24] if ctx else SESSION_ID
     request_id = uuid.uuid4().hex
+    import inference_trace
+    inference_trace.write('tts_request', **inference_trace.correlation.get(), tts_request_id=request_id, text=body.get('text'))
     complete = False
     started = time.monotonic()
     try:

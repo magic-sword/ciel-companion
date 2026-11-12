@@ -2,6 +2,8 @@
 
 > 責務：現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。
 
+開発のローカル会話LLMに推論再現ログを反映した（2026-11-12）。HTTP送信body、SSE逐次出力、要求/発話/HTTP/TTSのID、model manifestとmode/propsを`agent/data/debug/traces/`へ保存する。unit806件成功、配布イメージ内の専用5テスト成功。実SDKから32token上限・fixture tool付きの要求を送り、messages/tools/上限/出力/DONE/ID対応/JSON書出し、実TTS合成と対応IDを確認した。音声再生・ゲーム操作は行っていない。health200・worker登録・再起動回数0。本番・共用Ciel・ワールドのID/image/起動時刻は不変。[条件と証拠](weight-space-results-ja.md#開発の推論再現ログ)。録音や音声認識・背景推論全体のリプレイではない。
+
 単一返答内の反復ベンチマークを追加し、途中終了でも重複量とSSEを保持する。感度テスト5件成功。現行Qwenで実ログ由来自発発話・話題切替・反復依頼対照を各1回測定し、全てstopで終了。対象2条件では今回の長い反復は再現せず、完全な実送信入力がない近似再構成の限界が残る。WSP比較の感度確立とは扱わない。[測定結果](weight-space-results-ja.md#単一返答の反復プローブ)。通常サービス・重みは変更していない。
 
 通常の開発接続を本番と同じCiel（8771）へ変更し、2026-11-12に反映した。開発agentは既存イメージのまま設定を再作成し、CIEL_DEBUG_LOG=1と書込可能なログvolume、worker登録、health 200、共有先のMCP profile 2/work 1を確認。旧Ciel_Devコンテナは停止した。本番各コンテナのID・image・起動時刻は不変。証拠は`~/work/ciel-companion-dev/server/data/deployments/shared-ciel-20261112-175822/`の設定退避・before/after/verification JSON。実音声による操作・新ログの内容確認は未実施。Ciel_Debugの明示起動経路は設定とwhitelistの2テストで確認し、今回は起動していない。通常の`--dev`と検証用`--dev --minecraft`の使い分けは[実行設定](../operations/local-runtime-ja.md)を参照する。

@@ -218,7 +218,13 @@ async def tts_node(text: AsyncIterable[str], events: ExpressionEvents, backchann
         t0 = time.perf_counter()
         latency.mark('最初の文')
         debug_log.record('voice_sentence', speech_id=speech_id, chars=len(body), first=spoken <= 1)
-        pcm, sr = await synthesize(http, with_emoji(body, emotion), CAPTIONS[emotion], style=STYLE)
+        import inference_trace
+        inference_trace.write('tts_sentence', speech_id=speech_id, sequence=spoken, text=body, emotion=emotion)
+        trace_token = inference_trace.correlation.set(dict(speech_id=speech_id, sequence=spoken))
+        try:
+            pcm, sr = await synthesize(http, with_emoji(body, emotion), CAPTIONS[emotion], style=STYLE)
+        finally:
+            inference_trace.correlation.reset(trace_token)
         debug_log.record('voice_pcm', speech_id=speech_id, elapsed_ms=round((time.perf_counter()-t0)*1000, 2))
         latency.mark('最初の声')
         dur_ms = int(len(pcm) / 2 / sr * 1000)
