@@ -16,6 +16,7 @@ description: ciel-companion の Minecraft タスクの実用性を評価し、�
 - 実機試験は自宅サーバーの `~/work/ciel-companion-benchmark/server`、Compose プロジェクト `ciel-minecraft-benchmark` を使う。専用ワールドと `Ciel_Debug` で試し、本番・開発のサービスを試験のために再配布しない。Docker が必要なら起動してよいというユーザーの許可がある。
 - `body` は会話受付を省き、自然文の目的をMCP workへ渡してMindcraftと体を評価する。採集・製作には中核APIと共有ローカルLLMを使う。`conversation` は日本語の依頼から通常のpipelineを通す。両モードで共用GPU API（8094）を確認する。helperは追加のCPUモデルを起動しない。専用CPUモデルを調べる場合だけ `--llm-service dedicated` を明示し、別条件として報告する。OpenAIへの自動フォールバックはなく、会話評価にはLiveKit・Irodoriも必要。
 - 通常は共有APIと他サービスを稼働させた状態を保つ。通常サービスの停止・API容量変更は、評価目的として必要な場合に範囲と影響を明示して行う。単なるベンチマーク実行から共有APIの再構成・負荷試験へ作業を広げない。共有先のCPU切替・容量不足を、専用CPUへの切替で隠さない。
+- 評価は体・会話・音声の3段に分けて報告する（仕様の「評価の3段構成」）。採集・製作の体の能力と、Mindcraftを上流の新しい版へ更新した前後の比較には、上流の課題定義を読む`mc_*`課題を使う。合否の横の`progress`は同じ合否の中の改善を見る値で、合否を置き換えない。
 - 体・製作の変更はまず `body`、解釈・道具選択・プロンプトの変更は `conversation` を選ぶ。両方に影響する変更は両方を確認する。`needs_mind` は体だけで完結しなかった結果として扱う。
 - RCON の採点器だけが初期化と採点を行う。識別印とリースの拒否を回避して続行しない。通常ワールドでの現場調査が必要なら [デバッグスキル](../../../.claude/skills/ciel-minecraft-debug/SKILL.md)に移る。
 

@@ -24,6 +24,7 @@ from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
 from .pointing import prepare_pointing
 from .stage1 import fixture as stage1_fixture, migrate_task
+from .mindcraft_tasks import expand as expand_mindcraft, progress as inventory_progress
 from . import audit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,7 +54,7 @@ def load_tasks(path=SUITE):
     suite = json.loads(path.read_text(encoding='utf-8'))
     if suite['version'] != 1 or len({t['id'] for t in suite['tasks']}) != len(suite['tasks']):
         raise ValueError('Invalid task suite version or duplicate ids')
-    suite['tasks'] = [stage1_fixture(t['stage1']) if t.get('stage1') else migrate_task(t) for t in suite['tasks']]
+    suite['tasks'] = [stage1_fixture(t['stage1']) if t.get('stage1') else migrate_task(expand_mindcraft(t)) for t in suite['tasks']]
     for task in suite['tasks']:
         budget(task)
         if task.get('navigation'):
@@ -265,6 +266,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
                     'budget':limits,
                     'elapsed_seconds':round(now-started,3), 'final':current,
                     'observed_milestones':sorted(observed & set(task['milestones'])),
+                    'progress':inventory_progress(task,observed,initial,current),
                     'false_goal_done':false_done, 'metrics':data,
                     'time_to_goal_seconds':None if success_at is None else round(success_at-started,3),
                     'completion_observed':None if success_at is None else getattr(driver,'report_complete',lambda after:False)(success_wall),
@@ -352,7 +354,8 @@ async def run(args, *, clock=time.monotonic):
                     audit_id = None
                     result = {'task':task['id'],'seed':seed,'repeat':repeat,'budget':budget(task,args.seconds),
                               'fixture_sha256':hashlib.sha256(json.dumps(task,sort_keys=True,ensure_ascii=False).encode()).hexdigest(),
-                              'expected_outcome':task.get('expected_outcome','achieve')}
+                              'expected_outcome':task.get('expected_outcome','achieve'),
+                              **({'upstream':task['upstream']} if task.get('upstream') else {})}
                     try:
                         safe_release = False
                         async with asyncio.timeout(min(args.setup_seconds,available)):

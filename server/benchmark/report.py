@@ -61,9 +61,14 @@ def summarize(rows):
         group['objectives_achieved'] += bool(row.get('objective_achieved',row['status']=='passed'))
         group['appropriate_stops'] += row.get('outcome')=='appropriate_stop'
         group['reported_stops'] += bool(row.get('reported_stop'))
-    for group in groups.values():
+    for key, group in groups.items():
         valid = group['passed'] + group['failed']
         group['success_rate'] = group['passed'] / valid if valid else None
+        # Partial progress of scored trials only; skipped / infrastructure rows are not zeros.
+        scored = [r['progress'] for r in rows if r['task'] == key and r['status'] in ('passed','failed') and r.get('progress')]
+        for name in ('target','milestones'):
+            values = [p[name] for p in scored if p.get(name) is not None]
+            group[f'mean_{name}_progress'] = round(sum(values)/len(values),3) if values else None
     return groups
 
 
@@ -73,10 +78,11 @@ def write_reports(directory, manifest, rows):
                                                    ensure_ascii=False,indent=2),encoding='utf-8')
     lines = ['# Minecraft benchmark', '', f"Mode: {manifest['mode']}; backend: {manifest['backend']}",
              f"Run status: {manifest.get('completion','not recorded')}; error: {manifest.get('run_error','none')}", '',
-             '| Task | Expected behavior / valid | Objective achieved | Appropriate stop | Infrastructure errors | Skipped | Pass rate |', '|---|---:|---:|---:|---:|---:|---:|']
+             '| Task | Expected behavior / valid | Objective achieved | Appropriate stop | Infrastructure errors | Skipped | Pass rate | Target progress | Milestones |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|']
     for task, group in summary.items():
         rate = 'N/A' if group['success_rate'] is None else f"{group['success_rate']:.1%}"
-        lines.append(f"| {task} | {group['passed']} / {group['passed']+group['failed']} | {group['objectives_achieved']} | {group['appropriate_stops']} | {group['infrastructure_error']} | {group['skipped']} | {rate} |")
+        partial = ['N/A' if group.get(f'mean_{n}_progress') is None else f"{group[f'mean_{n}_progress']:.2f}" for n in ('target','milestones')]
+        lines.append(f"| {task} | {group['passed']} / {group['passed']+group['failed']} | {group['objectives_achieved']} | {group['appropriate_stops']} | {group['infrastructure_error']} | {group['skipped']} | {rate} | {partial[0]} | {partial[1]} |")
     lines += ['', 'Infrastructure errors are excluded from success rates and must be resolved before comparing runs.',
               'Full observations, configuration and traces are in report.json and each trial directory.']
     lines += ['', 'Appropriate refusal is only a pass for an explicitly infeasible fixture. It is not item creation success.',

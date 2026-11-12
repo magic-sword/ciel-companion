@@ -41,6 +41,11 @@
     {"id":"s1_no_stance","stage1":"no_stance"},
     {"id":"s1_stop_continue","stage1":"stop_continue"},
     {"id":"s1_changed","stage1":"changed"},
-    {"id":"gather_cobblestone","prompt":"丸石を30個集めて、採集を始めた場所へ持ち帰ってください。","item":"cobblestone","count":30,"return_to_start":true,"action":{"kind":"gather","args":{"item":"cobblestone","count":30}},"inventory":{"wooden_pickaxe":1},"forest":"none","milestones":["cobblestone","dirt"],"budget":{"seconds":120}}
+    {"id":"gather_cobblestone","prompt":"丸石を30個集めて、採集を始めた場所へ持ち帰ってください。","item":"cobblestone","count":30,"return_to_start":true,"action":{"kind":"gather","args":{"item":"cobblestone","count":30}},"inventory":{"wooden_pickaxe":1},"forest":"none","milestones":["cobblestone","dirt"],"budget":{"seconds":120}},
+    {"id":"mc_gather_oak_logs","mindcraft":{"file":"tasks/basic/single_agent.json","task":"gather_oak_logs"},"modes":["body"],"forest":"near","milestones":["oak_log"],"budget":{"seconds":90}},
+    {"id":"mc_crafting_oak_log","mindcraft":{"file":"tasks/single_agent/crafting_train.json","task":"crafting_oak_log"},"modes":["body"],"forest":"near","milestones":["oak_log"],"budget":{"seconds":60}},
+    {"id":"mc_crafting_stick","mindcraft":{"file":"tasks/single_agent/crafting_train.json","task":"crafting_stick"},"modes":["body"],"forest":"near","milestones":["oak_log","oak_planks","stick"],"budget":{"seconds":90}},
+    {"id":"mc_crafting_wooden_pickaxe","mindcraft":{"file":"tasks/single_agent/crafting_train.json","task":"crafting_wooden_pickaxe"},"modes":["body"],"forest":"near","milestones":["oak_log","oak_planks","stick","crafting_table","wooden_pickaxe"],"budget":{"seconds":90}},
+    {"id":"mc_crafting_stone_pickaxe","mindcraft":{"file":"tasks/single_agent/crafting_train.json","task":"crafting_stone_pickaxe"},"modes":["body"],"forest":"near","milestones":["oak_log","oak_planks","stick","crafting_table","wooden_pickaxe","cobblestone","stone_pickaxe"],"budget":{"seconds":120}}
   ]
 }
