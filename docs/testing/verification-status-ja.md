@@ -4,7 +4,9 @@
 
 標準pipelineのゲーム通知を共通履歴へ一本化するリファクターを開発へ反映した。検証済みの重要通知を発生元・ID・時刻付きで記録し、発話の中断・期限切れ後も直近文脈へ渡す。推論起動時の通知本文の再添付と作業結果の直接読み上げを撤去し、持ち物・現在の作業などは要求時の状態補足へ維持した。MCP側の既存の重要通知選別を使用し、通信形式は変更していない。追加3テストを含むunit809件と通知のオフライン結合チェックが成功。実モデルの自然なリアクション・反復率・キャッシュ性能は未確認。回帰記録は`.local/regression/20261112T112231Z-c41168/`。[履歴と入力の契約](../conversation/conversation-pipeline-ja.md#入力から返答まで)を参照する。
 
-2026-11-12、コミット`b359344`の通知・履歴差分を開発agentへ配布した。稼働イメージをベースに会話コード7ファイルと関連テスト4ファイルを更新し、agent.pyは稼働版へのコミット差分適用で未配布機能を混ぜていない。配布イメージ内の関連45テスト成功、11ファイルのhash一致、HTTP200、worker登録、再起動回数0を確認。本番・Minecraftの体/ワールド・共有LLM・TTS/DBなど他コンテナのID・image・起動時刻は不変。本番会話サーバーへの配布は未実施。新imageは`4e0aa44150497fd2c6bdc86c4e237b2754fe44f94d99da3167fbb3625da799b8`、runtime manifestは`bad07adcdbaed837a43d66e311cb68f08b36c5d137cce1280d2c5a529892f885`。証拠と退避は開発ホストの`~/work/ciel-companion-dev/server/data/deployments/game-event-history-b359344/`（before/after、source-manifest、runtime、verification、テスト/buildログ、source-backup）。実ゲーム操作・合成音声再生による確認は行っていない。
+2026-11-12、完全コミットからビルドする`deploy-agent.py --dev`で`d980a056fad3c073ed6592394e4770c9aaf73a7b`を開発へ配布した。差分配布時に機能差と説明したagent.pyは、退避ソースと再照合すると改行形式だけの差だった。更新前の実行コード・prompt150ファイルにも機能差はなく、設定・音声素材を含む187ファイルの照合ではemotion.py・irodori_tts.py・models.py・speech_input.pyに改行差だけが残っていた。今回の新規releaseからのビルド後は187ファイルすべて欠落0・余分0・バイト差0。配布イメージ内の関連45テスト成功、HTTP200、worker登録、再起動回数0、本番・Minecraftの体/ワールド・共有LLM・TTS/DBなど他コンテナ不変を確認した。比較器の改行・バイナリ素材・削除済みファイルに関する3テストも成功。本番会話サーバーへの配布は未実施。
+
+新imageは`ef314835c203e473089cd870957828f61034c5931e485edf7895943a300ebc8b`、runtime manifestは`f99e1eedad5c139d897f0ecb6f92a7fad3448b3bbea0edd38a3cf785e6220311`。証拠・DB退避・完全な配布元は開発ホストの`~/work/ciel-companion-dev/server/data/deployments/agent-d980a056fad3-1794483504477222495/`（before/after、runtime、verification、テスト/buildログ、release）。以後は`deploy-server.sh --dev`も同じ入口を使い、未コミット変更を拒否してHEAD一式を配布する。実ゲーム操作・合成音声再生・キャッシュ性能による確認は行っていない。
 
 2026-11-12 19:50 JSTの開発実会話で、同一返答のLLM受信SSEに4文の並びが77周期続く反復を確認した。約330秒・10,056文字の途中snapshotと実送信入力を保全。同じ入力の再送5回は全て短くstopで終了し、長いループは未再現。完了済み依頼を再提案する内的な考えからの自発発話と、生成上限の欠如を確認したが、発症の直接条件は未特定。今回の作業は調査・再送・記録のみで、予防修正や配布はしていない。[原因の切り分け・条件・証拠](weight-space-results-ja.md#実会話の推論トレースによる反復調査)。
 
