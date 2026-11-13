@@ -297,7 +297,10 @@ export const queryList = [
 
             // Generate crafting plan
             try {
-                let craftingPlan = mc.getDetailedCraftingPlan(target_item, quantity, curr_inventory);
+                // A placed table within crafting range counts as available, like craftRecipe.
+                const tableAvailable = (curr_inventory['crafting_table'] || 0) > 0
+                    || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
+                let craftingPlan = mc.getDetailedCraftingPlan(target_item, quantity, curr_inventory, tableAvailable);
                 craftingPlan = prefixMessage + craftingPlan;
                 return pad(craftingPlan);
             } catch (error) {
