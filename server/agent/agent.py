@@ -290,7 +290,8 @@ class Ciel(Agent):
             tail = mind._tail(list(chat_ctx.items))
             user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
             if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
-                reply = await intake.handle(user_item)
+                # The selection reads the utterance as the continuation of the last few turns.
+                reply = await intake.handle(user_item, conversation=game_intake.recent(chat_ctx.items, user_item))
                 intake_checked = True
                 if reply is not None:
                     yield reply

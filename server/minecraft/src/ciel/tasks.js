@@ -5,7 +5,8 @@ import { shortWhy } from './words.js';
 export const TASK_VERSION = 1;
 export const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const definitions = [{
-  name: 'minecraft.pursue_goal', description: 'Minecraftの依頼をMindcraftのAgentへ渡す。採集・製作・移動等の対応範囲はMindcraftの標準命令に従う。',
+  name: 'minecraft.pursue_goal', description: 'マイクラで、物を集める・作る・掘ってくるなど、時間をかけて仕上げる作業を頼む。計画と実行はゲームが行う。',
+  examples: ['原木を10個集めてきて', '石のツルハシを作ってくれる？', '丸石を掘ってきてほしいな'],
   arguments: {type:'object',additionalProperties:false,required:['request'],properties:{request:{type:'string',minLength:1,maxLength:2000}}},
   constraints: {type:'object',additionalProperties:false,properties:{}},
   handoff: {version:1,argument:'request',constraints:{},seconds:120},

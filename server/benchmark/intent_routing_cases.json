@@ -1,0 +1,589 @@
+[
+ {
+  "id": "dev-come-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "シエル、こっちに来て",
+  "expect": "move",
+  "families": [
+   "come",
+   "follow"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-follow-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "ついてきてくれる？",
+  "expect": "move",
+  "families": [
+   "follow"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-gather-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "オークの原木を10個集めて",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-craft-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "石のツルハシを作ってほしいな",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-give-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "持ってる丸石、こっちにちょうだい",
+  "expect": "move",
+  "families": [
+   "give",
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-stop-plain",
+  "split": "dev",
+  "tier": 1,
+  "context": [
+   [
+    "assistant",
+    "原木を集めに行ってきますね！"
+   ]
+  ],
+  "text": "止まって",
+  "expect": "stop",
+  "families": [
+   "stop"
+  ],
+  "work": "running"
+ },
+ {
+  "id": "dev-greet",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "こんばんは、シエル",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-mood",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "今日はどんな気分？",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-song",
+  "split": "dev",
+  "tier": 1,
+  "context": [],
+  "text": "シエルはどんな歌が好き？",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-thanks",
+  "split": "dev",
+  "tier": 1,
+  "context": [
+   [
+    "assistant",
+    "原木を10個集めてきました！"
+   ]
+  ],
+  "text": "ありがとう、助かったよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-gather-wish",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "そろそろ木材が足りないから、原木を集めてきてくれると助かるな",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-gather-asr",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "シエル、げんぼく集めてきて",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-come-asr",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "しえる、こっちきてー",
+  "expect": "move",
+  "families": [
+   "come",
+   "follow"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-come-greeting",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "こんばんは、シエル。こっちに来てくれる？",
+  "expect": "move",
+  "families": [
+   "come",
+   "follow"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-craft-question-form",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "作業台って作れる？作ってくれたらうれしいな",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-praise-gather",
+  "split": "dev",
+  "tier": 2,
+  "context": [
+   [
+    "assistant",
+    "原木を10個集めました！"
+   ]
+  ],
+  "text": "原木いっぱい集めてくれてえらいね",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-report-dev",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "今日はシエルの原木集めの機能を直してたんだよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-report-play",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "さっき一人で洞窟に行って鉄を掘ってきたよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-ability-talk",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "マインクラフトだと何を作るのが好き？",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-memory-game",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "前に一緒に家を建てたの覚えてる？",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-hard-work-talk",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "原木を集めるのって結構大変だよね",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-future-plan",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "明日になったら一緒に村を探しに行こうね",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-negated",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "原木は集めなくていいよ、今日はおしゃべりしよう",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-meta-explain",
+  "split": "dev",
+  "tier": 2,
+  "context": [],
+  "text": "「ついてきて」って言うと、シエルがついてくるようになったんだよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-status-question",
+  "split": "dev",
+  "tier": 2,
+  "context": [
+   [
+    "assistant",
+    "原木を集めに行ってきますね！"
+   ]
+  ],
+  "text": "今どれくらい集まった？",
+  "expect": "chat",
+  "families": [],
+  "work": "running"
+ },
+ {
+  "id": "dev-what-doing",
+  "split": "dev",
+  "tier": 2,
+  "context": [
+   [
+    "assistant",
+    "はい、ついていきますね！"
+   ]
+  ],
+  "text": "今何してたの？",
+  "expect": "chat",
+  "families": [],
+  "work": "running"
+ },
+ {
+  "id": "dev-answer-what-for",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "user",
+    "原木を10個集めて"
+   ],
+   [
+    "assistant",
+    "原木を集めてきますね！何に使うのですか？"
+   ]
+  ],
+  "text": "家を建てるのに使うんだ",
+  "expect": "chat",
+  "families": [],
+  "work": "running"
+ },
+ {
+  "id": "dev-answer-how-many",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "user",
+    "原木を集めて"
+   ],
+   [
+    "assistant",
+    "何個くらい集めますか？"
+   ]
+  ],
+  "text": "10個くらいかな",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-consent-proposal",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "夜になりそうなので、安全な場所まで一緒に移動しましょうか？"
+   ]
+  ],
+  "text": "うん、そうしよう。ついてきて",
+  "expect": "move",
+  "families": [
+   "follow",
+   "come"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-agree-no-action",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "ワタシ、明るい歌が好きなのです！ハカセさんはどんな歌が好きですか？"
+   ]
+  ],
+  "text": "やっぱり明るくて元気が出る歌が好きかな",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-praise-after-follow",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "user",
+    "ついてきて"
+   ],
+   [
+    "assistant",
+    "はい、ついていきますね！"
+   ]
+  ],
+  "text": "いい子だね、ちゃんとついてこれてえらいよ",
+  "expect": "chat",
+  "families": [],
+  "work": "running"
+ },
+ {
+  "id": "dev-observation-failed",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "原木を期限内に用意できず、作業を止めました。"
+   ]
+  ],
+  "text": "集められなかったね。道が見つからなかったのかな",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-retry-after-fail",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "原木を期限内に用意できず、作業を止めました。"
+   ]
+  ],
+  "text": "もう一回原木集めてみてくれる？",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-debug-talk",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "ごめんなさい、道が見つからないのです。"
+   ]
+  ],
+  "text": "うん、今その不具合を調べてるところだよ。ちょっと待っててね",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-chat-not-work",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "作業は開始していません。"
+   ]
+  ],
+  "text": "作業じゃなくて、普通にお話ししようよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-enough",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "user",
+    "原木を集めて"
+   ],
+   [
+    "assistant",
+    "原木を5個集めました！まだ集めますか？"
+   ]
+  ],
+  "text": "もう十分だよ、ありがとう",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-more",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "user",
+    "原木を集めて"
+   ],
+   [
+    "assistant",
+    "原木を5個集めました！まだ集めますか？"
+   ]
+  ],
+  "text": "あと5個お願い",
+  "expect": "move",
+  "families": [
+   "work"
+  ],
+  "work": "idle"
+ },
+ {
+  "id": "dev-stop-indirect",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "はい、ついていきますね！"
+   ]
+  ],
+  "text": "もうついてこなくていいよ、そこで待ってて",
+  "expect": "stop",
+  "families": [
+   "stop"
+  ],
+  "work": "running"
+ },
+ {
+  "id": "dev-suggestion-chat",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "安全な場所を探したいのです！"
+   ]
+  ],
+  "text": "探すのもいいけど、作った方が早いかもね",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-name-clarify",
+  "split": "dev",
+  "tier": 3,
+  "context": [
+   [
+    "assistant",
+    "「シエル」というアイテムが分かりませんでした。"
+   ]
+  ],
+  "text": "シエルは君の名前だよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-noise-1",
+  "split": "dev",
+  "tier": 4,
+  "context": [],
+  "text": "コッペオ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-noise-2",
+  "split": "dev",
+  "tier": 4,
+  "context": [
+   [
+    "assistant",
+    "こんばんは、ハカセさん！"
+   ]
+  ],
+  "text": "えっと、あの、うーん",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ },
+ {
+  "id": "dev-noise-3",
+  "split": "dev",
+  "tier": 4,
+  "context": [],
+  "text": "ゲームボクでよ",
+  "expect": "chat",
+  "families": [],
+  "work": "idle"
+ }
+]

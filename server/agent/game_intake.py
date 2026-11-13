@@ -36,6 +36,9 @@ def decision_schema(payload):
         decision=(current.get('decision')or{}).get('decision_id')
         if current.get('state')=='needs_decision'and decision:
             alternatives.append(obj({'operation':{'const':'answer'},'decision_id':{'const':decision},'action':{'enum':['retry','cancel']}}))
+        # A short reading of what the speaker is doing is written before the operation.
+        reading={'speaker_act':{'type':'string','maxLength':60}}
+        alternatives=[obj({**reading,**a['properties']})for a in alternatives]
     else:
         definition=payload['capability']
         if payload.get('confirmed_request'):
@@ -60,6 +63,18 @@ def available_variants(definition,mentions,source_roles=None):
     return [{'id':key,'description':v['description']}for key,v in definition.get('preparation',{}).get('variants',{}).items()
             if not(ranged_height and v.get('required_height_mentions'))
             and not(labelled_heights and not labelled<=set(v.get('roles',[])))]
+
+
+def recent(items, until, limit=4, chars=200):
+    """The spoken turns just before `until`: user and Ciel text only, newest last."""
+    turns = []
+    for item in items:
+        if item is until:
+            break
+        role, text = getattr(item, 'role', None), (getattr(item, 'text_content', None) or '').strip()
+        if role in ('user', 'assistant') and text:
+            turns.append((role, text[:chars]))
+    return turns[-limit:]
 
 
 class GameIntake:
@@ -120,7 +135,9 @@ class GameIntake:
                             constraints=copy.deepcopy(d.get('constraints', {})),
                             **({'preparation': copy.deepcopy(d['preparation'])} if d.get('preparation') else {}),
                             **({'handoff': copy.deepcopy(d['handoff'])} if d.get('handoff') else {}),
-                            interpretation=d.get('interpretation', ''))
+                            interpretation=d.get('interpretation', ''),
+                            # Phrases the game declares for this work, like an act tool's triggers.
+                            examples=copy.deepcopy(d.get('examples', [])[:3]))
                        for d in (env.profile.get('work') or {}).get('capabilities', [])]
         for fn in getattr(env, 'tools', []):
             if getattr(env, 'meta', {}).get(fn.id, {}).get('ciel/role') != 'act':
@@ -166,12 +183,14 @@ class GameIntake:
             self._generation += 1
             self._fast_stop = asyncio.create_task(self._stop())
 
-    async def handle(self, item):
+    async def handle(self, item, conversation=()):
+        """conversation: the few turns before this item, as (role, text), so that answers,
+        thanks and remarks about earlier work are read as part of the conversation."""
         async with self._lock:
             key = item.id
             if key in self._items:
                 return self._items[key]
-            result = await self._handle(item.text_content or '', key)
+            result = await self._handle(item.text_content or '', key, conversation)
             self._items[key] = result
             if len(self._items) > 128:
                 del self._items[next(iter(self._items))]
@@ -220,7 +239,7 @@ class GameIntake:
             debug_log.record('model_response', role='game_intake', stage=payload['stage'], id=request,
                              seconds=round(time.monotonic()-began, 3))
 
-    async def _handle(self, text, request_id):
+    async def _handle(self, text, request_id, conversation=()):
         generation = self._generation
         if not self.authorized():
             return None
@@ -267,6 +286,7 @@ class GameIntake:
         epoch = getattr(env, '_connection_epoch', None)
         try:
             action = await self._infer({'stage': 'select', 'input': text,
+                **({'conversation': [{'role': r, 'text': s} for r, s in conversation]} if conversation else {}),
                 'capabilities': [{'id': i, 'description': d['description'],
                                   **({'reference_argument': d['reference_argument']} if d.get('reference_argument') else {}),
                                   **({'target_ids': d['target_ids']} if 'target_ids' in d and not definitions[i].get('preparation') else {}),

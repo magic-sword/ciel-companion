@@ -105,7 +105,7 @@ export function makeServer(hub, sessionId) {
   ({ x, z: zz }) => body((l) => l.do('go_to', { x, z: zz })));
   server.registerTool('minecraft_find_blocks', {
     title: '探す',
-    description: 'マイクラで、見える所に無いブロックを探す（見つけたら止まる。集めるのは minecraft_collect_blocks）。block は英語の ID か呼び名。'
+    description: 'マイクラで、見える所に無いブロックのある場所を探しに行き、見つけた所で止まる。block は英語の ID か呼び名。'
       + 'how は walk（周りを歩いて見回す。木・花・砂など地面の上の物）・dig（階段状に掘り下げながら見る。石・鉱石など地中の物）・auto（体が選ぶ）。掘る探索では目的の鉱石に必要な道具を先に用意し、装備する。',
     inputSchema: { block: z.string(), how: z.string().optional() }, ...ACT('minecraft_find_blocks', { 'ciel/long_running': true }),
   }, ({ block, how }) => body((l) => l.do('find', { block, how: ['walk', 'dig', 'auto'].includes(how) ? how : 'auto' })));
