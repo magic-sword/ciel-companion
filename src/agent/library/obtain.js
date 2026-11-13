@@ -50,7 +50,9 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
             return false;
         }
         const before = inventory[step.item] || 0;
-        await perform(bot, step);
+        const began = Date.now();
+        if (!await performWithin(bot, step, stepSeconds(step)))
+            skills.log(bot, `Timed out trying to ${describe(step)} after ${Math.round((Date.now() - began) / 1000)}s.`);
         done++;
         if ((world.getInventoryCounts(bot)[step.item] || 0) > before) repeats = 0;
         else repeats++;
@@ -63,6 +65,30 @@ function describe(step) {
     if (step.type === 'craft') return `craft ${step.produces} ${step.item}`;
     if (step.type === 'smelt') return `smelt ${step.count} ${step.input}`;
     return `mine ${step.count} ${step.item}` + (step.tool ? ` with a ${step.tool}` : '');
+}
+
+// A pathfinding or pickup wait can hang without ever failing, so every step gets its own
+// deadline and is stopped the same way an interrupt stops an action.
+function stepSeconds(step) {
+    if (step.type === 'craft') return 20;
+    if (step.type === 'smelt') return 20 + 12 * step.count;
+    return 20 + 15 * step.count;
+}
+
+async function performWithin(bot, step, seconds) {
+    let timer;
+    const work = perform(bot, step).then(() => true, err => {
+        skills.log(bot, `Failed to ${describe(step)}: ${err?.message ?? err}.`);
+        return true;
+    });
+    const expired = new Promise(resolve => { timer = setTimeout(() => resolve(false), seconds * 1000); });
+    const finished = await Promise.race([work, expired]);
+    clearTimeout(timer);
+    if (finished) return true;
+    skills.haltMovement(bot);
+    // Let the stopped step settle before planning again; never wait on it forever.
+    await Promise.race([work, new Promise(resolve => setTimeout(resolve, 3000))]);
+    return false;
 }
 
 async function perform(bot, step) {
