@@ -38,7 +38,8 @@ export class GameTasks {
       : t.evidence.activity?.stage==='thinking' ? '次の行動を考えています。'
       : t.evidence.activity?.stage==='returning' ? '集めた物を持って戻っています。'
       : t.evidence.activity?.command==='!collectBlocks' ? 'ブロックを集めています。'
-      : t.evidence.activity?.command==='!craftRecipe' ? '材料から作っています。' : '依頼を実行しています。';
+      : t.evidence.activity?.command==='!craftRecipe' ? '材料から作っています。'
+      : t.evidence.activity?.command==='!obtainItem' ? '必要な物を順に集めて作っています。' : '依頼を実行しています。';
     if (t.reason === 'body_changed') message = '準備中に別の動作へ切り替わったため、この作業は開始しませんでした。';
     return structuredClone({ version: TASK_VERSION, session: this.link.session, task_id: t.id, request_id: t.request.request_id, message,
       revision: t.revision, state: t.state, capability: t.request.capability, arguments: t.request.arguments,

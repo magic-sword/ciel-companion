@@ -81,7 +81,7 @@ class Progress:
     def event(self, e, elapsed):
         if e['kind'] == 'work_activity':
             physical = e.get('stage') == 'returning' or (e.get('stage') == 'executing'
-                and e.get('command') in {'!collectBlocks','!craftRecipe','!smeltItem','!searchForBlock',
+                and e.get('command') in {'!collectBlocks','!craftRecipe','!obtainItem','!smeltItem','!searchForBlock',
                     '!searchForEntity','!goToCoordinates','!moveAway','!equip','!consume','!clearFurnace','!goToSurface'})
             if physical:
                 if self.first_action is None: self.first_action = elapsed
