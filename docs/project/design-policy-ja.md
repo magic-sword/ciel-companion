@@ -6,7 +6,7 @@
 
 ## 責務を分ける
 
-Minecraftの依頼は、会話側で意図・能力・権限を確認して元の自然文をMindcraft本来のAgent.handleMessageへ渡す。上流のPrompter・History・SelfPrompter・NPC・命令実行器が判断と実行を担当し、CIEL中核APIをモデル接続先として注入する。CIEL独自のbrain・目標JSON・材料計画・帰還ループと既存施工エンジンへの代替は使用しない。標準動作でうまくいかない箇所は報告し、利用者が使用感を確認してから拡張方針を決める。中核APIは同じ人格・記憶・会話を共有するが、音声の表情タグや話し言葉の形式は実行判断へ付けない。[作業契約](../games/game-work-contract-ja.md)に自然文handoffと終了の意味を定める。
+Minecraftの依頼は、会話側で意図・能力・権限を確認して元の自然文をMindcraft本来のAgent.handleMessageへ渡す。上流のPrompter・History・SelfPrompter・NPC・命令実行器が判断と実行を担当し、CIEL中核APIをモデル接続先として注入する。CIEL独自のbrain・目標JSON・材料計画・帰還ループと既存施工エンジンへの代替は使用しない。標準動作でうまくいかない箇所は報告し、利用者が使用感を確認してから拡張方針を決める。長い作業の依存関係・計画グラフ・世界の記憶・持ち主への相談の拡張は[採用前の設計案](../games/minecraft/minecraft-long-horizon-ja.md)にまとめ、段階ごとに採用を判断する。中核APIは同じ人格・記憶・会話を共有するが、音声の表情タグや話し言葉の形式は実行判断へ付けない。[作業契約](../games/game-work-contract-ja.md)に自然文handoffと終了の意味を定める。
 
 Minecraftの実行基盤はMindcraftの固定版を土台にする。CIELは認証済み入力、所有権、明示停止、Bot接続の寿命、アプリへの状態投影を担当する。スタンドアロンのMindServer・公開ゲームチャット受付・別TTSは起動しない。標準Agentの部品初期化を共用メソッドへ抽出し、モデル注入と命令観測の入口を追加する。Paper/Mineflayerの互換修正と取消後のI/O遮断は残すが、行動選択や移動戦略を既存CIELの技で上書きしない。出典と許諾は[第三者依存](third-party-dependencies.md)、動作と配布範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
 
