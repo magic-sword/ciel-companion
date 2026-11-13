@@ -35,7 +35,8 @@ class CoreHost:
             context.append({'role':'user','content':json.dumps({'type':'permitted_memory','text':memory},ensure_ascii=False)})
         return context
 
-    async def infer(self, context, messages, *, response_format='text', max_tokens=256, purpose='game_core'):
+    async def infer(self, context, messages, *, response_format='text', max_tokens=256, purpose='game_core',
+                    queued_seconds=0):
         context.extend(messages)
         if models.is_local('mind'):
             source = llm.ChatContext()
@@ -45,7 +46,7 @@ class CoreHost:
                        for item in mind.local_context(source).items]
         ident, began = uuid.uuid4().hex, time.monotonic()
         self.record('core_request', role=purpose, id=ident, model=models.model('mind'),
-                         input_chars=sum(len(m['content']) for m in context))
+                         input_chars=sum(len(m['content']) for m in context), queued_seconds=queued_seconds)
         try:
             options = models.options('mind', model=models.model('mind'), messages=context, max_tokens=max_tokens, temperature=0)
             if response_format == 'json':

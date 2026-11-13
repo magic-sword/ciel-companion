@@ -51,37 +51,29 @@ test('without registration the full prompt is still sent; failed preparation kee
   assert.equal(slow.reference, 'docs');
 });
 
-test('concurrent Mindcraft requests are sent one at a time; cancel also drops queued ones', async () => {
-  let active = 0, peak = 0;
+test('overlapping requests are sent at once with priorities; CIEL schedules them', async () => {
+  const seen = [];
   const releases = [];
   const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
     fetch: async (url, options) => {
-      if (options.method === 'DELETE') return { ok: false, status: 404 };
-      active += 1; peak = Math.max(peak, active);
+      if (url.endsWith('/reference')) return { ok: true };
+      if (url.endsWith('/prepare')) return { ok: true, json: async () => ({ status: 'prepared', seconds: 0 }) };
       const request = JSON.parse(options.body);
+      seen.push(request.priority);
       await new Promise(resolve => releases.push(resolve));
-      active -= 1;
-      return { ok: true, json: async () => ({ request_id: request.request_id, text: request.request_id }) };
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: 'ok' }) };
     } });
-  const first = model.sendRequest([], 'turn');
-  const summary = model.sendRequest([], 'summarize');
+  const before = model.sendRequest([], 'anything');
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(releases.length, 1);
-  releases.shift()();
-  assert.equal(typeof await first, 'string');
+  assert.deepEqual(seen, ['decision']);
+  releases.shift()(); await before;
+  await model.prepareReference('docs');
+  const turn = model.sendRequest([], 'docs\nstats');
+  const summary = model.sendRequest([], 'summarize the memory');
   await new Promise(resolve => setImmediate(resolve));
-  releases.shift()();
-  assert.equal(typeof await summary, 'string');
-  assert.equal(peak, 1);
-  const running = model.sendRequest([], 'a');
-  const queued = model.sendRequest([], 'b');
-  await new Promise(resolve => setImmediate(resolve));
-  const stop = model.cancel();
-  releases.shift()();
-  await assert.rejects(running, /cancelled/);
-  await assert.rejects(queued, /cancelled/);
-  await stop;
-  assert.equal(releases.length, 0);
+  assert.deepEqual(seen.slice(1), ['decision', 'background']);
+  releases.splice(0).forEach(release => release());
+  assert.deepEqual(await Promise.all([turn, summary]), ['ok', 'ok']);
 });
 
 test('cancelled requests reject a late successful HTTP response', async () => {

@@ -12,7 +12,6 @@ export class CielModel {
     this.transport = transport;
     this.pending = new Map();
     this.reference = null;
-    this.queue = null;
   }
 
   // Startup: register the fixed part of the execution prompt once, then let CIEL evaluate it.
@@ -42,24 +41,19 @@ export class CielModel {
     const controller = new AbortController();
     this.pending.set(id, controller);
     // CIEL already holds the registered fixed prefix; send only what changes per turn.
-    const text = this.reference && systemMessage.startsWith(this.reference + '\n')
-      ? systemMessage.slice(this.reference.length + 1) : systemMessage;
-    // A CIEL session serves one request at a time. Mindcraft can summarize memory while the
-    // next turn is prompted, so queue instead of letting the core answer 409 session_busy.
-    const previous = this.queue;
-    let release;
-    const mine = new Promise(resolve => { release = resolve; });
-    this.queue = mine;
+    const decision = Boolean(this.reference) && systemMessage.startsWith(this.reference + '\n');
+    const text = decision ? systemMessage.slice(this.reference.length + 1) : systemMessage;
+    // Requests may overlap (e.g. memory summaries during the next turn). CIEL decides how to
+    // schedule them; this client only says which ones are the action decisions.
+    const priority = decision || !this.reference ? 'decision' : 'background';
     try {
-      if (previous) await previous;
-      if (controller.signal.aborted || !this.pending.has(id)) throw new Error('CIEL request cancelled');
       const messages = [
         { role: 'user', content: JSON.stringify({ type: 'execution_context', text }) },
         ...turns.map(turn => ({ role: turn.role === 'assistant' ? 'assistant' : 'user',
           content: turn.role === 'system' ? JSON.stringify({ type: 'execution_observation', text: turn.content }) : turn.content })),
       ];
       const response = await this.transport(`${this.url}/v1/respond`, {
-        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, response_format: responseFormat }),
+        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, response_format: responseFormat, priority }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(125000)]),
       });
       if (!response.ok) throw new Error(`CIEL inference failed: ${response.status}`);
@@ -67,10 +61,7 @@ export class CielModel {
       if (!this.pending.has(id)) throw new Error('CIEL request cancelled');
       if (result.request_id !== id || typeof result.text !== 'string') throw new Error('Invalid CIEL response');
       return result.text;
-    } finally {
-      this.pending.delete(id); release();
-      if (this.queue === mine) this.queue = null;
-    }
+    } finally { this.pending.delete(id); }
   }
 
   headers() { return { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' }; }

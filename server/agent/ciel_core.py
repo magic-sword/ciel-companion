@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 
 from aiohttp import web
 
+import inference_scheduler
+
 REFERENCE_CHARS = 48000
+SESSION_IN_FLIGHT = 8
 PREPARE_SECONDS = 120
 
 
@@ -16,6 +19,7 @@ PREPARE_SECONDS = 120
 class CoreSession:
     context: object
     infer: object
+    scheduler: object = field(default_factory=inference_scheduler.shared)
     tasks: dict = field(default_factory=dict)
     closed: bool = False
     # Fixed execution material (e.g. Mindcraft command docs), registered once per session.
@@ -57,10 +61,11 @@ class CoreSession:
 
         async def run():
             began = time.monotonic()
-            async with asyncio.timeout(PREPARE_SECONDS):
+            async with asyncio.timeout(PREPARE_SECONDS), self.scheduler.slot('decision') as queued:
                 context = await self._context()
                 await self.infer(context, [{'role': 'user', 'content': json.dumps({'type': 'prepare'})}],
-                                 response_format='text', max_tokens=1, purpose='game_core_prepare')
+                                 response_format='text', max_tokens=1, purpose='game_core_prepare',
+                                 queued_seconds=queued)
             if self.closed or asyncio.current_task().cancelling():
                 raise asyncio.CancelledError()
             return {'status': 'prepared', 'seconds': round(time.monotonic() - began, 3)}
@@ -72,8 +77,12 @@ class CoreSession:
     async def respond(self, request):
         if self.closed:
             raise web.HTTPGone()
-        if not isinstance(request, dict) or set(request) != {'request_id', 'messages', 'response_format'}:
+        if (not isinstance(request, dict) or not {'request_id', 'messages', 'response_format'} <= set(request)
+                or not set(request) <= {'request_id', 'messages', 'response_format', 'priority'}):
             raise web.HTTPBadRequest(reason='invalid_request')
+        priority = request.get('priority', 'decision')
+        if priority not in inference_scheduler.PRIORITY:
+            raise web.HTTPBadRequest(reason='invalid_priority')
         if request['response_format'] not in ('text','json'):
             raise web.HTTPBadRequest(reason='invalid_response_format')
         ident, messages = request['request_id'], request['messages']
@@ -93,13 +102,17 @@ class CoreSession:
             raise web.HTTPConflict(reason='request_id_used')
         if len(self.tasks) >= 1024:
             raise web.HTTPTooManyRequests(reason='session_request_limit')
-        if any(not task.done() for task in self.tasks.values()):
-            raise web.HTTPConflict(reason='session_busy')
+        # Concurrent requests are accepted, as with hosted LLM APIs; the shared scheduler
+        # decides when each runs. Only a runaway client is refused.
+        if sum(not task.done() for task in self.tasks.values()) >= SESSION_IN_FLIGHT:
+            raise web.HTTPTooManyRequests(reason='session_in_flight_limit')
 
         async def generate():
-            async with asyncio.timeout(120):
+            # The deadline covers waiting for a slot as well as inference.
+            async with asyncio.timeout(120), self.scheduler.slot(priority) as queued:
                 context = await self._context()
-                result = await self.infer(context, copy.deepcopy(messages), response_format=request['response_format'])
+                result = await self.infer(context, copy.deepcopy(messages), response_format=request['response_format'],
+                                          queued_seconds=queued)
                 if self.closed or asyncio.current_task().cancelling():
                     raise asyncio.CancelledError()
                 if not isinstance(result, str):
@@ -127,13 +140,15 @@ class CoreSession:
 
 
 class CielCore:
-    def __init__(self):
+    def __init__(self, scheduler=None):
         self.sessions = {}
+        # Process-wide by default: every bound session competes for the same model slots.
+        self.scheduler = scheduler or inference_scheduler.shared()
 
     def bind(self, *, context, infer):
         """Only the trusted conversation host can bind permitted context and model access."""
         token = secrets.token_urlsafe(32)
-        self.sessions[token] = CoreSession(context, infer)
+        self.sessions[token] = CoreSession(context, infer, self.scheduler)
         return token
 
     async def release(self, token):

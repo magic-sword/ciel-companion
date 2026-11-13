@@ -33,7 +33,7 @@ class HostTests(unittest.IsolatedAsyncioTestCase):
         with patch('core_host.models.create_client', return_value=client):
             host = CoreHost(agent, book)
         received = []
-        async def infer(context, messages, *, response_format):
+        async def infer(context, messages, *, response_format, **options):
             received.append((context,messages))
             return '!inventory'
         host.infer = infer
