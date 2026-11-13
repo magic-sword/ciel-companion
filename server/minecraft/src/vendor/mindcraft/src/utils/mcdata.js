@@ -363,7 +363,7 @@ export function getBlockTool(blockName) {
     if (!block || !block.harvestTools) {
         return null;
     }
-    return getItemName(Object.keys(block.harvestTools)[0]);  // Double check first tool is always simplest
+    return harvestTools(blockName)[0] ?? null;  // The id order is not the tier order (copper tools since 1.21.9).
 }
 
 export function makeItem(name, amount=1) {
@@ -472,7 +472,7 @@ export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory
         return "Invalid input. Please provide a valid item name and positive count.";
     }
 
-    if (isBaseItem(targetItem)) {
+    if (isBaseItem(targetItem) && !needsToolOrSmelting(targetItem)) {
         const available = current_inventory[targetItem] || 0;
         if (available >= count) return "You have all required items already in your inventory!";
         return `${targetItem} is a base item, you need to find ${count - available} more in the world`;
@@ -495,7 +495,67 @@ function isBaseItem(item) {
     return loopingItems.has(item) || getItemCraftingRecipes(item) === null;
 }
 
+// The block a base item is usually mined from: the same-named block, then a plain ore.
+function preferredBlockSource(item) {
+    const sources = getItemBlockSources(item).filter(source => source !== 'grass_block');
+    return sources.find(source => source === item)
+        ?? sources.find(source => source.endsWith('_ore') && !source.startsWith('deepslate'))
+        ?? sources[0] ?? null;
+}
+
+// Tools that can harvest a block, easiest to make first; empty when the hand is enough.
+// harvestTools is keyed by item id, which is not the crafting order (copper tools since 1.21.9).
+const TOOL_TIERS = ['wooden', 'stone', 'copper', 'iron', 'golden', 'diamond', 'netherite'];
+function harvestTools(blockName) {
+    const block = mcdata.blocksByName[blockName];
+    if (!block?.harvestTools) return [];
+    const tier = name => {
+        const index = TOOL_TIERS.indexOf(name.split('_')[0]);
+        return index === -1 ? TOOL_TIERS.length : index;
+    };
+    return Object.keys(block.harvestTools).map(id => getItemName(id)).sort((a, b) => tier(a) - tier(b));
+}
+
+function needsToolOrSmelting(item) {
+    const source = preferredBlockSource(item);
+    return Boolean(getItemSmeltingIngredient(item)) || (source !== null && harvestTools(source).length > 0);
+}
+
+function hasAny(items, inventory, leftovers, crafted) {
+    return items.some(item => (inventory[item] || 0) > 0 || (leftovers[item] || 0) > 0 || crafted.made.has(item));
+}
+
+// Make one item (a tool or a station) once for the plan unless one is already available.
+function ensureOne(item, alternatives, inventory, leftovers, crafted) {
+    if (hasAny(alternatives, inventory, leftovers, crafted)) return;
+    craftItem(item, 1, inventory, leftovers, crafted);
+    crafted.made.add(item);
+}
+
+// Base items that need a tool to mine, or come from smelting, get those steps in order.
+function gatherBaseItem(item, count, inventory, leftovers, crafted) {
+    const ingredient = getItemSmeltingIngredient(item);
+    if (ingredient && !crafted.smelting.has(item)) {
+        crafted.smelting.add(item);
+        craftItem(ingredient, count, inventory, leftovers, crafted);
+        ensureOne('furnace', ['furnace'], inventory, leftovers, crafted);
+        craftItem('coal', Math.ceil(count / 8), inventory, leftovers, crafted);
+        crafted.steps.push(`Smelt ${count} ${ingredient} in a furnace with fuel -> ${count} ${item}`);
+        crafted.smelting.delete(item);
+        return;
+    }
+    crafted.required[item] = (crafted.required[item] || 0) + count;
+    const source = preferredBlockSource(item);
+    const tools = source ? harvestTools(source) : [];
+    if (tools.length === 0) return;
+    ensureOne(tools[0], tools, inventory, leftovers, crafted);
+    crafted.steps.push(`Mine ${count} ${item} from ${source} with a ${tools[0]} or better`);
+    crafted.toolSteps = true;
+}
+
 function craftItem(item, count, inventory, leftovers, crafted = { required: {}, steps: [], leftovers: {} }) {
+    crafted.made ??= new Set();
+    crafted.smelting ??= new Set();
     // Check available inventory and leftovers first
     const availableInv = inventory[item] || 0;
     const availableLeft = leftovers[item] || 0;
@@ -519,7 +579,7 @@ function craftItem(item, count, inventory, leftovers, crafted = { required: {}, 
     if (availableInv > 0) inventory[item] = 0;
 
     if (isBaseItem(item)) {
-        crafted.required[item] = (crafted.required[item] || 0) + stillNeeded;
+        gatherBaseItem(item, stillNeeded, inventory, leftovers, crafted);
         return crafted;
     }
 
@@ -555,14 +615,17 @@ function craftItem(item, count, inventory, leftovers, crafted = { required: {}, 
     return crafted;
 }
 
-function formatPlan(targetItem, { required, steps, leftovers }) {
+function formatPlan(targetItem, { required, steps, leftovers, toolSteps }) {
     const lines = [];
 
     if (Object.keys(required).length > 0) {
         lines.push('You are missing the following items:');
-        Object.entries(required).forEach(([item, count]) => 
+        Object.entries(required).forEach(([item, count]) =>
             lines.push(`- ${count} ${item}`));
-        lines.push('\nOnce you have these items, here\'s your crafting plan:');
+        // Some items can only be mined after their tool is made, so the order matters.
+        lines.push(toolSteps
+            ? '\nFollow this plan in order; gather each missing item when its step comes:'
+            : '\nOnce you have these items, here\'s your crafting plan:');
     } else {
         lines.push('You have all items required to craft this item!');
         lines.push('Here\'s your crafting plan:');
