@@ -173,6 +173,19 @@ class ProgressTest(unittest.TestCase):
         self.assertEqual(watch.last_progress,1)
         self.assertEqual(watch.reason(31,budget(load_tasks()[0])),'first_action_timeout')
 
+    def test_regathering_consumed_items_is_progress_but_consumption_is_not(self):
+        def held(position=0, **inventory):
+            return {'inventory':{'oak_log':0,'oak_planks':0,**inventory},'position':[position,64,0],'health':20}
+        watch=Progress(held(),load_tasks()[0])
+        watch.observe(held(oak_log=2),5)           # gathered
+        watch.observe(held(oak_planks=8),10)       # crafted: planks are new
+        watch.observe(held(),20)                   # consumed: not progress
+        self.assertEqual(watch.last_progress,10)
+        watch.observe(held(oak_log=1),25)          # the same log count as before, re-gathered
+        self.assertEqual(watch.last_progress,25)
+        watch.observe(held(oak_log=1),40)          # holding still is not progress
+        self.assertEqual(watch.last_progress,25)
+
     def test_repeated_async_failure_counts_snapshot_once(self):
         watch=Progress(state(),load_tasks()[0])
         for n in range(2):

@@ -4,6 +4,9 @@ import math
 import re
 
 VERSION = 'practical-v1'
+# Inventory progress: any tracked item above the previous observation, so re-gathering what
+# was consumed counts. Until 2026-11-13 an item had to exceed its highest count so far.
+PROGRESS_RULE = 'inventory_gain_since_last_observation'
 DEFAULT = {'seconds':90, 'first_action':30, 'no_progress':30, 'same_failure':2,
            'blocked_grace':10, 'stop_grace':5}
 ACTION_TOOLS = {'minecraft_pointed_action','minecraft_clear_region','minecraft_build_region','minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item',
@@ -29,7 +32,7 @@ def budget(task, cap=None):
 class Progress:
     def __init__(self, initial, task):
         self.task = task
-        self.highwater = dict(initial['inventory'])
+        self.previous = dict(initial['inventory'])
         self.cells = {self.cell(initial)}
         self.last_progress = 0
         self.first_action = None
@@ -62,9 +65,9 @@ class Progress:
         progress = cell not in self.cells
         self.cells.add(cell)
         for item,count in state['inventory'].items():
-            if count > self.highwater.get(item,0):
+            if count > self.previous.get(item,0):
                 progress = True
-                self.highwater[item] = count
+        self.previous = dict(state['inventory'])
         if progress:
             self.last_progress = elapsed
             self.failures.clear()

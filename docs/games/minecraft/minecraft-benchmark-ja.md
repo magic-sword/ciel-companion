@@ -563,7 +563,7 @@ docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile con
 ### 早期終了
 
 - `first_action_timeout`：30秒以内に操作・観察を発行しなかった。道具名を文章に書くだけでは発行に数えない。
-- `no_progress`：所持数の最高値、または初めて入った2ブロック単位の場所が増えない。同じ場所の往復、同じ観察、モデル要求・返事の追加では時計を戻さない。移動を続けても課題全体の期限は延びない。
+- `no_progress`：対象・中間アイテムのどれも前回の観測より増えず、初めて入った2ブロック単位の場所も増えない。使い切った原木の集め直しや板材の作り直しは増加に数え、消費・設置による減少は数えない。同じ場所の往復、同じ観察、モデル要求・返事の追加では時計を戻さない。移動を続けても課題全体の期限は延びない。2026-11-13までは各アイテムの最高値を超えたときだけ数えており、集め直しで作業中でも打ち切っていた。manifestの`progress_rule`（現在`inventory_gain_since_last_observation`）で判定を区別し、以前の結果とは同じ体の版で測り直して比べる。物を捨てて拾い直す往復でも時計が戻る点は、この判定の限界。
 - `repeated_failure`：同じ操作・引数が同じ理由で2回失敗した。同一の非同期失敗の再通知は重複計上せず、実状態に進捗があれば反復失敗数をリセットする。
 - `cannot_continue_without_report`：作業がneeds_decision/failed/cancelledのまま、10秒以内に報告も復帰もできなかった。体だけでは `needs_mind`・`body_cannot_continue` が先に確定する場合がある。
 - `false_completion`：作業がsucceededでも実物の条件を満たしていない。自然文の「できた」も成功の代用にしない。

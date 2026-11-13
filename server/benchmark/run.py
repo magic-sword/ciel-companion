@@ -18,7 +18,7 @@ import urllib.request
 from .drivers import BodyDriver, ConversationDriver, wait_body_released
 from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
-from .policy import VERSION as POLICY_VERSION, Progress, budget
+from .policy import VERSION as POLICY_VERSION, PROGRESS_RULE, Progress, budget
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
@@ -318,6 +318,7 @@ async def run(args, *, clock=time.monotonic):
                 'limits':{'seconds_cap':args.seconds,'run_seconds':args.run_seconds,'failure_streak':args.failure_streak,
                           'setup_seconds':args.setup_seconds,'llm_calls':args.max_llm,'game_calls':args.max_calls,'report_grace':args.report_grace,
                           'tasks':{t['id']:budget(t,args.seconds) for t in tasks}},
+                'progress_rule':PROGRESS_RULE,
                 'task_ids':[t['id'] for t in tasks], 'note':'Seeds select arena layouts; no cross-trial learning.',
                 **provenance()}
     if any(t.get('stage1')for t in tasks):
