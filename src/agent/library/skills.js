@@ -33,6 +33,12 @@ async function equipHighestAttack(bot) {
         await bot.equip(weapon, 'hand');
 }
 
+// Name the simplest harvesting tool so the next step can make it instead of retrying.
+function toolHint(blockName) {
+    const tool = mc.getBlockTool(blockName);
+    return tool ? ` It needs a ${tool} or better; use !getCraftingPlan("${tool}", 1) to make one first.` : '';
+}
+
 export async function craftRecipe(bot, itemName, num=1) {
     /**
      * Attempt to craft the given item name from a recipe. May craft many items.
@@ -491,7 +497,7 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
         }
         const itemId = bot.heldItem ? bot.heldItem.type : null
         if (!block.canHarvest(itemId)) {
-            log(bot, `Don't have right tools to harvest ${blockType}.`);
+            log(bot, `Don't have right tools to harvest ${blockType}.${toolHint(block.name)}`);
             return false;
         }
         try {
@@ -596,7 +602,7 @@ export async function breakBlockAt(bot, x, y, z) {
             await bot.tool.equipForBlock(block);
             const itemId = bot.heldItem ? bot.heldItem.type : null
             if (!block.canHarvest(itemId)) {
-                log(bot, `Don't have right tools to break ${block.name}.`);
+                log(bot, `Don't have right tools to break ${block.name}.${toolHint(block.name)}`);
                 return false;
             }
         }
