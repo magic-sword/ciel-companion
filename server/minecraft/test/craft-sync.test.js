@@ -40,6 +40,25 @@ test('2x2 hand crafting confirms clicks, the output and the final inventory with
   assert.equal(bot.__handCrafting,false);
 });
 
+test('a stale first window update is not trusted; later inventory packets are applied first',async()=>{
+  const {EventEmitter}=await import('node:events');
+  const client=new EventEmitter(),inventory={id:0,type:'minecraft:inventory',slots:[]};
+  let taken=null;
+  const bot={currentWindow:null,inventory,_client:client,
+    async _syncWindow(w){
+      // The first full update answers an earlier click and still lacks the output...
+      w.slots[0]=null;
+      // ...the reply to this sync arrives a moment later.
+      setTimeout(()=>{w.slots[0]={name:'crafting_table',count:1};client.emit('packet',{windowId:0},{name:'window_items'});},40);
+    },
+    async clickWindow(){},
+    async putAway(slot){taken=inventory.slots[slot];},
+    async craft(){inventory.slots[0]={name:'crafting_table',count:1};await bot.putAway(0);}};
+  confirmedCrafting(bot);
+  await bot.craft({},1,null);
+  assert.deepEqual(taken,{name:'crafting_table',count:1});
+});
+
 test('inventory clicks outside crafting are not synchronized',async()=>{
   const events=[];
   const bot={currentWindow:null,inventory:{type:'minecraft:inventory',slots:[]},
