@@ -2,7 +2,7 @@
 
 > 責務：Minecraftの長い作業を進めるための、依存関係のグラフ・作業の計画グラフ・世界の記憶・持ち主への相談・失敗からの立て直しの設計と、段階ごとの採用条件。
 
-**状態：採用前の設計案。未実装。** 現在の判断の仕組みは[MindcraftのLLM通信と推論・行動ループ](mindcraft-agent-loop-ja.md)、体と接続の構成は[Minecraftサービス](minecraft-design-ja.md)、依頼・期限・判断待ち・取消は[作業契約](../game-work-contract-ja.md)、評価は[ベンチマーク](minecraft-benchmark-ja.md)が正本。本書の内容は、各段を採用した時点でそれらの正本へ移し、本書からは削る。
+**状態：採用前の設計案。** 第1段（依存関係の照会）だけを実装し、採用条件の測定中。第2段以降は未実装。 現在の判断の仕組みは[MindcraftのLLM通信と推論・行動ループ](mindcraft-agent-loop-ja.md)、体と接続の構成は[Minecraftサービス](minecraft-design-ja.md)、依頼・期限・判断待ち・取消は[作業契約](../game-work-contract-ja.md)、評価は[ベンチマーク](minecraft-benchmark-ja.md)が正本。本書の内容は、各段を採用した時点でそれらの正本へ移し、本書からは削る。
 
 ## 解決したいこと
 
