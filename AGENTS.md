@@ -13,6 +13,8 @@
 - 稼働中の Minecraft で発生した不具合の現場調査には、[ciel-minecraft-debug](.claude/skills/ciel-minecraft-debug/SKILL.md)を使う。専用ベンチマークとは接続先・復元範囲が異なる。
 - 会話サーバーを変更するときは、追加で [server/agent/AGENTS.md](server/agent/AGENTS.md)を読む。通常の検証方法は [回帰テスト](docs/testing/regression-tests-ja.md)、全体の入口は [資料一覧](docs/README.md)。
 
+- シエルの会話モデルへ渡すプロンプト（`server/agent/config/prompts`、persona.toml、会話へ差し込む補足の文言）を書く・直すときは、[ciel-prompt-writing スキル](.agents/skills/ciel-prompt-writing/SKILL.md)を読む。言わせたくない言葉を挙げず、してほしいことを書き、変更前後を注釈の書き出し確率で比べる。
+
 - 作業・目標や会話中の表示を変更するときは[表示契約](docs/app/work-display-contract-ja.md)を読む。goal.state / goal.control v2、元のwork状態と確認の有効期間、表示対象のID・版を維持する。旧段一覧・paused集約へ戻さない。
 
 - 文書の追加・整理・更新には[ciel-documentation共有スキル](.agents/skills/ciel-documentation/SKILL.md)を使う。文書は[管理ルール](docs/project/documentation-policy-ja.md)と[資料一覧](docs/README.md)の責務に従い、既存の正本を更新する。日付付きの設計書・実装記録・旧仕様の併記を増やさず、履歴はGit、測定の条件と未確認範囲は[分野別の実測資料](docs/README.md#テストと確認状況)、現在の配布・確認範囲は[確認状況](docs/testing/verification-status-ja.md)へ置く。

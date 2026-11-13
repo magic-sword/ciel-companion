@@ -317,7 +317,9 @@ class Ciel(Agent):
             index = next((i for i, item in enumerate(ctx.items) if getattr(item, 'role', None) == 'system'), None)
             instructions = llm.ChatMessage(role='system', content=[self.instructions_for(
                 style.talk if style else 'normal', style.presence if style else 'solo')
-                + '\n\n' + self.capabilities.summary()])
+                + '\n\n' + self.capabilities.summary()
+                # Last in the fixed prefix: what a reply is. Earlier positions did not reduce annotations.
+                + '\n\n' + self.persona.reply_frame])
             if index is None:
                 ctx.items.insert(0, instructions)
             else:

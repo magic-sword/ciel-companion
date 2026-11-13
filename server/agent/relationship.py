@@ -44,7 +44,7 @@ def context(name: str, r: Relationship | None, last_seen: datetime | None, priva
         return ''
     stage = STAGES[min(max(r.stage, 0), len(STAGES) - 1)]
     if not private:
-        return f'\n[{name}さんとの親しさ：{stage}（口調だけに表す。口に出さない）]'
+        return f'\n[{name}さんとの親しさ：{stage}（口調で表す）]'
     # 会えたときに表に出やすい順（寂しさ・気分を先に。気持ちは前の会話までの思いで、下敷きにするもの）
     parts = [stage]
     if r.stage >= 1 and last_seen is not None and datetime.now(timezone.utc) - last_seen >= timedelta(days=LONELY_DAYS):
@@ -53,7 +53,7 @@ def context(name: str, r: Relationship | None, last_seen: datetime | None, priva
         parts.append(f'前の会話から続いている気分：{r.mood.rstrip("。")}')
     if r.feeling:
         parts.append(f'前の会話までの気持ち：{r.feeling.rstrip("。")}')
-    return f'\n[{name}さんとの関係（シエルの心の中。そのまま口に出さない）：' + '。'.join(parts) + ']'
+    return f'\n[{name}さんとの関係（シエルの心の中）：' + '。'.join(parts) + ']'
 
 
 class RelationKeeper:

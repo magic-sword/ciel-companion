@@ -8,4 +8,6 @@ Minecraft のベンチマークには `.claude/skills/ciel-minecraft-benchmark/S
 
 音声認識精度・応答遅延のベンチマークには `.claude/skills/ciel-voice-benchmark/SKILL.md` を入口として使う。
 
+シエルの会話モデルへ渡すプロンプト（`server/agent/config/prompts`、persona.toml、会話へ差し込む補足の文言）を書く・直すときは `.claude/skills/ciel-prompt-writing/SKILL.md` を使う。
+
 文書の追加・整理・更新では[文書管理スキル](.claude/skills/ciel-documentation/SKILL.md)を使う。共有スキルの正本は`.claude/skills`、Codex側の`.agents/skills`は正本を読む入口とする。

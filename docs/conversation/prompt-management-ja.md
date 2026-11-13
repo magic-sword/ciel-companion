@@ -34,6 +34,7 @@
 | `server/agent/config/prompts/relationship.md` | 会話の終わりに、シエルがその人をどう思っているか（関係）を書き直す係への指示。処理は `relationship.py`。[関係の決定記録](../services/shared-memory-ja.md) |
 | `server/agent/config/prompts/minutes.md`・`minutes_live.md`・`minutes_voice.md` | 会話のまとめ（議事録など）の清書・ライブの差分・声での頼まれ方。処理は `minutes.py`・`summaries/`。[議事録の決定記録](../services/meeting-minutes-ja.md) |
 | `server/agent/config/summaries/*.toml`・`*.md` | まとめのテンプレート。TOML は見出しと種類（モデルへの本文ではない）、Markdown は書き方の指示（モデルへそのまま渡す） |
+| `server/agent/config/prompts/reply_frame.md` | 返事の前提（書いたとおりに読み上げられて相手に届く）。`agent.py`が能力一覧のあと、固定systemの最後に付ける。前へ移すと注釈を減らす効果が消えた |
 | `server/agent/config/prompts/talker.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline`の共通会話指示（会話と必要な道具の選択）、背景の短いまとめ、付箋と依頼の印の読み方。`listener.md`は独立モジュール用に残すが、通常pipelineの途中文字起こしには接続しない。処理は`mind.py`・`board.py`。[会話の処理構造](conversation-pipeline-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
 | `server/agent/config/prompts/game_select.md`・`game_intake.md`・`game_draft.md` | ゲーム受付の能力選択・選択済み能力の引数生成・確認への補足。draftのある選択時だけ補足用本文を追加し、通常の指示を維持する |
@@ -56,7 +57,7 @@ Markdown は HTML に変換せず、そのソースをモデルへ渡す。見�
 
 ## 変更・評価・公開の手順
 
-1. 本文または参照先を変更し、Git の差分で意図しない変更や指示の矛盾がないか確認する。
+1. 本文または参照先を変更し、Git の差分で意図しない変更や指示の矛盾がないか確認する。書き方は[ciel-prompt-writing スキル](../../.claude/skills/ciel-prompt-writing/SKILL.md)に従う（言わせたくない言葉や項目名を挙げず、してほしいことを書く。返事が読み上げられる前提は `reply_frame.md` に 1 回だけ置き、場面の指示で繰り返さない）。
 2. `load_persona()` で読み込みを確認する。ローダー変更時は、起動ディレクトリに依存しないパス解決、別設定、欠落・空・不正なファイルも確認する。
 3. 本文を変更した場合は、同じモデル・声の方式で代表的な会話を比較する。あいさつ、落ち込みへの返答、分からない質問、長い説明、口癖の頻度、割り込みへの反応を確認する。Irodori はタグの付与と読み上げからの除去も確認する。
 4. 変更理由、使用モデル・声の方式、確認結果、未検証の項目を PR や作業記録に残す。読み込み確認と実際の会話品質の確認を区別する。
