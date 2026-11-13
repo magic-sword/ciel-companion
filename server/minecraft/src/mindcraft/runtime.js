@@ -5,6 +5,7 @@ import { alignPlayerCollision } from '../player-physics.js';
 import { confirmedCrafting } from '../craft-sync.js';
 import { CielModel } from './ciel-model.js';
 import { SessionModel } from './session-model.js';
+import { cacheLayout } from './prompt-layout.js';
 import { executeCommand, blacklistCommands } from '../vendor/mindcraft/src/agent/commands/index.js';
 import defaultSettings from '../vendor/mindcraft/settings.js';
 import { setSettings } from '../vendor/mindcraft/src/agent/settings.js';
@@ -37,7 +38,11 @@ export class MindcraftRunner extends BodyCommands {
       this.agent.memory_bank=new MemoryBank();
       this.agent.npc.data.goals=[];this.agent.npc.data.curr_goal=null;
     }
-    this.coreModel = new CielModel(null, url, {token});
+    const model = new CielModel(null, url, {token});
+    this.coreModel = model;
+    if(!this.agent || !this.referenceTemplate) return {status:'unavailable'};
+    const reference = await this.agent.prompter.replaceStrings(this.referenceTemplate, []);
+    return model.prepareReference(reference);
   }
   async unbindCore() {
     const model=this.coreModel; this.coreModel=null;
@@ -89,6 +94,10 @@ export class MindcraftRunner extends BodyCommands {
       ()=>{if(this.current)this.activity(this.current,'thinking');});
     await agent.initializeComponents({name:bot.username,model:'ciel'}, {chat:provider});
     if(this.bot!==bot)return;
+    // Same upstream wording, fixed lines first: CIEL caches them once per bound session.
+    const layout=cacheLayout(agent.prompter.profile.conversing);
+    agent.prompter.profile.conversing=layout.template;
+    this.referenceTemplate=layout.reference;
     this.agent=agent;
     agent.bot=bot;
     agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};

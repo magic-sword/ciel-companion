@@ -6,7 +6,7 @@
 
 ## 採用する構成と理由
 
-外部実行APIの出力形式は`server/agent/config/prompts/execution_api.md`をCoreHostが読み込む。人格・記憶は共通だが、音声の表情タグを行動命令へ混ぜない。Minecraftは固定したMindcraftのprofiles/defaultsにある上流プロンプトと例をPrompterがそのまま使用する。独自brain.js・goal.md・action.mdは撤去した。判断プロンプトを試験結果に合わせて書き換える前に、上流Agentの失敗と利用者の使用感を報告する。
+外部実行APIの出力形式は`server/agent/config/prompts/execution_api.md`をCoreHostが読み込む。人格・記憶は共通だが、音声の表情タグを行動命令へ混ぜない。Minecraftは固定したMindcraftのprofiles/defaultsにある上流プロンプトと例をPrompterが使用する。会話判断の`conversing`だけは、文面を変えずに行の順序を`server/minecraft/src/mindcraft/prompt-layout.js`で並べ替える。名前と命令説明だけを含む固定の行を先頭に、`$SELF_PROMPT`・記憶・状態・持ち物・例と末尾の行を後ろに置き、固定部分を中核APIへ接続時に登録して推論のキャッシュを再利用する（[サービス境界](service-boundaries-ja.md)）。`$COMMAND_DOCS`が1回だけ含まれない上流の版では起動を拒否する。独自brain.js・goal.md・action.mdは撤去した。判断プロンプトを試験結果に合わせて書き換える前に、上流Agentの失敗と利用者の使用感を報告する。
 
 本文は UTF-8 の Markdown、参照先は TOML、読み込み処理は Python で管理する。日本語の長文を設定ファイルの文字列として編集する負担を減らし、エディタの Markdown プレビューと Git の差分確認を使える構成にする。専用のプロンプト管理サービスは現時点では導入しない。
 

@@ -35,7 +35,7 @@ class CoreHost:
             context.append({'role':'user','content':json.dumps({'type':'permitted_memory','text':memory},ensure_ascii=False)})
         return context
 
-    async def infer(self, context, messages, *, response_format='text'):
+    async def infer(self, context, messages, *, response_format='text', max_tokens=256, purpose='game_core'):
         context.extend(messages)
         if models.is_local('mind'):
             source = llm.ChatContext()
@@ -44,17 +44,17 @@ class CoreHost:
             context = [{'role': item.role, 'content': item.text_content}
                        for item in mind.local_context(source).items]
         ident, began = uuid.uuid4().hex, time.monotonic()
-        self.record('core_request', role='game_core', id=ident, model=models.model('mind'),
+        self.record('core_request', role=purpose, id=ident, model=models.model('mind'),
                          input_chars=sum(len(m['content']) for m in context))
         try:
-            options = models.options('mind', model=models.model('mind'), messages=context, max_tokens=256, temperature=0)
+            options = models.options('mind', model=models.model('mind'), messages=context, max_tokens=max_tokens, temperature=0)
             if response_format == 'json':
                 options['response_format'] = {'type':'json_object'}
             response = await self.client.chat.completions.create(**options)
             models.record('mind', models.model('mind'), getattr(response, 'usage', None))
             return response.choices[0].message.content or ''
         finally:
-            self.record('model_response', role='game_core', id=ident, seconds=round(time.monotonic()-began,3))
+            self.record('model_response', role=purpose, id=ident, seconds=round(time.monotonic()-began,3))
 
     async def start(self):
         token = self.core.bind(context=self.context, infer=self.infer)

@@ -11,15 +11,41 @@ export class CielModel {
     this.token = token;
     this.transport = transport;
     this.pending = new Map();
+    this.reference = null;
+  }
+
+  // Startup: register the fixed part of the execution prompt once, then let CIEL evaluate it.
+  // Preparation failure only loses the speed-up; registration failure keeps full prompts.
+  async prepareReference(reference, { seconds = 60 } = {}) {
+    const registered = await this.transport(`${this.url}/v1/reference`, {
+      method: 'PUT', headers: this.headers(), body: JSON.stringify({ text: reference }),
+      signal: AbortSignal.timeout(10000),
+    }).catch(() => null);
+    if (!registered?.ok) return { status: 'unregistered' };
+    this.reference = reference;
+    const began = Date.now();
+    try {
+      const response = await this.transport(`${this.url}/v1/prepare`, {
+        method: 'POST', headers: this.headers(), body: '{}', signal: AbortSignal.timeout(seconds * 1000),
+      });
+      const result = response.ok ? await response.json() : null;
+      return { status: result?.status ?? 'failed', reference_chars: reference.length,
+        seconds: result?.seconds ?? (Date.now() - began) / 1000 };
+    } catch {
+      return { status: 'failed', reference_chars: reference.length, seconds: (Date.now() - began) / 1000 };
+    }
   }
 
   async sendRequest(turns, systemMessage, responseFormat = 'text') {
     const id = randomUUID();
     const controller = new AbortController();
     this.pending.set(id, controller);
+    // CIEL already holds the registered fixed prefix; send only what changes per turn.
+    const text = this.reference && systemMessage.startsWith(this.reference + '\n')
+      ? systemMessage.slice(this.reference.length + 1) : systemMessage;
     try {
       const messages = [
-        { role: 'user', content: JSON.stringify({ type: 'execution_context', text: systemMessage }) },
+        { role: 'user', content: JSON.stringify({ type: 'execution_context', text }) },
         ...turns.map(turn => ({ role: turn.role === 'assistant' ? 'assistant' : 'user',
           content: turn.role === 'system' ? JSON.stringify({ type: 'execution_observation', text: turn.content }) : turn.content })),
       ];

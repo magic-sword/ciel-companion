@@ -73,5 +73,53 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError): await response
         await core.release(token)
 
+    async def test_reference_follows_persona_and_precedes_changing_context(self):
+        core = CielCore()
+        history = ['first']
+        seen = []
+        async def context():
+            return [{'role':'system','content':'persona'}, {'role':'user','content':history[-1]}]
+        async def infer(ctx, messages, *, response_format='text', max_tokens=256, purpose='game_core'):
+            seen.append((ctx, messages, max_tokens, purpose))
+            return 'ok'
+        token = core.bind(context=context, infer=infer)
+        session = core.sessions[token]
+        with self.assertRaises(web.HTTPConflict): await session.prepare()
+        with self.assertRaises(web.HTTPBadRequest): session.set_reference({'text': 1})
+        self.assertEqual(session.set_reference({'text':'command docs'}), {'status':'registered','chars':12})
+        result = await session.prepare()
+        self.assertEqual(result['status'], 'prepared')
+        history.append('second')
+        await session.respond({'response_format':'text','request_id':'r','messages':[{'role':'user','content':'stats'}]})
+        prefixes = [[m['content'] for m in ctx[:2]] for ctx, *_ in seen]
+        self.assertEqual(prefixes, [['persona', '{"type": "execution_reference", "text": "command docs"}']]*2)
+        self.assertEqual(seen[1][0][2]['content'], 'second')
+        self.assertEqual([(s[2], s[3]) for s in seen], [(1, 'game_core_prepare'), (256, 'game_core')])
+        await core.release(token)
+
+    async def test_reference_and_prepare_over_http_and_busy_session(self):
+        core = CielCore()
+        gate = asyncio.Event()
+        async def context(): return [{'role':'system','content':'persona'}]
+        async def infer(ctx, messages, **options):
+            await gate.wait()
+            return 'ok'
+        token = core.bind(context=context, infer=infer)
+        headers = {'Authorization': 'Bearer ' + token}
+        async with TestClient(TestServer(core.application())) as client:
+            self.assertEqual((await client.put('/v1/reference', json={'text':'docs'})).status, 401)
+            self.assertEqual((await client.put('/v1/reference', json={'text':'docs'}, headers=headers)).status, 200)
+            self.assertEqual((await client.put('/v1/reference', json={'text':'x'*48001}, headers=headers)).status, 413)
+            preparing = asyncio.create_task(client.post('/v1/prepare', headers=headers))
+            while not core.sessions[token].tasks: await asyncio.sleep(0)
+            busy = await client.post('/v1/respond', headers=headers, json={'response_format':'text','request_id':'a',
+                                                                         'messages':[{'role':'user','content':'go'}]})
+            self.assertEqual(busy.status, 409)
+            self.assertEqual((await client.put('/v1/reference', json={'text':'new'}, headers=headers)).status, 409)
+            gate.set()
+            response = await preparing
+            self.assertEqual(response.status, 200)
+            self.assertEqual((await response.json())['status'], 'prepared')
+
 
 if __name__ == '__main__': unittest.main()

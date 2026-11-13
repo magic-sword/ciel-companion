@@ -14,6 +14,43 @@ test('Mindcraft sends context as data and uses the bound CIEL session', async ()
   assert.equal(await model.sendRequest([{ role: 'user', content: 'look' }], 'game context'), '!inventory');
 });
 
+test('a registered fixed prefix is prepared once and omitted from later requests', async () => {
+  const calls = [];
+  const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async (url, options) => {
+      calls.push([url.split('/v1/')[1], options.method, options.body]);
+      if (url.endsWith('/reference')) return { ok: true, json: async () => ({ status: 'registered' }) };
+      if (url.endsWith('/prepare')) return { ok: true, json: async () => ({ status: 'prepared', seconds: 12.5 }) };
+      const request = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: 'ok' }) };
+    } });
+  assert.deepEqual(await model.prepareReference('rules\ndocs'), { status: 'prepared', reference_chars: 10, seconds: 12.5 });
+  await model.sendRequest([], 'rules\ndocs\nstats');
+  await model.sendRequest([], 'other prompt');
+  const sent = calls.filter(c => c[0] === 'respond').map(c => JSON.parse(JSON.parse(c[2]).messages[0].content).text);
+  assert.deepEqual(sent, ['stats', 'other prompt']);
+  assert.deepEqual(calls.slice(0, 2).map(c => c.slice(0, 2)), [['reference', 'PUT'], ['prepare', 'POST']]);
+});
+
+test('without registration the full prompt is still sent; failed preparation keeps the registration', async () => {
+  const sent = [];
+  const reject = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async (url, options) => {
+      if (url.endsWith('/reference')) return { ok: false, status: 500 };
+      const request = JSON.parse(options.body);
+      sent.push(JSON.parse(request.messages[0].content).text);
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: 'ok' }) };
+    } });
+  assert.deepEqual(await reject.prepareReference('docs'), { status: 'unregistered' });
+  await reject.sendRequest([], 'docs\nstats');
+  assert.deepEqual(sent, ['docs\nstats']);
+  const slow = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async url => url.endsWith('/reference') ? { ok: true } : { ok: false, status: 504 } });
+  const result = await slow.prepareReference('docs');
+  assert.equal(result.status, 'failed');
+  assert.equal(slow.reference, 'docs');
+});
+
 test('cancelled requests reject a late successful HTTP response', async () => {
   let release;
   const model = new CielModel(null, 'http://localhost:8775', { token: 'session',

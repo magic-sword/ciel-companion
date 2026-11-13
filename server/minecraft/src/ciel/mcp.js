@@ -79,8 +79,8 @@ export function makeServer(hub, sessionId) {
     const endpoint = new URL(url);
     if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || endpoint.username || endpoint.password)
       return json({status:'invalid_endpoint'});
-    await l.bindCore(url, token);
-    return json({status:'ready'});
+    const prepared = await l.bindCore(url, token);
+    return json({status:'ready', ...(prepared ? {prepared} : {})});
   });
   server.registerTool('minecraft_link', {
     description: '体を受け持つ（on=true）・離す（on=false）。会話サーバーが、アプリの設定に合わせて呼ぶ（心には渡さない）',

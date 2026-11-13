@@ -42,7 +42,8 @@ TOPIC = 'ciel.game'
 VERSION = 1
 PROFILE_VERSION = 2
 PREPARE_TIMEOUT = 4.0      # 会話の始めに、ゲームのサーバーの決まり・道具・指示を読むのを待つ上限
-CALL_TIMEOUT = 40.0        # 道具 1 回の答えを待つ上限（景色を撮るのに 25 秒かかることがある）
+BIND_TIMEOUT = 90.0        # 推論の受け持ちと、起動時の準備（固定の実行用指示の読み込み、上限60秒）
+CALL_TIMEOUT = 40.0       # 道具 1 回の答えを待つ上限（景色を撮るのに 25 秒かかることがある）
 PING_SECONDS = 20.0        # 受け持ち前・待機中も通信を保つ（体の側は 60 秒無通信でセッションを閉じる）
 LINK_RETRY_SECONDS = 3.0   # 使用中・接続待ちからの再試行。ほかの会話の所有権は奪わない
 RETRY_MIN, RETRY_MAX = 3.0, 30.0
@@ -351,7 +352,8 @@ class GameEnv:
         bind_tool = self.profile.get('inference', {}).get('bind_tool')
         if self.linked and bind_tool and getattr(self, 'core_endpoint', None):
             core_url, core_token = self.core_endpoint
-            bound = await self._call(bind_tool, {'url': core_url, 'token': core_token})
+            # Binding includes startup preparation of the fixed execution prompt.
+            bound = await self._call(bind_tool, {'url': core_url, 'token': core_token}, timeout=BIND_TIMEOUT)
             if bound.get('status') != 'ready':
                 await self._call(self.profile.get('link_tool') or f'{self.game}_link', {'on': False})
                 self.linked = False

@@ -370,6 +370,10 @@ async def run(args, *, clock=time.monotonic):
                             driver = driver_type(url=args.url,agent=args.agent,backend=args.backend,model_id=args.model_id,
                                                  debug_dir=args.debug_dir,trace=trace)
                             await driver.open()
+                            # Startup preparation happens while binding, before the task clock starts.
+                            bound = [e for e in trace.events if e['kind']=='game_result' and e.get('name')=='minecraft_bind_core']
+                            if bound:
+                                result['preparation'] = bound[-1].get('result',{}).get('prepared')
                             if task.get('navigation'):
                                 await prepare_navigation(task, initial)
                             if task.get('spatial'):
