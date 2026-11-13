@@ -198,7 +198,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 chat.add_message(role='system',content=suffix)
                 _=[c async for c in agent._pipeline_llm(chat,agent.tools,{})]
                 self.assertEqual(chat.items[-1].text_content,suffix)
-        prefix=agent.instructions_for('normal','solo')+'\n\n'+agent.capabilities.summary()
+        prefix=agent.instructions_for('normal','solo')+'\n\n'+agent.capabilities.summary()+'\n\n'+agent.persona.reply_frame
         for ctx,suffix in zip(seen,('state-A','state-B')):
             self.assertEqual(ctx.items[0].text_content,prefix)
             self.assertEqual(ctx.items[-1].role,'user')
