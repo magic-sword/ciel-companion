@@ -266,9 +266,13 @@ export function getItemCraftingRecipes(itemName) {
                 recipe[ingredientName] = 0;
             recipe[ingredientName]++;
         }
+        // Shapes wider or taller than 2, or more than 4 loose ingredients, need a crafting table.
+        const requiresTable = r.inShape
+            ? r.inShape.length > 2 || r.inShape.some(row => row.length > 2)
+            : (r.ingredients?.length ?? 0) > 4;
         recipes.push([
             recipe,
-            {craftedCount : r.result.count}
+            {craftedCount : r.result.count, requiresTable}
         ]);
     }
     // sort recipes by if their ingredients include common items
@@ -462,7 +466,7 @@ export function initializeLoopingItems() {
 /**
  * Gets a detailed plan for crafting an item considering current inventory
  */
-export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory = {}) {
+export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory = {}, tableAvailable = null) {
     initializeLoopingItems();
     if (!targetItem || count <= 0 || !getItemId(targetItem)) {
         return "Invalid input. Please provide a valid item name and positive count.";
@@ -474,9 +478,16 @@ export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory
         return `${targetItem} is a base item, you need to find ${count - available} more in the world`;
     }
 
+    // A plan that needs a crafting table must also budget for one when none is
+    // carried or nearby; otherwise it under-counts the base materials.
+    tableAvailable ??= (current_inventory['crafting_table'] || 0) > 0;
+    const probe = craftItem(targetItem, count, { ...current_inventory }, {});
     const inventory = { ...current_inventory };
     const leftovers = {};
-    const plan = craftItem(targetItem, count, inventory, leftovers);
+    let plan = { required: {}, steps: [], leftovers: {} };
+    if (probe.needsTable && !tableAvailable && targetItem !== 'crafting_table')
+        plan = craftItem('crafting_table', 1, inventory, leftovers, plan);
+    plan = craftItem(targetItem, count, inventory, leftovers, plan);
     return formatPlan(targetItem, plan);
 }
 
@@ -519,6 +530,7 @@ function craftItem(item, count, inventory, leftovers, crafted = { required: {}, 
     }
 
     const [ingredients, result] = recipe;
+    if (result.requiresTable) crafted.needsTable = true;
     const craftedPerRecipe = result.craftedCount;
     const batchCount = Math.ceil(stillNeeded / craftedPerRecipe);
     const totalProduced = batchCount * craftedPerRecipe;
