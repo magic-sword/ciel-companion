@@ -51,6 +51,39 @@ test('without registration the full prompt is still sent; failed preparation kee
   assert.equal(slow.reference, 'docs');
 });
 
+test('concurrent Mindcraft requests are sent one at a time; cancel also drops queued ones', async () => {
+  let active = 0, peak = 0;
+  const releases = [];
+  const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async (url, options) => {
+      if (options.method === 'DELETE') return { ok: false, status: 404 };
+      active += 1; peak = Math.max(peak, active);
+      const request = JSON.parse(options.body);
+      await new Promise(resolve => releases.push(resolve));
+      active -= 1;
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: request.request_id }) };
+    } });
+  const first = model.sendRequest([], 'turn');
+  const summary = model.sendRequest([], 'summarize');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(releases.length, 1);
+  releases.shift()();
+  assert.equal(typeof await first, 'string');
+  await new Promise(resolve => setImmediate(resolve));
+  releases.shift()();
+  assert.equal(typeof await summary, 'string');
+  assert.equal(peak, 1);
+  const running = model.sendRequest([], 'a');
+  const queued = model.sendRequest([], 'b');
+  await new Promise(resolve => setImmediate(resolve));
+  const stop = model.cancel();
+  releases.shift()();
+  await assert.rejects(running, /cancelled/);
+  await assert.rejects(queued, /cancelled/);
+  await stop;
+  assert.equal(releases.length, 0);
+});
+
 test('cancelled requests reject a late successful HTTP response', async () => {
   let release;
   const model = new CielModel(null, 'http://localhost:8775', { token: 'session',

@@ -12,6 +12,7 @@ export class CielModel {
     this.transport = transport;
     this.pending = new Map();
     this.reference = null;
+    this.queue = null;
   }
 
   // Startup: register the fixed part of the execution prompt once, then let CIEL evaluate it.
@@ -43,7 +44,15 @@ export class CielModel {
     // CIEL already holds the registered fixed prefix; send only what changes per turn.
     const text = this.reference && systemMessage.startsWith(this.reference + '\n')
       ? systemMessage.slice(this.reference.length + 1) : systemMessage;
+    // A CIEL session serves one request at a time. Mindcraft can summarize memory while the
+    // next turn is prompted, so queue instead of letting the core answer 409 session_busy.
+    const previous = this.queue;
+    let release;
+    const mine = new Promise(resolve => { release = resolve; });
+    this.queue = mine;
     try {
+      if (previous) await previous;
+      if (controller.signal.aborted || !this.pending.has(id)) throw new Error('CIEL request cancelled');
       const messages = [
         { role: 'user', content: JSON.stringify({ type: 'execution_context', text }) },
         ...turns.map(turn => ({ role: turn.role === 'assistant' ? 'assistant' : 'user',
@@ -58,7 +67,10 @@ export class CielModel {
       if (!this.pending.has(id)) throw new Error('CIEL request cancelled');
       if (result.request_id !== id || typeof result.text !== 'string') throw new Error('Invalid CIEL response');
       return result.text;
-    } finally { this.pending.delete(id); }
+    } finally {
+      this.pending.delete(id); release();
+      if (this.queue === mine) this.queue = null;
+    }
   }
 
   headers() { return { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' }; }
