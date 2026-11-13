@@ -33,6 +33,12 @@ async function equipHighestAttack(bot) {
         await bot.equip(weapon, 'hand');
 }
 
+// Point at the plan executor when materials are missing, instead of leaving the choice of
+// what to gather to the model one step at a time.
+function obtainHint(itemName, num) {
+    return ` Use !obtainItem("${itemName}", ${num}) to gather and craft everything it needs in order.`;
+}
+
 // Name the simplest harvesting tool so the next step can make it instead of retrying.
 function toolHint(blockName) {
     const tool = mc.getBlockTool(blockName);
@@ -79,7 +85,7 @@ export async function craftRecipe(bot, itemName, num=1) {
                 }
             }
             else {
-                log(bot, `Crafting ${itemName} requires a crafting table.`)
+                log(bot, `Crafting ${itemName} requires a crafting table.${obtainHint(itemName, num)}`)
                 return false;
             }
         }
@@ -88,7 +94,7 @@ export async function craftRecipe(bot, itemName, num=1) {
         }
     }
     if (!recipes || recipes.length === 0) {
-        log(bot, `You do not have the resources to craft a ${itemName}. It requires: ${Object.entries(mc.getItemCraftingRecipes(itemName)[0][0]).map(([key, value]) => `${key}: ${value}`).join(', ')}.`);
+        log(bot, `You do not have the resources to craft a ${itemName}. It requires: ${Object.entries(mc.getItemCraftingRecipes(itemName)[0][0]).map(([key, value]) => `${key}: ${value}`).join(', ')}.${obtainHint(itemName, num)}`);
         if (placedTable) {
             await collectBlock(bot, 'crafting_table', 1);
         }
@@ -420,6 +426,23 @@ export async function defendSelf(bot, range=9) {
 
 
 
+/**
+ * Stop digging, collecting and pathfinding so a stalled step cannot keep steering the bot.
+ * mineflayer-pathfinder waits for a dig to end before it really stops; when its digging flag
+ * is set but no dig is running, that wait never ends and it swallows every later control.
+ * @param {MinecraftBot} bot
+ **/
+export function haltMovement(bot) {
+    try { bot.stopDigging(); } catch {}
+    try { bot.collectBlock?.cancelTask?.(); } catch {}
+    try { bot.pathfinder.stop(); } catch {}
+    if (bot.pathfinder?.isMining?.() && !bot.targetDigBlock)
+        bot.emit('diggingAborted', null);
+}
+
+const COLLECT_SECONDS = 15;
+const MAX_SKIPPED = 3;
+
 export async function collectBlock(bot, blockType, num=1, exclude=null) {
     /**
      * Collect one of the given block type.
@@ -446,11 +469,14 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
         blocktypes.push('stone');
     const isLiquid = blockType === 'lava' || blockType === 'water';
 
-    let collected = 0;
+    let collected = 0, skipped = 0;
 
     const movements = new pf.Movements(bot);
     movements.dontMineUnderFallingBlock = false;
     movements.dontCreateFlow = true;
+    // collectblock paths with whatever movements are set; pickupNearbyItems leaves canDig off,
+    // which strands it before any block that needs digging to reach.
+    bot.pathfinder.setMovements(movements);
 
     // Blocks to ignore safety for, usually next to lava/water
     const unsafeBlocks = ['obsidian'];
@@ -511,9 +537,36 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
                 await pickupNearbyItems(bot);
                 success = true;
             }
-            else {
-                await bot.collectBlock.collect(block);
+            else if (bot.canDigBlock(block)
+                    && bot.entity.position.offset(0, 1.62, 0).distanceTo(block.position.offset(0.5, 0.5, 0.5)) <= 4.5) {
+                // Already in reach: collectblock's look-at-block path goal can stall without a
+                // single path event in a pit dug down to the block, so dig it from here.
+                await bot.dig(block);
+                await pickupNearbyItems(bot);
+                bot.pathfinder.setMovements(movements);
                 success = true;
+            }
+            else {
+                // collectblock has no deadline: a path it cannot find or a drop it cannot reach
+                // leaves it waiting forever. Stop it, pick up nearby drops, and skip that block
+                // so the nearest-block search does not walk into the same trap again.
+                let timer;
+                const collecting = bot.collectBlock.collect(block).then(() => true);
+                const finished = await Promise.race([collecting,
+                    new Promise(resolve => { timer = setTimeout(() => resolve(false), COLLECT_SECONDS * 1000); })]);
+                clearTimeout(timer);
+                if (finished) success = true;
+                else {
+                    collecting.catch(() => {});
+                    haltMovement(bot);
+                    const drop = bot.nearestEntity(e => e.name === 'item');
+                    const at = v => v ? `(${Math.floor(v.x)}, ${Math.floor(v.y)}, ${Math.floor(v.z)})` : 'none';
+                    log(bot, `Collecting ${blockType} at ${at(block.position)} took over ${COLLECT_SECONDS}s from ${at(bot.entity.position)}`
+                        + ` (block now ${bot.blockAt(block.position)?.name}, nearest drop ${at(drop?.position)}); trying another block.`);
+                    await pickupNearbyItems(bot);
+                    exclude = [...(exclude || []), block.position];
+                    if (skipped++ < MAX_SKIPPED) i--;
+                }
             }
             if (success)
                 collected++;
@@ -526,6 +579,7 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
             }
             else {
                 log(bot, `Failed to collect ${blockType}: ${err}.`);
+                exclude = [...(exclude || []), block.position];
                 continue;
             }
         }
