@@ -1,6 +1,6 @@
 # 現在の確認範囲と配布状況
 
-2026-11-13、Mindcraftのvendorをfork `magic-sword/mindcraft`の`ciel-vendor`ブランチからgit subtreeで取り込む形へ移した。取り込んだソースは移行前とバイト単位で一致し、上流の1体用課題定義2ファイルを追加した。ベンチマークの体の段へMindcraft定義の5課題（`mc_*`）と部分達成度`progress`を追加した。課題読込・部分点・集計のオフラインテストを含むベンチマーク関連84件、通常回帰unit 828件、bodyのNode 142件（1件skip）は成功。専用環境で`mc_*`5課題をbody・seed11・各1回で測り、2成功・3失敗・環境障害0（[Minecraftの実測](minecraft-results-ja.md#mindcraft定義課題の基準値)）。その後、Mindcraftの固定の実行用指示を中核APIへ登録・準備してキャッシュを再利用する変更と、要求の順番待ちを入れ、同条件で測り直した（2成功・3失敗・環境障害0、会話判断の要求の中央値は約11秒から4.18秒、[実測](minecraft-results-ja.md#固定の実行用指示のキャッシュと起動時の準備)）。通常サービスへのDockerイメージの再ビルドと配布は未実施。
+2026-11-13、Mindcraftのvendorをfork `magic-sword/mindcraft`の`ciel-vendor`ブランチからgit subtreeで取り込む形へ移した。取り込んだソースは移行前とバイト単位で一致し、上流の1体用課題定義2ファイルを追加した。ベンチマークの体の段へMindcraft定義の5課題（`mc_*`）と部分達成度`progress`を追加した。課題読込・部分点・集計のオフラインテストを含むベンチマーク関連84件、通常回帰unit 828件、bodyのNode 142件（1件skip）は成功。専用環境で`mc_*`5課題をbody・seed11・各1回で測り、2成功・3失敗・環境障害0（[Minecraftの実測](minecraft-results-ja.md#mindcraft定義課題の基準値)）。その後、Mindcraftの固定の実行用指示を中核APIへ登録・準備してキャッシュを再利用する変更と、要求の順番待ちを入れ、同条件で測り直した（2成功・3失敗・環境障害0、会話判断の要求の中央値は約11秒から4.18秒、[実測](minecraft-results-ja.md#固定の実行用指示のキャッシュと起動時の準備)）。製作計画に作業台を含めるforkの修正と、製作時の持ち物同期の修正後は3/5（木のつるはしが初めて成功、[実測](minecraft-results-ja.md#木のつるはしの失敗調査と製作の修正)）。通常サービスへのDockerイメージの再ビルドと配布は未実施。
 
 2026-11-13、Minecraftの判断を上流Agent.handleMessage・Prompter・History・SelfPrompter・NPCへ切り替えた作業版。CIELモデルはPrompterへ注入し、独自brain・目標JSON・自動帰還・範囲施工への代替を撤去した。座標施工・指差し実行は現在非公開。旧版の採集・製作・施工の成功実績はこの版へ引き継がない。会話の切り替えでゲーム履歴と場所記憶を分離し、取消された記憶要約がプロセスを落とさない境界を追加した。通常サービスには未配布。
 
