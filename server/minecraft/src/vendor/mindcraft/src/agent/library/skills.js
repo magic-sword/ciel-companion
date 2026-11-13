@@ -36,7 +36,7 @@ async function equipHighestAttack(bot) {
 // Name the simplest harvesting tool so the next step can make it instead of retrying.
 function toolHint(blockName) {
     const tool = mc.getBlockTool(blockName);
-    return tool ? ` It needs a ${tool} or better; use !getCraftingPlan("${tool}", 1) to make one first.` : '';
+    return tool ? ` It needs a ${tool} or better; use !obtainItem("${tool}", 1) to make one first.` : '';
 }
 
 export async function craftRecipe(bot, itemName, num=1) {

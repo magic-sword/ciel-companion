@@ -478,17 +478,31 @@ export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory
         return `${targetItem} is a base item, you need to find ${count - available} more in the world`;
     }
 
+    return formatPlan(targetItem, count, buildPlan(targetItem, count, current_inventory, tableAvailable));
+}
+
+/**
+ * The same plan as ordered actions for a program to execute:
+ * {type: 'craft', item, times, produces} | {type: 'mine', item, count, source, tool} |
+ * {type: 'smelt', item, input, count}. `times` is the number of recipe uses.
+ */
+export function getCraftingActions(targetItem, count = 1, current_inventory = {}, tableAvailable = null) {
+    initializeLoopingItems();
+    if (!targetItem || count <= 0 || !getItemId(targetItem)) return null;
+    return buildPlan(targetItem, count, current_inventory, tableAvailable).actions;
+}
+
+function buildPlan(targetItem, count, current_inventory, tableAvailable) {
     // A plan that needs a crafting table must also budget for one when none is
     // carried or nearby; otherwise it under-counts the base materials.
     tableAvailable ??= (current_inventory['crafting_table'] || 0) > 0;
     const probe = craftItem(targetItem, count, { ...current_inventory }, {});
     const inventory = { ...current_inventory };
     const leftovers = {};
-    let plan = { required: {}, steps: [], leftovers: {} };
+    let plan = { required: {}, steps: [], leftovers: {}, actions: [] };
     if (probe.needsTable && !tableAvailable && targetItem !== 'crafting_table')
         plan = craftItem('crafting_table', 1, inventory, leftovers, plan);
-    plan = craftItem(targetItem, count, inventory, leftovers, plan);
-    return formatPlan(targetItem, plan);
+    return craftItem(targetItem, count, inventory, leftovers, plan);
 }
 
 function isBaseItem(item) {
@@ -541,14 +555,16 @@ function gatherBaseItem(item, count, inventory, leftovers, crafted) {
         ensureOne('furnace', ['furnace'], inventory, leftovers, crafted);
         craftItem('coal', Math.ceil(count / 8), inventory, leftovers, crafted);
         crafted.steps.push(`Smelt ${count} ${ingredient} in a furnace with fuel -> ${count} ${item}`);
+        crafted.actions.push({ type: 'smelt', item, input: ingredient, count });
         crafted.smelting.delete(item);
         return;
     }
     crafted.required[item] = (crafted.required[item] || 0) + count;
     const source = preferredBlockSource(item);
     const tools = source ? harvestTools(source) : [];
+    if (tools.length > 0) ensureOne(tools[0], tools, inventory, leftovers, crafted);
+    crafted.actions.push({ type: 'mine', item, count, source: source ?? item, tool: tools[0] ?? null });
     if (tools.length === 0) return;
-    ensureOne(tools[0], tools, inventory, leftovers, crafted);
     crafted.steps.push(`Mine ${count} ${item} from ${source} with a ${tools[0]} or better`);
     crafted.toolSteps = true;
 }
@@ -556,6 +572,7 @@ function gatherBaseItem(item, count, inventory, leftovers, crafted) {
 function craftItem(item, count, inventory, leftovers, crafted = { required: {}, steps: [], leftovers: {} }) {
     crafted.made ??= new Set();
     crafted.smelting ??= new Set();
+    crafted.actions ??= [];
     // Check available inventory and leftovers first
     const availableInv = inventory[item] || 0;
     const availableLeft = leftovers[item] || 0;
@@ -611,11 +628,12 @@ function craftItem(item, count, inventory, leftovers, crafted = { required: {}, 
         .map(([name, amount]) => `${amount * batchCount} ${name}`)
         .join(' + ');
     crafted.steps.push(`Craft ${stepIngredients} -> ${totalProduced} ${item}`);
+    crafted.actions.push({ type: 'craft', item, times: batchCount, produces: totalProduced });
 
     return crafted;
 }
 
-function formatPlan(targetItem, { required, steps, leftovers, toolSteps }) {
+function formatPlan(targetItem, count, { required, steps, leftovers, toolSteps }) {
     const lines = [];
 
     if (Object.keys(required).length > 0) {
@@ -644,5 +662,6 @@ function formatPlan(targetItem, { required, steps, leftovers, toolSteps }) {
             lines.push(`- ${count} ${item}`));
     }
 
+    lines.push(`\n!obtainItem("${targetItem}", ${count}) carries out this whole plan in order.`);
     return lines.join('\n');
 }

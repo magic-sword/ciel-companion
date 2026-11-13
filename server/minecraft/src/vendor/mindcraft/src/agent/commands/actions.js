@@ -1,4 +1,5 @@
 import * as skills from '../library/skills.js';
+import { obtainItem } from '../library/obtain.js';
 import settings from '../settings.js';
 import convoManager from '../conversation.js';
 
@@ -262,6 +263,17 @@ export const actionsList = [
         perform: runAsAction(async (agent, type, num) => {
             await skills.collectBlock(agent.bot, type, num);
         }, false, 10) // 10 minute timeout
+    },
+    {
+        name: '!obtainItem',
+        description: 'Get an item by carrying out its whole crafting plan in order: gathering materials, making any needed tool, crafting table or furnace, mining with the right tool, smelting and crafting. Stops and reports if a step cannot be done.',
+        params: {
+            'item_name': { type: 'ItemName', description: 'The item to have.' },
+            'num': { type: 'int', description: 'How many of the item to have in total.', domain: [1, Number.MAX_SAFE_INTEGER] }
+        },
+        perform: runAsAction(async (agent, item_name, num) => {
+            await obtainItem(agent.bot, item_name, num);
+        })
     },
     {
         name: '!craftRecipe',
