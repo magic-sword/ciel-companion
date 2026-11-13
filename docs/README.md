@@ -112,6 +112,7 @@
 | 資料 | このファイルが所有する内容 |
 |---|---|
 | [games/minecraft/minecraft-design-ja.md](games/minecraft/minecraft-design-ja.md) | Minecraft固有の体・計画・知識・視覚と接続先・変更入口。 |
+| [games/minecraft/mindcraft-agent-loop-ja.md](games/minecraft/mindcraft-agent-loop-ja.md) | 固定版Mindcraftのモデル通信、観測・履歴・命令実行・継続判断の仕組みと、CIELへの接続点をコードから説明する。 |
 | [games/minecraft/minecraft-benchmark-ja.md](games/minecraft/minecraft-benchmark-ja.md) | 課題・practical-v1・採点・専用環境・実行・拡張・比較の方法。 |
 
 ## アプリ

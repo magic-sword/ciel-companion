@@ -4,6 +4,8 @@
 
 この資料はMinecraft固有の体・知識・視覚の構成と操作範囲を説明する。接続は[ゲーム環境MCP](../game-environment-mcp-design-ja.md)、依頼の外枠は[作業契約](../game-work-contract-ja.md)、評価方法は[ベンチマーク](minecraft-benchmark-ja.md)が正本。
 
+MindcraftがLLMへ送る情報と、命令・結果から判断を繰り返す仕組みは[LLM通信と推論・行動ループ](mindcraft-agent-loop-ja.md)を参照する。固定版のコードに基づき、上流の動作とCIELへの接続点を説明する。
+
 ## 構成と責務
 
 Java版MinecraftとMineflayerの体を別サービスとして動かす。`server/minecraft/`がMCP入口、所有権、計画・レシピ、移動・採集・製作、実状態による確認・局所修復を持つ。ゲームの知識・日本語名・失敗理由もゲーム側で管理する。会話ホストにはMinecraft用の計画ツリーを持たせない。
