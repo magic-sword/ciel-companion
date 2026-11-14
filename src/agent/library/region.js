@@ -130,6 +130,10 @@ async function placeBed(bot, item, cell, partner) {
         skills.log(bot, `Don't have any ${item} to place.`);
         return false;
     }
+    // Both cells must be empty (the ground the house is dug into may still be there).
+    for (const p of [foot, foot.plus(foot.minus(stand))]) {
+        if (!EMPTY.has(bot.blockAt(p)?.name ?? 'air')) await skills.breakBlockAt(bot, p.x, p.y, p.z);
+    }
     await skills.goToPosition(bot, stand.x, stand.y, stand.z, 0);
     await bot.equip(bed, 'hand');
     await bot.lookAt(foot.offset(0.5, 0, 0.5), true);
