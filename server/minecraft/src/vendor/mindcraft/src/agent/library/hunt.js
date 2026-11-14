@@ -3,6 +3,7 @@ import * as skills from './skills.js';
 import * as world from './world.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
+import { limit } from './estimate.js';
 import { MOBS, WOOL_COLORS } from './mobs.js';
 
 const RANGE = 64;
@@ -10,9 +11,9 @@ const RANGE = 64;
 // to a spot at least LEG / 2 blocks from where the bot has been (LEG blocks along open land
 // when no such ground is in sight), with its own time.
 const LEG = 32;
-const LEGS = 6;
-const LEG_SECONDS = 30;
-export const EXPLORE_SECONDS = LEGS * LEG_SECONDS;
+export const EXPLORE_LEGS = 6;
+const LEGS = EXPLORE_LEGS;
+const LEG_SECONDS = limit('explore_leg');
 // A sheared sheep grows its wool back after eating grass, usually within a minute.
 const REGROW_WAIT_MS = 30000;
 

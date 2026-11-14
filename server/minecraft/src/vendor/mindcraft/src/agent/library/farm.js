@@ -1,6 +1,6 @@
 import * as skills from './skills.js';
 import { runPlan, haveStep, dropStep, fillBucketStep } from './plan.js';
-import { CROPS, buildRegion, materials, remaining, seconds } from './region.js';
+import { CROPS, buildRegion, materials, remaining, seconds, estimate } from './region.js';
 import { findSites, atSite } from './sites.js';
 
 const HOES = ['wooden_hoe', 'stone_hoe', 'copper_hoe', 'iron_hoe', 'golden_hoe', 'diamond_hoe', 'netherite_hoe'];
@@ -41,6 +41,7 @@ export function farmSteps(blueprint, crop = 'wheat') {
         done: bot => remaining(blueprint, bot).length === 0,
         run: bot => buildRegion(bot, blueprint),
         seconds: bot => seconds(blueprint, bot),
+        estimate: bot => estimate(blueprint, bot),
     });
     return steps;
 }

@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as skills from './skills.js';
 import { runPlan, haveStep } from './plan.js';
-import { buildRegion, clearingTool, materials, remaining, seconds } from './region.js';
+import { buildRegion, clearingTool, materials, remaining, seconds, estimate } from './region.js';
 import { findSites, atSite } from './sites.js';
 import { getTypeOfGeneric, blockSatisfied } from '../npc/utils.js';
 
@@ -73,6 +73,7 @@ export function houseSteps(blueprint, bot) {
         done: b => remaining(blueprint, b).length === 0,
         run: b => buildRegion(b, blueprint),
         seconds: b => seconds(blueprint, b),
+        estimate: b => estimate(blueprint, b),
     });
     return steps;
 }

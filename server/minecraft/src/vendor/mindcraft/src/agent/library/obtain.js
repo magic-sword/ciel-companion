@@ -3,9 +3,10 @@ import * as world from './world.js';
 import * as skills from './skills.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
-import { getFromMob, countSuitable, EXPLORE_SECONDS } from './hunt.js';
+import { getFromMob, countSuitable, EXPLORE_LEGS } from './hunt.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
 import { baseStation } from './base.js';
+import { expected, limit, SLACK, FLOOR } from './estimate.js';
 
 /**
  * Obtain an item by executing its crafting plan step by step.
@@ -74,22 +75,27 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
     return false;
 }
 
-/**
- * The time obtaining num items may take: the sum of the deadlines of the plan's steps, as
- * obtainItem runs them (the mining of one block in one trip). A choice ends the plan there.
- */
-export function obtainSeconds(bot, itemName, num = 1) {
+// The plan's steps as obtainItem runs them: the mining of one block in one trip. A choice ends it.
+function plannedSteps(bot, itemName, num) {
     const inventory = world.getInventoryCounts(bot);
     const actions = mc.getCraftingActions(itemName, num, inventory, stations(bot, inventory)) || [];
-    const mined = new Map();
-    let total = 0;
+    const mined = new Map(), others = [];
     for (const step of actions) {
         if (step.type === 'choose') break;
         if (step.type === 'mine') mined.set(step.item, { ...step, count: (mined.get(step.item)?.count || 0) + step.count });
-        else total += stepSeconds(bot, step);
+        else others.push(step);
     }
-    for (const step of mined.values()) total += stepSeconds(bot, step);
-    return total;
+    return [...others, ...mined.values()];
+}
+
+/** The longest obtaining num items may take: the sum of its steps' deadlines. */
+export function obtainSeconds(bot, itemName, num = 1) {
+    return plannedSteps(bot, itemName, num).reduce((sum, step) => sum + stepSeconds(bot, step), 0);
+}
+
+/** The time obtaining num items usually takes (up to the 90th percentile of each step). */
+export function obtainEstimate(bot, itemName, num = 1) {
+    return plannedSteps(bot, itemName, num).reduce((sum, step) => sum + stepEstimate(bot, step), 0);
 }
 
 /**
@@ -109,14 +115,21 @@ function describe(step) {
     return `mine ${step.count} ${step.item}` + (step.tool ? ` with a ${step.tool}` : '');
 }
 
+// The usual time of a step, from the measured step times (estimate.js). A mob not in sight is
+// looked for first, leg by leg.
+function stepEstimate(bot, step) {
+    if (step.type === 'craft') return expected('craft');
+    if (step.type === 'smelt') return expected('smelt') + expected('smelt_item', null, Math.max(0, step.count - 1));
+    if (step.type === 'mob')
+        return expected('mob', step.method) + (countSuitable(bot, step) === 0 ? EXPLORE_LEGS * expected('explore_leg') : 0);
+    return expected('mine', step.item, step.count);
+}
+
 // A pathfinding or pickup wait can hang without ever failing, so every step gets its own
-// deadline and is stopped the same way an interrupt stops an action.
+// deadline, its usual time with slack, and is stopped the same way an interrupt stops an action.
 function stepSeconds(bot, step) {
-    if (step.type === 'craft') return 20;
-    if (step.type === 'smelt') return 20 + 12 * step.count;
-    if (step.type === 'mob')  // one mob; shearing may wait for regrowth, and none in sight means looking first
-        return (step.method === 'shear' ? 75 : 40) + (countSuitable(bot, step) === 0 ? EXPLORE_SECONDS : 0);
-    return 20 + 15 * step.count;
+    if (step.type === 'mine') return limit('mine', step.item, step.count);
+    return Math.ceil(Math.max(FLOOR, stepEstimate(bot, step) * SLACK));
 }
 
 async function perform(bot, step) {
