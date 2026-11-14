@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "b0fd343749a343a4d2a1a4adc50a1db9177123a6",
+  "fork_commit": "a19409bd5aacf39ff9e08e76a70e35c56f1911b6",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -149,7 +149,7 @@
       "upstream_sha256": "e1705bb4785f0a3f3dc41818a81bcdc78fe092857f3cc52c10d23046339405c6"
     },
     "src/agent/agent.js": {
-      "sha256": "a641541be24c07d857936553725d296fed82c5cff17655a26b57fced302e9150",
+      "sha256": "3780ca44e7fe510b0744cffd079a989f666b0961f7a54f1a0432de623e6e4383",
       "upstream_sha256": "258d2ac49d39a6d8fa164e448975fae76d5d1a945f1f2fa1f03bd06a7abc17d7"
     },
     "src/agent/coder.js": {
@@ -181,7 +181,7 @@
       "upstream_sha256": "5360fc1a4f4d845f7f717ddbe2170d1f69e3d9c61b7448e4a9d0f14444027c3e"
     },
     "src/agent/library/deadline.js": {
-      "sha256": "c0612fd954f34c52c74a188bf915e4ccc5ac27a82582dd07e2d869a9166083df"
+      "sha256": "c97b350528f30b62cc84498c9c5f1b06e2771e0019d2bce126f23b00b20c43c3"
     },
     "src/agent/library/farm.js": {
       "sha256": "50cfc8d1142eee2a77cd962726bc0a02aa80376fbb8d349b087e4efcb841c134"
@@ -208,10 +208,10 @@
       "sha256": "6c90f43dd30e04cbbb6b80a966284dc76556bdf036603302b1f110193dce3c14"
     },
     "src/agent/library/obtain.js": {
-      "sha256": "8bd906a8efed15b3f894ec5973230a3b1611517a499fa9fd59bcad9c30e0de8c"
+      "sha256": "c6cef285331b0ed9f46c8e336e85081dffb5f7ccfeeedb03dd694e1981abb286"
     },
     "src/agent/library/plan.js": {
-      "sha256": "d135e74b724c32ea448d1b809b53776af5b8248863d6a11b77da48a022f662e3"
+      "sha256": "9b03eb3789e2f5d45c2bbf22442d362f89839214090b18297c3333f4cbea2946"
     },
     "src/agent/library/region.js": {
       "sha256": "09dbea2833aeb59928425f6a9d9f51dfd321e5d703eccec1bbd041acd40011a5"
