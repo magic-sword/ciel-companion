@@ -267,7 +267,7 @@ export const actionsList = [
     },
     {
         name: '!obtainItem',
-        description: 'Get an item by carrying out its whole crafting plan in order: gathering materials, making any needed tool, crafting table or furnace, mining with the right tool, smelting and crafting. Stops and reports if a step cannot be done.',
+        description: 'Get an item by carrying out its whole crafting plan in order: gathering materials, making any needed tool, crafting table or furnace, mining with the right tool, smelting and crafting. Stops and reports if a step cannot be done. When an item can come several ways, such as killing or shearing sheep for wool, it lists them with their costs to choose from with !chooseOption.',
         params: {
             'item_name': { type: 'ItemName', description: 'The item to have.' },
             'num': { type: 'int', description: 'How many of the item to have in total.', domain: [1, Number.MAX_SAFE_INTEGER] }
@@ -293,7 +293,7 @@ export const actionsList = [
             'option_id': { type: 'string', description: 'The id of the option to choose.' }
         },
         perform: runAsAction(async (agent, option_id) => {
-            const choice = agent.pendingChoice;
+            const choice = agent.bot.pendingChoice;
             if (!choice) {
                 skills.log(agent.bot, 'Nothing is waiting for a choice.');
                 return;
@@ -303,7 +303,7 @@ export const actionsList = [
                 skills.log(agent.bot, `${option_id} is not one of the options for ${choice.question}: ${Object.keys(choice.options).join(', ')}.`);
                 return;
             }
-            agent.pendingChoice = null;
+            agent.bot.pendingChoice = null;
             await go();
         })
     },

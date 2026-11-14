@@ -7,6 +7,7 @@ import { plugin as pvp } from 'mineflayer-pvp';
 import { plugin as collectblock } from 'mineflayer-collectblock';
 import { plugin as autoEat } from 'mineflayer-auto-eat';
 import plugin from 'mineflayer-armor-manager';
+import { mobWays, mobsNeeded } from '../agent/library/mobs.js';
 const armorManager = plugin;
 let mc_version = settings.minecraft_version;
 let mcdata = null;
@@ -51,6 +52,13 @@ export const WOOL_COLORS = [
     'black'
 ]
 
+
+/** Load the game data of a version: done at login, or directly to read recipes and drops without a bot. */
+export function useVersion(version) {
+    mc_version = version;
+    mcdata = minecraftData(version);
+    Item = prismarine_items(version);
+}
 
 export function initBot(username) {
     mc_version = settings.minecraft_version;
@@ -124,11 +132,7 @@ export function initBot(username) {
         bot.acceptResourcePack();
     });
 
-    bot.once('login', () => {
-        mc_version = bot.version;
-        mcdata = minecraftData(mc_version);
-        Item = prismarine_items(mc_version);
-    });
+    bot.once('login', () => useVersion(bot.version));
 
     return bot;
 }
@@ -472,7 +476,7 @@ export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory
         return "Invalid input. Please provide a valid item name and positive count.";
     }
 
-    if (isBaseItem(targetItem) && !needsToolOrSmelting(targetItem)) {
+    if (isBaseItem(targetItem) && !needsToolOrSmelting(targetItem) && mobWays(targetItem).length === 0) {
         const available = current_inventory[targetItem] || 0;
         if (available >= count) return "You have all required items already in your inventory!";
         return `${targetItem} is a base item, you need to find ${count - available} more in the world`;
@@ -484,22 +488,24 @@ export function getDetailedCraftingPlan(targetItem, count = 1, current_inventory
 /**
  * The same plan as ordered actions for a program to execute:
  * {type: 'craft', item, times, produces} | {type: 'mine', item, count, source, tool} |
- * {type: 'smelt', item, input, count}. `times` is the number of recipe uses.
+ * {type: 'smelt', item, input, count} | {type: 'mob', item, count, mob, method, tool, color} |
+ * {type: 'choose', item, count, options}. `times` is the number of recipe uses. choices maps an
+ * item to the way chosen for it (an id from a 'choose' action).
  */
-export function getCraftingActions(targetItem, count = 1, current_inventory = {}, tableAvailable = null) {
+export function getCraftingActions(targetItem, count = 1, current_inventory = {}, tableAvailable = null, choices = {}) {
     initializeLoopingItems();
     if (!targetItem || count <= 0 || !getItemId(targetItem)) return null;
-    return buildPlan(targetItem, count, current_inventory, tableAvailable).actions;
+    return buildPlan(targetItem, count, current_inventory, tableAvailable, choices).actions;
 }
 
-function buildPlan(targetItem, count, current_inventory, tableAvailable) {
+function buildPlan(targetItem, count, current_inventory, tableAvailable, choices = {}) {
     // A plan that needs a crafting table must also budget for one when none is
     // carried or nearby; otherwise it under-counts the base materials.
     tableAvailable ??= (current_inventory['crafting_table'] || 0) > 0;
-    const probe = craftItem(targetItem, count, { ...current_inventory }, {});
+    const probe = craftItem(targetItem, count, { ...current_inventory }, {}, { required: {}, steps: [], leftovers: {}, choices });
     const inventory = { ...current_inventory };
     const leftovers = {};
-    let plan = { required: {}, steps: [], leftovers: {}, actions: [] };
+    let plan = { required: {}, steps: [], leftovers: {}, actions: [], choices };
     if (probe.needsTable && !tableAvailable && targetItem !== 'crafting_table')
         plan = craftItem('crafting_table', 1, inventory, leftovers, plan);
     return craftItem(targetItem, count, inventory, leftovers, plan);
@@ -569,6 +575,29 @@ function gatherBaseItem(item, count, inventory, leftovers, crafted) {
     crafted.toolSteps = true;
 }
 
+// Items that mobs give. One way from a mob that is not hostile, with no other way, is taken
+// as it is; otherwise the plan stops at a choice, which the caller (in the end the model)
+// answers through choices: a way's id such as "shear:sheep", or "make" for crafting or mining.
+function getFromMob(item, count, inventory, leftovers, crafted) {
+    const ways = mobWays(item);
+    if (ways.length === 0) return false;
+    const other = !isBaseItem(item) || preferredBlockSource(item) !== null;
+    const only = ways.length === 1 && !other && !ways[0].hostile ? ways[0].id : null;
+    const pick = crafted.choices?.[item] ?? only;
+    if (pick === 'make') return false;
+    const way = ways.find(w => w.id === pick);
+    if (!way) {
+        const options = [...ways.map(w => w.id), ...(other ? ['make'] : [])];
+        crafted.steps.push(`Choose how to get ${count} ${item}: ${options.join(', ')}`);
+        crafted.actions.push({ type: 'choose', item, count, options });
+        return true;
+    }
+    if (way.tool) ensureOne(way.tool, [way.tool], inventory, leftovers, crafted);
+    crafted.steps.push(`Get ${count} ${item} by ${way.method === 'shear' ? 'shearing' : 'killing'} about ${mobsNeeded(way, count)} ${way.mob}`);
+    crafted.actions.push({ type: 'mob', item, count, mob: way.mob, method: way.method, tool: way.tool, color: way.color });
+    return true;
+}
+
 function craftItem(item, count, inventory, leftovers, crafted = { required: {}, steps: [], leftovers: {} }) {
     crafted.made ??= new Set();
     crafted.smelting ??= new Set();
@@ -594,6 +623,8 @@ function craftItem(item, count, inventory, leftovers, crafted = { required: {}, 
     const stillNeeded = count - totalAvailable;
     if (availableLeft > 0) leftovers[item] = 0;
     if (availableInv > 0) inventory[item] = 0;
+
+    if (getFromMob(item, stillNeeded, inventory, leftovers, crafted)) return crafted;
 
     if (isBaseItem(item)) {
         gatherBaseItem(item, stillNeeded, inventory, leftovers, crafted);
