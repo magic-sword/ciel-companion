@@ -144,10 +144,11 @@ test('the owner speaks into a running work, and what the body says is told as it
 });
 
 test('the estimate of a plan lengthens the work within the ceiling from its start, and never shortens it', async()=>{
-  let now=0;const {link,work}=fixture();work.clock=()=>now;let release;
-  link.runSkill=()=>new Promise(r=>{release=r;});
+  let now=0;const {link,work}=fixture();work.clock=()=>now;let release,waited;
+  link.runSkill=(skill,args,id,ms)=>{waited=ms;return new Promise(r=>{release=r;});};
   const id=work.submit(request({budget_ms:120000})).task_id;await wait(()=>release);
   const op=work.active.operation;
+  assert.equal(waited,MAX_BUDGET_MS,'the link waits up to the ceiling, not the first deadline');
   now=60000;work.activity({request_id:op,stage:'estimate',seconds:900});
   assert.equal(work.view().remaining_ms,900000);
   assert.equal(work.view().evidence.estimate.seconds,900);

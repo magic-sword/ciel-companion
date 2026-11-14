@@ -11,7 +11,7 @@ let nextCommandId = 1;   // 受け持つ会話が替わっても、遅い終了�
 
 const START_TIMEOUT_MS = 3000;    // 技を頼んでから「始めた」が返るまでの上限
 const LOOK_TIMEOUT_MS = 25000;    // 景色を頼んでから絵が返るまでの上限（初めはブラウザを開いて描き終えるまで 10 秒ほど）
-export const STEP_TIMEOUT_MS = 900000;   // 目的の段（技 1 つ）が終わるまで待つ上限
+export const STEP_TIMEOUT_MS = 1800000;  // 目的の段（技 1 つ）が終わるまで待つ上限（作業契約の上限30分と同じ）
 
 function timeout(promise, ms, onTimeout) {
   let t;

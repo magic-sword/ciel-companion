@@ -165,7 +165,9 @@ export class GameTasks {
     const args={request,goal_id:t.id};
     this.link.notice({kind:'work_action',id:t.operation,task_id:t.id,skill:'pursue',arguments:args});
     try {
-      const done=await this.link.runSkill('pursue',args,t.operation,Math.max(1,t.deadline-this.clock()));
+      // The work's own timer stops it at its deadline, which a plan may lengthen; the link's wait
+      // only guards the ceiling, so it does not cut off a work that was lengthened.
+      const done=await this.link.runSkill('pursue',args,t.operation,Math.max(1,t.started+MAX_BUDGET_MS-this.clock()));
       this.link.notice({kind:'work_action_result',id:t.operation,task_id:t.id,result:done});
       if(!this.current(t,generation))return;
       const {waiting_owner:_asked,...kept}=t.evidence;   // a question belongs to the run that asked it
