@@ -6,6 +6,7 @@ import { runPlan } from '../src/vendor/mindcraft/src/agent/library/plan.js';
 import { remaining, materials } from '../src/vendor/mindcraft/src/agent/library/region.js';
 import { findSites } from '../src/vendor/mindcraft/src/agent/library/sites.js';
 import { farmBlueprint, farmSteps } from '../src/vendor/mindcraft/src/agent/library/farm.js';
+import { limit } from '../src/vendor/mindcraft/src/agent/library/estimate.js';
 
 const require = createRequire(import.meta.url);
 const registry = require('prismarine-registry')('1.21.11');
@@ -82,7 +83,9 @@ test('the farm plan reads the work left from the world and sums the steps\' own 
   assert.equal(steps.seeds.done(bot), true);
   assert.equal(steps.water.done(bot), false);
   assert.deepEqual(steps.farm.needs, ['hoe', 'seeds', 'bucket', 'water', 'dirt']);
-  assert.equal(steps.farm.seconds(bot), 20 + 6 * remaining(blueprint, bot).length);
+  // The deadline gives every cell its own; the estimate is the measured time per cell.
+  assert.equal(steps.farm.seconds(bot), 20 + limit('cell') * remaining(blueprint, bot).length);
+  assert.ok(steps.farm.estimate(bot) > 0 && steps.farm.estimate(bot) < steps.farm.seconds(bot));
   assert.equal(remaining(blueprint, bot).length, 15);
 });
 
