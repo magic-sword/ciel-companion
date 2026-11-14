@@ -299,22 +299,26 @@ export const actionsList = [
     },
     {
         name: '!chooseOption',
-        description: 'Choose one of the options a plan is waiting on, by its id (such as "site_2"), and carry the plan on.',
+        description: 'Choose one of the options a plan is waiting on, by its id (such as "site_2"), and carry the plan on. Choosing again from the last choice made changes the way the plan goes from here, such as when the owner asks for another way.',
         params: {
             'option_id': { type: 'string', description: 'The id of the option to choose.' }
         },
         perform: runAsAction(async (agent, option_id) => {
-            const choice = agent.bot.pendingChoice;
+            const bot = agent.bot;
+            // A choice already made can be made again: the plan is rebuilt from the world as it is now.
+            const choice = bot.pendingChoice ?? bot.lastChoice;
             if (!choice) {
-                skills.log(agent.bot, 'Nothing is waiting for a choice.');
+                skills.log(bot, 'Nothing is waiting for a choice.');
                 return;
             }
             const go = choice.options[option_id];
             if (!go) {
-                skills.log(agent.bot, `${option_id} is not one of the options for ${choice.question}: ${Object.keys(choice.options).join(', ')}.`);
+                skills.log(bot, `${option_id} is not one of the options for ${choice.question}: ${Object.keys(choice.options).join(', ')}.`);
                 return;
             }
-            agent.bot.pendingChoice = null;
+            if (!bot.pendingChoice) skills.log(bot, `Changing ${choice.question}: now ${option_id}.`);
+            bot.pendingChoice = null;
+            bot.lastChoice = choice;
             await go();
         })
     },
