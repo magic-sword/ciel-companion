@@ -88,15 +88,17 @@ test('a step that stops at a choice pauses the plan, and choosing carries the re
   assert.deepEqual(state.log, ['kill', 'bed']);
 });
 
-test('looking for sheep walks to grass in sight and outward, and along open land when there is none', () => {
+test('looking for sheep walks to grass in sight (not behind a wall) and outward, and along open land when there is none', () => {
   const { bot, set } = fixture();
-  for (let x = 12; x < 32; x++) for (let z = -2; z <= 1; z++) set(x, 63, z, 'grass_block');
+  for (let x = 20; x < 32; x++) for (let z = -2; z <= 1; z++) set(x, 63, z, 'grass_block');
+  // Nearer grass behind a wall is not in sight.
+  for (let x = -20; x <= -14; x++) for (let z = -2; z <= 1; z++) set(x, 63, z, 'grass_block');
+  for (let z = -32; z < 32; z++) for (let y = 64; y < 68; y++) set(-6, y, z, 'bedrock');
   const start = bot.entity.position.floored();
   const leg = nextLeg(bot, 'grass_block', [start]);
   assert.deepEqual([leg.heading, leg.ground, leg.target.y], ['east', true, 64]);
-  assert.ok(leg.target.x >= 16, 'not a spot next to where the search began');
+  assert.ok(leg.target.x >= 20, 'not a spot next to where the search began');
   // Grass already looked at is passed over; with none left, the open land that reaches farthest.
-  for (let z = -32; z < 32; z++) for (let y = 64; y < 68; y++) set(-6, y, z, 'bedrock');
   const again = nextLeg(bot, 'grass_block', [start, new Vec3(22, 64, 0)]);
   assert.equal(again.ground, false);
   assert.notEqual(again.heading, 'west', 'the wall cuts the west off within 8 blocks');
