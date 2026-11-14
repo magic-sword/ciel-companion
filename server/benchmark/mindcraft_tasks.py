@@ -65,7 +65,7 @@ def progress(task, observed, initial, final):
     """Partial progress beside the binary result. Milestones are a lower bound: a short-lived
     intermediate can be crafted and consumed between two snapshots, so achieving the target
     credits every milestone."""
-    if task.get('farm'):
+    if task.get('farm') or task.get('house'):
         target = farm_progress(final.get('goal_blocks'))
     else:
         gained = final['inventory'].get(task['item'], 0) - initial['inventory'].get(task['item'], 0)

@@ -26,6 +26,7 @@ from .pointing import prepare_pointing
 from .stage1 import fixture as stage1_fixture, migrate_task
 from .mindcraft_tasks import expand as expand_mindcraft, progress as inventory_progress
 from .farm import validate as validate_farm
+from .house import validate as validate_house
 from . import audit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,6 +72,8 @@ def load_tasks(path=SUITE):
             validate_spatial(task)
         if task.get('farm'):
             validate_farm(task)
+        if task.get('house'):
+            validate_house(task)
         mobs = task.get('mobs', {})
         if any(name not in PASSIVE_MOBS or not isinstance(n, int) or not 1 <= n <= 8 for name, n in mobs.items()) or (mobs and task['forest'] != 'near'):
             raise ValueError('Mobs must be passive mobs, 1..8 each, beside a near forest')

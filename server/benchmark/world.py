@@ -12,6 +12,7 @@ import time
 import uuid
 
 from .farm import layout as farm_layout, commands as farm_commands, checks as farm_checks
+from .house import layout as house_layout, commands as house_commands, checks as house_checks, mob_spot as pasture_spot
 
 MARKER = 'ciel-benchmark-v1'
 OBJECTIVE = 'cielbench'
@@ -148,6 +149,7 @@ class World:
         self.navigation = task.get('navigation')
         self.spatial = task.get('spatial')
         self.farm = None
+        self.house = None
         self.mobs = dict(task.get('mobs', {}))
         if self.navigation:
             if not self.scalar('execute if entity Bench_Owner', success=True):
@@ -204,11 +206,17 @@ class World:
                         break
                 ores.append((name, x, z))
                 self._write(f'setblock {x} 63 {z} minecraft:{name}')
-        # Passive mobs on the side away from the trees; sheep are white, so their wool is.
+        pasture = bool(task.get('house', {}).get('pasture'))
+        if task.get('house'):
+            self.house = house_layout(rng, side, task['house']['plan'])
+            for command in house_commands(self.house, pasture):
+                self._write(command)
+        # Passive mobs on the side away from the trees, or out of sight in the pasture; sheep
+        # are white, so their wool is.
         mobs = []
         for name, count in sorted(self.mobs.items()):
             for _ in range(count):
-                x, z = -side*rng.randint(4, 14), rng.randint(-8, 8)
+                x, z = pasture_spot(rng) if pasture else (-side*rng.randint(4, 14), rng.randint(-8, 8))
                 mobs.append((name, x, z))
                 self._write(f'summon minecraft:{name} {x}.5 64 {z}.5' + (' {Color:0b}' if name == 'sheep' else ''))
         if task.get('farm'):
@@ -240,11 +248,15 @@ class World:
         for x, y, z, name in farm_checks(self.farm) if self.farm else []:
             if not self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True):
                 raise RuntimeError('Fixture farm placement failed')
+        for x, y, z, name in house_checks(self.house, pasture) if self.house else []:
+            if not self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True):
+                raise RuntimeError('Fixture house placement failed')
         if self.navigation:
             self.move_target(self.navigation['targets'][0])
         return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48],
                 **({'ores': [[name, x, 63, z] for name, x, z in ores]} if ores else {}),
                 **({'farm': self.farm} if self.farm else {}),
+                **({'house': {k: v for k, v in self.house.items() if k != 'goal_layouts'}} if self.house else {}),
                 **({'mobs': [[name, x, 64, z] for name, x, z in mobs]} if mobs else {})}
 
     def move_target(self, position):
@@ -277,6 +289,12 @@ class World:
         if getattr(self, 'farm', None):
             result['goal_blocks'] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
                                      for x, y, z, name in self.farm['goal_blocks']]
+        if getattr(self, 'house', None):
+            # The house may be turned any way that fits its patch; the turn with the most cells
+            # in place is the one being built.
+            layouts = [[any(self.scalar(f'execute if block {x} {y} {z} {accept}', success=True) for accept in accepts)
+                        for x, y, z, accepts in cells] for cells in self.house['goal_layouts']]
+            result['goal_blocks'] = max(layouts, key=sum)
         if getattr(self, 'navigation', None):
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Fixture owner disconnected')
@@ -285,7 +303,7 @@ class World:
 
 
 def achieved(task, initial, current):
-    if task.get('farm'):
+    if task.get('farm') or task.get('house'):
         return bool(current.get('goal_blocks')) and all(current['goal_blocks'])
     item = task['item']
     if task.get('return_to_start') and math.dist(initial['position'], current['position']) > 1:
