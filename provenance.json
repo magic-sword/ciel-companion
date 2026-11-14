@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "a585605061f66277cef42fff594f8fa8555a76d4",
+  "fork_commit": "27842f455d6c8f1ac1ae213c779eb1c88b9ed395",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -13,6 +13,8 @@
     "src/agent/commands/queries.js",
     "src/agent/library/deadline.js",
     "src/agent/library/farm.js",
+    "src/agent/library/hunt.js",
+    "src/agent/library/mobs.js",
     "src/agent/library/obtain.js",
     "src/agent/library/plan.js",
     "src/agent/library/region.js",
@@ -154,7 +156,7 @@
       "upstream_sha256": "418ad6b04c7d49b767b6cb61ba7551f4ca1823e9adb437af6f3b4eeb462165b6"
     },
     "src/agent/commands/actions.js": {
-      "sha256": "953605f9d7455e0deabb9f1ef498b66679ed3fcf3e215fd6694433f9da721d66",
+      "sha256": "ede3c20de33a5395b32739e7d921536fbb3ba8dee1e689c8db00f4330c68fbf9",
       "upstream_sha256": "85e10a7d0c81be65966777fd2b67a1b89427f35826ea89f71efe9658417402a7"
     },
     "src/agent/commands/index.js": {
@@ -181,11 +183,14 @@
       "sha256": "c0612fd954f34c52c74a188bf915e4ccc5ac27a82582dd07e2d869a9166083df"
     },
     "src/agent/library/farm.js": {
-      "sha256": "c4474bcf229fae3c507eba6d809ee3f170fc8dfc3c1145b9a0c735c8461567ea"
+      "sha256": "7758d60022a1e0253a59acf7b83fa8dd4556e6d7339b468aaa6769ccd78c60a6"
     },
     "src/agent/library/full_state.js": {
       "sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901",
       "upstream_sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901"
+    },
+    "src/agent/library/hunt.js": {
+      "sha256": "28abe810e332d6d11020037224568cc51ccca1b21b29f0c520bedc33850c0f50"
     },
     "src/agent/library/index.js": {
       "sha256": "c81808a40066108adcb39af4045e77a4571f6479793acd213f1cb82aac09d82d",
@@ -195,8 +200,11 @@
       "sha256": "1329dc6967600c501b0f2be637e83b5957edd86bd9ef77be95596ec69f5f4068",
       "upstream_sha256": "1329dc6967600c501b0f2be637e83b5957edd86bd9ef77be95596ec69f5f4068"
     },
+    "src/agent/library/mobs.js": {
+      "sha256": "6c90f43dd30e04cbbb6b80a966284dc76556bdf036603302b1f110193dce3c14"
+    },
     "src/agent/library/obtain.js": {
-      "sha256": "258928604e1d5d19406dcdc893512f50da6d697173f82e3ddeaf639d9ca2b6a6"
+      "sha256": "8930b277b14fc0e2239853cec0a3e268bd8af717a29d2e451fadb1b77230c221"
     },
     "src/agent/library/plan.js": {
       "sha256": "e0199c3e194f70dd86368eb2a8ce5183b64aabaf604ef69420da0e0ef0e868a6"
@@ -440,7 +448,7 @@
       "upstream_sha256": "76af7030322639d700ec90bc04d4bd90bb4a052665e462ef89a57bb4e2bda3a0"
     },
     "src/utils/mcdata.js": {
-      "sha256": "d7767c44691edbf82625ef925b10ed04c4e4f5498fe80177a953194efdf1140d",
+      "sha256": "352cc6f3aa63591b7349c8624556bf2da9cff098311d7e8439186f84691e49cd",
       "upstream_sha256": "9020bf8681ab3907f482ce6339c683fc4a70aec484238379e3b84553b028b9eb"
     },
     "src/utils/text.js": {

@@ -66,7 +66,7 @@ export async function makeFarm(agent, size, crop = 'wheat') {
     }
     if (sites[0].changes <= levelingLimit(size))
         return await farmAt(bot, sites[0], size, crop);
-    agent.pendingChoice = {
+    bot.pendingChoice = {
         question: `where to make the ${size} x ${size} farm`,
         options: Object.fromEntries(sites.map(site => [site.id, () => farmAt(bot, site, size, crop)])),
     };
