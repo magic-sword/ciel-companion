@@ -74,9 +74,10 @@ test('obtaining an item with several ways lists them with costs and waits for a 
   assert.deepEqual(Object.keys(bot.pendingChoice.options), ['kill:sheep', 'shear:sheep', 'make']);
   assert.match(bot.output, /kill:sheep: about 3 sheep needed, 2 suitable sheep seen nearby/);
   assert.match(bot.output, /shear:sheep: about 2 sheep needed, 1 suitable sheep seen nearby, a shears to make first, the sheep stay/);
-  assert.match(bot.output, /make: craft or mine white_wool instead \(\d+ steps in all, then another choice\)/);
+  // The choice that follows says which of its ways can be done from here.
+  assert.match(bot.output, /make: craft or mine white_wool instead \(\d+ steps in all, then a choice for string: kill:spider \(no spider seen, fights back\), make \(no [a-z_ ]*cobweb in sight\)\)/);
   // A way that needs a block not in sight says so (here no iron ore for the shears), and the
   // whole choice is kept for the model to read even when the output is shortened.
-  assert.match(bot.output, /shear:sheep: .*no [a-z_ ]*iron_ore[a-z_ ]* seen nearby to mine/);
+  assert.match(bot.output, /shear:sheep: .*cannot be done here: no [a-z_ ]*iron_ore[a-z_ ]* in sight to mine/);
   assert.match(bot.pendingChoice.text, /Choose one with !chooseOption\("id"\) using an id below and tell the owner in a few words which way you took, or ask the owner/);
 });
