@@ -302,6 +302,8 @@ export const queryList = [
                     || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
                 let craftingPlan = mc.getDetailedCraftingPlan(target_item, quantity, curr_inventory, tableAvailable);
                 craftingPlan = prefixMessage + craftingPlan;
+                if (!agent.blocked_actions.includes('!obtainItem'))
+                    craftingPlan += `\n\n!obtainItem("${target_item}", ${quantity}) carries out this whole plan in order.`;
                 return pad(craftingPlan);
             } catch (error) {
                 console.error("Error generating crafting plan:", error);

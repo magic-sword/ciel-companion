@@ -662,6 +662,5 @@ function formatPlan(targetItem, count, { required, steps, leftovers, toolSteps }
             lines.push(`- ${count} ${item}`));
     }
 
-    lines.push(`\n!obtainItem("${targetItem}", ${count}) carries out this whole plan in order.`);
     return lines.join('\n');
 }
