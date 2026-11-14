@@ -9,7 +9,12 @@
 - `mc_*`5課題：14/15
 - 長い作業：8/9
 
-開発・本番・普段の体には未配布。
+同日、利用者の依頼によりコミット`054b74d617e78d9eecddc7adc972cfbf94ee3f39`を配布した。
+- 体：`deploy-body.py`でサーバー上のテスト通過・149ファイル一致・他コンテナ不変・参加済み（image `bb2094178e7c6b89ede2b7d94011ae864204a14896800a56f4772b5583cc66a0`、根拠`~/work/ciel-companion/server/data/deployments/body-054b74d617e7-1794648546215662457`）。コンテナ内に`plan.js`・`region.js`・`farm.js`・`sites.js`とモードの聞き直しの修正があることを確認した。
+- 開発：`deploy-agent.py --dev`で194ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `0859120f69fa0ee1227a00fd2839b5223aeff0a716b2c670cf798357478dd319`）。
+- 本番：標準`deploy-server.sh`で`DEPLOY_SERVER_DONE`。会話サーバーのコードは前回の配布から変わっていないため、agentは作り直されず、image `765cbb8d…`と起動時刻を維持した。
+
+普段のワールドでの`!buildFarm`は未確認。
 
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
