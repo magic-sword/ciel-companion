@@ -1,7 +1,7 @@
 import * as mc from '../../utils/mcdata.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
-import { obtainItem, obtainSeconds } from './obtain.js';
+import { obtainItem, obtainSeconds, obtainEstimate } from './obtain.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
 
@@ -17,9 +17,11 @@ import { recordTime } from './timing.js';
  */
 export async function runPlan(bot, steps, { tries = 2 } = {}) {
     const byId = new Map(steps.map(step => [step.id, step]));
-    const total = steps.filter(step => !step.done(bot)).reduce((sum, step) => sum + step.seconds(bot), 0);
+    // A step's estimate is its usual time; its seconds are its deadline, the most it may take.
+    const pending = steps.filter(step => !step.done(bot));
+    const total = pending.reduce((sum, step) => sum + (step.estimate ?? step.seconds)(bot), 0);
     skills.log(bot, `Plan: ${steps.map(step => step.label).join(', ')}. About ${Math.round(total)}s.`);
-    // The work that runs the plan may last as long as its steps (CIEL's work deadline).
+    // The work that runs the plan may last as long as its steps usually take (CIEL's work deadline).
     bot.reportEstimate?.(total);
     const failures = new Map();
     for (;;) {
@@ -94,6 +96,7 @@ export function haveStep(id, item, num = 1, { needs = [], satisfiedBy = [item] }
         },
         run: bot => obtainItem(bot, item, amount(num, bot)),
         seconds: bot => Math.max(SECONDS_PER_ITEM_STEP, obtainSeconds(bot, item, Math.max(1, amount(num, bot)))),
+        estimate: bot => amount(num, bot) <= 0 ? 0 : obtainEstimate(bot, item, Math.max(1, amount(num, bot))),
     };
 }
 

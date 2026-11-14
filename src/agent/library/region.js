@@ -3,6 +3,7 @@ import * as skills from './skills.js';
 import * as world from './world.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
+import { expected, limit } from './estimate.js';
 import { Blueprint } from '../tasks/construction_tasks.js';
 
 /**
@@ -22,7 +23,7 @@ export const CROPS = {
 const TILLABLE = new Set(['grass_block', 'dirt', 'farmland']);
 const EMPTY = new Set(['air', 'cave_air', 'short_grass', 'tall_grass', 'fern', 'large_fern', 'snow', 'dead_bush']);
 const SPECIAL = new Set(['air', 'farmland', 'water', ...Object.keys(CROPS)]);
-const CELL_SECONDS = 15;
+const CELL_SECONDS = limit('cell');
 
 const same = (blueprint, expected, actual) => actual === expected || Boolean(blueprint.same?.(expected, actual));
 
@@ -53,9 +54,17 @@ export function materials(blueprint, bot) {
     return need;
 }
 
+// The most the remaining cells may take: each with its own deadline.
 export function seconds(blueprint, bot) {
-    return 20 + 6 * remaining(blueprint, bot).length;
+    return 20 + CELL_SECONDS * remaining(blueprint, bot).length;
 }
+
+/** The time the remaining cells usually take (the measured time per cell, by phase). */
+export function estimate(blueprint, bot) {
+    return remaining(blueprint, bot).reduce((sum, cell) => sum + expected('cell', phaseOf(cell)), 0);
+}
+
+const phaseOf = cell => PHASES.find(phase => phase.wants(cell))?.name ?? 'place';
 
 /**
  * Change the remaining cells in order: clear what is in the way (top down), place blocks
