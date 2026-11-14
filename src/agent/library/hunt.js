@@ -104,26 +104,40 @@ function heading(dx, dz) {
     return HEADINGS[(turn + 8) % 8][0];
 }
 
+// Whether the bot could see the top of the block under p: no solid block on the line from its eyes.
+function inSight(bot, p) {
+    const eye = bot.entity.position.offset(0, 1.62, 0);
+    const top = new Vec3(p.x + 0.5, p.y + 0.05, p.z + 0.5);
+    const steps = Math.ceil(eye.distanceTo(top) * 2);
+    for (let i = 1; i < steps; i++) {
+        const at = eye.plus(top.minus(eye).scaled(i / steps)).floored();
+        if (at.equals(p.offset(0, -1, 0))) return true;
+        if (bot.blockAt(at)?.boundingBox === 'block') return false;
+    }
+    return true;
+}
+
 /**
  * Choose where to look next. The mob's spawn ground in sight (within RANGE, with room to stand
- * on it) comes first: of the spots not near a place already visited, the one that is near the
- * bot and leads away from where the search began, so the search keeps going outward. With none
- * in sight, follow the surface along each heading until it is cut off and take the open heading
- * that reaches farthest within a leg, again away from places visited.
+ * on it, and no wall in between) comes first: of the spots not near a place already tried, the
+ * one that is near the bot and leads away from where the search began, so the search keeps
+ * going outward. With none in sight, follow the surface along each heading until it is cut off
+ * and take the open heading that reaches farthest within a leg, again away from places tried.
+ * @param visited places reached and targets that could not be reached, the start first.
  * @returns {{heading, target: Vec3, ground: boolean} | null}
  */
 export function nextLeg(bot, ground, visited) {
     const from = bot.entity.position.floored();
     const start = visited[0];
     const fresh = p => visited.every(v => v.distanceTo(p) >= LEG / 2);
+    const cost = p => p.distanceTo(from) - 0.5 * p.distanceTo(start);
     const spots = bot.findBlocks({ matching: block => block?.name === ground, maxDistance: RANGE, count: 4096 })
         .map(p => new Vec3(p.x, p.y + 1, p.z))
-        .filter(p => fresh(p) && surface(bot, p.x, p.z, p.y)?.y === p.y);
-    if (spots.length > 0) {
-        const cost = p => p.distanceTo(from) - 0.5 * p.distanceTo(start);
-        const target = spots.reduce((a, b) => cost(b) < cost(a) ? b : a);
+        .filter(p => fresh(p) && surface(bot, p.x, p.z, p.y)?.y === p.y)
+        .sort((a, b) => cost(a) - cost(b));
+    const target = spots.find(p => inSight(bot, p));
+    if (target)
         return { heading: heading(target.x - from.x, target.z - from.z), target, ground: true };
-    }
     let best = null;
     for (const [name, dx, dz] of HEADINGS) {
         const norm = Math.hypot(dx, dz);
@@ -141,12 +155,20 @@ export function nextLeg(bot, ground, visited) {
     return best;
 }
 
-/** Walk legs toward the mob's spawn ground until found() sees one, or no new heading is left. */
+/**
+ * Walk legs toward the mob's spawn ground until found() sees one, or no new heading is left.
+ * The places tried are kept on the bot for the next search for the same mob (a retry starts
+ * where this one ended), and dropped once one is found.
+ */
 export async function explore(bot, mob, found) {
     const ground = MOBS[mob]?.spawn.ground ?? 'grass_block';
-    const visited = [bot.entity.position.floored()];
+    bot.searched = bot.searched ?? {};
+    const visited = bot.searched[mob] = bot.searched[mob] ?? [bot.entity.position.floored()];
     for (let leg = 0; leg < LEGS && !bot.interrupt_code; leg++) {
-        if (found()) return true;
+        if (found()) {
+            delete bot.searched[mob];
+            return true;
+        }
         const next = nextLeg(bot, ground, visited);
         if (!next) {
             skills.log(bot, `No ${mob} within ${RANGE} blocks and no new way to look.`);
@@ -155,7 +177,10 @@ export async function explore(bot, mob, found) {
         skills.log(bot, `No ${mob} within ${RANGE} blocks; looking ${next.heading}, toward ${next.ground ? ground : 'open land'}.`);
         const { x, y, z } = next.target;
         await within(bot, () => skills.goToPosition(bot, x, y, z, 3), LEG_SECONDS, `walk ${next.heading}`);
-        visited.push(bot.entity.position.floored());
+        // A target not reached is tried too, so a spot behind a wall is not chosen again.
+        visited.push(bot.entity.position.floored(), next.target);
     }
-    return Boolean(found());
+    if (!found()) return false;
+    delete bot.searched[mob];
+    return true;
 }

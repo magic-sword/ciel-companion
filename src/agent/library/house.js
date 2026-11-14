@@ -88,6 +88,10 @@ export async function buildHouse(agent, name) {
         skills.log(bot, `There is no house plan named ${name}; known plans: ${houseNames().join(', ')}.`);
         return false;
     }
+    // A house begun and not finished is carried on where it stands, wherever the bot is now.
+    const begun = bot.houses?.[name];
+    if (begun && remaining(houseBlueprint(bot, house, begun.corner, begun.turns), bot).length > 0)
+        return await houseAt(bot, house, name, begun);
     const sites = [0, 1].flatMap(turns => {
         const [width, depth] = footprint(house, turns);
         return findSites(bot, width, depth).map(site => ({ ...site, turns }));
@@ -104,6 +108,7 @@ export async function buildHouse(agent, name) {
 
 async function houseAt(bot, house, name, site) {
     skills.log(bot, `Building the ${name} at ${site.corner.x}, ${site.corner.y}, ${site.corner.z}.`);
+    bot.houses = { ...(bot.houses ?? {}), [name]: site };
     const blueprint = houseBlueprint(bot, house, site.corner, site.turns);
     reserve(bot, blueprint);
     return await runPlan(bot, houseSteps(blueprint, bot));
