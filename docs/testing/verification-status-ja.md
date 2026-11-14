@@ -16,6 +16,11 @@
 
 普段のワールドでの`!buildFarm`は未確認。
 
+同日、モブからの入手（知識表・見つける・倒す・刈る・計画の中の選択、fork `27842f4`、コミット`88245eb`）を加えた。体のNode 170件（既存1件skip）は成功。専用環境では次のとおり（[実測](minecraft-results-ja.md#モブからの入手ベッドの課題)）。開発・本番・普段の体には未配布。
+- 羊3匹のベッド：実行器あり2/3・なし1/3
+- 羊1匹のベッド：あり0/3・なし0/3（多くはLLMが計画の前に唯一の羊を倒した）
+- `mc_*`5課題15/15、長い作業9/9、農地3/3
+
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
 同日、利用者の依頼により同じコミットを標準`deploy-server.sh`で本番へ配布した。本番agentはMindcraftへの切り替え以前の版からの更新で、Mindcraftへの切り替え・中核APIの統合・依頼受付の変更が本番に初めて出た。`DEPLOY_SERVER_DONE`、Git管理server 585ファイルの一致（118ファイルは改行形式だけの差）、実コンテナ内のagent.py・game_intake.pyの一致、HTTP 200、LiveKitへのworker登録、再起動0、Traceback・ERRORなしを確認した。作り直したのはagent（image `3411d0dd9c070cd337377a6f59649f0ad9dae179e8e078bfe6b10638cb56867c`）とsinging（`8b21524dcfa04a012390e411ec38106e6df7f615d40b57ed8567a91dd46858c3`）。tts・DB・共有LLM・Minecraftの体/ワールド/知識・開発agentはID・image・起動時刻を維持した。作業終了時の表示の見出しの変更に合わせたUnityアプリの更新と、本番での会話・実音声・ゲーム操作は未確認。
