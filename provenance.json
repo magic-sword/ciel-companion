@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "df60088a0a547c82b94ff35b6cb767eb67918244",
+  "fork_commit": "760db1eef9f64a305a68e2f327c7c1d99d5de738",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -145,7 +145,7 @@
       "upstream_sha256": "8ed0f3a9d482656f47e062917aed9880a6cba680d624bb3b375e3bc53f7f37b2"
     },
     "src/agent/action_manager.js": {
-      "sha256": "80c280b7568f6dcdc62143a477ae9980bcbca7af40f4fdce8ca8cd066173ef44",
+      "sha256": "a03ff03d5c9ee03eb53f923f2f2a93cdb906566a193a32ae32999df24e661ac4",
       "upstream_sha256": "e1705bb4785f0a3f3dc41818a81bcdc78fe092857f3cc52c10d23046339405c6"
     },
     "src/agent/agent.js": {
@@ -208,7 +208,7 @@
       "sha256": "6c90f43dd30e04cbbb6b80a966284dc76556bdf036603302b1f110193dce3c14"
     },
     "src/agent/library/obtain.js": {
-      "sha256": "4ca7a08c8edf2f36b0d78e2f3d6eadc8d0a71793e6d8c96236b411560f95f9aa"
+      "sha256": "23b9d654e41138f66865ad6143d4abef3708d36a0731f6976e635f886faef656"
     },
     "src/agent/library/plan.js": {
       "sha256": "9b03eb3789e2f5d45c2bbf22442d362f89839214090b18297c3333f4cbea2946"
@@ -217,14 +217,14 @@
       "sha256": "09dbea2833aeb59928425f6a9d9f51dfd321e5d703eccec1bbd041acd40011a5"
     },
     "src/agent/library/sites.js": {
-      "sha256": "73b7742958c5c8e7c4ca6dfc20c818ccdbc2f816dae2232783827b4172c02bf9"
+      "sha256": "d035715765dd7ebdcf5ddfadeaf9feeade2d4f94e1eb83f9174b72ac612ef864"
     },
     "src/agent/library/skill_library.js": {
       "sha256": "ef52fe70e640c079a38f5b319582f356cd782149358f32a93117d38df0f5e32e",
       "upstream_sha256": "ef52fe70e640c079a38f5b319582f356cd782149358f32a93117d38df0f5e32e"
     },
     "src/agent/library/skills.js": {
-      "sha256": "f062688cd0ff86bde48fdd004057e96cfd0ec61fd5c713ee3b4f8825c8f0a51c",
+      "sha256": "3e82dffa802b1b53aef6b96572c2c3dd8d61ecf6390987b759d84c7c59498f47",
       "upstream_sha256": "723041242575d78f54c7bfa44daa4f04c8ceac80deab524039fe9c769e3cd0b0"
     },
     "src/agent/library/world.js": {
