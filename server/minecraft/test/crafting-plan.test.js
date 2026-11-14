@@ -1,20 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import * as mc from '../src/vendor/mindcraft/src/utils/mcdata.js';
 
-// mcdata.js loads recipe data only after a bot logs in. Import a copy of the vendored file
-// with the 1.21.11 data preloaded, inside this package so its dependencies resolve.
-const dir = new URL(`./.tmp-crafting-plan-${randomUUID()}/`, import.meta.url);
-mkdirSync(new URL('src/utils/', dir), { recursive: true });
-mkdirSync(new URL('src/agent/', dir), { recursive: true });
-const source = new URL('../src/vendor/mindcraft/src/utils/mcdata.js', import.meta.url);
-copyFileSync(source, new URL('src/utils/mcdata.js', dir));
-const copy = new URL('src/utils/mcdata.js', dir);
-writeFileSync(copy, readFileSync(copy, 'utf8').replace(/^let mcdata = null;$/m, "let mcdata = minecraftData('1.21.11');"));
-writeFileSync(new URL('src/agent/settings.js', dir), "export default { minecraft_version: '1.21.11' };\n");
-const mc = await import(copy);
-test.after(() => rmSync(dir, { recursive: true, force: true }));
+// mcdata.js loads recipe data at login; load the body's version directly.
+mc.useVersion('1.21.11');
 
 const steps = plan => plan.split('\n').filter(line => /^(Craft|Mine|Smelt) /.test(line));
 const index = (lines, pattern) => lines.findIndex(line => pattern.test(line));
