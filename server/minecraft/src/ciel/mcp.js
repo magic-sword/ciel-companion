@@ -15,7 +15,7 @@ import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextp
 import { z } from 'zod';
 
 import { registerKnowledge } from '../knowledge/main.js';
-import { CAPABILITIES, TASK_VERSION } from './tasks.js';
+import { CAPABILITIES, MAX_BUDGET_MS, TASK_VERSION } from './tasks.js';
 import { BUILD_BLOCKS } from '../spatial.js';
 import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText } from './words.js';
 
@@ -160,7 +160,7 @@ export function makeServer(hub, sessionId) {
   const work = async fn => mine() ? json(await fn(mine().work)) : json({ status: 'unavailable' });
   server.registerTool('minecraft_task_submit', { description: '期限付きの作業を受け付ける。段の計画と実行はゲームが行う。',
     inputSchema: { request_id: z.string().min(1).max(160), capability: z.string(), arguments: z.record(z.string(), z.any()),
-      budget_ms: z.number().int().min(100).max(120000), constraints: z.record(z.string(), z.any()) }, ...WORK },
+      budget_ms: z.number().int().min(100).max(MAX_BUDGET_MS), constraints: z.record(z.string(), z.any()) }, ...WORK },
   r => work(w => w.submit(r)));
   server.registerTool('minecraft_task_status', { description: '作業の最新状態と根拠を取得する。',
     inputSchema: { task_id: z.string() }, ...WORK },
