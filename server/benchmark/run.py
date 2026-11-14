@@ -80,6 +80,9 @@ def load_tasks(path=SUITE):
             raise ValueError('owner must be {"reply": text, "say": [{"after_command": "!name", "text": text}]}')
         if task.get('keep_mobs') and not task.get('mobs'):
             raise ValueError('keep_mobs needs mobs')
+        far = task.get('far_ores', {})
+        if far and (not task.get('house', {}).get('pasture') or any(name not in ORES or not isinstance(n, int) or not 1 <= n <= 8 for name, n in far.items())):
+            raise ValueError('far_ores are known ores, 1..8 each, in the pasture of a house task')
         mobs = task.get('mobs', {})
         if any(name not in PASSIVE_MOBS or not isinstance(n, int) or not 1 <= n <= 8 for name, n in mobs.items()) or (mobs and task['forest'] != 'near'):
             raise ValueError('Mobs must be passive mobs, 1..8 each, beside a near forest')

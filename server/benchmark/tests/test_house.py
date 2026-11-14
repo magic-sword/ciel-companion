@@ -50,5 +50,13 @@ class HouseTaskTest(unittest.TestCase):
         self.assertTrue(achieved(task, initial, {'goal_blocks': [True] * 101}))
 
 
+    def test_iron_for_shears_lies_out_of_sight_in_the_pasture(self):
+        from server.benchmark.house import far_ore_spots, PASTURE
+        task = next(t for t in load_tasks() if t['id'] == 'long_dirt_shelter')
+        self.assertEqual(task['far_ores'], {'iron_ore': 3})
+        spots = far_ore_spots(random.Random(11), task['far_ores'])
+        self.assertEqual(len({(x, z) for _, x, z in spots}), 3)
+        self.assertTrue(all(PASTURE[0] <= x <= PASTURE[2] and PASTURE[1] <= z <= PASTURE[3] for _, x, z in spots))
+
 if __name__ == '__main__':
     unittest.main()

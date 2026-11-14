@@ -12,7 +12,7 @@ import time
 import uuid
 
 from .farm import layout as farm_layout, commands as farm_commands, checks as farm_checks
-from .house import layout as house_layout, commands as house_commands, checks as house_checks, mob_spot as pasture_spot, LAND as PASTURE_LAND
+from .house import layout as house_layout, commands as house_commands, checks as house_checks, mob_spot as pasture_spot, LAND as PASTURE_LAND, far_ore_spots
 
 MARKER = 'ciel-benchmark-v1'
 OBJECTIVE = 'cielbench'
@@ -219,6 +219,10 @@ class World:
             self.house = house_layout(rng, side, task['house']['plan'])
             for command in house_commands(self.house, pasture):
                 self._write(command)
+            # Ores out of sight in the pasture, for a way that has to look for them (shears' iron).
+            for name, x, z in far_ore_spots(rng, task.get('far_ores', {})):
+                ores.append((name, x, z))
+                self._write(f'setblock {x} 63 {z} minecraft:{name}')
         # Passive mobs on the side away from the trees, or out of sight in the pasture; sheep
         # are white, so their wool is.
         mobs = []

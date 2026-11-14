@@ -115,6 +115,18 @@ def checks(house, pasture):
     return out
 
 
+def far_ore_spots(rng, ores):
+    """Ore blocks set into the pasture's ground, out of sight from the house, as (name, x, z)."""
+    spots, taken = [], set()
+    for name, count in sorted(ores.items()):
+        for _ in range(count):
+            while (spot := (rng.randint(PASTURE[0], PASTURE[2]), rng.randint(PASTURE[1], PASTURE[3]))) in taken:
+                pass
+            taken.add(spot)
+            spots.append((name, *spot))
+    return spots
+
+
 def mob_spot(rng):
     """Where a pasture animal is summoned."""
     return rng.randint(PASTURE[0] + 1, PASTURE[2] - 1), rng.randint(PASTURE[1] + 1, PASTURE[3] - 1)
