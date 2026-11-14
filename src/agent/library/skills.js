@@ -3,6 +3,7 @@ import * as world from "./world.js";
 import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
 import settings from "../../../settings.js";
+import activeSettings from "../settings.js";
 
 const blockPlaceDelay = settings.block_place_delay == null ? 0 : settings.block_place_delay;
 const useDelay = blockPlaceDelay > 0;
@@ -33,16 +34,24 @@ async function equipHighestAttack(bot) {
         await bot.equip(weapon, 'hand');
 }
 
+// Hints never point at a command the agent's settings have blocked.
+function executorAvailable() {
+    return !(activeSettings.blocked_actions || []).includes('!obtainItem');
+}
+
 // Point at the plan executor when materials are missing, instead of leaving the choice of
 // what to gather to the model one step at a time.
 function obtainHint(itemName, num) {
+    if (!executorAvailable()) return '';
     return ` Use !obtainItem("${itemName}", ${num}) to gather and craft everything it needs in order.`;
 }
 
 // Name the simplest harvesting tool so the next step can make it instead of retrying.
 function toolHint(blockName) {
     const tool = mc.getBlockTool(blockName);
-    return tool ? ` It needs a ${tool} or better; use !obtainItem("${tool}", 1) to make one first.` : '';
+    if (!tool) return '';
+    return executorAvailable() ? ` It needs a ${tool} or better; use !obtainItem("${tool}", 1) to make one first.`
+        : ` It needs a ${tool} or better.`;
 }
 
 export async function craftRecipe(bot, itemName, num=1) {
