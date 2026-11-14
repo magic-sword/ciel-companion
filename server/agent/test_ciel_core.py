@@ -93,7 +93,7 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
         history.append('second')
         await session.respond({'response_format':'text','request_id':'r','messages':[{'role':'user','content':'stats'}]})
         prefixes = [[m['content'] for m in ctx[:2]] for ctx, *_ in seen]
-        self.assertEqual(prefixes, [['persona', '{"type": "execution_reference", "text": "command docs"}']]*2)
+        self.assertEqual(prefixes, [['persona', 'command docs']]*2)
         self.assertEqual(seen[1][0][2]['content'], 'second')
         self.assertEqual([(s[2], s[3]) for s in seen], [(1, 'game_core_prepare'), (256, 'game_core')])
         await core.release(token)

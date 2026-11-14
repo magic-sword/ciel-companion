@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { strictFormat } from '../vendor/mindcraft/src/utils/text.js';
 
 // A Mindcraft model provider backed by a session of CIEL, including its context.
 // The host supplies a session capability; the model never chooses a memory owner.
+// Messages take Mindcraft's own strictFormat form: its instructions and system turns are
+// user messages starting with "SYSTEM: ", since the host keeps the only system message.
+const SYSTEM = 'SYSTEM: ';
 export class CielModel {
   static prefix = 'ciel';
 
@@ -18,7 +22,7 @@ export class CielModel {
   // Preparation failure only loses the speed-up; registration failure keeps full prompts.
   async prepareReference(reference, { seconds = 60 } = {}) {
     const registered = await this.transport(`${this.url}/v1/reference`, {
-      method: 'PUT', headers: this.headers(), body: JSON.stringify({ text: reference }),
+      method: 'PUT', headers: this.headers(), body: JSON.stringify({ text: SYSTEM + reference }),
       signal: AbortSignal.timeout(10000),
     }).catch(() => null);
     if (!registered?.ok) return { status: 'unregistered' };
@@ -47,11 +51,9 @@ export class CielModel {
     // schedule them; this client only says which ones are the action decisions.
     const priority = decision || !this.reference ? 'decision' : 'background';
     try {
-      const messages = [
-        { role: 'user', content: JSON.stringify({ type: 'execution_context', text }) },
-        ...turns.map(turn => ({ role: turn.role === 'assistant' ? 'assistant' : 'user',
-          content: turn.role === 'system' ? JSON.stringify({ type: 'execution_observation', text: turn.content }) : turn.content })),
-      ];
+      // strictFormat rewrites the objects it reads; give it copies of Mindcraft's history.
+      const messages = strictFormat([{ role: 'system', content: text },
+        ...turns.map(turn => ({ role: ['assistant', 'system'].includes(turn.role) ? turn.role : 'user', content: turn.content }))]);
       const response = await this.transport(`${this.url}/v1/respond`, {
         method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, response_format: responseFormat, priority }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(125000)]),

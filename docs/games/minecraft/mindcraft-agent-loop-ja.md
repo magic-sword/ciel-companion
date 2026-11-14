@@ -198,16 +198,15 @@ sequenceDiagram
 {
   "request_id": "要求ごとのUUID",
   "messages": [
-    {"role": "user", "content": "{\"type\":\"execution_context\",\"text\":\"Mindcraftの指示・観測・命令一覧\"}"},
-    {"role": "user", "content": "利用者名: オークの原木を4個集めて"},
+    {"role": "user", "content": "SYSTEM: Mindcraftの指示・観測\n利用者名: オークの原木を4個集めて"},
     {"role": "assistant", "content": "!collectBlocks(\"oak_log\", 4)"},
-    {"role": "user", "content": "{\"type\":\"execution_observation\",\"text\":\"実行結果\"}"}
+    {"role": "user", "content": "SYSTEM: 実行結果"}
   ],
   "response_format": "text"
 }
 ```
 
-これは形式を説明する例。`content`内のJSONも文字列であり、APIのtool callではない。Mindcraftのsystem履歴は `execution_observation` に包まれる。
+これは形式を説明する例。メッセージは上流Mindcraftの`strictFormat`（`src/utils/text.js`）で作る。Mindcraftの指示とsystem履歴は`SYSTEM: `で始まるuserになり、続くuserは1つにまとまる。命令一覧などの固定部分は`/v1/reference`へ`SYSTEM: `付きで一度だけ登録し、ホストが人格の直後に置く。ホストは会話の記録を心と同じ形（`名前：発言`、出来事は事実の一文）で渡す（`mind.turn_message`）。システムメッセージはホストの人格だけで、クライアントの文はsystemにならない。
 
 [CIEL中核API](../../../server/agent/ciel_core.py)はトークンに対応するセッションを確認し、[ホスト](../../../server/agent/core_host.py)が提供する人格・許可された記憶・会話文脈と合わせて推論する。Mindcraftが記憶の所有者を自由に選ぶ仕組みではない。結果は `{"request_id": "...", "text": "..."}`。取消には `DELETE /v1/requests/{id}` とローカルの通信中断を使う。
 

@@ -326,11 +326,8 @@ class Mind:
             if t.role == 'user':
                 if any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
-                out.add_message(role='user', content=f'{t.name}：{self._marked(text)}')
-            elif t.role == 'event':
-                out.add_message(role='system', content=_event_fact(text))
-            else:
-                out.add_message(role='assistant', content=text)
+                text = self._marked(text)
+            out.add_message(**turn_message(t, text))
         notes = self._notes(deep=talker_instructions is None, memory=turn.get('memory'))
         self.handed = None
         if talker_instructions is None and tail_users:
@@ -526,6 +523,16 @@ def _event_fact(text: str) -> str:
         return json.loads(text).get('fact') or text
     except (ValueError, AttributeError):
         return text
+
+
+def turn_message(turn, text: str) -> dict:
+    """記録の 1 件を、会話モデルへ渡す 1 件にする（心と、外部の実行クライアントに渡す文脈で同じ形）。
+    人の発言は「名前：発言」、出来事は事実の一文の system（ローカルでは local_context が SYSTEM: にする）"""
+    if turn.role == 'user':
+        return {'role': 'user', 'content': f'{turn.name}：{text}'}
+    if turn.role == 'event':
+        return {'role': 'system', 'content': _event_fact(text)}
+    return {'role': 'assistant', 'content': text}
 
 
 # Qwen rejects system messages after the first one. Notes keep their place as

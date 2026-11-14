@@ -1,6 +1,5 @@
 """Bind the shared CIEL persona, permitted memory and conversation to external clients."""
 from aiohttp import web
-import json
 import time
 import uuid
 import debug_log
@@ -26,13 +25,11 @@ class CoreHost:
         memory = await self.book.greeting_context(private) if self.book else ''
         context = [{'role':'system','content':a.instructions_for(
             style.talk if style else 'normal', style.presence if style else 'solo', execution=True) + '\n' + self.execution_instructions}]
-        # Read the same history without consuming voice notifications or pending notes.
-        for turn in a.mind._recent(mind.DEEP_TURNS):
-            context.append({'role': 'assistant' if turn.role == 'assistant' else 'user',
-                'content': turn.text[:mind.TURN_CHARS] if turn.role == 'assistant' else
-                json.dumps({'type':turn.role,'name':turn.name,'text':turn.text[:mind.TURN_CHARS]},ensure_ascii=False)})
+        # Read the same history without consuming voice notifications or pending notes,
+        # in the same form the conversation model reads it.
+        context.extend(mind.turn_message(turn, turn.text[:mind.TURN_CHARS]) for turn in a.mind._recent(mind.DEEP_TURNS))
         if memory:
-            context.append({'role':'user','content':json.dumps({'type':'permitted_memory','text':memory},ensure_ascii=False)})
+            context.append({'role':'system','content':memory})
         return context
 
     async def infer(self, context, messages, *, response_format='text', max_tokens=256, purpose='game_core',

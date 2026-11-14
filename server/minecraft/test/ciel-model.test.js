@@ -2,16 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CielModel } from '../src/mindcraft/ciel-model.js';
 
-test('Mindcraft sends context as data and uses the bound CIEL session', async () => {
+test('Mindcraft sends its instructions in strictFormat and uses the bound CIEL session', async () => {
   const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
     fetch: async (url, options) => {
       assert.equal(options.headers.Authorization, 'Bearer session');
       const request = JSON.parse(options.body);
       assert.equal(request.messages[0].role, 'user');
-      assert.equal(JSON.parse(request.messages[0].content).type, 'execution_context');
+      // Mindcraft's strictFormat: its instructions open the first user message, then the turns follow.
+      assert.equal(request.messages[0].content, 'SYSTEM: game context\nlook');
       return { ok: true, json: async () => ({ request_id: request.request_id, text: '!inventory' }) };
     } });
   assert.equal(await model.sendRequest([{ role: 'user', content: 'look' }], 'game context'), '!inventory');
+});
+
+test('command results go as SYSTEM: lines without changing Mindcraft history', async () => {
+  let messages;
+  const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async (url, options) => {
+      const request = JSON.parse(options.body);
+      messages = request.messages;
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: 'ok' }) };
+    } });
+  const turns = [{ role: 'user', content: 'owner: collect logs' }, { role: 'assistant', content: '!collectBlocks("oak_log", 4)' },
+    { role: 'system', content: 'Collected 4 oak_log.' }];
+  const before = structuredClone(turns);
+  await model.sendRequest(turns, 'rules');
+  assert.deepEqual(messages, [{ role: 'user', content: 'SYSTEM: rules\nowner: collect logs' },
+    { role: 'assistant', content: '!collectBlocks("oak_log", 4)' }, { role: 'user', content: 'SYSTEM: Collected 4 oak_log.' }]);
+  assert.deepEqual(turns, before);
 });
 
 test('a registered fixed prefix is prepared once and omitted from later requests', async () => {
@@ -27,8 +45,9 @@ test('a registered fixed prefix is prepared once and omitted from later requests
   assert.deepEqual(await model.prepareReference('rules\ndocs'), { status: 'prepared', reference_chars: 10, seconds: 12.5 });
   await model.sendRequest([], 'rules\ndocs\nstats');
   await model.sendRequest([], 'other prompt');
-  const sent = calls.filter(c => c[0] === 'respond').map(c => JSON.parse(JSON.parse(c[2]).messages[0].content).text);
-  assert.deepEqual(sent, ['stats', 'other prompt']);
+  const sent = calls.filter(c => c[0] === 'respond').map(c => JSON.parse(c[2]).messages[0].content);
+  assert.deepEqual(sent, ['SYSTEM: stats', 'SYSTEM: other prompt']);
+  assert.equal(JSON.parse(calls[0][2]).text, 'SYSTEM: rules\ndocs');
   assert.deepEqual(calls.slice(0, 2).map(c => c.slice(0, 2)), [['reference', 'PUT'], ['prepare', 'POST']]);
 });
 
@@ -38,12 +57,12 @@ test('without registration the full prompt is still sent; failed preparation kee
     fetch: async (url, options) => {
       if (url.endsWith('/reference')) return { ok: false, status: 500 };
       const request = JSON.parse(options.body);
-      sent.push(JSON.parse(request.messages[0].content).text);
+      sent.push(request.messages[0].content);
       return { ok: true, json: async () => ({ request_id: request.request_id, text: 'ok' }) };
     } });
   assert.deepEqual(await reject.prepareReference('docs'), { status: 'unregistered' });
   await reject.sendRequest([], 'docs\nstats');
-  assert.deepEqual(sent, ['docs\nstats']);
+  assert.deepEqual(sent, ['SYSTEM: docs\nstats']);
   const slow = new CielModel(null, 'http://localhost:8775', { token: 'session',
     fetch: async url => url.endsWith('/reference') ? { ok: true } : { ok: false, status: 504 } });
   const result = await slow.prepareReference('docs');

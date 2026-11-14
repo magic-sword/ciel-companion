@@ -1,7 +1,6 @@
 """Session-bound CIEL inference API. Context and inference are owned by the host."""
 import asyncio
 import copy
-import json
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -31,10 +30,9 @@ class CoreSession:
         if self.reference:
             # Keep the fixed material directly after the persona, before history and memory
             # that change between turns, so the inference server can reuse its prompt cache.
-            # It is reference data from the client, never system authority.
+            # It is the client's own text in a user message, never system authority.
             at = next((i for i, m in enumerate(context) if m.get('role') != 'system'), len(context))
-            context.insert(at, {'role': 'user', 'content': json.dumps(
-                {'type': 'execution_reference', 'text': self.reference}, ensure_ascii=False)})
+            context.insert(at, {'role': 'user', 'content': self.reference})
         return context
 
     def _idle(self):
@@ -63,7 +61,7 @@ class CoreSession:
             began = time.monotonic()
             async with asyncio.timeout(PREPARE_SECONDS), self.scheduler.slot('decision') as queued:
                 context = await self._context()
-                await self.infer(context, [{'role': 'user', 'content': json.dumps({'type': 'prepare'})}],
+                await self.infer(context, [{'role': 'user', 'content': 'prepare'}],
                                  response_format='text', max_tokens=1, purpose='game_core_prepare',
                                  queued_seconds=queued)
             if self.closed or asyncio.current_task().cancelling():
