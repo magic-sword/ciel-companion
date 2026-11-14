@@ -157,7 +157,9 @@ export class ActionManager {
         let output = bot.output;
         const MAX_OUT = 500;
         if (output.length > MAX_OUT) {
-            output = `Action output is very long (${output.length} chars) and has been shortened.\n
+            // The model gets the ends; the console keeps all of it for finding what went wrong.
+            console.log(`Full action output:\n${output}`);
+            output =`Action output is very long (${output.length} chars) and has been shortened.\n
           First outputs:\n${output.substring(0, MAX_OUT / 2)}\n...skipping many lines.\nFinal outputs:\n ${output.substring(output.length - MAX_OUT / 2)}`;
         }
         else {
