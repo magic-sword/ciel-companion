@@ -142,6 +142,6 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
             [id, () => obtainItem(bot, itemName, num, { choices: { ...choices, [step.item]: id } })])),
     };
     // The owner is asked only where the design says so: a fight with a mob that fights back.
-    const ask = ways.some(w => w.hostile && step.options.includes(w.id)) ? '; ask first before one that fights back' : '';
-    skills.log(bot, `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. Choose one with !chooseOption${ask}:\n${lines.join('\n')}`);
+    const ask = ways.some(w => w.hostile && step.options.includes(w.id)) ? ', and ask the owner first before one that fights back' : '';
+    skills.log(bot, `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. The choice is yours: reply with !chooseOption("id") using one id below${ask}.\n${lines.join('\n')}`);
 }
