@@ -6,7 +6,7 @@
 
 ## 責務を分ける
 
-Minecraftの依頼は、会話側で意図・能力・権限を確認して元の自然文をMindcraft本来のAgent.handleMessageへ渡す。上流のPrompter・History・SelfPrompter・NPC・命令実行器が判断と実行を担当し、CIEL中核APIをモデル接続先として注入する。CIEL独自のbrain・目標JSON・帰還ループと既存施工エンジンへの代替は使用しない。標準動作でうまくいかない箇所は報告し、利用者が使用感を確認してから拡張方針を決める。長い作業は、答えが決まる手順を上流NPCの`item_goal.js`を土台にした計画グラフの実行器（forkで拡張）が進め、LLMは入手方法の選択・失敗時の方針・持ち主への相談を判断する方向とし、判断は必要になった時点で遅延して聞く。設計と採用条件は[採用前の設計案](../games/minecraft/minecraft-long-horizon-ja.md)にまとめ、段階ごとに採用を判断する。中核APIは同じ人格・記憶・会話を共有するが、音声の表情タグや話し言葉の形式は実行判断へ付けない。[作業契約](../games/game-work-contract-ja.md)に自然文handoffと終了の意味を定める。
+Minecraftの依頼は、会話側で意図・能力・権限を確認して元の自然文をMindcraft本来のAgent.handleMessageへ渡す。上流のPrompter・History・SelfPrompter・NPC・命令実行器が判断と実行を担当し、CIEL中核APIをモデル接続先として注入する。CIEL独自のbrain・目標JSON・帰還ループと既存施工エンジンへの代替は使用しない。標準動作でうまくいかない箇所は報告し、利用者が使用感を確認してから拡張方針を決める。長い作業は、答えが決まる手順を上流NPCの`item_goal.js`を土台にした計画グラフの実行器（forkで拡張）が進め、LLMは入手方法の選択・失敗時の方針・持ち主への相談を判断する方向とし、判断は必要になった時点で遅延して聞く。アイテム以外の目標（農地・建築・整地）にも、観測で完了を確かめられる状態を節にした汎用の実行計画として広げる。厳密な計算は機械が行い、LLMには選択・判断を任せる。構造を書かせる場合はJSON Schemaで型を宣言したtool呼び出しで受けて検査する。期限は節ごとに持ち、全体はその積み上げにする。地形・建築は上流の設計図（`Blueprint`・`BuildGoal`）を土台にし、二重に実装しない。設計と採用条件は[採用前の設計案](../games/minecraft/minecraft-long-horizon-ja.md)にまとめ、段階ごとに採用を判断する。中核APIは同じ人格・記憶・会話を共有するが、音声の表情タグや話し言葉の形式は実行判断へ付けない。[作業契約](../games/game-work-contract-ja.md)に自然文handoffと終了の意味を定める。
 
 Minecraftの実行基盤はMindcraftの固定版を土台にする。CIELは認証済み入力、所有権、明示停止、Bot接続の寿命、アプリへの状態投影を担当する。スタンドアロンのMindServer・公開ゲームチャット受付・別TTSは起動しない。標準Agentの部品初期化を共用メソッドへ抽出し、モデル注入と命令観測の入口を追加する。Paper/Mineflayerの互換修正と取消後のI/O遮断は残すが、行動選択や移動戦略を既存CIELの技で上書きしない。出典と許諾は[第三者依存](third-party-dependencies.md)、動作と配布範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
 
