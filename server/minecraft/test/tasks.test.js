@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameTasks, CAPABILITIES } from '../src/ciel/tasks.js';
+import { GameTasks, CAPABILITIES, MAX_BUDGET_MS } from '../src/ciel/tasks.js';
 
 const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.pursue_goal',
   arguments: { request: 'Make a stone pickaxe' },
@@ -100,8 +100,8 @@ test('legacy construction is not advertised or substituted for native Agent exec
 
 test('one work may last up to the contract ceiling, and no longer', () => {
   const f = fixture();
-  assert.equal(f.work.submit(request({ request_id: 'too-long', budget_ms: 600001 })).reason, 'invalid_request');
-  const long = f.work.submit(request({ request_id: 'long', budget_ms: 600000 }));
+  assert.equal(f.work.submit(request({ request_id: 'too-long', budget_ms: MAX_BUDGET_MS + 1 })).reason, 'invalid_request');
+  const long = f.work.submit(request({ request_id: 'long', budget_ms: MAX_BUDGET_MS }));
   assert.notEqual(long.status, 'error');
   f.work.cancel(long.task_id, 'test');
 });
@@ -141,4 +141,21 @@ test('the owner speaks into a running work, and what the body says is told as it
   await wait(()=>work.active.state==='succeeded');
   assert.equal(work.tell(id,'more').reason,'not_running');
   work.close();
+});
+
+test('the estimate of a plan lengthens the work within the ceiling from its start, and never shortens it', async()=>{
+  let now=0;const {link,work}=fixture();work.clock=()=>now;let release;
+  link.runSkill=()=>new Promise(r=>{release=r;});
+  const id=work.submit(request({budget_ms:120000})).task_id;await wait(()=>release);
+  const op=work.active.operation;
+  now=60000;work.activity({request_id:op,stage:'estimate',seconds:900});
+  assert.equal(work.view().remaining_ms,900000);
+  assert.equal(work.view().evidence.estimate.seconds,900);
+  work.activity({request_id:op,stage:'estimate',seconds:10});
+  assert.equal(work.view().remaining_ms,900000,'never shorter');
+  work.activity({request_id:op,stage:'estimate',seconds:99999});
+  assert.equal(work.active.deadline,MAX_BUDGET_MS,'not past the ceiling from the start');
+  work.activity({request_id:'other',stage:'estimate',seconds:99999});
+  release({ok:true,note:{native_finished:true,objective_verified:false,response:'Done',inventory:{}}});
+  await wait(()=>work.active.state==='succeeded');work.close();
 });

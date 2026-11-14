@@ -18,7 +18,7 @@ import urllib.request
 from .drivers import BodyDriver, ConversationDriver, wait_body_released
 from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
-from .policy import VERSION as POLICY_VERSION, POLICIES, PROGRESS_RULE, Progress, budget, task_policy
+from .policy import VERSION as POLICY_VERSION, POLICIES, LONG_POLICIES, PROGRESS_RULE, Progress, budget, task_policy
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
@@ -321,7 +321,7 @@ async def run(args, *, clock=time.monotonic):
         tasks = [t for t in tasks if t['id'] in selected]
     else:
         # Long tasks have their own policy; they run only when named.
-        tasks = [t for t in tasks if task_policy(t) != 'long-horizon-v1']
+        tasks = [t for t in tasks if task_policy(t) not in LONG_POLICIES]
     if args.task and any(args.mode not in task.get('modes',['body','conversation']) for task in tasks):
         raise ValueError('Selected task does not support this mode')
     tasks = [t for t in tasks if args.mode in t.get('modes',['body','conversation'])]
@@ -334,10 +334,10 @@ async def run(args, *, clock=time.monotonic):
     password = os.environ.get('CIEL_BENCH_RCON_PASSWORD')
     if not password:
         raise ValueError('Set CIEL_BENCH_RCON_PASSWORD in the environment')
-    long_tasks = {task_policy(t) == 'long-horizon-v1' for t in tasks}
-    if len(long_tasks) > 1:
-        raise ValueError('Run long-horizon-v1 tasks separately from practical tasks')
-    policy = ('long-horizon-v1' if True in long_tasks else 'spatial-v1' if any(t.get('stage1') for t in tasks)
+    long_tasks = {task_policy(t) for t in tasks if task_policy(t) in LONG_POLICIES}
+    if long_tasks and (len(long_tasks) > 1 or any(task_policy(t) not in LONG_POLICIES for t in tasks)):
+        raise ValueError('Run each long policy separately from other tasks')
+    policy = (next(iter(long_tasks)) if long_tasks else 'spatial-v1' if any(t.get('stage1') for t in tasks)
               else POLICY_VERSION)
     args.max_llm = POLICIES[policy]['llm_calls'] if args.max_llm is None else args.max_llm
     args.max_calls = POLICIES[policy]['game_calls'] if args.max_calls is None else args.max_calls

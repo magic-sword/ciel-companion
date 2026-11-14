@@ -84,13 +84,21 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.env._call.await_args.args,
                          ('answer', {'task_id': 'task', 'decision_id': 'q', 'action': 'reply', 'message': 'The left one.'}))
 
+    async def test_a_work_the_game_lengthened_is_not_stopped_at_the_first_deadline(self):
+        await self.runner.start('puzzle.solve', {}, seconds=10)
+        first = self.runner._deadline
+        self.runner.accept({**self.remote, 'revision': 2, 'remaining_ms': 900000})
+        self.assertGreater(self.runner._deadline, first + 800)
+        self.runner.accept({**self.remote, 'revision': 3, 'remaining_ms': 1000})
+        self.assertGreater(self.runner._deadline, first + 800, 'an estimate never shortens the work')
+
     async def test_unsupported_version_and_invalid_budget_do_not_submit(self):
         self.env.profile['work']['version'] = 99
         self.assertEqual((await self.runner.start('puzzle.solve', {}))['reason'], 'work_protocol_mismatch')
         self.env._call.assert_not_awaited()
         self.env.profile['work']['version'] = 1
         self.assertEqual((await self.runner.start('puzzle.solve', {}, seconds=True))['reason'], 'invalid_budget')
-        self.assertEqual((await self.runner.start('puzzle.solve', {}, seconds=601))['reason'], 'invalid_budget')
+        self.assertEqual((await self.runner.start('puzzle.solve', {}, seconds=goals.MAX_SECONDS + 1))['reason'], 'invalid_budget')
         self.env._call.assert_not_awaited()
 
     async def test_transport_error_does_not_report_success(self):

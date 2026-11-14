@@ -127,8 +127,10 @@ class BodyDriver:
             return
         self.owner = ScriptedOwner(task, self.runner, self.trace)
         self._owner_task = asyncio.create_task(self.owner.run())
+        given = task.get('budget', {})
         self.task = asyncio.create_task(self.runner.start('minecraft.pursue_goal',
-            {'request': task['prompt']}, constraints={}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
+            {'request': task['prompt']}, constraints={}, title=task['prompt'],
+            seconds=given.get('submit_seconds', given.get('seconds', 90))))
 
     async def _region(self, task):
         import copy

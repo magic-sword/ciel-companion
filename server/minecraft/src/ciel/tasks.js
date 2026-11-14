@@ -13,9 +13,10 @@ const definitions = [{
 }];
 export const CAPABILITIES=definitions;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-// One work may run up to 10 minutes: long multi-step requests (an iron tool from scratch).
-// The conversation's handoff still asks for 120 s; only callers that need more pass more.
-export const MAX_BUDGET_MS = 600000;
+// One work may run up to 30 minutes: a house from nothing is wood, tools, a bed from sheep that
+// must be found, and a hundred blocks. The conversation's handoff asks for 120 s; a plan the
+// body makes may lengthen the work to its own estimate (estimate()), within this ceiling.
+export const MAX_BUDGET_MS = 1800000;
 const validId = s => typeof s === 'string' && s.length > 0 && s.length <= 160;
 // The owner's words handed into a work (a reply to its question, or a change of mind).
 const MESSAGE_CHARS = 2000;
@@ -83,15 +84,34 @@ export class GameTasks {
     if (!this.link.playing()) return { status: 'unavailable' };
     if (this.tasks.size >= 512) return { status: 'error', reason: 'session_request_limit' };
     const t = { id: randomUUID(), request: structuredClone(r), signature, revision: 0, state: 'accepted', reason: '',
-      evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, replies: 0, failures: new Map(), generation: 0,
+      evidence: {}, decision: null, started: this.clock(), deadline: this.clock() + r.budget_ms, repairs: 0, replies: 0, failures: new Map(), generation: 0,
       follow, followStopping: false };
     this.tasks.set(t.id, t); this.requests.set(r.request_id, t); this.active = t;
     // Reject beyond the history bound; never evict a request and execute its retry a second time.
     this.changed(t, 'accepted');
-    t.timer = setTimeout(() => { void this.cancel(t.id, 'deadline'); }, Math.max(1, r.budget_ms - Math.min(5000, r.budget_ms / 4)));
-    t.timer.unref?.();
+    this.arm(t);
     void this.run(t);
     return this.view(t);
+  }
+
+  // The stop before the deadline leaves time to confirm the body has stopped.
+  arm(t) {
+    clearTimeout(t.timer);
+    const left = t.deadline - this.clock();
+    t.timer = setTimeout(() => { void this.cancel(t.id, 'deadline'); }, Math.max(1, left - Math.min(5000, left / 4)));
+    t.timer.unref?.();
+  }
+
+  // The body's plan says how long its remaining steps take (the sum of each step's own time, from
+  // the plan graph). The work may last that long from now, within the ceiling from its start; an
+  // estimate never shortens a work, and a failure never lengthens it.
+  estimate(t, seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    const deadline = Math.min(t.started + MAX_BUDGET_MS, this.clock() + seconds * 1000);
+    if (deadline <= t.deadline) return;
+    t.deadline = deadline;
+    this.arm(t);
+    this.changed(t, 'running', '', { ...t.evidence, estimate: { seconds: Math.round(seconds) } });
   }
 
   current(t, generation) { return !this.closed && this.active === t && t.generation === generation && t.state === 'running'; }
@@ -105,6 +125,7 @@ export class GameTasks {
       if(text)this.link.notice({kind:'work_message',task_id:t.id,revision:t.revision,text});
       return;
     }
+    if(event.stage==='estimate')return this.estimate(t,Number(event.seconds));
     if(!['thinking','executing','returning'].includes(event.stage))return;
     const activity={stage:event.stage,command:String(event.command??'').slice(0,64)};
     this.link.notice({kind:'work_activity',task_id:t.id,...activity});

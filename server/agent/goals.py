@@ -9,8 +9,9 @@ import debug_log
 
 TOPIC = 'ciel.goal'
 TERMINAL = frozenset(('succeeded', 'failed', 'cancelled'))
-# The work contract's ceiling for one work (the game enforces the same limit).
-MAX_SECONDS = 600
+# The work contract's ceiling for one work (the game enforces the same limit). The game may
+# lengthen a work to its plan's estimate within it; the client follows remaining_ms.
+MAX_SECONDS = 1800
 # The owner's words handed to a work (the game enforces the same limit).
 MAX_MESSAGE = 2000
 ACTIVE = frozenset(('accepted', 'running', 'needs_decision', 'cancelling'))
@@ -96,6 +97,7 @@ class GoalRunner:
         self.work = dict(w)
         self._unknown = False
         self._confirmed_at = time.monotonic()
+        self._follow_deadline(w)
         debug_log.record('work_state', work=w)
         self._publish()
         if w['state'] in TERMINAL or w['state'] == 'needs_decision':
@@ -106,6 +108,12 @@ class GoalRunner:
                 fact = {k: w.get(k) for k in ('task_id', 'state', 'message', 'reason', 'decision')}
                 self.say('game', settle=0.2, instructions=json.dumps({'work_result': fact, 'title': self.title}, ensure_ascii=False), merge=True)
         return True
+
+    def _follow_deadline(self, w):
+        """A work the game lengthened (its plan's estimate) is not stopped at the first deadline."""
+        remaining = w.get('remaining_ms')
+        if w['state'] not in TERMINAL and type(remaining) in (int, float):
+            self._deadline = max(self._deadline, time.monotonic() + min(remaining / 1000, MAX_SECONDS))
 
     async def _poll(self, task_id):
         try:

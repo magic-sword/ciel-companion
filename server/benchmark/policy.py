@@ -7,9 +7,14 @@ VERSION = 'practical-v1'
 # Long multi-step tasks (an iron tool from scratch) cannot fit practical-v1's 60-120 s; they
 # run under their own deadlines and are never compared with practical-v1 numbers.
 LONG_VERSION = 'long-horizon-v1'
+# Works whose plan lengthens them (a house from nothing): submitted with the conversation's
+# handoff, judged against the work contract's 30-minute ceiling.
+PLANNED_VERSION = 'planned-work-v1'
+LONG_POLICIES = (LONG_VERSION, PLANNED_VERSION)
 POLICIES = {VERSION: {'seconds': (1, 120), 'llm_calls': 30, 'game_calls': 80},
             'spatial-v1': {'seconds': (1, 120), 'llm_calls': 30, 'game_calls': 80},
-            LONG_VERSION: {'seconds': (121, 600), 'llm_calls': 80, 'game_calls': 200}}
+            LONG_VERSION: {'seconds': (121, 600), 'llm_calls': 80, 'game_calls': 200},
+            PLANNED_VERSION: {'seconds': (601, 1800), 'llm_calls': 200, 'game_calls': 600}}
 # Inventory progress: any tracked item above the previous observation, so re-gathering what
 # was consumed counts. Until 2026-11-13 an item had to exceed its highest count so far.
 PROGRESS_RULE = 'inventory_gain_since_last_observation'
@@ -31,7 +36,12 @@ def task_policy(task):
 
 
 def budget(task, cap=None):
-    result = {**DEFAULT, **task.get('budget',{})}
+    # submit_seconds: the budget the work is submitted with, when the plan is to lengthen it.
+    given = {k: v for k, v in task.get('budget',{}).items() if k != 'submit_seconds'}
+    submit = task.get('budget',{}).get('submit_seconds')
+    if submit is not None and (isinstance(submit,bool) or not isinstance(submit,(int,float)) or not 0 < submit <= given.get('seconds',0)):
+        raise ValueError('submit_seconds must be positive and within the task deadline')
+    result = {**DEFAULT, **given}
     if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v <= 0
            for v in result.values()):
         raise ValueError('Task budgets must be finite and positive')

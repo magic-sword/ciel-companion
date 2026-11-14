@@ -37,7 +37,8 @@ class HouseTaskTest(unittest.TestCase):
 
     def test_the_suite_task_hides_the_sheep_at_the_end_of_a_narrow_lane(self):
         task = next(t for t in load_tasks() if t['id'] == 'long_dirt_shelter')
-        self.assertEqual((task['policy'], task['mobs'], task['house']), ('long-horizon-v1', {'sheep': 3}, {'plan': 'dirt_shelter', 'pasture': True}))
+        self.assertEqual(task['budget']['submit_seconds'], 120)
+        self.assertEqual((task['policy'], task['mobs'], task['house']), ('planned-work-v1', {'sheep': 3}, {'plan': 'dirt_shelter', 'pasture': True}))
         self.assertLess(LANE_Z[1] - LANE_Z[0] + 1, 5, 'too narrow for the house')
         self.assertGreater(PASTURE[0], 26 + 64, 'out of sight from the trees')
         house = layout(random.Random(11), 1, 'dirt_shelter')

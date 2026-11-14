@@ -139,6 +139,9 @@ export class MindcraftRunner extends BodyCommands {
     agent.bot=bot;
     this.trackReplies(agent);
     agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};
+    // A plan's own estimate of its remaining time, for the work's deadline (ciel/tasks.js).
+    bot.reportEstimate=seconds=>{const c=this.current;if(c&&!c.token.cancelled)this.report('activity',{id:c.id,
+      request_id:c.request_id,command_scope:c.scope??'',stage:'estimate',command:'',seconds:Math.round(seconds)});};
     agent.task=new Task(agent,null,Date.now());
     const { VisionInterpreter }=await import('../vendor/mindcraft/src/agent/vision/vision_interpreter.js');
     agent.vision_interpreter=new VisionInterpreter(agent,false);
