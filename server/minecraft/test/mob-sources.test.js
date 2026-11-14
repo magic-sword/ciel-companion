@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import minecraftData from 'minecraft-data';
 import { Vec3 } from 'vec3';
 import { MOBS, WOOL_COLORS, mobWays } from '../src/vendor/mindcraft/src/agent/library/mobs.js';
-import { suitable } from '../src/vendor/mindcraft/src/agent/library/hunt.js';
+import { suitable, untilSpawn, neverSpawns } from '../src/vendor/mindcraft/src/agent/library/hunt.js';
 import { obtainItem } from '../src/vendor/mindcraft/src/agent/library/obtain.js';
 import { getCraftingActions, useVersion } from '../src/vendor/mindcraft/src/utils/mcdata.js';
 
@@ -75,9 +75,22 @@ test('obtaining an item with several ways lists them with costs and waits for a 
   assert.match(bot.output, /kill:sheep: about 3 sheep needed, 2 suitable sheep seen nearby/);
   assert.match(bot.output, /shear:sheep: about 2 sheep needed, 1 suitable sheep seen nearby, a shears to make first, the sheep stay/);
   // The choice that follows says which of its ways can be done from here.
-  assert.match(bot.output, /make: craft or mine white_wool instead \(\d+ steps in all, then a choice for string: kill:spider \(no spider seen, fights back\), make \(no [a-z_ ]*cobweb in sight\)\)/);
+  assert.match(bot.output, /make: craft or mine white_wool instead \(\d+ steps in all, then a choice for string: kill:spider \((?:[a-z_ ]+ to look for, )?spider to look for, fights back\), make \([a-z_ ]*cobweb to look for\)\)/);
   // A way that needs a block not in sight says so (here no iron ore for the shears), and the
   // whole choice is kept for the model to read even when the output is shortened.
-  assert.match(bot.output, /shear:sheep: .*cannot be done here: no [a-z_ ]*iron_ore[a-z_ ]* in sight to mine/);
+  assert.match(bot.output, /shear:sheep: .*iron_ore[a-z_ ]* not in sight, so I look for it first/);
   assert.match(bot.pendingChoice.text, /Choose one with !chooseOption\("id"\) using an id below and tell the owner in a few words which way you took, or ask the owner/);
+});
+
+test('a mob of the night is waited for, met with a sword, and on peaceful difficulty never comes', () => {
+  assert.equal(untilSpawn({ time: { timeOfDay: 6000 } }, 'spider'), 350);
+  assert.equal(untilSpawn({ time: { timeOfDay: 18000 } }, 'spider'), 0);
+  assert.equal(untilSpawn({ time: { timeOfDay: 6000 } }, 'sheep'), 0);
+  assert.equal(neverSpawns({ game: { difficulty: 'peaceful' } }, 'spider'), true);
+  assert.equal(neverSpawns({ game: { difficulty: 'normal' } }, 'spider'), false);
+  assert.equal(neverSpawns({ game: { difficulty: 'peaceful' } }, 'sheep'), false);
+  const plan = getCraftingActions('string', 2, {}, false, { string: 'kill:spider' });
+  assert.ok(plan.some(a => a.type === 'craft' && a.item === 'wooden_sword'), 'a sword is made first');
+  assert.equal(plan.at(-1).type, 'mob');
+  assert.ok(!getCraftingActions('string', 2, { stone_sword: 1 }, false, { string: 'kill:spider' }).some(a => a.item === 'wooden_sword'));
 });
