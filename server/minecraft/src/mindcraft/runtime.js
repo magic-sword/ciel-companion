@@ -79,6 +79,17 @@ export class MindcraftRunner extends BodyCommands {
     this.owner = owner;
     this.bot = null;
     this.modeActions = new Set();
+    this.replying = 0;
+  }
+
+  // A mode that interrupts an action (unstuck, self-defence) asks the model again on its own,
+  // outside the work's first message. The work is not over until those replies are handled.
+  trackReplies(agent) {
+    const handleMessage = agent.handleMessage.bind(agent);
+    agent.handleMessage = async (...args) => {
+      this.replying++;
+      try { return await handleMessage(...args); } finally { this.replying--; }
+    };
   }
 
   attach(bot) {
@@ -122,6 +133,7 @@ export class MindcraftRunner extends BodyCommands {
     this.referenceTemplate=layout.reference;
     this.agent=agent;
     agent.bot=bot;
+    this.trackReplies(agent);
     agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};
     agent.task=new Task(agent,null,Date.now());
     const { VisionInterpreter }=await import('../vendor/mindcraft/src/agent/vision/vision_interpreter.js');
@@ -205,7 +217,7 @@ export class MindcraftRunner extends BodyCommands {
     // The upstream loop owns interpretation, history, commands and recovery.
     await this.agent.handleMessage(this.owner || 'user',c.args.request);
     while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
-        || this.agent.self_prompter.isActive())) await pause(100);
+        || this.agent.self_prompter.isActive() || this.modeActions.size || this.replying)) await pause(100);
     if(c.token.cancelled)throw new Failed(c.token.reason??'stopped');
     return {native_finished:true,objective_verified:false,response:this.nativeResponse,
       inventory:inventory(this.bot)};

@@ -118,3 +118,32 @@ test('the upstream restart after smelting resyncs the inventory instead of disco
   await hung('Safely restarting to update inventory.');
   assert.equal(stops.length, 1);
 });
+
+test('a work waits for the reply a mode asks for after interrupting its action', async () => {
+  const runner = new MindcraftRunner(() => {}, null);
+  const order = [];
+  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false },
+    async handleMessage(source, text) {
+      if (source === 'system') {
+        await new Promise(r => setTimeout(r, 300));
+        order.push('reply'); runner.nativeResponse = 'carried on';
+        return;
+      }
+      order.push('first');
+      // The unstuck mode runs as its own action, then calls handleMessage, awaited by no one.
+      const mode = new Promise(r => setTimeout(r, 150));
+      runner.modeActions.add(mode);
+      mode.then(() => runner.modeActions.delete(mode));
+      void mode.then(() => agent.handleMessage('system', '(AUTO MESSAGE) interrupted by unstuck'));
+    } };
+  runner.agent = agent;
+  runner.trackReplies(agent);
+  runner.coreModel = {};
+  runner.activity = () => {};
+  runner.bot = { inventory: { items: () => [] } };
+  const pending = runner.pursue({ args: { request: 'make a farm' }, token: { cancelled: false } });
+  await new Promise(r => setTimeout(r, 10));
+  const result = await pending;
+  assert.deepEqual(order, ['first', 'reply']);
+  assert.equal(result.response, 'carried on');
+});
