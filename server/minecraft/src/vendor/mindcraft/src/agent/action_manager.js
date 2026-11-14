@@ -161,6 +161,8 @@ export class ActionManager {
             console.log(`Full action output:\n${output}`);
             output =`Action output is very long (${output.length} chars) and has been shortened.\n
           First outputs:\n${output.substring(0, MAX_OUT / 2)}\n...skipping many lines.\nFinal outputs:\n ${output.substring(output.length - MAX_OUT / 2)}`;
+            // A plan waiting on a choice needs its options read in full, wherever they were.
+            if (bot.pendingChoice?.text) output += `\nWaiting for your choice:\n${bot.pendingChoice.text}`;
         }
         else {
             output = 'Action output:\n' + output.toString();

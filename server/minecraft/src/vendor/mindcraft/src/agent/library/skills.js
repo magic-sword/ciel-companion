@@ -452,6 +452,20 @@ export function haltMovement(bot) {
 const COLLECT_SECONDS = 15;
 const MAX_SKIPPED = 3;
 
+/** The blocks collectBlock digs for blockType: its ores, deepslate ores, grass for dirt, stone for cobblestone. */
+export function blockSources(blockType) {
+    let blocktypes = [blockType];
+    if (blockType === 'coal' || blockType === 'diamond' || blockType === 'emerald' || blockType === 'iron' || blockType === 'gold' || blockType === 'lapis_lazuli' || blockType === 'redstone')
+        blocktypes.push(blockType+'_ore');
+    if (blockType.endsWith('ore'))
+        blocktypes.push('deepslate_'+blockType);
+    if (blockType === 'dirt')
+        blocktypes.push('grass_block');
+    if (blockType === 'cobblestone')
+        blocktypes.push('stone');
+    return blocktypes;
+}
+
 export async function collectBlock(bot, blockType, num=1, exclude=null) {
     /**
      * Collect one of the given block type.
@@ -467,15 +481,7 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
         log(bot, `Invalid number of blocks to collect: ${num}.`);
         return false;
     }
-    let blocktypes = [blockType];
-    if (blockType === 'coal' || blockType === 'diamond' || blockType === 'emerald' || blockType === 'iron' || blockType === 'gold' || blockType === 'lapis_lazuli' || blockType === 'redstone')
-        blocktypes.push(blockType+'_ore');
-    if (blockType.endsWith('ore'))
-        blocktypes.push('deepslate_'+blockType);
-    if (blockType === 'dirt')
-        blocktypes.push('grass_block');
-    if (blockType === 'cobblestone')
-        blocktypes.push('stone');
+    let blocktypes = blockSources(blockType);
     const isLiquid = blockType === 'lava' || blockType === 'water';
 
     let collected = 0, skipped = 0;

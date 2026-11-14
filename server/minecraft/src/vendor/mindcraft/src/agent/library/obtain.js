@@ -124,7 +124,9 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         const chosen = { ...choices, [step.item]: id };
         const plan = mc.getCraftingActions(itemName, num, inventory, tableAvailable, chosen) || [];
         const further = plan.some(a => a.type === 'choose') ? ', then another choice' : '';
-        if (id === 'make') return `make: craft or mine ${step.item} instead (${plan.length} steps in all${further})`;
+        const unseen = unseenSources(bot, plan);
+        const missing = unseen.length ? `, no ${unseen.join(' or ')} seen nearby to mine` : '';
+        if (id === 'make') return `make: craft or mine ${step.item} instead (${plan.length} steps in all${missing}${further})`;
         const way = ways.find(w => w.id === id);
         const seen = countSuitable(bot, way);
         const facts = [`about ${mobsNeeded(way, step.count)} ${way.mob} needed`,
@@ -132,16 +134,25 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         if (way.tool && !(inventory[way.tool] > 0)) facts.push(`a ${way.tool} to make first`);
         if (way.stays) facts.push(`the ${way.mob} stay`);
         if (way.hostile) facts.push('it fights back');
+        if (unseen.length) facts.push(`no ${unseen.join(' or ')} seen nearby to mine`);
         facts.push(`${plan.length} steps in all${further}`);
         const notes = [MOBS[way.mob].methods[way.method].note, MOBS[way.mob].spawn.note].filter(Boolean).join(' ');
         return `${id}: ${facts.join(', ')}. ${notes}`.trim();
     });
+    // The owner is asked only where the design says so: a fight with a mob that fights back.
+    const ask = ways.some(w => w.hostile && step.options.includes(w.id)) ? ', and ask the owner first before one that fights back' : '';
+    const text = `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. The choice is yours: reply with !chooseOption("id") using one id below${ask}.\n${lines.join('\n')}`;
     bot.pendingChoice = {
         question: `how to get ${step.count} ${step.item}`,
+        text,
         options: Object.fromEntries(step.options.map(id =>
             [id, () => obtainItem(bot, itemName, num, { choices: { ...choices, [step.item]: id } })])),
     };
-    // The owner is asked only where the design says so: a fight with a mob that fights back.
-    const ask = ways.some(w => w.hostile && step.options.includes(w.id)) ? ', and ask the owner first before one that fights back' : '';
-    skills.log(bot, `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. The choice is yours: reply with !chooseOption("id") using one id below${ask}.\n${lines.join('\n')}`);
+    skills.log(bot, text);
+}
+
+// Blocks a plan would mine that are not within 64 blocks, so a way that cannot be done here shows.
+function unseenSources(bot, plan) {
+    const sources = [...new Set(plan.filter(a => a.type === 'mine').map(a => a.source))];
+    return sources.filter(source => !world.getNearestBlock(bot, skills.blockSources(source), 64));
 }

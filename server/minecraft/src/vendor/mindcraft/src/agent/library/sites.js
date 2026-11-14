@@ -80,11 +80,12 @@ export function describeSites(sites) {
  */
 export async function atSite(bot, sites, limit, what, go) {
     if (sites[0].changes <= limit) return await go(sites[0]);
+    const text = `Every place needs the land changed. Choose where to make ${what} with !chooseOption, or ask first:\n${describeSites(sites)}`;
     bot.pendingChoice = {
         question: `where to make ${what}`,
+        text,
         options: Object.fromEntries(sites.map(site => [site.id, () => go(site)])),
     };
-    skills.log(bot, `Every place needs the land changed. Choose where to make ${what} with !chooseOption, or ask first:
-${describeSites(sites)}`);
+    skills.log(bot, text);
     return false;
 }
