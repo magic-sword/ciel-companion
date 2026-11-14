@@ -28,6 +28,21 @@ export function blockedActions(env = process.env) {
   return [...new Set([...defaultSettings.blocked_actions, ...extra])];
 }
 
+// Upstream Mindcraft restarts its process after a successful !smeltItem only to refresh the
+// inventory. CIEL owns the connection, so it resyncs the inventory window and keeps playing;
+// every other exit request still stops the body.
+const INVENTORY_RESTART = 'Safely restarting to update inventory.';
+export function nativeExit(bot, stop, timeoutMs = 3000) {
+  return msg => {
+    if (msg !== INVENTORY_RESTART) return stop(msg);
+    if (typeof bot._syncWindow !== 'function') return;
+    let timer;
+    const expired = new Promise(resolve => { timer = setTimeout(resolve, timeoutMs); });
+    return Promise.race([bot._syncWindow(bot.inventory), expired])
+      .catch(e => console.warn('Inventory resync failed:', e.message)).finally(() => clearTimeout(timer));
+  };
+}
+
 export function createMindcraftBot(options) {
   setSettings({ ...defaultSettings, ...options, blocked_actions: blockedActions(), minecraft_version: options.version });
   return initBot(options.username);
@@ -116,7 +131,7 @@ export class MindcraftRunner extends BodyCommands {
     blacklistCommands(agent.blocked_actions);
     // Transport and process lifecycle belong to CIEL; planning belongs to Agent.
     agent.openChat=async message=>{this.nativeResponse=String(message).trim();};
-    agent.cleanKill=()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');};
+    agent.cleanKill=nativeExit(bot,()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');});
     const requestInterrupt=agent.requestInterrupt.bind(agent);
     agent.requestInterrupt=()=>{requestInterrupt();this.actionScope.interrupt();};
     const nativeRun=agent.actions.runAction.bind(agent.actions);

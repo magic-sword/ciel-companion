@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ActionScope } from '../src/mindcraft/action-scope.js';
-import { MindcraftRunner, blockedActions } from '../src/mindcraft/runtime.js';
+import { MindcraftRunner, blockedActions, nativeExit } from '../src/mindcraft/runtime.js';
 import { protectWorld } from '../src/mindcraft/protection.js';
 import { Vec3 } from 'vec3';
 import { parseCommand } from '../src/protocol.js';
@@ -104,4 +104,17 @@ test('the benchmark body can block extra Mindcraft commands, such as the plan ex
   assert.ok(!defaults.includes('!obtainItem'));
   assert.deepEqual(blockedActions({ CIEL_MINDCRAFT_BLOCKED_ACTIONS: ' !obtainItem, ' }), [...defaults, '!obtainItem']);
   assert.throws(() => blockedActions({ CIEL_MINDCRAFT_BLOCKED_ACTIONS: 'obtainItem' }), /Invalid/);
+});
+
+test('the upstream restart after smelting resyncs the inventory instead of disconnecting', async () => {
+  const stops = [], synced = [];
+  const bot = { inventory: { id: 0 }, _syncWindow: async window => { synced.push(window.id); } };
+  const exit = nativeExit(bot, msg => stops.push(msg));
+  await exit('Safely restarting to update inventory.');
+  assert.deepEqual([stops, synced], [[], [0]]);
+  exit('Infinite action loop detected, shutting down.');
+  assert.deepEqual(stops, ['Infinite action loop detected, shutting down.']);
+  const hung = nativeExit({ inventory: { id: 0 }, _syncWindow: () => new Promise(() => {}) }, msg => stops.push(msg), 10);
+  await hung('Safely restarting to update inventory.');
+  assert.equal(stops.length, 1);
 });
