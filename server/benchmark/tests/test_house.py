@@ -22,8 +22,10 @@ class HouseTaskTest(unittest.TestCase):
                 for goal in house['goal_layouts']:
                     self.assertEqual({y for _, y, _, _ in goal}, {62, 63, 64, 65})
                     self.assertTrue(all(x1 <= x <= x2 and z1 <= z <= z2 for x, _, z, _ in goal))
-                px1, pz1, px2, pz2 = house['pile']
-                self.assertLess((px2 - px1 + 1) * (pz2 - pz1 + 1), 30, 'the pile is no place to build')
+                dx1, dz1, dx2, dz2 = house['dirt']
+                self.assertLess(min(dx2 - dx1, dz2 - dz1) + 1, 5, 'the dirt is no place to build')
+                self.assertGreaterEqual((dx2 - dx1 + 1) * (dz2 - dz1 + 1), 50, 'enough dirt for the walls and roof')
+                self.assertTrue(dz2 < -16, 'clear of the ores')
 
     def test_generic_blocks_accept_every_kind_the_body_may_place(self):
         goal = cells(load('dirt_shelter'), (0, 63, 0), 0)

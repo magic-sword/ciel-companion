@@ -2,8 +2,9 @@
 
 The arena surface is stone with one grass patch exactly the size of the house, so the place is
 fixed (the body builds on grass or dirt) and the result is read cell by cell for each way the
-house can be turned to fit the patch. A dirt pile smaller than the house gives dirt without
-being a place to build. The plans need a bed: with a pasture, the sheep are out of sight at the
+house can be turned to fit the patch. Dirt comes from a place too narrow for the house, without
+being a place to build: a strip of surface dirt four wide, as dirt is dug from the ground (a
+dirt mound stalls the body, see the results). The plans need a bed: with a pasture, the sheep are out of sight at the
 end of a lane four blocks wide beyond the arena wall (too narrow to build on), so the body has
 to look for them.
 """
@@ -65,7 +66,7 @@ def cells(plan, corner, turns):
 
 
 def layout(rng, side, name):
-    """The patch on the side away from the trees (side is the trees' x direction), the dirt pile
+    """The patch on the side away from the trees (side is the trees' x direction), the dirt strip
     beyond the trees' rows, and the goal cells for each turn of the house that fits the patch."""
     plan = load(name)
     width, depth = footprint(plan)
@@ -74,19 +75,19 @@ def layout(rng, side, name):
     xs = sorted(away*(8 + offset + i) for i in range(width))
     z0 = rng.randint(-4, 4 - depth + 1)
     patch = (xs[0], z0, xs[-1], z0 + depth - 1)
-    pile_x = sorted(side*(3 + i) for i in range(5))
-    pile = (pile_x[0], -23, pile_x[-1], -19)
+    strip_x = sorted(side*(3 + i) for i in range(14))
+    dirt = (strip_x[0], -23, strip_x[-1], -20)
     corner = (patch[0], 63, patch[1])
     goals = [cells(plan, corner, turns) for turns in range(4) if footprint(plan, turns) == (width, depth)]
-    return {'plan': name, 'patch': patch, 'pile': pile, 'goal_layouts': goals}
+    return {'plan': name, 'patch': patch, 'dirt': dirt, 'goal_layouts': goals}
 
 
 def commands(house, pasture):
     """Fixture commands, after the stone surface is laid."""
     x1, z1, x2, z2 = house['patch']
-    px1, pz1, px2, pz2 = house['pile']
+    dx1, dz1, dx2, dz2 = house['dirt']
     out = [f'fill {x1} 63 {z1} {x2} 63 {z2} minecraft:grass_block',
-           f'fill {px1} 64 {pz1} {px2} 66 {pz2} minecraft:dirt']
+           f'fill {dx1} 63 {dz1} {dx2} 63 {dz2} minecraft:dirt']
     if pasture:
         # Reset the land beyond the arena wall (other fixtures change it), then the lane and pasture.
         out.append(f'forceload add {LANE_X[0]} -17 {FAR_END} 17')
@@ -105,8 +106,8 @@ def commands(house, pasture):
 def checks(house, pasture):
     """Blocks that must be in place after the fixture, as (x, y, z, block)."""
     x1, z1, _, _ = house['patch']
-    px1, pz1, _, _ = house['pile']
-    out = [(x1, 63, z1, 'grass_block'), (px1, 66, pz1, 'dirt')]
+    dx1, dz1, _, _ = house['dirt']
+    out = [(x1, 63, z1, 'grass_block'), (dx1, 63, dz1, 'dirt')]
     if pasture:
         out += [(LANE_X[0], 63, LANE_Z[0], 'grass_block'), (LANE_X[0], 64, LANE_Z[0], 'air'), (PASTURE[0], 63, PASTURE[1], 'grass_block')]
     return out
