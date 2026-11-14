@@ -498,14 +498,18 @@ export function getCraftingActions(targetItem, count = 1, current_inventory = {}
     return buildPlan(targetItem, count, current_inventory, tableAvailable, choices).actions;
 }
 
+// tableAvailable: whether a crafting table can be used, or { crafting_table, furnace } for every
+// station that can be used without making one (carried, nearby or at the base).
 function buildPlan(targetItem, count, current_inventory, tableAvailable, choices = {}) {
+    const stations = tableAvailable !== null && typeof tableAvailable === 'object' ? { ...tableAvailable }
+        : { crafting_table: tableAvailable ?? (current_inventory['crafting_table'] || 0) > 0 };
+    tableAvailable = Boolean(stations.crafting_table);
     // A plan that needs a crafting table must also budget for one when none is
     // carried or nearby; otherwise it under-counts the base materials.
-    tableAvailable ??= (current_inventory['crafting_table'] || 0) > 0;
-    const probe = craftItem(targetItem, count, { ...current_inventory }, {}, { required: {}, steps: [], leftovers: {}, choices });
+    const probe = craftItem(targetItem, count, { ...current_inventory }, {}, { required: {}, steps: [], leftovers: {}, choices, stations });
     const inventory = { ...current_inventory };
     const leftovers = {};
-    let plan = { required: {}, steps: [], leftovers: {}, actions: [], choices };
+    let plan = { required: {}, steps: [], leftovers: {}, actions: [], choices, stations };
     if (probe.needsTable && !tableAvailable && targetItem !== 'crafting_table')
         plan = craftItem('crafting_table', 1, inventory, leftovers, plan);
     return craftItem(targetItem, count, inventory, leftovers, plan);
@@ -547,7 +551,7 @@ function hasAny(items, inventory, leftovers, crafted) {
 
 // Make one item (a tool or a station) once for the plan unless one is already available.
 function ensureOne(item, alternatives, inventory, leftovers, crafted) {
-    if (hasAny(alternatives, inventory, leftovers, crafted)) return;
+    if (crafted.stations?.[item] || hasAny(alternatives, inventory, leftovers, crafted)) return;
     craftItem(item, 1, inventory, leftovers, crafted);
     crafted.made.add(item);
 }

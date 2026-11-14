@@ -1,5 +1,6 @@
 import * as mc from "../../utils/mcdata.js";
 import * as world from "./world.js";
+import { baseStation, atHome } from "./base.js";
 import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
 import settings from "../../../settings.js";
@@ -54,18 +55,31 @@ function toolHint(blockName) {
         : ` It needs a ${tool} or better.`;
 }
 
-// Take back a crafting table this craft placed, and wait until it is in the inventory: the next
-// plan is made from the inventory at once, and a table still lying on the ground made it craft
-// another one.
-async function recoverTable(bot, waitMs = 3000) {
-    const count = () => world.getInventoryCounts(bot)['crafting_table'] || 0;
+// Take back a station (crafting table, furnace) this step placed, and wait until it is in the
+// inventory: the next plan is made from the inventory at once, and a table still lying on the
+// ground made it craft another one. One placed at the base's home stays there as the base's.
+async function recoverStation(bot, name, placed, waitMs = 3000) {
+    if (placed && atHome(bot, name, placed)) {
+        log(bot, `Left the ${name} at the base.`);
+        return;
+    }
+    const count = () => world.getInventoryCounts(bot)[name] || 0;
     const before = count();
-    await collectBlock(bot, 'crafting_table', 1);
+    await collectBlock(bot, name, 1);
     for (const until = Date.now() + waitMs; count() <= before && Date.now() < until && !bot.interrupt_code;) {
         await pickupNearbyItems(bot);
         if (count() <= before) await new Promise(resolve => setTimeout(resolve, 200));
     }
-    if (count() <= before) log(bot, `The crafting table was not picked up.`);
+    if (count() <= before) log(bot, `The ${name} was not picked up.`);
+}
+
+// Walk to the base's station when there is none nearby and none carried; null when there is none.
+async function goToBaseStation(bot, name, range) {
+    const at = baseStation(bot, name);
+    if (!at) return null;
+    log(bot, `Using the ${name} at the base.`);
+    await goToPosition(bot, at.x, at.y, at.z, 3);
+    return world.getNearestBlock(bot, name, range);
 }
 
 export async function craftRecipe(bot, itemName, num=1) {
@@ -108,8 +122,12 @@ export async function craftRecipe(bot, itemName, num=1) {
                 }
             }
             else {
-                log(bot, `Crafting ${itemName} requires a crafting table.${obtainHint(itemName, num)}`)
-                return false;
+                craftingTable = await goToBaseStation(bot, 'crafting_table', craftingTableRange);
+                if (!craftingTable) {
+                    log(bot, `Crafting ${itemName} requires a crafting table.${obtainHint(itemName, num)}`)
+                    return false;
+                }
+                recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, craftingTable);
             }
         }
         else {
@@ -118,7 +136,7 @@ export async function craftRecipe(bot, itemName, num=1) {
     }
     if (!recipes || recipes.length === 0) {
         log(bot, `You do not have the resources to craft a ${itemName}. It requires: ${Object.entries(mc.getItemCraftingRecipes(itemName)[0][0]).map(([key, value]) => `${key}: ${value}`).join(', ')}.${obtainHint(itemName, num)}`);
-        if (placedTable) await recoverTable(bot);
+        if (placedTable) await recoverStation(bot, 'crafting_table', craftingTable?.position);
         return false;
     }
     
@@ -136,7 +154,7 @@ export async function craftRecipe(bot, itemName, num=1) {
     await bot.craft(recipe, Math.min(craftLimit.num, num), craftingTable);
     if(craftLimit.num<num) log(bot, `Not enough ${craftLimit.limitingResource} to craft ${num}, crafted ${craftLimit.num}. You now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
     else log(bot, `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
-    if (placedTable) await recoverTable(bot);
+    if (placedTable) await recoverStation(bot, 'crafting_table', craftingTable?.position);
 
     //Equip any armor the bot may have crafted.
     //There is probablly a more efficient method than checking the entire inventory but this is all mineflayer-armor-manager provides. :P
@@ -200,6 +218,7 @@ export async function smeltItem(bot, itemName, num=1) {
             furnaceBlock = world.getNearestBlock(bot, 'furnace', furnaceRange);
             placedFurnace = true;
         }
+        else furnaceBlock = await goToBaseStation(bot, 'furnace', furnaceRange);
     }
     if (!furnaceBlock){
         log(bot, `There is no furnace nearby and you have no furnace.`)
@@ -288,9 +307,7 @@ export async function smeltItem(bot, itemName, num=1) {
 
     await bot.closeWindow(furnace);
 
-    if (placedFurnace) {
-        await collectBlock(bot, 'furnace', 1);
-    }
+    if (placedFurnace) await recoverStation(bot, 'furnace', furnaceBlock?.position);
     if (total === 0) {
         log(bot, `Failed to smelt ${itemName}.`);
         return false;
