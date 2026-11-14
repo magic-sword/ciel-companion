@@ -18,7 +18,7 @@ import urllib.request
 from .drivers import BodyDriver, ConversationDriver, wait_body_released
 from .report import metrics, write_reports
 from .world import Rcon, World, achieved, stable
-from .policy import VERSION as POLICY_VERSION, PROGRESS_RULE, Progress, budget
+from .policy import VERSION as POLICY_VERSION, POLICIES, PROGRESS_RULE, Progress, budget, task_policy
 from .navigation import evaluate_navigation, validate_navigation, task_items, prepare_navigation
 from .distractors import configuration as distractor_configuration
 from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
@@ -50,6 +50,9 @@ class Trace:
         return [e for e in self.events if e['phase'] == 'execution']
 
 
+ORES = ('coal_ore', 'iron_ore', 'gold_ore', 'copper_ore')
+
+
 def load_tasks(path=SUITE):
     suite = json.loads(path.read_text(encoding='utf-8'))
     if suite['version'] != 1 or len({t['id'] for t in suite['tasks']}) != len(suite['tasks']):
@@ -63,6 +66,9 @@ def load_tasks(path=SUITE):
             validate_spatial(task)
         if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand'):
             raise ValueError('Unknown fixture layout')
+        ores = task.get('ores', {})
+        if any(name not in ORES or not isinstance(n, int) or not 1 <= n <= 8 for name, n in ores.items()) or (ores and task['forest'] != 'near'):
+            raise ValueError('Ores must be known ore blocks, 1..8 each, beside a near forest')
         if task.get('expected_outcome','achieve') not in ('achieve','report_unavailable'):
             raise ValueError('Unknown expected outcome')
         if task.get('expected_outcome') == 'report_unavailable' and (task['forest']!='none' or task['inventory'] or task['item']!='stone_pickaxe'):
@@ -294,6 +300,9 @@ async def run(args, *, clock=time.monotonic):
         if selected - {t['id'] for t in tasks}:
             raise ValueError('Unknown task id')
         tasks = [t for t in tasks if t['id'] in selected]
+    else:
+        # Long tasks have their own policy; they run only when named.
+        tasks = [t for t in tasks if task_policy(t) != 'long-horizon-v1']
     if args.task and any(args.mode not in task.get('modes',['body','conversation']) for task in tasks):
         raise ValueError('Selected task does not support this mode')
     tasks = [t for t in tasks if args.mode in t.get('modes',['body','conversation'])]
@@ -306,10 +315,19 @@ async def run(args, *, clock=time.monotonic):
     password = os.environ.get('CIEL_BENCH_RCON_PASSWORD')
     if not password:
         raise ValueError('Set CIEL_BENCH_RCON_PASSWORD in the environment')
+    long_tasks = {task_policy(t) == 'long-horizon-v1' for t in tasks}
+    if len(long_tasks) > 1:
+        raise ValueError('Run long-horizon-v1 tasks separately from practical tasks')
+    policy = ('long-horizon-v1' if True in long_tasks else 'spatial-v1' if any(t.get('stage1') for t in tasks)
+              else POLICY_VERSION)
+    args.max_llm = POLICIES[policy]['llm_calls'] if args.max_llm is None else args.max_llm
+    args.max_calls = POLICIES[policy]['game_calls'] if args.max_calls is None else args.max_calls
+    # The body variant under test, e.g. '!obtainItem' blocked to measure Mindcraft without the plan executor.
+    blocked = [a for a in os.environ.get('CIEL_BENCH_BLOCKED_ACTIONS', '').split(',') if a]
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=False)
     plan = [(task,seed,repeat) for task in tasks for seed in args.seed for repeat in range(args.repeats)]
-    manifest = {'format':2, 'policy':'spatial-v1' if any(t.get('stage1') for t in tasks) else POLICY_VERSION, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
+    manifest = {'format':2, 'policy':policy, 'body_blocked_actions':blocked, 'completion':'running', 'created_at':datetime.now(timezone.utc).isoformat(), 'mode':args.mode,
                 'backend':args.backend if args.mode == 'conversation' else 'local',
                 'model_id':args.model_id,
                 'minecraft_version':'1.21.11', 'seeds':args.seed, 'repeats':args.repeats,
@@ -475,8 +493,8 @@ def parser():
     ap.add_argument('--run-seconds',type=float,default=600,help='Whole-run wall budget, including setup and cleanup (max 3600)')
     ap.add_argument('--setup-seconds',type=float,default=45)
     ap.add_argument('--failure-streak',type=int,default=3,help='Stop after consecutive failures; 0 disables this guard')
-    ap.add_argument('--max-llm',type=int,default=30)
-    ap.add_argument('--max-calls',type=int,default=80)
+    ap.add_argument('--max-llm',type=int,help='Default from the task policy (30 practical, 80 long-horizon)')
+    ap.add_argument('--max-calls',type=int,help='Default from the task policy (80 practical, 200 long-horizon)')
     ap.add_argument('--report-grace',type=float,default=5,help='Observe completion/reply after the item condition is verified')
     ap.add_argument('--debug-dir',default=str(Path(__file__).parent/'data'/'debug'))
     ap.add_argument('--output',default=str(Path(__file__).parent/'data'/'results'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')))
@@ -489,7 +507,7 @@ def main(*, native_exit=False):
     args.seed = args.seed or [11]
     import math
     values = [args.run_seconds,args.setup_seconds,args.report_grace]+([args.seconds] if args.seconds is not None else [])
-    if any(not math.isfinite(v) for v in values) or min(args.repeats,args.run_seconds,args.setup_seconds,args.max_calls) <= 0 or (args.seconds is not None and args.seconds<=0) or args.run_seconds>3600 or min(args.max_llm,args.report_grace,args.failure_streak) < 0 or len(set(args.seed)) != len(args.seed):
+    if any(not math.isfinite(v) for v in values) or min(args.repeats,args.run_seconds,args.setup_seconds) <= 0 or (args.max_calls is not None and args.max_calls <= 0) or (args.seconds is not None and args.seconds<=0) or args.run_seconds>3600 or min(args.report_grace,args.failure_streak) < 0 or (args.max_llm is not None and args.max_llm < 0) or len(set(args.seed)) != len(args.seed):
         ap.error('Budgets and repeats must be positive, max-llm nonnegative, and seeds unique')
     try:
         code = asyncio.run(run(args))

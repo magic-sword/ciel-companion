@@ -8,7 +8,9 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from benchmark.mindcraft_tasks import VENDOR, expand, progress
 from benchmark.report import summarize
+from benchmark.policy import budget, task_policy
 from benchmark.run import load_tasks
+from benchmark.world import MARKER, World
 
 
 def entry(**kw):
@@ -66,12 +68,51 @@ class SuiteTest(unittest.TestCase):
     def test_vendored_tasks_load_as_body_only_tasks(self):
         tasks = {t['id']: t for t in load_tasks() if t.get('upstream')}
         self.assertEqual(set(tasks), {'mc_gather_oak_logs', 'mc_crafting_oak_log', 'mc_crafting_stick',
-                                      'mc_crafting_wooden_pickaxe', 'mc_crafting_stone_pickaxe'})
+                                      'mc_crafting_wooden_pickaxe', 'mc_crafting_stone_pickaxe',
+                                      'mc_long_gold_ingot', 'mc_long_iron_pickaxe', 'mc_long_shield'})
         for task in tasks.values():
             self.assertEqual(task['modes'], ['body'])
             self.assertTrue((VENDOR/task['upstream']['file']).is_file())
-            self.assertLessEqual(task['budget']['seconds'], 120)
             self.assertEqual(task['milestones'][-1], task['item'])
+            self.assertFalse(set(task['milestones']) & set(task['inventory']), 'given items are not progress')
+            if task_policy(task) == 'long-horizon-v1':
+                self.assertTrue(task['id'].startswith('mc_long_'))
+                self.assertGreater(task['budget']['seconds'], 120)
+                self.assertLessEqual(task['budget']['seconds'], task['upstream']['timeout'])
+                self.assertTrue(task['ores'])
+            else:
+                self.assertLessEqual(task['budget']['seconds'], 120)
+
+    def test_deadlines_must_fit_their_policy(self):
+        for task in ({'budget': {'seconds': 300}}, {'policy': 'long-horizon-v1', 'budget': {'seconds': 90}},
+                     {'policy': 'unknown', 'budget': {'seconds': 90}}):
+            with self.subTest(task=task), self.assertRaises(ValueError):
+                budget(task)
+        self.assertEqual(budget({'policy': 'long-horizon-v1', 'budget': {'seconds': 300}})['seconds'], 300)
+
+
+class OreFixtureTest(unittest.TestCase):
+    def reset(self, task, seed):
+        world = World(type('Rcon', (), {'command': lambda self, c: 'meta has: "'+MARKER+'"' if 'suite' in c else 'ok'})())
+        world.lease, world.scalar = 'test', lambda *a, **kw: 1
+        return world.reset(task, seed)
+
+    def test_ores_are_seeded_apart_from_trees_and_spawn(self):
+        task = next(t for t in load_tasks() if t['id'] == 'mc_long_iron_pickaxe')
+        first, again, other = self.reset(task, 11), self.reset(task, 11), self.reset(task, 12)
+        self.assertEqual(first, again)
+        self.assertNotEqual(first['ores'], other['ores'])
+        names = [o[0] for o in first['ores']]
+        self.assertEqual((names.count('iron_ore'), names.count('coal_ore')), (4, 2))
+        cells = {(x, z) for _, x, _, z in first['ores']}
+        self.assertEqual(len(cells), 6)
+        self.assertFalse(cells & ({tuple(t) for t in first["trees"]} | {(0, 0)}))
+
+    def test_tree_layout_of_existing_tasks_is_unchanged_by_ores(self):
+        task = next(t for t in load_tasks() if t['id'] == 'mc_crafting_stone_pickaxe')
+        long = next(t for t in load_tasks() if t['id'] == 'mc_long_iron_pickaxe')
+        self.assertEqual(self.reset(task, 11)['trees'], self.reset(long, 11)['trees'])
+        self.assertNotIn('ores', self.reset(task, 11))
 
 
 class ProgressTest(unittest.TestCase):

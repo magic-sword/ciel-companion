@@ -90,6 +90,7 @@ services:
       CIEL_BENCH_LLM_SERVICE: ${CIEL_BENCH_LLM_SERVICE:-shared}
       CIEL_BENCH_LLM_URL: ${CIEL_BENCH_LLM_URL:-http://127.0.0.1:8094/v1}
       CIEL_BENCH_LLM_CONTROL: ${CIEL_BENCH_LLM_CONTROL:-http://127.0.0.1:8095}
+      CIEL_BENCH_BLOCKED_ACTIONS: ${CIEL_BENCH_BLOCKED_ACTIONS:-}
     volumes:
       - ./benchmark/data:/workspace/server/benchmark/data
       - ./benchmark/data/world/ciel-benchmark-audit:/workspace/server/benchmark/data/audit:ro
@@ -113,6 +114,8 @@ services:
       EYE_PORT: '3008'
       KNOWLEDGE_DATA: /app/knowledge-data
       CIEL_POINTING_FILE: /app/pointing/selection.json
+      # Body variant under test; the runner records the same value in the manifest.
+      CIEL_MINDCRAFT_BLOCKED_ACTIONS: ${CIEL_BENCH_BLOCKED_ACTIONS:-}
     volumes:
       - ./benchmark:/app/benchmark:ro
       - ./benchmark/data/observations:/app/benchmark-data

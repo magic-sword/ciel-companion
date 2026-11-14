@@ -4,6 +4,12 @@ import math
 import re
 
 VERSION = 'practical-v1'
+# Long multi-step tasks (an iron tool from scratch) cannot fit practical-v1's 60-120 s; they
+# run under their own deadlines and are never compared with practical-v1 numbers.
+LONG_VERSION = 'long-horizon-v1'
+POLICIES = {VERSION: {'seconds': (1, 120), 'llm_calls': 30, 'game_calls': 80},
+            'spatial-v1': {'seconds': (1, 120), 'llm_calls': 30, 'game_calls': 80},
+            LONG_VERSION: {'seconds': (121, 600), 'llm_calls': 80, 'game_calls': 200}}
 # Inventory progress: any tracked item above the previous observation, so re-gathering what
 # was consumed counts. Until 2026-11-13 an item had to exceed its highest count so far.
 PROGRESS_RULE = 'inventory_gain_since_last_observation'
@@ -17,6 +23,13 @@ CONSTRAINT = r'(原木|木材|木|材料|作業台|道具|資源).{0,40}(不足|
 DECLINE = r'(できません|作れません|続けられません|作るのは難しい|製作は難しい|中止します|断念します|停止します|作業を止めます)'
 
 
+def task_policy(task):
+    name = task.get('policy', VERSION)
+    if name not in POLICIES:
+        raise ValueError('Unknown task policy')
+    return name
+
+
 def budget(task, cap=None):
     result = {**DEFAULT, **task.get('budget',{})}
     if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v <= 0
@@ -24,6 +37,9 @@ def budget(task, cap=None):
         raise ValueError('Task budgets must be finite and positive')
     if set(result) != set(DEFAULT):
         raise ValueError('Unknown task budget field')
+    low, high = POLICIES[task_policy(task)]['seconds']
+    if not low <= result['seconds'] <= high:
+        raise ValueError('Task deadline outside its policy range')
     if cap is not None:
         result['seconds'] = min(result['seconds'],cap)
     return result

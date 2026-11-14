@@ -213,10 +213,10 @@ class ProgressTest(unittest.TestCase):
         self.assertEqual(data['skipped'],1)
 
 class RunBudgetTest(unittest.IsolatedAsyncioTestCase):
-    async def check_run(self,run_seconds,streak):
+    async def check_run(self,run_seconds,streak,tasks=('gather_logs',),env=None):
         now=[0]
         with tempfile.TemporaryDirectory() as folder:
-            args=parser().parse_args(['--mode','body','--model-id','test-model','--task','gather_logs','--seed','11','--repeats','5',
+            args=parser().parse_args(['--mode','body','--model-id','test-model',*[a for t in tasks for a in ('--task',t)],'--seed','11','--repeats','5',
                                       '--run-seconds',str(run_seconds),'--failure-streak',str(streak),'--output',folder+'/result'])
             async def assess(*a,**kw):
                 now[0]+=kw['seconds']
@@ -224,7 +224,7 @@ class RunBudgetTest(unittest.IsolatedAsyncioTestCase):
             driver=MagicMock(open=AsyncMock(),close=AsyncMock())
             world=MagicMock(snapshot=lambda items:{'inventory':{item:0 for item in items},'position':[0,64,0],'health':20},
                             reset=lambda task,seed:{'layout_seed':seed})
-            with patch.dict(os.environ,{'CIEL_BENCH_RCON_PASSWORD':'test'}),patch('benchmark.run.Rcon'), \
+            with patch.dict(os.environ,{'CIEL_BENCH_RCON_PASSWORD':'test',**(env or {})}),patch('benchmark.run.Rcon'), \
                     patch('benchmark.run.World',return_value=world),patch('benchmark.run.BodyDriver',return_value=driver), \
                     patch('benchmark.run.wait_body_released',new=AsyncMock()),patch('benchmark.run.evaluate',new=assess), \
                     patch('benchmark.run.provenance',return_value={}):
@@ -244,6 +244,33 @@ class RunBudgetTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code,1)
         self.assertEqual(data['manifest']['completion'],'stopped_early')
         self.assertEqual(sum(r['status']=='skipped' for r in data['trials']),2)
+
+    async def test_long_tasks_record_their_policy_limits_and_the_body_variant(self):
+        code,data=await self.check_run(3600,1,('mc_long_iron_pickaxe',),{'CIEL_BENCH_BLOCKED_ACTIONS':'!obtainItem'})
+        manifest=data['manifest']
+        self.assertEqual((manifest['policy'],manifest['body_blocked_actions']),('long-horizon-v1',['!obtainItem']))
+        self.assertEqual((manifest['limits']['llm_calls'],manifest['limits']['game_calls']),(80,200))
+        self.assertEqual(manifest['limits']['tasks']['mc_long_iron_pickaxe']['seconds'],300)
+        code,data=await self.check_run(600,1)
+        self.assertEqual((data['manifest']['policy'],data['manifest']['body_blocked_actions'],data['manifest']['limits']['llm_calls']),
+                         ('practical-v1',[],30))
+
+    async def test_long_and_practical_tasks_never_share_a_run(self):
+        with self.assertRaisesRegex(ValueError,'separately'):
+            await self.check_run(600,1,('gather_logs','mc_long_shield'))
+
+    async def test_long_tasks_are_left_out_unless_named(self):
+        tasks=[]
+        world=MagicMock(snapshot=lambda items:{'inventory':{i:0 for i in items},'position':[0,64,0],'health':20},
+                        reset=lambda task,seed:tasks.append(task['id']) or {'layout_seed':seed})
+        async def assess(*a,**kw):
+            return {'status':'passed','reason':'achieved','metrics':{}}
+        with tempfile.TemporaryDirectory() as folder:
+            args=parser().parse_args(['--mode','body','--model-id','m','--seed','11','--output',folder+'/result','--run-seconds','3600'])
+            with patch.dict(os.environ,{'CIEL_BENCH_RCON_PASSWORD':'test'}),patch('benchmark.run.Rcon'),                     patch('benchmark.run.World',return_value=world),patch('benchmark.run.BodyDriver',return_value=MagicMock(open=AsyncMock(),close=AsyncMock())),                     patch('benchmark.run.wait_body_released',new=AsyncMock()),patch('benchmark.run.evaluate',new=assess),                     patch('benchmark.run.provenance',return_value={}):
+                await run(args)
+        self.assertTrue(tasks)
+        self.assertFalse([t for t in tasks if t.startswith('mc_long_')])
 
 if __name__=='__main__':
     unittest.main()

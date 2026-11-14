@@ -190,6 +190,16 @@ class World:
             raise ValueError('Unknown fixture forest')
         for x, z in trees:
             self._write(f'fill {x} 64 {z} {x} 67 {z} minecraft:oak_log[axis=y]')
+        # Ore blocks set into the ground surface, away from the trees and the spawn point.
+        ores = []
+        for name, count in sorted(task.get('ores', {}).items()):
+            for _ in range(count):
+                while True:
+                    x, z = rng.randint(-14, 14), rng.choice((-1, 1))*rng.randint(10, 16)
+                    if (x, z) not in {(ox, oz) for _, ox, oz in ores}:
+                        break
+                ores.append((name, x, z))
+                self._write(f'setblock {x} 63 {z} minecraft:{name}')
         for item, count in task['inventory'].items():
             if not ITEM.fullmatch(item) or not 1 <= count <= 64:
                 raise ValueError('Invalid fixture inventory')
@@ -206,9 +216,13 @@ class World:
         for x, z in trees:
             if not self.scalar(f'execute if block {x} 64 {z} minecraft:oak_log', success=True):
                 raise RuntimeError('Fixture resource placement failed')
+        for name, x, z in ores:
+            if not self.scalar(f'execute if block {x} 63 {z} minecraft:{name}', success=True):
+                raise RuntimeError('Fixture ore placement failed')
         if self.navigation:
             self.move_target(self.navigation['targets'][0])
-        return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48]}
+        return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48],
+                **({'ores': [[name, x, 63, z] for name, x, z in ores]} if ores else {})}
 
     def move_target(self, position):
         self.guard()

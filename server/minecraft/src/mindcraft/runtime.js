@@ -21,8 +21,15 @@ const inventory = bot => {
 class Failed extends Error {
   constructor(reason, note) { super(reason); this.note = note; }
 }
+// Extra commands to block, e.g. '!obtainItem' to measure Mindcraft without the plan executor.
+export function blockedActions(env = process.env) {
+  const extra = (env.CIEL_MINDCRAFT_BLOCKED_ACTIONS || '').split(',').map(name => name.trim()).filter(Boolean);
+  if (extra.some(name => !/^![A-Za-z]+$/.test(name))) throw new Error('Invalid CIEL_MINDCRAFT_BLOCKED_ACTIONS');
+  return [...new Set([...defaultSettings.blocked_actions, ...extra])];
+}
+
 export function createMindcraftBot(options) {
-  setSettings({ ...defaultSettings, ...options, minecraft_version: options.version });
+  setSettings({ ...defaultSettings, ...options, blocked_actions: blockedActions(), minecraft_version: options.version });
   return initBot(options.username);
 }
 
@@ -104,7 +111,8 @@ export class MindcraftRunner extends BodyCommands {
     agent.task=new Task(agent,null,Date.now());
     const { VisionInterpreter }=await import('../vendor/mindcraft/src/agent/vision/vision_interpreter.js');
     agent.vision_interpreter=new VisionInterpreter(agent,false);
-    agent.blocked_actions=[...defaultSettings.blocked_actions];
+    agent.blocked_actions=blockedActions();
+    if(agent.blocked_actions.length>defaultSettings.blocked_actions.length)console.log('Blocked commands:',agent.blocked_actions.join(', '));
     blacklistCommands(agent.blocked_actions);
     // Transport and process lifecycle belong to CIEL; planning belongs to Agent.
     agent.openChat=async message=>{this.nativeResponse=String(message).trim();};

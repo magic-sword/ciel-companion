@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ActionScope } from '../src/mindcraft/action-scope.js';
-import { MindcraftRunner } from '../src/mindcraft/runtime.js';
+import { MindcraftRunner, blockedActions } from '../src/mindcraft/runtime.js';
 import { protectWorld } from '../src/mindcraft/protection.js';
 import { Vec3 } from 'vec3';
 import { parseCommand } from '../src/protocol.js';
@@ -97,4 +97,11 @@ test('native collection tolerates Mineflayer palette entries before checking act
   await collectBlock(bot, 'oak_log', 1);
   assert.equal(searches, 1);
   assert.match(bot.output, /No oak_log nearby/);
+});
+
+test('the benchmark body can block extra Mindcraft commands, such as the plan executor', () => {
+  const defaults = blockedActions({});
+  assert.ok(!defaults.includes('!obtainItem'));
+  assert.deepEqual(blockedActions({ CIEL_MINDCRAFT_BLOCKED_ACTIONS: ' !obtainItem, ' }), [...defaults, '!obtainItem']);
+  assert.throws(() => blockedActions({ CIEL_MINDCRAFT_BLOCKED_ACTIONS: 'obtainItem' }), /Invalid/);
 });

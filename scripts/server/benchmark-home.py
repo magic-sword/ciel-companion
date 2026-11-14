@@ -114,7 +114,7 @@ def stage():
 
 
 def smoke(mode, task_id='gather_logs', seconds=None, llm_service='shared', all_tasks=False, failure_streak=3,
-          distractors=0, distractor_surface='both', run_seconds=600):
+          distractors=0, distractor_surface='both', run_seconds=600, seeds=(11,), blocked=()):
     # Use a new result directory, and only the dedicated compose project/services.
     code = '''
 from pathlib import Path
@@ -123,6 +123,7 @@ root=Path.home()/'work/ciel-companion-benchmark/server'
 compose=['docker','compose','--env-file','.env.benchmark','-f','compose.benchmark.yaml','--profile','runner','--profile','conversation','--profile','local']
 os.environ.update(CIEL_BENCH_LLM_SERVICE='SERVICE_VALUE',
     CIEL_BENCH_DISTRACTORS='DISTRACTOR_COUNT_VALUE', CIEL_BENCH_DISTRACTOR_SURFACE='DISTRACTOR_SURFACE_VALUE',
+    CIEL_BENCH_BLOCKED_ACTIONS='BLOCKED_VALUE',
     CIEL_BENCH_LLM_URL='http://127.0.0.1:PORT_VALUE/v1',
     CIEL_BENCH_LLM_CONTROL='http://127.0.0.1:CONTROL_VALUE')
 def run(*args):
@@ -145,7 +146,7 @@ for attempt in range(90):
 else:
     raise SystemExit('Benchmark bot did not join')
 run('run','--rm','--no-deps','-T','benchmark-runner','--mode','MODE_VALUE',TASK_ARGS'--failure-streak','FAILURE_STREAK','--run-seconds','RUN_SECONDS',
-    '--seed','11','--repeats','1',TIME_ARGS'--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
+    SEED_ARGS'--repeats','1',TIME_ARGS'--output','/workspace/server/benchmark/data/results/smoke-MODE_VALUE-'+str(time.time_ns()))
 '''
     code=code.replace('MODE_BUILD',(", 'agent-bench'" if mode=='conversation' else '')
         + (", 'llm-bench'" if llm_service=='dedicated' else ''))
@@ -173,6 +174,9 @@ print('Shared inference API:',json.dumps(status))
     time_args = "'--seconds',"+repr(str(seconds))+"," if seconds is not None else ''
     selected_tasks = [task_id] if isinstance(task_id, str) else task_id
     task_args = '' if all_tasks else ''.join("'--task',"+repr(name)+',' for name in selected_tasks)
+    code=code.replace('SEED_ARGS',''.join(f"'--seed','{int(seed)}'," for seed in seeds))
+    code=code.replace('BLOCKED_VALUE',','.join(blocked))
+    if blocked: code=code.replace("'smoke-MODE_VALUE-'", "'smoke-MODE_VALUE-blocked-'")
     code=code.replace('TASK_ARGS',task_args).replace('FAILURE_STREAK',str(failure_streak)).replace('RUN_SECONDS',str(run_seconds))
     if all_tasks: code=code.replace('smoke-MODE_VALUE-', 'suite-MODE_VALUE-')
     remote(code.replace('MODE_VALUE',mode).replace('TIME_ARGS',time_args))
@@ -187,6 +191,9 @@ if __name__ == '__main__':
     ap.add_argument('--run-seconds',type=int,default=600,help='Prospective whole-suite budget (1..3600); task deadlines remain unchanged')
     ap.add_argument('--failure-streak',type=int,default=3,help='Consecutive task failure guard; 0 explicitly measures all failures')
     ap.add_argument('--seconds',type=int,help='Optional stricter cap on the practical task budget')
+    ap.add_argument('--seed',type=int,action='append',help='Arena layout seed; may repeat (default 11)')
+    ap.add_argument('--blocked-action',action='append',default=[],
+                    help='Mindcraft command to block in the benchmark body, e.g. !obtainItem; may repeat')
     ap.add_argument('--distractors',type=int,default=0,choices=range(101),metavar='0..100')
     ap.add_argument('--distractor-surface',choices=['work','catalog','both'],default='both')
     ap.add_argument('--llm-service',choices=['shared','dedicated'],default='shared',
@@ -197,6 +204,10 @@ if __name__ == '__main__':
         ap.error('--distractors requires conversation')
     if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,150}',name) for name in args.run):
         ap.error('--run must be a single result directory name')
+    if any(not re.fullmatch(r'![A-Za-z]+',name) for name in args.blocked_action):
+        ap.error('--blocked-action must be a Mindcraft command such as !obtainItem')
+    if args.seed and (len(set(args.seed)) != len(args.seed) or min(args.seed) < 0):
+        ap.error('--seed values must be unique and nonnegative')
     if args.failure_streak < 0:
         ap.error('--failure-streak must be nonnegative')
     if not 1 <= args.run_seconds <= 3600:
@@ -277,4 +288,4 @@ subprocess.run(['docker','compose','--env-file','.env.benchmark','-f','compose.b
 ''')
     else:
         smoke(args.action,args.task or ['gather_logs'],args.seconds,args.llm_service,args.all,args.failure_streak,
-              args.distractors,args.distractor_surface,args.run_seconds)
+              args.distractors,args.distractor_surface,args.run_seconds,args.seed or [11],args.blocked_action)
