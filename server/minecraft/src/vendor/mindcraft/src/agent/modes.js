@@ -225,6 +225,9 @@ const modes_list = [
         cooldown: 5,
         last_place: Date.now(),
         update: function (agent) {
+            // Torches a plan still needs (a house's) are not placed on the way.
+            const keep = agent.bot.keepItems?.('torch') ?? 0;
+            if (keep > 0 && (world.getInventoryCounts(agent.bot).torch || 0) <= keep) return;
             if (world.shouldPlaceTorch(agent.bot)) {
                 if (Date.now() - this.last_place < this.cooldown * 1000) return;
                 execute(this, agent, async () => {
