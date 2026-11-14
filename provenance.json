@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "9d20fc27694533ee3bf4fab94369d6f435c8d891",
+  "fork_commit": "3f606fbc347ba0f908a3a4716ccef992296e8d95",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -145,7 +145,7 @@
       "upstream_sha256": "8ed0f3a9d482656f47e062917aed9880a6cba680d624bb3b375e3bc53f7f37b2"
     },
     "src/agent/action_manager.js": {
-      "sha256": "e8037d8f8e006c9334580f787c39f84b68a1ddefcf90c56eda54a836cc3abfa3",
+      "sha256": "80c280b7568f6dcdc62143a477ae9980bcbca7af40f4fdce8ca8cd066173ef44",
       "upstream_sha256": "e1705bb4785f0a3f3dc41818a81bcdc78fe092857f3cc52c10d23046339405c6"
     },
     "src/agent/agent.js": {
@@ -208,7 +208,7 @@
       "sha256": "6c90f43dd30e04cbbb6b80a966284dc76556bdf036603302b1f110193dce3c14"
     },
     "src/agent/library/obtain.js": {
-      "sha256": "9f07309cbf408b571921d0dbfd6ee983b63a113f126b08cfa50a93237533cb39"
+      "sha256": "8bd906a8efed15b3f894ec5973230a3b1611517a499fa9fd59bcad9c30e0de8c"
     },
     "src/agent/library/plan.js": {
       "sha256": "d135e74b724c32ea448d1b809b53776af5b8248863d6a11b77da48a022f662e3"
