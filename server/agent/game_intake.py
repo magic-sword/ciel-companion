@@ -35,7 +35,16 @@ def decision_schema(payload):
         current=payload.get('current',{})
         decision=(current.get('decision')or{}).get('decision_id')
         if current.get('state')=='needs_decision'and decision:
-            alternatives.append(obj({'operation':{'const':'answer'},'decision_id':{'const':decision},'action':{'enum':['retry','cancel']}}))
+            actions=(current.get('decision')or{}).get('actions')or['retry','cancel']
+            plain=[a for a in actions if a in('retry','cancel')]
+            if plain:
+                alternatives.append(obj({'operation':{'const':'answer'},'decision_id':{'const':decision},'action':{'enum':plain}}))
+            if 'reply' in actions:
+                # The body asked the owner; the reply carries the owner's own words to it.
+                alternatives.append(obj({'operation':{'const':'answer'},'decision_id':{'const':decision},'action':{'const':'reply'},
+                                         'message':{'type':'string','minLength':1,'maxLength':2000}}))
+        if current.get('state')=='running':
+            alternatives.append(obj({'operation':{'const':'tell'},'message':{'type':'string','minLength':1,'maxLength':2000}}))
     else:
         definition=payload['capability']
         if payload.get('confirmed_request'):
@@ -368,6 +377,10 @@ class GameIntake:
             r = await self._stop()
         elif op == 'answer' and action.get('action') in ('retry', 'cancel'):
             r = await self.runner.answer(action.get('decision_id'), action['action'])
+        elif op == 'answer' and action.get('action') == 'reply':
+            r = await self.runner.answer(action.get('decision_id'), 'reply', str(action.get('message') or text)[:2000])
+        elif op == 'tell':
+            r = await self.runner.tell(str(action.get('message') or text)[:2000])
         elif op in ('submit', 'execute') and selected is not None:
             # A delayed model response cannot acquire a new connection or changed definition.
             current = self._capabilities()

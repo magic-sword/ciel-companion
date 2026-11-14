@@ -55,6 +55,26 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second['capability']['name'], 'puzzle.solve')
         self.assertEqual(second['required_operation'], 'submit')
 
+    async def test_a_reply_to_the_bodys_question_and_words_to_a_running_work_go_to_the_work(self):
+        from game_intake import decision_schema
+        question = {'state': 'needs_decision', 'decision': {'decision_id': 'q', 'kind': 'question', 'actions': ['reply', 'cancel']}}
+        alternatives = decision_schema({'stage': 'select', 'capabilities': [], 'current': question})['anyOf']
+        answers = [a['properties'] for a in alternatives if a['properties']['operation'] == {'const': 'answer'}]
+        self.assertEqual([a['action'] for a in answers], [{'enum': ['cancel']}, {'const': 'reply'}])
+        self.assertIn('message', answers[1])
+        running = decision_schema({'stage': 'select', 'capabilities': [], 'current': {'state': 'running'}})['anyOf']
+        self.assertIn({'const': 'tell'}, [a['properties']['operation'] for a in running])
+        self.runner.status = lambda: question
+        self.runner.answer = AsyncMock(return_value={'message': 'carrying on'})
+        self.respond({'operation': 'answer', 'decision_id': 'q', 'action': 'reply', 'message': 'Shear them.'})
+        await self.intake.handle(llm.ChatMessage(role='user', content=['Shear them.']))
+        self.assertEqual(self.runner.answer.await_args.args, ('q', 'reply', 'Shear them.'))
+        self.runner.status = lambda: {'state': 'running'}
+        self.runner.tell = AsyncMock(return_value={'message': 'told'})
+        self.respond({'operation': 'tell', 'message': 'Keep the sheep.'})
+        await self.intake.handle(llm.ChatMessage(role='user', content=['Keep the sheep.']))
+        self.assertEqual(self.runner.tell.await_args.args, ('Keep the sheep.',))
+
     async def test_chat_does_not_submit_and_pseudo_tool_text_is_rejected(self):
         self.respond({'operation': 'none'})
         self.assertIsNone(await self.intake.handle(llm.ChatMessage(role='user', content=['Question?'])))

@@ -63,6 +63,27 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(name, 'answer')
         self.assertEqual(args, {'task_id': 'task', 'decision_id': 'decision', 'action': 'retry'})
 
+    async def test_a_question_is_answered_with_the_owners_words_and_the_owner_speaks_into_a_running_work(self):
+        self.env.profile['work']['say'] = 'say'
+        await self.runner.start('puzzle.solve', {})
+        self.assertEqual((await self.runner.tell('  '))['reason'], 'invalid_message')
+        await self.runner.tell('Use the other corner.')
+        self.assertEqual(self.env._call.await_args.args, ('say', {'task_id': 'task', 'message': 'Use the other corner.'}))
+        # What the body says during the work is voiced; another work's message is not.
+        self.assertTrue(self.runner.message({'task_id': 'task', 'text': 'Starting at the corner.'}))
+        self.assertFalse(self.runner.message({'task_id': 'other', 'text': 'x'}))
+        self.assertIn('Starting at the corner.', self.lines[-1]['instructions'])
+        self.remote.update(state='needs_decision', revision=2, reason='owner_question',
+                           decision={'decision_id': 'q', 'kind': 'question', 'actions': ['reply', 'cancel'], 'message': 'Which corner?'})
+        self.runner.accept(copy.deepcopy(self.remote))
+        self.assertFalse(self.runner.state()['task']['can_retry'])
+        self.assertEqual((await self.runner.answer('q', 'retry'))['reason'], 'stale_decision')
+        self.assertEqual((await self.runner.answer('q', 'reply', ''))['reason'], 'invalid_message')
+        self.assertEqual((await self.runner.tell('more'))['reason'], 'not_running')
+        await self.runner.answer('q', 'reply', 'The left one.')
+        self.assertEqual(self.env._call.await_args.args,
+                         ('answer', {'task_id': 'task', 'decision_id': 'q', 'action': 'reply', 'message': 'The left one.'}))
+
     async def test_unsupported_version_and_invalid_budget_do_not_submit(self):
         self.env.profile['work']['version'] = 99
         self.assertEqual((await self.runner.start('puzzle.solve', {}))['reason'], 'work_protocol_mismatch')

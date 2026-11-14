@@ -11,6 +11,8 @@ TOPIC = 'ciel.goal'
 TERMINAL = frozenset(('succeeded', 'failed', 'cancelled'))
 # The work contract's ceiling for one work (the game enforces the same limit).
 MAX_SECONDS = 600
+# The owner's words handed to a work (the game enforces the same limit).
+MAX_MESSAGE = 2000
 ACTIVE = frozenset(('accepted', 'running', 'needs_decision', 'cancelling'))
 STATES = ACTIVE | TERMINAL
 
@@ -128,16 +130,44 @@ class GoalRunner:
             self._publish(unknown=True)
         return r
 
-    async def answer(self, decision_id, action):
+    async def answer(self, decision_id, action, message=None):
+        """retry or cancel a stopped work, or reply to the body's question with the owner's words."""
         if not self.work:
             return {'status': 'no_task'}
-        if (self.work['state'] != 'needs_decision' or action not in ('retry', 'cancel')
-                or decision_id != (self.work.get('decision') or {}).get('decision_id')):
+        decision = self.work.get('decision') or {}
+        if (self.work['state'] != 'needs_decision' or decision_id != decision.get('decision_id')
+                or action not in (decision.get('actions') or ('retry', 'cancel'))):
             return {'status': 'error', 'reason': 'stale_decision'}
-        r = await self._call('answer', {'task_id': self.work['task_id'], 'decision_id': decision_id, 'action': action})
+        args = {'task_id': self.work['task_id'], 'decision_id': decision_id, 'action': action}
+        if action == 'reply':
+            if not isinstance(message, str) or not message.strip() or len(message) > MAX_MESSAGE:
+                return {'status': 'error', 'reason': 'invalid_message'}
+            args['message'] = message.strip()
+        r = await self._call('answer', args)
         if not self.accept(r) and r != self.work:
             self._publish(unknown=True)
         return r
+
+    async def tell(self, message):
+        """The owner's words to the running work, such as another way to do it."""
+        if not self.work or self.work['state'] != 'running':
+            return {'status': 'error', 'reason': 'not_running'}
+        if not isinstance(message, str) or not message.strip() or len(message) > MAX_MESSAGE:
+            return {'status': 'error', 'reason': 'invalid_message'}
+        r = await self._call('say', {'task_id': self.work['task_id'], 'message': message.strip()})
+        if not self.accept(r) and r != self.work:
+            self._publish(unknown=True)
+        return r
+
+    def message(self, e):
+        """What the body says to the owner while it works (which way it chose, what it is doing)."""
+        w = self.work
+        text = e.get('text') if isinstance(e, dict) else None
+        if not w or e.get('task_id') != w['task_id'] or w['state'] in TERMINAL or not isinstance(text, str) or not text.strip():
+            return False
+        self.say('game', settle=0.2, instructions=json.dumps({'work_message': {'task_id': w['task_id'], 'text': text.strip()[:600]},
+                                                             'title': self.title}, ensure_ascii=False), merge=True)
+        return True
 
     def body_step(self):
         return self.title if self.work and self.work['state'] in ACTIVE else None
@@ -166,7 +196,8 @@ class GoalRunner:
                 remaining_ms=max(0, int(min(remaining - age * 1000, (self._deadline - time.monotonic()) * 1000))) if known else 0,
                 decision_id=decision.get('decision_id') or '', decision_message=decision.get('message') or '',
                 can_stop=w['state'] in ACTIVE and w['state'] != 'cancelling',
-                can_retry=confirmed and w['state'] == 'needs_decision' and bool(decision.get('decision_id')))
+                can_retry=(confirmed and w['state'] == 'needs_decision' and bool(decision.get('decision_id'))
+                           and 'retry' in (decision.get('actions') or ('retry',))))
         return {'v': 2, 'type': 'goal.state', 'stream_id': self._stream_id,
                 'revision': self._display_revision, 'confirmed': confirmed,
                 'confirmed_ago_ms': int(age * 1000), 'valid_for_ms': 10000, 'has_task': bool(w), 'task': task}

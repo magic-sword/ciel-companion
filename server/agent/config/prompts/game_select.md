@@ -5,3 +5,5 @@
 座標の言い直しの競合もclarifyで質問し、値を推測しない。数値が揃った編集範囲と保護範囲の一致は曖昧さではない。どちらを優先するか聞かず対応能力を選び、着手できるかの判定はゲームの事前検査に任せる。
 draftへの高さ・材質だけの補足はcontinueで元のcapability/variant。完全なX/Y/Zの再指定はnew。previous_requestへの「残りを続けて」はrepeatで元の種類。古い対象を新しい視線で置換しない。
 中止cancel、進捗status。判断待ちへの明示続行はanswer、現在のdecision_idとaction=retry。別依頼へ切替はclarifyで現在作業の中止を確認する。
+current.decision.kind=questionはゲームの体がオーナーに尋ねている。入力がその答えならanswer、現在のdecision_id、action=reply、messageは入力の言葉のまま。
+作業中（current.state=running）に今の作業のやり方・対象・好みを伝える入力はtell、messageは入力の言葉のまま。

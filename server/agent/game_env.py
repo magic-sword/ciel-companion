@@ -578,6 +578,11 @@ class GameEnv:
             if self.goals is not None and self.goals.work:
                 self.goals.accept(e.get('work'))
             return
+        if kind == 'work_message':
+            debug_log.record(kind, task_id=e.get('task_id'))
+            if self.goals is not None:
+                self.goals.message(e)
+            return
         if kind in ('work_action', 'work_action_result', 'work_activity'):
             debug_log.record(kind, **{k: v for k, v in e.items() if k != 'kind'})
             return
