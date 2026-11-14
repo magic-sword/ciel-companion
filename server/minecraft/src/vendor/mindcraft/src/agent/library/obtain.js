@@ -2,6 +2,7 @@ import * as mc from '../../utils/mcdata.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
 import { within } from './deadline.js';
+import { recordTime } from './timing.js';
 import { getFromMob, countSuitable, EXPLORE_SECONDS } from './hunt.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
 
@@ -63,7 +64,10 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
         if (!await within(bot, () => perform(bot, step), stepSeconds(bot, step), describe(step)))
             skills.log(bot, `Timed out trying to ${describe(step)} after ${Math.round((Date.now() - began) / 1000)}s.`);
         done++;
-        if ((world.getInventoryCounts(bot)[step.item] || 0) > before) repeats = 0;
+        const gained = (world.getInventoryCounts(bot)[step.item] || 0) - before;
+        recordTime(step.type, began, { item: step.item, count: step.count ?? step.produces ?? 1, gained,
+            ...(step.method ? { method: step.method, mob: step.mob } : {}) });
+        if (gained > 0) repeats = 0;
         else repeats++;
     }
     skills.log(bot, `Gave up obtaining ${itemName} after ${maxSteps} steps.`);

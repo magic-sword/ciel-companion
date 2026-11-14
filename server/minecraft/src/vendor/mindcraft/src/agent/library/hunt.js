@@ -2,6 +2,7 @@ import { Vec3 } from 'vec3';
 import * as skills from './skills.js';
 import * as world from './world.js';
 import { within } from './deadline.js';
+import { recordTime } from './timing.js';
 import { MOBS, WOOL_COLORS } from './mobs.js';
 
 const RANGE = 64;
@@ -176,7 +177,10 @@ export async function explore(bot, mob, found) {
         }
         skills.log(bot, `No ${mob} within ${RANGE} blocks; looking ${next.heading}, toward ${next.ground ? ground : 'open land'}.`);
         const { x, y, z } = next.target;
+        const began = Date.now(), from = bot.entity.position.clone();
         await within(bot, () => skills.goToPosition(bot, x, y, z, 3), LEG_SECONDS, `walk ${next.heading}`);
+        recordTime('explore_leg', began, { blocks: Math.round(from.distanceTo(bot.entity.position)),
+            reached: bot.entity.position.distanceTo(next.target) <= 4 });
         // A target not reached is tried too, so a spot behind a wall is not chosen again.
         visited.push(bot.entity.position.floored(), next.target);
     }
