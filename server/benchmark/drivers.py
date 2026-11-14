@@ -7,12 +7,55 @@ import uuid
 from pathlib import Path
 
 
+# Seconds the scripted owner takes before answering, as a person would.
+OWNER_DELAY = 2
+# What the owner says to a question when the task does not script one.
+DEFAULT_REPLY = 'Up to you.'
+
+
+class ScriptedOwner:
+    """The owner's side of the conversation, from the task: a reply to every question the body
+    asks, and words said into the running work when a command first appears (task['owner']['say']).
+    It answers through the conversation server's own work client, as Ciel's intake would."""
+
+    def __init__(self, task, runner, trace):
+        script = task.get('owner') or {}
+        self.reply = script.get('reply', DEFAULT_REPLY)
+        self.say = [dict(s) for s in script.get('say', [])]
+        self.runner, self.trace = runner, trace
+        self.answered = set()
+        self.commands = []
+
+    def activity(self, e):
+        if e.get('command'):
+            self.commands.append(e['command'])
+
+    async def run(self):
+        while True:
+            await asyncio.sleep(0.5)
+            w = self.runner.work or {}
+            decision = w.get('decision') or {}
+            if (w.get('state') == 'needs_decision' and decision.get('kind') == 'question'
+                    and decision.get('decision_id') not in self.answered):
+                self.answered.add(decision['decision_id'])
+                await asyncio.sleep(OWNER_DELAY)
+                self.trace('owner_reply', question=decision.get('message', ''), text=self.reply)
+                await self.runner.answer(decision['decision_id'], 'reply', self.reply)
+            for line in self.say:
+                if not line.get('said') and line['after_command'] in self.commands and w.get('state') == 'running':
+                    line['said'] = True
+                    await asyncio.sleep(OWNER_DELAY)
+                    self.trace('owner_say', text=line['text'])
+                    await self.runner.tell(line['text'])
+
+
 class BodyDriver:
     def __init__(self, url, trace, **_):
         self.url, self.trace = url, trace
         self.env = self.runner = self.task = None
         self.core_host = None
         self.goal_state = {}
+        self.owner = self._owner_task = None
 
     def record_core(self, kind, **data):
         self.trace('agent_event', event={'t':time.time(),
@@ -56,8 +99,10 @@ class BodyDriver:
         original_event = self.env.on_event
         def event(e):
             original_event(e)
-            if e.get('kind') in ('work_action', 'work_action_result', 'work_activity'):
+            if e.get('kind') in ('work_action', 'work_action_result', 'work_activity', 'work_message'):
                 self.trace(e['kind'], **{k: v for k, v in e.items() if k != 'kind'})
+            if e.get('kind') == 'work_activity' and self.owner:
+                self.owner.activity(e)
         self.env.on_event = event
         if not await self.env.prepare():
             raise RuntimeError('Benchmark MCP is unavailable')
@@ -80,6 +125,8 @@ class BodyDriver:
         if task.get('navigation') or task.get('spatial'):
             self.task = asyncio.create_task(self.env._call(task['body_call']['name'], task['body_call']['arguments']))
             return
+        self.owner = ScriptedOwner(task, self.runner, self.trace)
+        self._owner_task = asyncio.create_task(self.owner.run())
         self.task = asyncio.create_task(self.runner.start('minecraft.pursue_goal',
             {'request': task['prompt']}, constraints={}, title=task['prompt'], seconds=task.get('budget', {}).get('seconds', 90)))
 
@@ -124,7 +171,11 @@ class BodyDriver:
         return (self.goal_state.get('task') or {}).get('state') == 'cancelled'
 
     def failure_reason(self):
-        if self.runner and (self.runner.work or {}).get('state') == 'needs_decision':
+        work = (self.runner.work or {}) if self.runner else {}
+        # A question to the owner is answered by the scripted owner, not a failure.
+        if work.get('state') == 'needs_decision' and (work.get('decision') or {}).get('kind') == 'question':
+            return None
+        if work.get('state') == 'needs_decision':
             return 'needs_mind'
         if (self.goal_state.get('task') or {}).get('state') in ('needs_decision','failed'):
             return 'body_cannot_continue'
@@ -134,9 +185,10 @@ class BodyDriver:
         return (self.goal_state.get('task') or {}).get('state') == 'succeeded'
 
     async def close(self):
-        if self.task and not self.task.done():
-            self.task.cancel()
-            await asyncio.gather(self.task, return_exceptions=True)
+        for task in (self.task, self._owner_task):
+            if task and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if self.runner:
             await self.runner.close()
         if self.env:

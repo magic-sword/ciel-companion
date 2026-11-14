@@ -303,6 +303,9 @@ class World:
 
 
 def achieved(task, initial, current):
+    # The owner's wish that the animals stay (said to the body during the work) is part of the goal.
+    if task.get('keep_mobs') and any(current.get('mobs', {}).get(m, 0) < n for m, n in initial.get('mobs', {}).items()):
+        return False
     if task.get('farm') or task.get('house'):
         return bool(current.get('goal_blocks')) and all(current['goal_blocks'])
     item = task['item']

@@ -74,6 +74,12 @@ def load_tasks(path=SUITE):
             validate_farm(task)
         if task.get('house'):
             validate_house(task)
+        owner = task.get('owner')
+        if owner is not None and (set(owner) - {'reply', 'say'} or not isinstance(owner.get('reply', ''), str)
+                or any(set(s) != {'after_command', 'text'} for s in owner.get('say', []))):
+            raise ValueError('owner must be {"reply": text, "say": [{"after_command": "!name", "text": text}]}')
+        if task.get('keep_mobs') and not task.get('mobs'):
+            raise ValueError('keep_mobs needs mobs')
         mobs = task.get('mobs', {})
         if any(name not in PASSIVE_MOBS or not isinstance(n, int) or not 1 <= n <= 8 for name, n in mobs.items()) or (mobs and task['forest'] != 'near'):
             raise ValueError('Mobs must be passive mobs, 1..8 each, beside a near forest')
@@ -266,7 +272,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
             reason = driver.failure_reason()
         else:
             decline_stable_at = None
-            if goal.get('state') in ('needs_decision','failed','cancelled'):
+            if goal.get('state') in ('needs_decision','failed','cancelled') and goal.get('reason') != 'owner_question':
                 if blocked_at is None:
                     blocked_at = now
                 elif now-blocked_at >= limits['blocked_grace']:

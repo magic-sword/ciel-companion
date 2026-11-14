@@ -33,6 +33,11 @@ def metrics(events):
         'game_calls': sum(e['kind'] == 'game_call' and not e.get('name', '').endswith('_task_status') for e in raw),
         'status_polls': sum(e['kind'] == 'game_call' and e.get('name', '').endswith('_task_status') for e in raw),
         'work_actions': sum(e['kind'] == 'work_action' for e in raw),
+        # The conversation with the owner: questions answered, words said into the work, and
+        # what the body told the owner while working (recorded, not scored).
+        'owner_questions': sum(e['kind'] == 'owner_reply' for e in raw),
+        'owner_says': sum(e['kind'] == 'owner_say' for e in raw),
+        'body_messages': sum(e['kind'] == 'work_message' for e in raw),
         'llm_tool_calls': sum(e['kind'] == 'tool' for e in agent),
         'failed_game_calls': len(failed),
         'failed_game_tasks': len(failed_tasks),
