@@ -20,6 +20,7 @@ export const TIMES = {
     },
     mob: { kill: { median: 9.7, p90: 11.4 }, shear: { median: 22.8, p90: 24.3 } },  // one sheep, found
     explore_leg: { median: 9.1, p90: 9.7 },        // n=10 legs reached
+    tunnel_leg: { median: 20, p90: 30 },           // 16 blocks dug sideways (not measured yet)
     cell: { default: { median: 1.0, p90: 1.3 }, clear: { median: 0.9, p90: 1.2 } },  // placed or cleared (n=102)
 };
 // A step may run this much past its 90th percentile before it is stopped, and never less than FLOOR.

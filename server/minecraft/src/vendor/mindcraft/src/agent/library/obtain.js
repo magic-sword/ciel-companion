@@ -3,10 +3,11 @@ import * as world from './world.js';
 import * as skills from './skills.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
-import { getFromMob, countSuitable, EXPLORE_LEGS } from './hunt.js';
+import { getFromMob, countSuitable, untilSpawn, neverSpawns } from './hunt.js';
+import { searchBlocks, digsFor, EXPLORE_LEGS, TUNNELS, ORE_DEPTH } from './search.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
 import { baseStation } from './base.js';
-import { expected, limit, SLACK, FLOOR } from './estimate.js';
+import { expected, SLACK, FLOOR } from './estimate.js';
 
 /**
  * Obtain an item by executing its crafting plan step by step.
@@ -120,15 +121,30 @@ function describe(step) {
 function stepEstimate(bot, step) {
     if (step.type === 'craft') return expected('craft');
     if (step.type === 'smelt') return expected('smelt') + expected('smelt_item', null, Math.max(0, step.count - 1));
-    if (step.type === 'mob')
-        return expected('mob', step.method) + (countSuitable(bot, step) === 0 ? EXPLORE_LEGS * expected('explore_leg') : 0);
-    return expected('mine', step.item, step.count);
+    if (step.type === 'mob') {
+        const none = countSuitable(bot, step) === 0;
+        return expected('mob', step.method) + (none ? untilSpawn(bot, step.mob) + EXPLORE_LEGS * expected('explore_leg') : 0);
+    }
+    return expected('mine', step.item, step.count) + searchEstimate(bot, step.source);
+}
+
+// The time to look for a block not in sight: surface legs, and for an ore the dig down to its
+// depth and the tunnels there. Nothing when one is in sight.
+function searchEstimate(bot, source) {
+    const names = skills.blockSources(source);
+    if (world.getNearestBlock(bot, names, 64)) return 0;
+    let seconds = EXPLORE_LEGS * expected('explore_leg');
+    if (digsFor(names)) {
+        const ore = names.map(n => n.replace(/^deepslate_/, '')).find(n => ORE_DEPTH[n] !== undefined);
+        const down = Math.max(0, Math.floor(bot.entity.position.y) - ORE_DEPTH[ore]);
+        seconds += expected('mine', 'cobblestone', down) + TUNNELS * expected('tunnel_leg');
+    }
+    return seconds;
 }
 
 // A pathfinding or pickup wait can hang without ever failing, so every step gets its own
 // deadline, its usual time with slack, and is stopped the same way an interrupt stops an action.
 function stepSeconds(bot, step) {
-    if (step.type === 'mine') return limit('mine', step.item, step.count);
     return Math.ceil(Math.max(FLOOR, stepEstimate(bot, step) * SLACK));
 }
 
@@ -139,6 +155,12 @@ async function perform(bot, step) {
         return await skills.smeltItem(bot, step.input, step.count);
     if (step.type === 'mob')
         return await getFromMob(bot, step);
+    // A block not in sight is looked for first (a chosen way is carried out, not refused).
+    const names = skills.blockSources(step.source);
+    if (!world.getNearestBlock(bot, names, 64) && !await searchBlocks(bot, names)) {
+        skills.log(bot, `Looked for ${step.source} and found none.`);
+        return false;
+    }
     return await skills.collectBlock(bot, step.source, step.count);
 }
 
@@ -152,7 +174,7 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         const next = plan.find(a => a.type === 'choose');
         const further = next ? `, then a choice for ${next.item}: ${nextWays(bot, itemName, num, inventory, tableAvailable, chosen, next)}` : '';
         const unseen = unseenSources(bot, plan);
-        const missing = unseen.length ? `, cannot be done here: no ${unseen.join(' or ')} in sight to mine` : '';
+        const missing = unseen.length ? `, ${unseen.join(' and ')} not in sight, so I look for it first` : '';
         if (id === 'make') return `make: craft or mine ${step.item} instead (${plan.length} steps in all${missing}${further})`;
         const way = ways.find(w => w.id === id);
         const seen = countSuitable(bot, way);
@@ -161,7 +183,10 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         if (way.tool && !(inventory[way.tool] > 0)) facts.push(`a ${way.tool} to make first`);
         if (way.stays) facts.push(`the ${way.mob} stay`);
         if (way.hostile) facts.push('it fights back');
-        if (unseen.length) facts.push(`cannot be done here: no ${unseen.join(' or ')} in sight to mine`);
+        if (unseen.length) facts.push(`${unseen.join(' and ')} not in sight, so I look for it first`);
+        const wait = seen ? 0 : untilSpawn(bot, way.mob);
+        if (neverSpawns(bot, way.mob)) facts.push(`no ${way.mob} appears on peaceful difficulty`);
+        else if (wait > 0) facts.push(`they come out at night, in about ${wait}s`);
         facts.push(`${plan.length} steps in all${further}`);
         const notes = [MOBS[way.mob].methods[way.method].note, MOBS[way.mob].spawn.note].filter(Boolean).join(' ');
         return `${id}: ${facts.join(', ')}. ${notes}`.trim();
@@ -184,8 +209,8 @@ function nextWays(bot, itemName, num, inventory, tableAvailable, chosen, next) {
         const plan = mc.getCraftingActions(itemName, num, inventory, tableAvailable, { ...chosen, [next.item]: id }) || [];
         const unseen = unseenSources(bot, plan);
         const way = ways.find(w => w.id === id);
-        const notes = [unseen.length ? `no ${unseen.join(' or ')} in sight` : null,
-            way && countSuitable(bot, way) === 0 ? `no ${way.mob} seen` : null, way?.hostile ? 'fights back' : null].filter(Boolean);
+        const notes = [unseen.length ? `${unseen.join(' and ')} to look for` : null,
+            way && countSuitable(bot, way) === 0 ? `${way.mob} to look for` : null, way?.hostile ? 'fights back' : null].filter(Boolean);
         return notes.length ? `${id} (${notes.join(', ')})` : id;
     }).join(', ');
 }

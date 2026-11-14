@@ -582,6 +582,8 @@ function gatherBaseItem(item, count, inventory, leftovers, crafted) {
 // Items that mobs give. One way from a mob that is not hostile, with no other way, is taken
 // as it is; otherwise the plan stops at a choice, which the caller (in the end the model)
 // answers through choices: a way's id such as "shear:sheep", or "make" for crafting or mining.
+const SWORDS = ['wooden_sword', 'stone_sword', 'copper_sword', 'iron_sword', 'golden_sword', 'diamond_sword', 'netherite_sword'];
+
 function getFromMob(item, count, inventory, leftovers, crafted) {
     const ways = mobWays(item);
     if (ways.length === 0) return false;
@@ -597,6 +599,8 @@ function getFromMob(item, count, inventory, leftovers, crafted) {
         return true;
     }
     if (way.tool) ensureOne(way.tool, [way.tool], inventory, leftovers, crafted);
+    // A mob that fights back is met with a weapon in hand.
+    if (way.hostile) ensureOne('wooden_sword', SWORDS, inventory, leftovers, crafted);
     crafted.steps.push(`Get ${count} ${item} by ${way.method === 'shear' ? 'shearing' : 'killing'} about ${mobsNeeded(way, count)} ${way.mob}`);
     crafted.actions.push({ type: 'mob', item, count, mob: way.mob, method: way.method, tool: way.tool, color: way.color });
     return true;

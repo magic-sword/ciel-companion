@@ -2,18 +2,10 @@ import { Vec3 } from 'vec3';
 import * as skills from './skills.js';
 import * as world from './world.js';
 import { within } from './deadline.js';
-import { recordTime } from './timing.js';
-import { limit } from './estimate.js';
+import { explore, nextLeg, EXPLORE_LEGS } from './search.js';
 import { MOBS, WOOL_COLORS } from './mobs.js';
 
 const RANGE = 64;
-// Looking for a mob that is not in sight: walk legs toward the ground the mob spawns on, each
-// to a spot at least LEG / 2 blocks from where the bot has been (LEG blocks along open land
-// when no such ground is in sight), with its own time.
-const LEG = 32;
-export const EXPLORE_LEGS = 6;
-const LEGS = EXPLORE_LEGS;
-const LEG_SECONDS = limit('explore_leg');
 // A sheared sheep grows its wool back after eating grass, usually within a minute.
 const REGROW_WAIT_MS = 30000;
 
@@ -48,11 +40,36 @@ export function countSuitable(bot, way) {
  * Get an item from one mob: find the nearest suitable one within range, then kill it or shear
  * it, and pick up what it drops. The caller checks the inventory and repeats.
  */
+// Minecraft time of day in ticks (20 a second): hostile mobs come out on the surface from dusk
+// (13000) to dawn (23000).
+const NIGHT = [13000, 23000];
+
+/** Seconds until a mob that comes out at night can appear; 0 when it is night or any time suits it. */
+export function untilSpawn(bot, mob) {
+    if (MOBS[mob]?.spawn.time !== 'night') return 0;
+    const t = ((bot.time?.timeOfDay ?? 0) % 24000 + 24000) % 24000;
+    return t >= NIGHT[0] && t < NIGHT[1] ? 0 : Math.ceil(((NIGHT[0] - t + 24000) % 24000) / 20);
+}
+
+/** A hostile mob never appears on peaceful difficulty: a rule of the game, not a matter of looking. */
+export const neverSpawns = (bot, mob) => Boolean(MOBS[mob]?.hostile) && bot.game?.difficulty === 'peaceful';
+
 export async function getFromMob(bot, way) {
     const find = () => world.getNearestEntityWhere(bot, e => suitable(bot, e, way), RANGE);
     let target = find();
+    if (!target && neverSpawns(bot, way.mob)) {
+        skills.log(bot, `No ${way.mob} appears on peaceful difficulty.`);
+        return false;
+    }
+    // A mob of the night is waited for, then looked for.
+    const wait = target ? 0 : untilSpawn(bot, way.mob);
+    if (wait > 0) {
+        skills.log(bot, `Waiting about ${wait}s for night, when ${way.mob}s come out.`);
+        while (untilSpawn(bot, way.mob) > 0 && !bot.interrupt_code) await new Promise(resolve => setTimeout(resolve, 1000));
+        target = find();
+    }
     if (!target && !world.getNearestEntityWhere(bot, e => e.name === way.mob && !owned(bot, e), RANGE)) {
-        await explore(bot, way.mob, find);
+        await explore(bot, way.mob, find, MOBS[way.mob]?.spawn.ground ?? null);
         target = find();
     }
     const kept = MOBS[way.mob]?.methods[way.method]?.stays;
@@ -84,108 +101,5 @@ export async function getFromMob(bot, way) {
     return true;
 }
 
-const HEADINGS = [['east', 1, 0], ['south-east', 1, 1], ['south', 0, 1], ['south-west', -1, 1],
-    ['west', -1, 0], ['north-west', -1, -1], ['north', 0, -1], ['north-east', 1, -1]];
-
-// Where one can stand in the column at x, z near height y, with the block under it, or null
-// when there is none within reach (a wall, a cliff, or land not loaded).
-function surface(bot, x, z, y) {
-    for (let dy = 4; dy >= -4; dy--) {
-        const ground = bot.blockAt(new Vec3(x, y + dy, z));
-        const above = bot.blockAt(new Vec3(x, y + dy + 1, z));
-        const head = bot.blockAt(new Vec3(x, y + dy + 2, z));
-        if (!ground || !above || !head) return null;
-        if (ground.boundingBox === 'block' && above.boundingBox === 'empty' && head.boundingBox === 'empty')
-            return { y: y + dy + 1, name: ground.name };
-    }
-    return null;
-}
-
-function heading(dx, dz) {
-    const turn = Math.round(Math.atan2(dz, dx) / (Math.PI / 4));
-    return HEADINGS[(turn + 8) % 8][0];
-}
-
-// Whether the bot could see the top of the block under p: no solid block on the line from its eyes.
-function inSight(bot, p) {
-    const eye = bot.entity.position.offset(0, 1.62, 0);
-    const top = new Vec3(p.x + 0.5, p.y + 0.05, p.z + 0.5);
-    const steps = Math.ceil(eye.distanceTo(top) * 2);
-    for (let i = 1; i < steps; i++) {
-        const at = eye.plus(top.minus(eye).scaled(i / steps)).floored();
-        if (at.equals(p.offset(0, -1, 0))) return true;
-        if (bot.blockAt(at)?.boundingBox === 'block') return false;
-    }
-    return true;
-}
-
-/**
- * Choose where to look next. The mob's spawn ground in sight (within RANGE, with room to stand
- * on it, and no wall in between) comes first: of the spots not near a place already tried, the
- * one that is near the bot and leads away from where the search began, so the search keeps
- * going outward. With none in sight, follow the surface along each heading until it is cut off
- * and take the open heading that reaches farthest within a leg, again away from places tried.
- * @param visited places reached and targets that could not be reached, the start first.
- * @returns {{heading, target: Vec3, ground: boolean} | null}
- */
-export function nextLeg(bot, ground, visited) {
-    const from = bot.entity.position.floored();
-    const start = visited[0];
-    const fresh = p => visited.every(v => v.distanceTo(p) >= LEG / 2);
-    const cost = p => p.distanceTo(from) - 0.5 * p.distanceTo(start);
-    const spots = bot.findBlocks({ matching: block => block?.name === ground, maxDistance: RANGE, count: 4096 })
-        .map(p => new Vec3(p.x, p.y + 1, p.z))
-        .filter(p => fresh(p) && surface(bot, p.x, p.z, p.y)?.y === p.y)
-        .sort((a, b) => cost(a) - cost(b));
-    const target = spots.find(p => inSight(bot, p));
-    if (target)
-        return { heading: heading(target.x - from.x, target.z - from.z), target, ground: true };
-    let best = null;
-    for (const [name, dx, dz] of HEADINGS) {
-        const norm = Math.hypot(dx, dz);
-        let y = from.y, reach = null;
-        for (let d = 4; d <= LEG; d += 4) {
-            const x = Math.round(from.x + dx / norm * d), z = Math.round(from.z + dz / norm * d);
-            const s = surface(bot, x, z, y);
-            if (!s) break;
-            y = s.y;
-            reach = new Vec3(x, s.y, z);
-        }
-        if (!reach || reach.distanceTo(from) < 8 || !fresh(reach)) continue;
-        if (!best || reach.distanceTo(from) > best.target.distanceTo(from)) best = { heading: name, target: reach, ground: false };
-    }
-    return best;
-}
-
-/**
- * Walk legs toward the mob's spawn ground until found() sees one, or no new heading is left.
- * The places tried are kept on the bot for the next search for the same mob (a retry starts
- * where this one ended), and dropped once one is found.
- */
-export async function explore(bot, mob, found) {
-    const ground = MOBS[mob]?.spawn.ground ?? 'grass_block';
-    bot.searched = bot.searched ?? {};
-    const visited = bot.searched[mob] = bot.searched[mob] ?? [bot.entity.position.floored()];
-    for (let leg = 0; leg < LEGS && !bot.interrupt_code; leg++) {
-        if (found()) {
-            delete bot.searched[mob];
-            return true;
-        }
-        const next = nextLeg(bot, ground, visited);
-        if (!next) {
-            skills.log(bot, `No ${mob} within ${RANGE} blocks and no new way to look.`);
-            return false;
-        }
-        skills.log(bot, `No ${mob} within ${RANGE} blocks; looking ${next.heading}, toward ${next.ground ? ground : 'open land'}.`);
-        const { x, y, z } = next.target;
-        const began = Date.now(), from = bot.entity.position.clone();
-        await within(bot, () => skills.goToPosition(bot, x, y, z, 3), LEG_SECONDS, `walk ${next.heading}`);
-        recordTime('explore_leg', began, { blocks: Math.round(from.distanceTo(bot.entity.position)),
-            reached: bot.entity.position.distanceTo(next.target) <= 4 });
-        // A target not reached is tried too, so a spot behind a wall is not chosen again.
-        visited.push(bot.entity.position.floored(), next.target);
-    }
-    if (!found()) return false;
-    delete bot.searched[mob];
-    return true;
-}
+// The search is shared with blocks (search.js); kept here under the names callers know.
+export { nextLeg, EXPLORE_LEGS };
