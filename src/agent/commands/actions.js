@@ -1,6 +1,7 @@
 import * as skills from '../library/skills.js';
 import { obtainItem } from '../library/obtain.js';
 import { makeFarm } from '../library/farm.js';
+import { buildHouse, houseNames } from '../library/house.js';
 import settings from '../settings.js';
 import convoManager from '../conversation.js';
 
@@ -284,6 +285,16 @@ export const actionsList = [
         },
         perform: runAsAction(async (agent, size) => {
             await makeFarm(agent, size % 2 === 1 ? size : size - 1);
+        })
+    },
+    {
+        name: '!buildHouse',
+        description: `Build a house from a plan near you: ${houseNames().join(', ')}. Picks a flat grass place, gets every block and item the plan needs (a bed too), then clears the place and builds it. Stops at choices, such as how to get the wool, for !chooseOption.`,
+        params: {
+            'name': { type: 'string', description: 'The name of the house plan.' }
+        },
+        perform: runAsAction(async (agent, name) => {
+            await buildHouse(agent, name);
         })
     },
     {

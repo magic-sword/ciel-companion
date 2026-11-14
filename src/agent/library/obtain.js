@@ -2,7 +2,7 @@ import * as mc from '../../utils/mcdata.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
 import { within } from './deadline.js';
-import { getFromMob, countSuitable } from './hunt.js';
+import { getFromMob, countSuitable, EXPLORE_SECONDS } from './hunt.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
 
 /**
@@ -60,7 +60,7 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
         }
         const before = inventory[step.item] || 0;
         const began = Date.now();
-        if (!await within(bot, () => perform(bot, step), stepSeconds(step), describe(step)))
+        if (!await within(bot, () => perform(bot, step), stepSeconds(bot, step), describe(step)))
             skills.log(bot, `Timed out trying to ${describe(step)} after ${Math.round((Date.now() - began) / 1000)}s.`);
         done++;
         if ((world.getInventoryCounts(bot)[step.item] || 0) > before) repeats = 0;
@@ -79,10 +79,11 @@ function describe(step) {
 
 // A pathfinding or pickup wait can hang without ever failing, so every step gets its own
 // deadline and is stopped the same way an interrupt stops an action.
-function stepSeconds(step) {
+function stepSeconds(bot, step) {
     if (step.type === 'craft') return 20;
     if (step.type === 'smelt') return 20 + 12 * step.count;
-    if (step.type === 'mob') return step.method === 'shear' ? 75 : 40;  // one mob; shearing may wait for regrowth
+    if (step.type === 'mob')  // one mob; shearing may wait for regrowth, and none in sight means looking first
+        return (step.method === 'shear' ? 75 : 40) + (countSuitable(bot, step) === 0 ? EXPLORE_SECONDS : 0);
     return 20 + 15 * step.count;
 }
 
@@ -106,7 +107,9 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         const further = plan.some(a => a.type === 'choose') ? ', then another choice' : '';
         if (id === 'make') return `make: craft or mine ${step.item} instead (${plan.length} steps in all${further})`;
         const way = ways.find(w => w.id === id);
-        const facts = [`about ${mobsNeeded(way, step.count)} ${way.mob} needed`, `${countSuitable(bot, way)} suitable ${way.mob} seen nearby`];
+        const seen = countSuitable(bot, way);
+        const facts = [`about ${mobsNeeded(way, step.count)} ${way.mob} needed`,
+            seen ? `${seen} suitable ${way.mob} seen nearby` : `none seen nearby, so I look for them on ${MOBS[way.mob].spawn.ground ?? 'their ground'} first`];
         if (way.tool && !(inventory[way.tool] > 0)) facts.push(`a ${way.tool} to make first`);
         if (way.stays) facts.push(`the ${way.mob} stay`);
         if (way.hostile) facts.push('it fights back');
