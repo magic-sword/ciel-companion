@@ -2,6 +2,8 @@
 
 2026-11-13、長い作業の第2段として、計画の実行器`!obtainItem`と採集・停止の止まり方の修正を加えた（Mindcraft上流`e1c1fc3`＋fork `19f3696`）。専用環境で`mc_*`5課題を3回ずつ測り、15回すべて成功した。第1段は7/15で、第2段の採用条件を満たした（[実測](minecraft-results-ja.md#長い作業の計画-第2段計画の実行器)）。通常回帰unit 833件、bodyのNode 154件（既存1件skip）、vendor 104ファイルの照合は成功した。体が自分で掘った穴から出られない場合が専用試験で残っている。通常ワールド・会話モード・実音声は未確認。
 
+2026-11-14、長い作業（long-horizon-v1：金インゴット・鉄のつるはし・盾、段数×40秒）を加え、実行器の有無で比べた（コミット`12f47a1`、seed11〜13各1回）。長い作業は実行器あり8/9・なし3/9、`mc_*`5課題はあり15/15・なし9/15。精錬直後に体が切断する不具合を直してから測った（[実測](minecraft-results-ja.md#計画の実行器の有無の比較長い作業と今の5課題)）。600秒の作業上限と切断の修正は開発・本番に未配布。
+
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
 同日、利用者の依頼により同じコミットを標準`deploy-server.sh`で本番へ配布した。本番agentはMindcraftへの切り替え以前の版からの更新で、Mindcraftへの切り替え・中核APIの統合・依頼受付の変更が本番に初めて出た。`DEPLOY_SERVER_DONE`、Git管理server 585ファイルの一致（118ファイルは改行形式だけの差）、実コンテナ内のagent.py・game_intake.pyの一致、HTTP 200、LiveKitへのworker登録、再起動0、Traceback・ERRORなしを確認した。作り直したのはagent（image `3411d0dd9c070cd337377a6f59649f0ad9dae179e8e078bfe6b10638cb56867c`）とsinging（`8b21524dcfa04a012390e411ec38106e6df7f615d40b57ed8567a91dd46858c3`）。tts・DB・共有LLM・Minecraftの体/ワールド/知識・開発agentはID・image・起動時刻を維持した。作業終了時の表示の見出しの変更に合わせたUnityアプリの更新と、本番での会話・実音声・ゲーム操作は未確認。

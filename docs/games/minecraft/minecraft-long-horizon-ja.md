@@ -2,7 +2,7 @@
 
 > 責務：Minecraftの長い作業を進めるための、依存関係のグラフ・計画グラフの実行器・LLMが判断する分岐と遅延した判断・世界の記憶・持ち主への相談の設計と、段階ごとの採用条件。
 
-**状態：第1段・第2段を採用、第3段以降は設計案。** 第1段（依存関係の照会）と第2段（計画の実行器`!obtainItem`）を実装し、`mc_*`5課題が3回とも成功して第2段の採用条件を満たした（[第1段](../../testing/minecraft-results-ja.md#長い作業の計画-第1段依存関係の照会)・[第2段](../../testing/minecraft-results-ja.md#長い作業の計画-第2段計画の実行器)の実測）。実行器の現行仕様は[Minecraftサービス](minecraft-design-ja.md)へ移した。第2段は`item_goal.js`を土台にせず第1段の計画から作った直列の実行器で、方法の選択（保管場所・相談）と並行実行は第3段以降に残る。現在の判断の仕組みは[MindcraftのLLM通信と推論・行動ループ](mindcraft-agent-loop-ja.md)、体と接続の構成は[Minecraftサービス](minecraft-design-ja.md)、依頼・期限・判断待ち・取消は[作業契約](../game-work-contract-ja.md)、評価は[ベンチマーク](minecraft-benchmark-ja.md)が正本。本書の内容は、各段を採用した時点でそれらの正本へ移し、本書からは削る。
+**状態：第1段・第2段を採用、第3段以降は設計案。** 第1段（依存関係の照会）と第2段（計画の実行器`!obtainItem`）を実装し、`mc_*`5課題が3回とも成功して第2段の採用条件を満たした（[第1段](../../testing/minecraft-results-ja.md#長い作業の計画-第1段依存関係の照会)・[第2段](../../testing/minecraft-results-ja.md#長い作業の計画-第2段計画の実行器)の実測）。実行器の現行仕様は[Minecraftサービス](minecraft-design-ja.md)へ移した。長い作業3課題でも、実行器ありの体は8/9、実行器を禁止した体は3/9だった（[比較](../../testing/minecraft-results-ja.md#計画の実行器の有無の比較長い作業と今の5課題)）。第2段は`item_goal.js`を土台にせず第1段の計画から作った直列の実行器で、方法の選択（保管場所・相談）と並行実行は第3段以降に残る。現在の判断の仕組みは[MindcraftのLLM通信と推論・行動ループ](mindcraft-agent-loop-ja.md)、体と接続の構成は[Minecraftサービス](minecraft-design-ja.md)、依頼・期限・判断待ち・取消は[作業契約](../game-work-contract-ja.md)、評価は[ベンチマーク](minecraft-benchmark-ja.md)が正本。本書の内容は、各段を採用した時点でそれらの正本へ移し、本書からは削る。
 
 ## 解決したいこと
 
