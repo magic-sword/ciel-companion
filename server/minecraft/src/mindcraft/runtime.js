@@ -18,6 +18,10 @@ const inventory = bot => {
   for (const item of bot?.inventory?.items() ?? []) counts[item.name] = (counts[item.name] ?? 0) + item.count;
   return counts;
 };
+// The words of a reply without its commands (upstream's command form: !name or !name(args)).
+export const spoken = text => String(text ?? '').replace(/!\w+(?:\((?:[^)"]|"[^"]*")*\))?/g, '').replace(/[ \t]+\n/g, '\n').trim();
+// A reply that ends asking something leaves the work to the owner's answer.
+export const asks = text => /[?？]$/.test(spoken(text));
 class Failed extends Error {
   constructor(reason, note) { super(reason); this.note = note; }
 }
@@ -145,9 +149,9 @@ export class MindcraftRunner extends BodyCommands {
     agent.openChat=async message=>{
       this.nativeResponse=String(message).trim();
       // Told to the owner as it is said ("I'll go and look for sheep"), not only at the end.
-      const c=this.current;
-      if(c&&this.nativeResponse)this.report('activity',{id:c.id,request_id:c.request_id,command_scope:c.scope??'',
-        stage:'said',command:'',text:this.nativeResponse});
+      const c=this.current,text=spoken(this.nativeResponse);
+      if(c&&text)this.report('activity',{id:c.id,request_id:c.request_id,command_scope:c.scope??'',
+        stage:'said',command:'',text});
     };
     agent.cleanKill=nativeExit(bot,()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');});
     const requestInterrupt=agent.requestInterrupt.bind(agent);
@@ -226,11 +230,13 @@ export class MindcraftRunner extends BodyCommands {
     while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
         || this.agent.self_prompter.isActive() || this.modeActions.size || this.replying)) await pause(100);
     if(c.token.cancelled)throw new Failed(c.token.reason??'stopped');
-    // A plan left waiting on a choice: the model spoke to the owner instead of choosing.
+    // The model left the owner to decide: a plan waits on a choice it did not make, or its last
+    // words ask the owner something. Either way the work waits for the reply.
     const choice=this.bot.pendingChoice;
-    return {native_finished:true,objective_verified:false,response:this.nativeResponse,
-      ...(choice?{waiting_owner:{choice:choice.question,options:Object.keys(choice.options)}}:{}),
-      inventory:inventory(this.bot)};
+    const waiting=choice?{choice:choice.question,options:Object.keys(choice.options)}
+      :asks(this.nativeResponse)?{choice:null,options:[]}:null;
+    return {native_finished:true,objective_verified:false,response:spoken(this.nativeResponse),
+      ...(waiting?{waiting_owner:waiting}:{}),inventory:inventory(this.bot)};
   }
 
   // The owner's words during a work, heard like any message from the owner; the pursue loop
