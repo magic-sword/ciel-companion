@@ -4,6 +4,13 @@
 
 2026-11-14、長い作業（long-horizon-v1：金インゴット・鉄のつるはし・盾、段数×40秒）を加え、実行器の有無で比べた（コミット`12f47a1`、seed11〜13各1回）。長い作業は実行器あり8/9・なし3/9、`mc_*`5課題はあり15/15・なし9/15。精錬直後に体が切断する不具合を直してから測った（[実測](minecraft-results-ja.md#計画の実行器の有無の比較長い作業と今の5課題)）。同日、利用者の依頼により、この2つを含むコミット`89e6b1eb9a919b63e23941e4a1bc2e72debb107f`を配布した。体は`deploy-body.py`でサーバー上のテスト通過・144ファイル一致・他コンテナ不変・参加済み（image `2e555827fa01c21b1bd8c3433764b586cb62206744c87ccf9363c87d84547ddc`、根拠`~/work/ciel-companion/server/data/deployments/body-89e6b1eb9a91-1794636644131308385`）。開発は`deploy-agent.py --dev`で194ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `34f6b28f58289d021c15b6eb8f6b09bdd3bd5a666fd7e44c01aa3a040f08f5e8`、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-89e6b1eb9a91-1794636665651821910`）。本番は標準`deploy-server.sh`で`DEPLOY_SERVER_DONE`、agentのみ作り直し（image `765cbb8d86f00f38e5bc85f6dcb08d31a223e73e87bb4c7765710b01d39daa19`）、コンテナ内の`MAX_SECONDS = 600`、worker登録、再起動0・Traceback 0を確認。普段のワールドでの精錬と長い作業は未確認。
 
+同日、汎用の実行計画（節ごとの期限・上流`Blueprint`の範囲の実行器・`!buildFarm`・`!chooseOption`、fork `a585605`）と、モードの聞き直しの間に作業を終えない修正（`eea6428`）を加えた。体のNode 166件（既存1件skip）は成功。専用環境では次のとおり（[実測](minecraft-results-ja.md#汎用の実行計画農地の課題)）。
+- 農地の課題：実行器あり3/3・なし0/3
+- `mc_*`5課題：14/15
+- 長い作業：8/9
+
+開発・本番・普段の体には未配布。
+
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
 同日、利用者の依頼により同じコミットを標準`deploy-server.sh`で本番へ配布した。本番agentはMindcraftへの切り替え以前の版からの更新で、Mindcraftへの切り替え・中核APIの統合・依頼受付の変更が本番に初めて出た。`DEPLOY_SERVER_DONE`、Git管理server 585ファイルの一致（118ファイルは改行形式だけの差）、実コンテナ内のagent.py・game_intake.pyの一致、HTTP 200、LiveKitへのworker登録、再起動0、Traceback・ERRORなしを確認した。作り直したのはagent（image `3411d0dd9c070cd337377a6f59649f0ad9dae179e8e078bfe6b10638cb56867c`）とsinging（`8b21524dcfa04a012390e411ec38106e6df7f615d40b57ed8567a91dd46858c3`）。tts・DB・共有LLM・Minecraftの体/ワールド/知識・開発agentはID・image・起動時刻を維持した。作業終了時の表示の見出しの変更に合わせたUnityアプリの更新と、本番での会話・実音声・ゲーム操作は未確認。
