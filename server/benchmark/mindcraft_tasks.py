@@ -10,6 +10,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from .farm import progress as farm_progress
+
 VENDOR = Path(__file__).resolve().parents[1]/'minecraft'/'src'/'vendor'/'mindcraft'
 OWNED = ('prompt', 'item', 'count', 'inventory', 'action', 'spec')
 
@@ -63,8 +65,11 @@ def progress(task, observed, initial, final):
     """Partial progress beside the binary result. Milestones are a lower bound: a short-lived
     intermediate can be crafted and consumed between two snapshots, so achieving the target
     credits every milestone."""
-    gained = final['inventory'].get(task['item'], 0) - initial['inventory'].get(task['item'], 0)
-    target = max(0.0, min(1.0, gained/task['count']))
+    if task.get('farm'):
+        target = farm_progress(final.get('goal_blocks'))
+    else:
+        gained = final['inventory'].get(task['item'], 0) - initial['inventory'].get(task['item'], 0)
+        target = max(0.0, min(1.0, gained/task['count']))
     milestones = task['milestones']
     reached = len(milestones) if target >= 1 else len(set(observed) & set(milestones))
     return {'target': round(target, 3), 'milestones': round(reached/len(milestones), 3) if milestones else None,

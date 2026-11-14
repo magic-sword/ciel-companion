@@ -49,6 +49,7 @@ class Progress:
     def __init__(self, initial, task):
         self.task = task
         self.previous = dict(initial['inventory'])
+        self.placed = sum(initial.get('goal_blocks') or [])
         self.cells = {self.cell(initial)}
         self.last_progress = 0
         self.first_action = None
@@ -84,6 +85,11 @@ class Progress:
             if count > self.previous.get(item,0):
                 progress = True
         self.previous = dict(state['inventory'])
+        # Block goals (a farm) progress when more of their cells are in place.
+        placed = sum(state.get('goal_blocks') or [])
+        if placed > self.placed:
+            progress = True
+        self.placed = placed
         if progress:
             self.last_progress = elapsed
             self.failures.clear()
@@ -97,7 +103,7 @@ class Progress:
     def event(self, e, elapsed):
         if e['kind'] == 'work_activity':
             physical = e.get('stage') == 'returning' or (e.get('stage') == 'executing'
-                and e.get('command') in {'!collectBlocks','!craftRecipe','!obtainItem','!smeltItem','!searchForBlock',
+                and e.get('command') in {'!collectBlocks','!craftRecipe','!obtainItem','!buildFarm','!chooseOption','!useOn','!placeHere','!smeltItem','!searchForBlock',
                     '!searchForEntity','!goToCoordinates','!moveAway','!equip','!consume','!clearFurnace','!goToSurface'})
             if physical:
                 if self.first_action is None: self.first_action = elapsed

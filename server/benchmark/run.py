@@ -25,6 +25,7 @@ from .spatial import validate_spatial, evaluate_spatial, prepare_spatial
 from .pointing import prepare_pointing
 from .stage1 import fixture as stage1_fixture, migrate_task
 from .mindcraft_tasks import expand as expand_mindcraft, progress as inventory_progress
+from .farm import validate as validate_farm
 from . import audit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,7 +65,9 @@ def load_tasks(path=SUITE):
             validate_navigation(task)
         if task.get('spatial'):
             validate_spatial(task)
-        if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand'):
+        if task.get('farm'):
+            validate_farm(task)
+        if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand','stone'):
             raise ValueError('Unknown fixture layout')
         ores = task.get('ores', {})
         if any(name not in ORES or not isinstance(n, int) or not 1 <= n <= 8 for name, n in ores.items()) or (ores and task['forest'] != 'near'):
@@ -188,7 +191,7 @@ async def evaluate(task, world, driver, trace, initial, *, seconds, max_llm, max
                     continue
                 seen_body.add(id(entry))
                 watch.event(entry,before)
-        current = await asyncio.to_thread(world.snapshot, task['milestones'] + [task['item']])
+        current = await asyncio.to_thread(world.snapshot, task_items(task))
         now = clock()
         elapsed = now-started
         watch.observe(current,elapsed)

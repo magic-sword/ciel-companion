@@ -11,6 +11,8 @@ import struct
 import time
 import uuid
 
+from .farm import layout as farm_layout, commands as farm_commands, checks as farm_checks
+
 MARKER = 'ciel-benchmark-v1'
 OBJECTIVE = 'cielbench'
 ITEM = re.compile(r'^[a-z][a-z0-9_]*$')
@@ -145,6 +147,7 @@ class World:
             raise RuntimeError('Fixture reset requires the world lease')
         self.navigation = task.get('navigation')
         self.spatial = task.get('spatial')
+        self.farm = None
         if self.navigation:
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Benchmark fixture owner is not online')
@@ -200,6 +203,10 @@ class World:
                         break
                 ores.append((name, x, z))
                 self._write(f'setblock {x} 63 {z} minecraft:{name}')
+        if task.get('farm'):
+            self.farm = farm_layout(rng, side, task['farm']['size'])
+            for command in farm_commands(self.farm):
+                self._write(command)
         for item, count in task['inventory'].items():
             if not ITEM.fullmatch(item) or not 1 <= count <= 64:
                 raise ValueError('Invalid fixture inventory')
@@ -219,10 +226,14 @@ class World:
         for name, x, z in ores:
             if not self.scalar(f'execute if block {x} 63 {z} minecraft:{name}', success=True):
                 raise RuntimeError('Fixture ore placement failed')
+        for x, y, z, name in farm_checks(self.farm) if self.farm else []:
+            if not self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True):
+                raise RuntimeError('Fixture farm placement failed')
         if self.navigation:
             self.move_target(self.navigation['targets'][0])
         return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48],
-                **({'ores': [[name, x, 63, z] for name, x, z in ores]} if ores else {})}
+                **({'ores': [[name, x, 63, z] for name, x, z in ores]} if ores else {}),
+                **({'farm': self.farm} if self.farm else {})}
 
     def move_target(self, position):
         self.guard()
@@ -249,6 +260,9 @@ class World:
             for key, group in [('spatial_expected','expected'),('spatial_preserved','preserve')]:
                 result[key] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
                                for x,y,z,name in self.spatial[group]]
+        if getattr(self, 'farm', None):
+            result['goal_blocks'] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
+                                     for x, y, z, name in self.farm['goal_blocks']]
         if getattr(self, 'navigation', None):
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Fixture owner disconnected')
@@ -257,6 +271,8 @@ class World:
 
 
 def achieved(task, initial, current):
+    if task.get('farm'):
+        return bool(current.get('goal_blocks')) and all(current['goal_blocks'])
     item = task['item']
     if task.get('return_to_start') and math.dist(initial['position'], current['position']) > 1:
         return False
