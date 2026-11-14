@@ -36,8 +36,15 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
         }
         const seconds = step.seconds(bot);
         const began = Date.now();
+        const asked = bot.pendingChoice;
         if (!await within(bot, () => step.run(bot), seconds))
             skills.log(bot, `Timed out on "${step.label}" after ${Math.round((Date.now() - began) / 1000)}s.`);
+        if (bot.pendingChoice && bot.pendingChoice !== asked) {
+            continueAfterChoice(bot, steps, { tries });
+            const rest = steps.filter(other => !other.done(bot)).map(other => other.label);
+            skills.log(bot, `The plan waits for that choice; choosing carries it on: ${rest.join(', ')}.`);
+            return false;
+        }
         if (step.done(bot)) continue;
         const count = (failures.get(step.id) || 0) + 1;
         failures.set(step.id, count);
@@ -47,6 +54,21 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
             return false;
         }
     }
+}
+
+// A step stopped at a choice (such as how to get wool for a bed): each option first does what
+// it chose, then the plan goes on from the world state. A further choice is wrapped the same way.
+function continueAfterChoice(bot, steps, options) {
+    const choice = bot.pendingChoice;
+    choice.options = Object.fromEntries(Object.entries(choice.options).map(([id, go]) => [id, async () => {
+        const asked = bot.pendingChoice;
+        await go();
+        if (bot.pendingChoice && bot.pendingChoice !== asked) {
+            continueAfterChoice(bot, steps, options);
+            return false;
+        }
+        return bot.interrupt_code ? false : await runPlan(bot, steps, options);
+    }]));
 }
 
 const count = (bot, name) => world.getInventoryCounts(bot)[name] || 0;

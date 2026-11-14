@@ -1,4 +1,5 @@
 import { Vec3 } from 'vec3';
+import * as skills from './skills.js';
 
 /**
  * Find places for a width x depth plan near the bot. For each column the ground is the
@@ -71,4 +72,19 @@ function overlaps(a, b) {
 export function describeSites(sites) {
     return sites.map(site => `${site.id}: corner ${site.corner.x}, ${site.corner.y}, ${site.corner.z}, `
         + `${site.changes} blocks to level, ${site.distance} blocks away`).join('\n');
+}
+
+/**
+ * Go on at the best site when it needs at most limit blocks levelled; otherwise list the sites
+ * and wait for !chooseOption, since a real change to the land is the model's (or owner's) call.
+ */
+export async function atSite(bot, sites, limit, what, go) {
+    if (sites[0].changes <= limit) return await go(sites[0]);
+    bot.pendingChoice = {
+        question: `where to make ${what}`,
+        options: Object.fromEntries(sites.map(site => [site.id, () => go(site)])),
+    };
+    skills.log(bot, `Every place needs the land changed. Choose where to make ${what} with !chooseOption, or ask first:
+${describeSites(sites)}`);
+    return false;
 }

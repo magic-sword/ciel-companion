@@ -1,7 +1,7 @@
 import * as skills from './skills.js';
 import { runPlan, haveStep, dropStep, fillBucketStep } from './plan.js';
 import { CROPS, buildRegion, materials, remaining, seconds } from './region.js';
-import { findSites, describeSites } from './sites.js';
+import { findSites, atSite } from './sites.js';
 
 const HOES = ['wooden_hoe', 'stone_hoe', 'copper_hoe', 'iron_hoe', 'golden_hoe', 'diamond_hoe', 'netherite_hoe'];
 
@@ -64,14 +64,7 @@ export async function makeFarm(agent, size, crop = 'wheat') {
         skills.log(bot, `There is no grass or dirt place for a ${size} x ${size} farm within 24 blocks.`);
         return false;
     }
-    if (sites[0].changes <= levelingLimit(size))
-        return await farmAt(bot, sites[0], size, crop);
-    bot.pendingChoice = {
-        question: `where to make the ${size} x ${size} farm`,
-        options: Object.fromEntries(sites.map(site => [site.id, () => farmAt(bot, site, size, crop)])),
-    };
-    skills.log(bot, `Every place needs the land changed. Choose where to make the farm with !chooseOption, or ask first:\n${describeSites(sites)}`);
-    return false;
+    return await atSite(bot, sites, levelingLimit(size), `the ${size} x ${size} farm`, site => farmAt(bot, site, size, crop));
 }
 
 async function farmAt(bot, site, size, crop) {
