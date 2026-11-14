@@ -191,7 +191,11 @@ class World:
             trees = [(x + seed % 5, z) for x in (6,12,18,24) for z in (-12,-6,0,6)]
         elif task['forest'] == 'near':
             side = rng.choice((-1, 1))
-            trees = [(side*(x + seed % 5), rng.choice((-6, 0, 6))) for x in (6,12,18)]
+            # A dense forest (house tasks) has a row of three trees at each distance, as many as
+            # a player finds near a base; otherwise one tree at each distance.
+            rows = (-6, 0, 6) if task.get('dense_forest') else None
+            trees = ([(side*(x + seed % 5), z) for x in (6,12,18) for z in rows] if rows
+                     else [(side*(x + seed % 5), rng.choice((-6, 0, 6))) for x in (6,12,18)])
         else:
             raise ValueError('Unknown fixture forest')
         for x, z in trees:
