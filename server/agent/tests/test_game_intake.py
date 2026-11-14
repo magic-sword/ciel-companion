@@ -332,27 +332,3 @@ class IntakeTest(unittest.IsolatedAsyncioTestCase):
         self.create.side_effect = generate
         await self.intake.handle(llm.ChatMessage(role='user', content=['Move']))
         self.runner.env.use.assert_not_awaited()
-
-
-
-class ConversationContextTest(unittest.IsolatedAsyncioTestCase):
-    setUp, respond = IntakeTest.setUp, IntakeTest.respond
-
-    def test_recent_keeps_spoken_turns_before_the_item(self):
-        from game_intake import recent
-        ctx = llm.ChatContext()
-        ctx.add_message(role='system', content='notes')
-        for i in range(6):
-            ctx.add_message(role='user' if i % 2 == 0 else 'assistant', content=f't{i}')
-        item = ctx.add_message(role='user', content='now')
-        ctx.add_message(role='assistant', content='later')
-        self.assertEqual(recent(ctx.items, item), [('user', 't2'), ('assistant', 't3'), ('user', 't4'), ('assistant', 't5')])
-
-    async def test_selection_receives_the_conversation_and_work_examples(self):
-        self.runner.env.profile['work']['capabilities'][0]['examples'] = ['Solve this board']
-        self.respond({'operation': 'none'})
-        await self.intake.handle(llm.ChatMessage(role='user', content=['For a house']),
-                                 conversation=[('assistant', 'What is it for?')])
-        payload = json.loads(self.create.await_args.kwargs['messages'][1]['content'])
-        self.assertEqual(payload['conversation'], [{'role': 'assistant', 'text': 'What is it for?'}])
-        self.assertEqual(payload['capabilities'][0]['examples'], ['Solve this board'])

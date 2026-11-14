@@ -72,14 +72,14 @@ class RegionRolesTest(unittest.TestCase):
     def test_schema_requires_variant_and_keeps_select_separate_from_submit(self):
         payload={'stage':'select','capabilities':[{'id':'1','variants':[{'id':'floor'}]}]}
         schema=decision_schema({**payload,'draft':{'input':'original request'}})
-        jsonschema.validate({'speaker_act':'asks','operation':'select','capability':'1','variant':'floor','draft_action':'continue'},schema)
-        for value in ({'speaker_act':'asks','operation':'select','capability':'1'}, {'operation':'submit','arguments':{}}):
+        jsonschema.validate({'operation':'select','capability':'1','variant':'floor','draft_action':'continue'},schema)
+        for value in ({'operation':'select','capability':'1'}, {'operation':'submit','arguments':{}}):
             with self.assertRaises(jsonschema.ValidationError):jsonschema.validate(value,schema)
-        for value in ({'speaker_act':'asks','operation':'select','capability':'1','variant':'floor','draft_action':'continue'},
-                      {'speaker_act':'answers','operation':'answer','decision_id':'invented','action':'retry'}):
+        for value in ({'operation':'select','capability':'1','variant':'floor','draft_action':'continue'},
+                      {'operation':'answer','decision_id':'invented','action':'retry'}):
             with self.assertRaises(jsonschema.ValidationError):jsonschema.validate(value,decision_schema(payload))
         complete={**payload,'draft':{'input':'old','capability':'1','variant':'floor'},'targets':[{'axis':a}for a in 'xyz']}
-        action={'speaker_act':'asks','operation':'select','capability':'1','variant':'floor','draft_action':'new'}
+        action={'operation':'select','capability':'1','variant':'floor','draft_action':'new'}
         jsonschema.validate(action,decision_schema(complete))
         with self.assertRaises(jsonschema.ValidationError):jsonschema.validate({**action,'draft_action':'continue'},decision_schema(complete))
 
