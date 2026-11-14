@@ -284,7 +284,36 @@ G3は合格ソースを通常環境へ反映後、明示された小範囲で、
 
 採用条件は、1体用の`techtree`課題で、使用禁止の命令・不足アイテムの指定が無く、対象が単一アイテム、初期所持品に対象を含まないこと。上流の採点は持ち物の絶対数だが、この条件により開始時からの増加数で同じ判定になる。読み込みはこの条件を満たさない定義を拒否する。上流の`timeout`（300〜1000秒）は`result.json`の`upstream`へ記録するだけで、期限はpractical-v1で課題ごとに決める。
 
-目標文は英語のままなので`modes`は`body`だけとし、会話モードへ使わない。日本語の依頼は従来の`gather_logs`・`wooden_pickaxe`・`stone_pickaxe`などで評価する。領域は専用アリーナ（近くの原木と地下の石）であり、上流の自由なワールドとは資源配置・期限が違う。MineCollabの公表値と直接比較しない。鉄・金・銅・レッドストーン・ダイヤ（鉱石が無い）、ハサミ・羊毛（鉄・羊が無い）、鉄のつるはし（鉄鉱石が無い）の上流課題は、領域にその資源を復元する仕組みを作るまで採用しない。複数体の協力課題と人とAIの課題も対象外。
+目標文は英語のままなので`modes`は`body`だけとし、会話モードへ使わない。日本語の依頼は従来の`gather_logs`・`wooden_pickaxe`・`stone_pickaxe`などで評価する。領域は専用アリーナ（近くの原木と地下の石）であり、上流の自由なワールドとは資源配置・期限が違う。MineCollabの公表値と直接比較しない。金インゴット・鉄のつるはし・盾は、鉱石を置く地形で次節の長い作業として扱う。銅・レッドストーン・ダイヤ、ハサミ・羊毛（羊が無い）の上流課題はまだ採用していない。複数体の協力課題と人とAIの課題も対象外。
+
+### 長い作業（long-horizon-v1）
+
+依存関係の段が10を超える製作は、practical-v1の60〜120秒に収まらない。上流の定義を同じ方法で読み、別の評価条件`long-horizon-v1`で測る。課題の期限は121〜600秒、モデル要求の上限は80回、操作の上限は200回（practical-v1は30回・80回）。課題を`--task`で名指ししたときだけ実行し、practical-v1の課題と同じ実行に混ぜない（混ぜると拒否する）。結果はpractical-v1の値と直接比べない。期限は難易度に合わせ、実行器の段数×40秒（上限600秒）とする。上流の`timeout`は課題によらず一律の値なので使わない。精錬中は持ち物が増えないため、不進行の判定は60秒にする。
+
+| ID | 上流の定義 | 初期所持品 | 鉱石 | 期限 | 実行器の段数 |
+|---|---|---|---|---:|---:|
+| `mc_long_gold_ingot` | `crafting_gold_ingot` | 鉄のつるはし | 金2・石炭2 | 320秒 | 8 |
+| `mc_long_iron_pickaxe` | `crafting_iron_pickaxe` | 石のつるはし | 鉄4・石炭2 | 480秒 | 12 |
+| `mc_long_shield` | `crafting_shield_missing_iron_ingot` | 板材7 | 鉄2・石炭2 | 600秒 | 15 |
+
+鉱石は地表（y=63）に1個ずつ埋め、位置は配置seedで決める（x=−14〜14、z=±10〜16。木・出発点と重ならない）。鉱石を置かない課題の木の位置は変わらない。中間到達には初期所持品を含めない。
+
+作業契約の1件の期限は最大600秒で、会話からの依頼は従来どおり120秒を求める。長い作業の評価は、課題の期限をそのまま作業の期限として体へ渡す。
+
+#### 計画の実行器の有無を比べる
+
+`--blocked-action '!obtainItem'`を付けると、専用環境の体だけで`!obtainItem`を使えなくする（`CIEL_MINDCRAFT_BLOCKED_ACTIONS`）。命令の一覧・製作計画の文・失敗文のヒントからも`!obtainItem`への案内が消え、`!getCraftingPlan`の計画は残る。manifestの`body_blocked_actions`に記録する。比べるのは「実行器あり」と「Mindcraftの1手ずつの選択（計画の照会あり）」で、上流そのままの体ではない。
+
+1回の実行は3600秒までなので、3課題×3配置は2回に分ける（金と鉄で約2400秒、盾で約1800秒）。
+
+```powershell
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --task mc_long_gold_ingot --task mc_long_iron_pickaxe --seed 11 --seed 12 --seed 13 --failure-streak 0 --run-seconds 3600
+.\.venv\Scripts\python.exe scripts/server/benchmark-home.py body --task mc_long_shield --seed 11 --seed 12 --seed 13 --failure-streak 0 --run-seconds 3600
+# 実行器なしの版は、同じ2回に --blocked-action '!obtainItem' を付ける
+.\.venv\Scripts\python.exe -m server.benchmark.arm_compare <実行器なしの結果> <実行器ありの結果>
+```
+
+温度0では同じ配置の繰り返しは同じ命令を選ぶため、繰り返し回数ではなく配置seedを増やす。`arm_compare`は課題と配置で試行を対にし、両方で採点できた試行だけを比べる。環境障害と未実施は失敗に数えない。
 
 ### 能力数の増加による選択性能
 

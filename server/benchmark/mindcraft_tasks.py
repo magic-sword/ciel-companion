@@ -1,8 +1,9 @@
 """Body-layer tasks whose goal and success condition come from vendored Mindcraft task files.
 
 A suite entry names the upstream file and task id. The upstream definition owns the goal
-text, target item, count and initial inventory; CIEL owns the arena, the practical-v1
-deadline and the milestone list used for partial progress. Only single-agent inventory
+text, target item, count and initial inventory; CIEL owns the arena (with any ore blocks),
+the deadline under the task's policy (practical-v1 or long-horizon-v1) and the milestone list
+used for partial progress. Only single-agent inventory
 (techtree) tasks without blocked commands or missing items are accepted.
 """
 import hashlib

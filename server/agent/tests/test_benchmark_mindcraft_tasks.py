@@ -78,7 +78,6 @@ class SuiteTest(unittest.TestCase):
             if task_policy(task) == 'long-horizon-v1':
                 self.assertTrue(task['id'].startswith('mc_long_'))
                 self.assertGreater(task['budget']['seconds'], 120)
-                self.assertLessEqual(task['budget']['seconds'], task['upstream']['timeout'])
                 self.assertTrue(task['ores'])
             else:
                 self.assertLessEqual(task['budget']['seconds'], 120)

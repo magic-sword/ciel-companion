@@ -250,7 +250,7 @@ class RunBudgetTest(unittest.IsolatedAsyncioTestCase):
         manifest=data['manifest']
         self.assertEqual((manifest['policy'],manifest['body_blocked_actions']),('long-horizon-v1',['!obtainItem']))
         self.assertEqual((manifest['limits']['llm_calls'],manifest['limits']['game_calls']),(80,200))
-        self.assertEqual(manifest['limits']['tasks']['mc_long_iron_pickaxe']['seconds'],300)
+        self.assertEqual(manifest['limits']['tasks']['mc_long_iron_pickaxe']['seconds'],480)
         code,data=await self.check_run(600,1)
         self.assertEqual((data['manifest']['policy'],data['manifest']['body_blocked_actions'],data['manifest']['limits']['llm_calls']),
                          ('practical-v1',[],30))
