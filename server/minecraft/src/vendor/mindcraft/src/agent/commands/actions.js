@@ -2,6 +2,7 @@ import * as skills from '../library/skills.js';
 import { obtainItem } from '../library/obtain.js';
 import { makeFarm } from '../library/farm.js';
 import { buildHouse, houseNames } from '../library/house.js';
+import { setBase, describeBase } from '../library/base.js';
 import settings from '../settings.js';
 import convoManager from '../conversation.js';
 
@@ -285,6 +286,15 @@ export const actionsList = [
         },
         perform: runAsAction(async (agent, size) => {
             await makeFarm(agent, size % 2 === 1 ? size : size - 1);
+        })
+    },
+    {
+        name: '!setBase',
+        description: 'Make the place where you stand your base. A crafting table, furnace or chest within 8 blocks, or placed there later, stays as the base\'s own, and plans walk back to use them instead of making new ones. Choose it with the owner or where you have built a house.',
+        params: {},
+        perform: runAsAction(async (agent) => {
+            setBase(agent.bot);
+            skills.log(agent.bot, describeBase(agent.bot));
         })
     },
     {

@@ -5,6 +5,7 @@ import { within } from './deadline.js';
 import { recordTime } from './timing.js';
 import { getFromMob, countSuitable, EXPLORE_SECONDS } from './hunt.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
+import { baseStation } from './base.js';
 
 /**
  * Obtain an item by executing its crafting plan step by step.
@@ -35,8 +36,7 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
             skills.log(bot, `Obtained ${num} ${itemName} (${done} steps).`);
             return true;
         }
-        const tableAvailable = (inventory['crafting_table'] || 0) > 0
-            || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
+        const tableAvailable = stations(bot, inventory);
         const actions = mc.getCraftingActions(itemName, num, inventory, tableAvailable, choices);
         if (!actions || actions.length === 0) {
             skills.log(bot, `There is no known way to obtain ${itemName}.`);
@@ -80,8 +80,7 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
  */
 export function obtainSeconds(bot, itemName, num = 1) {
     const inventory = world.getInventoryCounts(bot);
-    const tableAvailable = (inventory['crafting_table'] || 0) > 0 || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
-    const actions = mc.getCraftingActions(itemName, num, inventory, tableAvailable) || [];
+    const actions = mc.getCraftingActions(itemName, num, inventory, stations(bot, inventory)) || [];
     const mined = new Map();
     let total = 0;
     for (const step of actions) {
@@ -91,6 +90,16 @@ export function obtainSeconds(bot, itemName, num = 1) {
     }
     for (const step of mined.values()) total += stepSeconds(bot, step);
     return total;
+}
+
+/**
+ * The stations a plan can use without making one: carried, placed within 16 blocks, or at the
+ * base within reach (craftRecipe and smeltItem walk there).
+ */
+export function stations(bot, inventory = world.getInventoryCounts(bot)) {
+    const usable = name => (inventory[name] || 0) > 0 || world.getNearestBlock(bot, name, 16) !== null
+        || baseStation(bot, name) !== null;
+    return { crafting_table: usable('crafting_table'), furnace: usable('furnace') };
 }
 
 function describe(step) {
