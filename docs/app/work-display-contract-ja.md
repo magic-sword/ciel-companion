@@ -14,7 +14,7 @@ Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのm
 |---|---|---|
 | accepted | 受付済み・開始待ち | 止める |
 | running | 実行中 | 止める |
-| needs_decision | 判断待ち。サービスからの説明 | 止める／確認済みの判断に再試行する |
+| needs_decision | 判断待ち。サービスからの説明。体がオーナーに尋ねているとき（reason=owner_question）は、`decision_message`がその質問 | 止める／確認済みの判断に再試行する。質問への答えは会話で伝え、再試行は表示しない（`can_retry=false`） |
 | cancelling | 停止確認中 | 再開・再試行を表示しない |
 | succeeded | 処理終了。目的達成の確認範囲はサービスの説明に従う | なし |
 | failed | 完了できませんでした | なし |

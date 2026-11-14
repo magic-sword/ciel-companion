@@ -42,7 +42,19 @@ CIEL側で数量目標を固定したり、自動帰還・不足分の補充を�
 
 ## 判断と中止
 
-`minecraft_task_answer` は `task_id`、`decision_id`、`action=retry|cancel`。IDの一致する判断待ちだけを受け付け、retryも元の制約と期限内、3回までに限定する。Mindcraftの外側にレシピ分解・修復ループを重ねない。実行例外は失敗として返し、成功するまで探索を繰り返す根拠にしない。
+`minecraft_task_answer` は `task_id`、`decision_id`、`action=retry|reply|cancel`、replyのときは `message`（オーナーの言葉、2000文字まで）。IDの一致する判断待ちだけを受け付け、`decision.actions` に無い操作は `invalid_decision`。retryも元の制約と期限内、3回までに限定する。Mindcraftの外側にレシピ分解・修復ループを重ねない。実行例外は失敗として返し、成功するまで探索を繰り返す根拠にしない。
+
+判断待ちには2種類あり、`decision.kind` で区別する。
+- **`failure`**（`actions=[retry, cancel]`）：実行が止まった。従来どおり。
+- **`question`**（`actions=[reply, cancel]`、`reason=owner_question`）：体がオーナーに尋ねている。体の応答処理が終わったとき、計画が選択待ちのまま（`!chooseOption`が選ばれていない）か、体の最後の言葉が「？」「?」で終わる場合。`decision.message` は体の言葉、`decision.options` は計画の選択肢のID。replyはオーナーの言葉を依頼文として同じworkの体をもう一度動かす。期限・制約は変えず、1つのworkで8回まで。
+
+尋ねるか自分で決めるかの線引きは体のLLMが判断する。計画の選択肢の文面は「選んで、どの方法にしたかを一言伝えるか、オーナーが決めることなら尋ねる」と伝える。
+
+`minecraft_task_say` は `task_id`、`message`。実行中（running）のworkへオーナーの言葉を渡す（方法の変更など）。体はオーナーの発言として聞き、新しい命令を出せば実行中の操作は止まる。`!chooseOption` は最後に選んだ選択肢から選び直せ、計画をその時点の世界から組み直す（倒したモブは戻らない）。runningでなければ `not_running`。
+
+体がwork中に話した言葉は、命令を除いた文を通知 `work_message`（task_id、revision、text）で送る。会話サーバーは作業の結果と同じ経路でシエルに話させる。状態は変えない。
+
+会話サーバーでは、依頼の判定（`game_intake`）が判断待ちの質問への答えを `answer(action=reply, message)`、実行中の作業への言葉を `tell(message)` として選ぶ。どちらもmessageは入力の言葉のまま渡す。
 
 `minecraft_task_cancel` はtask_idを指定する。体へ対象を固定した停止を送り、現在・待機の操作がなくblockedでもないことを確認して `cancelled` とする。確認できないときは `cancelling / stop_unconfirmed` を保ち、新しい作業を拒否する。遅い計画・技の完了・判断回答で再開しない。
 
