@@ -19,6 +19,8 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
     const byId = new Map(steps.map(step => [step.id, step]));
     const total = steps.filter(step => !step.done(bot)).reduce((sum, step) => sum + step.seconds(bot), 0);
     skills.log(bot, `Plan: ${steps.map(step => step.label).join(', ')}. About ${Math.round(total)}s.`);
+    // The work that runs the plan may last as long as its steps (CIEL's work deadline).
+    bot.reportEstimate?.(total);
     const failures = new Map();
     for (;;) {
         if (bot.interrupt_code) {
