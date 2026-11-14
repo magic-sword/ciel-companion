@@ -1,4 +1,5 @@
 // Mindcraft owns the body. This adapter translates CIEL's ownership/result contract.
+import { join } from 'node:path';
 import { BodyCommands } from '../body-command.js';
 import { ActionScope } from './action-scope.js';
 import { alignPlayerCollision } from '../player-physics.js';
@@ -106,6 +107,10 @@ export class MindcraftRunner extends BodyCommands {
     this.actionScope = new ActionScope(bot);
     bot.output = '';
     bot.interrupt_code = false;
+    // Game memory kept across restarts (the base), one file per world (server address).
+    bot.baseFile = process.env.CIEL_BODY_DATA
+      ? join(process.env.CIEL_BODY_DATA, `base-${String(process.env.MC_HOST ?? 'local').replace(/[^\w.-]/g, '_')}-${process.env.MC_PORT ?? '25565'}.json`)
+      : null;
     bot.lastDamageTime = 0;
     bot.lastDamageTaken = 0;
     let health = bot.health;

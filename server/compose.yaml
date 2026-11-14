@@ -192,8 +192,10 @@ services:
       - CIEL_PORT=8771                  # MCP の入口（src/ciel/mcp.js）。BODY_HOST（このマシンの中）だけで開く
       - EYE_PORT=3007                   # 目（src/eye.js）の視点のページ。BODY_HOST（このマシンの中）だけで開く
       - KNOWLEDGE_DATA=/app/knowledge-data   # 知識の道具（minecraft_search）が読む手元の Wiki
+      - CIEL_BODY_DATA=/app/body-data   # ゲームの記憶（拠点など）。ワールドごとのファイル
     volumes:
       - ./minecraft/knowledge/data:/app/knowledge-data
+      - minecraft-body-data:/app/body-data
     depends_on:
       - minecraft
     restart: unless-stopped
@@ -240,4 +242,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  minecraft-body-data:   # 体のゲームの記憶（拠点）。作り直しても残す
   db-data:
