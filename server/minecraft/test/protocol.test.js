@@ -80,3 +80,10 @@ test('景色を見る命令には id が要る', () => {
   assert.deepEqual(parseCommand(JSON.stringify({ v: 1, type: 'look', id: 7 })), { cmd: { type: 'look', id: 7 } });
   assert.equal(parseCommand(JSON.stringify({ v: 1, type: 'look' })).error, 'bad_id');
 });
+
+test('オーナーの言葉を実行中の命令へ渡す', () => {
+  assert.deepEqual(p({ v: 1, type: 'tell', task: 7, text: '  刈ってね ' }).cmd, { type: 'tell', task: 7, text: '刈ってね' });
+  assert.equal(p({ v: 1, type: 'tell', text: 'x' }).error, 'bad_id');
+  assert.equal(p({ v: 1, type: 'tell', task: 7, text: ' ' }).error, 'bad_args');
+  assert.equal(p({ v: 1, type: 'tell', task: 7, text: 'x'.repeat(2001) }).error, 'bad_args');
+});

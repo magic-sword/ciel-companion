@@ -78,5 +78,5 @@ test('obtaining an item with several ways lists them with costs and waits for a 
   // A way that needs a block not in sight says so (here no iron ore for the shears), and the
   // whole choice is kept for the model to read even when the output is shortened.
   assert.match(bot.output, /shear:sheep: .*no [a-z_ ]*iron_ore[a-z_ ]* seen nearby to mine/);
-  assert.match(bot.pendingChoice.text, /The choice is yours: reply with !chooseOption\("id"\)/);
+  assert.match(bot.pendingChoice.text, /Choose one with !chooseOption\("id"\) using an id below and tell the owner in a few words which way you took, or ask the owner/);
 });

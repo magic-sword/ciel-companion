@@ -17,6 +17,11 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 // The conversation's handoff still asks for 120 s; only callers that need more pass more.
 export const MAX_BUDGET_MS = 600000;
 const validId = s => typeof s === 'string' && s.length > 0 && s.length <= 160;
+// The owner's words handed into a work (a reply to its question, or a change of mind).
+const MESSAGE_CHARS = 2000;
+const validMessage = s => typeof s === 'string' && s.trim().length > 0 && s.length <= MESSAGE_CHARS;
+// Replies to the body's questions within one work; each one runs the body again.
+const MAX_REPLIES = 8;
 const keys = (o, allowed) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
 export class GameTasks {
@@ -34,6 +39,7 @@ export class GameTasks {
     if (!t) return null;
     let message = t.reason === 'stop_unconfirmed' ? '停止を確認できません。新しい作業は始めていません。'
       : t.state === 'succeeded' ? `Mindcraftの応答処理が終了しました。成果は未検証です。${t.evidence.response??''}`
+      : t.state === 'needs_decision' && t.decision?.kind === 'question' ? `オーナーの返事を待っています。${t.decision.message}`
       : t.state === 'needs_decision' ? `作業を止めて待っています。${t.evidence.clarification || shortWhy(t.reason,t.evidence)}。`
       : t.state === 'cancelled' ? `${shortWhy(t.reason,t.evidence)}。作業を中止して待っています。`
       : t.state === 'failed' ? '期限内に完了できず、作業を止めました。'
@@ -77,7 +83,7 @@ export class GameTasks {
     if (!this.link.playing()) return { status: 'unavailable' };
     if (this.tasks.size >= 512) return { status: 'error', reason: 'session_request_limit' };
     const t = { id: randomUUID(), request: structuredClone(r), signature, revision: 0, state: 'accepted', reason: '',
-      evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, failures: new Map(), generation: 0,
+      evidence: {}, decision: null, deadline: this.clock() + r.budget_ms, repairs: 0, replies: 0, failures: new Map(), generation: 0,
       follow, followStopping: false };
     this.tasks.set(t.id, t); this.requests.set(r.request_id, t); this.active = t;
     // Reject beyond the history bound; never evict a request and execute its retry a second time.
@@ -92,8 +98,14 @@ export class GameTasks {
 
   activity(event) {
     const t=this.active;
-    if(!t || t.state!=='running' || event.request_id!==t.operation
-        || !['thinking','executing','returning'].includes(event.stage))return;
+    if(!t || t.state!=='running' || event.request_id!==t.operation)return;
+    // What the body says to the owner while it works: told, not kept as the work's state.
+    if(event.stage==='said'){
+      const text=String(event.text??'').trim().slice(0,600);
+      if(text)this.link.notice({kind:'work_message',task_id:t.id,revision:t.revision,text});
+      return;
+    }
+    if(!['thinking','executing','returning'].includes(event.stage))return;
     const activity={stage:event.stage,command:String(event.command??'').slice(0,64)};
     this.link.notice({kind:'work_activity',task_id:t.id,...activity});
     this.changed(t,'running','',{...t.evidence,activity});
@@ -123,20 +135,26 @@ export class GameTasks {
     return false;
   }
 
-  async run(t) {
+  // request: the words the body works from; the owner's reply when a question is answered.
+  async run(t, request = t.request.arguments.request) {
     const generation = ++t.generation;
     this.changed(t, 'running');
     if (!await this.leaveFollow(t,generation) || !this.current(t,generation)) return;
     t.operation=randomUUID();
-    const args={request:t.request.arguments.request,goal_id:t.id};
+    const args={request,goal_id:t.id};
     this.link.notice({kind:'work_action',id:t.operation,task_id:t.id,skill:'pursue',arguments:args});
     try {
       const done=await this.link.runSkill('pursue',args,t.operation,Math.max(1,t.deadline-this.clock()));
       this.link.notice({kind:'work_action_result',id:t.operation,task_id:t.id,result:done});
       if(!this.current(t,generation))return;
-      t.evidence={...t.evidence,...done.note};
+      const {waiting_owner:_asked,...kept}=t.evidence;   // a question belongs to the run that asked it
+      t.evidence={...kept,...done.note};
       const e=t.evidence,b=this.link.body;
-      if(done.ok && e.native_finished===true && e.objective_verified===false && b&&!b.current&&!b.pending&&!b.blocked&&!b.owner)
+      const idle=b&&!b.current&&!b.pending&&!b.blocked&&!b.owner;
+      // The body stopped at a choice and spoke to the owner instead: the work waits for the reply.
+      if(done.ok && e.native_finished===true && e.waiting_owner && idle)
+        this.ask(t,e);
+      else if(done.ok && e.native_finished===true && e.objective_verified===false && idle)
         this.changed(t,'succeeded','',e);
       else if(['unlinked','disconnected','died','replaced','stopped','no_answer','stop_timeout'].includes(done.reason))
         await this.cancel(t.id,done.reason);
@@ -144,26 +162,52 @@ export class GameTasks {
     } catch(e) {if(this.current(t,generation))await this.cancel(t.id,'execution_error');}
   }
 
+  ask(t, evidence) {
+    const waiting = evidence.waiting_owner;
+    const message = String(evidence.response || waiting.choice || '').trim().slice(0, 600);
+    t.decision = { decision_id: randomUUID(), kind: 'question', actions: ['reply', 'cancel'], message,
+      options: Array.isArray(waiting.options) ? waiting.options.slice(0, 12) : [] };
+    this.changed(t, 'needs_decision', 'owner_question', evidence);
+  }
+
   block(t, reason, evidence = {}) {
     if (t.request.constraints.failure_policy === 'stop' || evidence.goal?.failure_policy === 'stop') {
       t.evidence = evidence;
       return this.cancel(t.id, reason);
     }
-    t.decision = { decision_id: randomUUID(), actions: ['retry', 'cancel'] };
+    t.decision = { decision_id: randomUUID(), kind: 'failure', actions: ['retry', 'cancel'] };
     this.changed(t, 'needs_decision', reason, evidence);
   }
 
-  answer(id, decisionId, action) {
+  answer(id, decisionId, action, message) {
     const t = this.tasks.get(id);
     if (!t || t !== this.active || t.state !== 'needs_decision' || t.decision?.decision_id !== decisionId)
       return { status: 'error', reason: 'stale_decision' };
-    if (!['retry', 'cancel'].includes(action)) return { status: 'error', reason: 'invalid_decision' };
+    if (!t.decision.actions.includes(action)) return { status: 'error', reason: 'invalid_decision' };
     if (action === 'cancel') return this.cancel(id);
+    if (action === 'reply') {
+      // The reply carries on the same work: same deadline and constraints, a bounded number of turns.
+      if (!validMessage(message)) return { status: 'error', reason: 'invalid_message' };
+      if (t.replies++ >= MAX_REPLIES || this.clock() >= t.deadline - 5000) return this.cancel(id, 'reply_budget');
+      t.decision = null;
+      void this.run(t, message.trim());
+      return this.view(t);
+    }
     // Retry cannot change constraints, reset deadline, or loop without bound.
     if (t.repairs++ >= 3 || this.clock() >= t.deadline - 5000) return this.cancel(id, 'repair_budget');
     t.decision = null;
     void this.run(t);
     return this.view(t);
+  }
+
+  // The owner's words while the body works ("shear them instead"): the body hears them as the
+  // owner speaking, and may change its plan. A waiting question is answered with answer(reply).
+  tell(id, message) {
+    const t = this.tasks.get(id);
+    if (!t || t !== this.active || t.state !== 'running' || !t.operation) return { status: 'error', reason: 'not_running' };
+    if (!validMessage(message)) return { status: 'error', reason: 'invalid_message' };
+    const r = this.link.tell(t.operation, message.trim());
+    return r.status === 'told' ? this.view(t) : { status: 'error', reason: r.reason ?? 'not_running' };
   }
 
   cancel(id, reason = 'requested') {

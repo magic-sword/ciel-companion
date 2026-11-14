@@ -105,3 +105,40 @@ test('one work may last up to the contract ceiling, and no longer', () => {
   assert.notEqual(long.status, 'error');
   f.work.cancel(long.task_id, 'test');
 });
+
+test('a body that stops at a choice and speaks to the owner waits for the reply, then carries on', async()=>{
+  const {link,work}=fixture();
+  const replies=[{ok:true,note:{native_finished:true,objective_verified:false,response:'Kill the sheep or shear them?',
+    waiting_owner:{choice:'how to get 3 white_wool',options:['kill:sheep','shear:sheep','make']},inventory:{}}},
+    {ok:true,note:{native_finished:true,objective_verified:false,response:'Built it.',inventory:{}}}];
+  link.runSkill=async(skill,args)=>{link.calls.push([skill,args]);return replies.shift();};
+  work.submit(request());await wait(()=>work.active.state==='needs_decision');
+  const asked=work.view();
+  assert.equal(asked.reason,'owner_question');
+  assert.deepEqual([asked.decision.kind,asked.decision.actions,asked.decision.options],['question',['reply','cancel'],['kill:sheep','shear:sheep','make']]);
+  assert.match(asked.message,/オーナーの返事を待っています。Kill the sheep or shear them\?/);
+  assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'retry').reason,'invalid_decision');
+  assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'reply','  ').reason,'invalid_message');
+  const deadline=work.active.deadline;
+  work.answer(asked.task_id,asked.decision.decision_id,'reply','Kill them, that is fine.');
+  await wait(()=>work.active.state==='succeeded');
+  assert.equal(link.calls[1][1].request,'Kill them, that is fine.');
+  assert.equal(work.active.deadline,deadline);
+  assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'reply','again').reason,'stale_decision');
+  work.close();
+});
+
+test('the owner speaks into a running work, and what the body says is told as it says it', async()=>{
+  const {link,work}=fixture();let release;const told=[];
+  link.runSkill=()=>new Promise(r=>{release=r;});link.tell=(operation,text)=>{told.push([operation,text]);return{status:'told'};};
+  const id=work.submit(request()).task_id;await wait(()=>release);
+  assert.equal(work.tell(id,'').reason,'invalid_message');
+  assert.equal(work.tell(id,'Shear them instead.').state,'running');
+  assert.deepEqual(told,[[work.active.operation,'Shear them instead.']]);
+  work.activity({request_id:work.active.operation,stage:'said',text:"I'll go and look for sheep."});
+  assert.deepEqual(link.events.filter(e=>e.kind==='work_message').map(e=>[e.task_id,e.text]),[[id,"I'll go and look for sheep."]]);
+  release({ok:true,note:{native_finished:true,objective_verified:false,response:'Done',inventory:{}}});
+  await wait(()=>work.active.state==='succeeded');
+  assert.equal(work.tell(id,'more').reason,'not_running');
+  work.close();
+});

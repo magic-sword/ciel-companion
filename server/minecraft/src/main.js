@@ -85,6 +85,7 @@ function command(raw) {
   const cmd = r.cmd;
   if (cmd.type === 'do') void runner.start({ ...cmd, scope: link?.bodyScope });
   else if (cmd.type === 'stop') void runner.stop('stopped', cmd.task, link?.bodyScope);
+  else if (cmd.type === 'tell') runner.tell(cmd.task, cmd.text);
   else if (cmd.type === 'chat') {
     if (bot?.entity) bot.chat(cmd.text);
     else send('error', { reason: 'not_spawned' });

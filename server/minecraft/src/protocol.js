@@ -5,6 +5,7 @@ export const VERSION = 1;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;        // マイクラのプレイヤー名
 const BLOCK = /^[a-z0-9_]{1,64}$/;           // ブロック・持ち物の名前（oak_log など）
 const CHAT_CHARS = 256;                      // マイクラのチャットの上限
+const TELL_CHARS = 2000;                     // オーナーの言葉を作業へ渡す上限（作業の依頼文と同じ）
 const COLLECT_MAX = 64;
 const CRAFT_MAX = 64;
 const DIG_MAX = 32;
@@ -110,6 +111,12 @@ export function parseCommand(raw) {
     case 'stop':
       if (m.task !== undefined && !Number.isInteger(m.task)) return { error: 'bad_id' };
       return { cmd: { type: 'stop', ...(m.task !== undefined ? { task: m.task } : {}) } };
+    // The owner's words to a running command (a work), heard by the body's model as the owner speaking.
+    case 'tell': {
+      if (!Number.isInteger(m.task)) return { error: 'bad_id' };
+      if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > TELL_CHARS) return { error: 'bad_args' };
+      return { cmd: { type: 'tell', task: m.task, text: m.text.trim() } };
+    }
     case 'chat': {
       if (typeof m.text !== 'string' || !m.text.trim()) return { error: 'bad_args' };
       // 改行や制御文字はコマンドの区切りにならないよう、空白にする。先頭の / はコマンドになるので送らない

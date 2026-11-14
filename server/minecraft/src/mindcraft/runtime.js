@@ -142,7 +142,13 @@ export class MindcraftRunner extends BodyCommands {
     if(agent.blocked_actions.length>defaultSettings.blocked_actions.length)console.log('Blocked commands:',agent.blocked_actions.join(', '));
     blacklistCommands(agent.blocked_actions);
     // Transport and process lifecycle belong to CIEL; planning belongs to Agent.
-    agent.openChat=async message=>{this.nativeResponse=String(message).trim();};
+    agent.openChat=async message=>{
+      this.nativeResponse=String(message).trim();
+      // Told to the owner as it is said ("I'll go and look for sheep"), not only at the end.
+      const c=this.current;
+      if(c&&this.nativeResponse)this.report('activity',{id:c.id,request_id:c.request_id,command_scope:c.scope??'',
+        stage:'said',command:'',text:this.nativeResponse});
+    };
     agent.cleanKill=nativeExit(bot,()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');});
     const requestInterrupt=agent.requestInterrupt.bind(agent);
     agent.requestInterrupt=()=>{requestInterrupt();this.actionScope.interrupt();};
@@ -220,8 +226,21 @@ export class MindcraftRunner extends BodyCommands {
     while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
         || this.agent.self_prompter.isActive() || this.modeActions.size || this.replying)) await pause(100);
     if(c.token.cancelled)throw new Failed(c.token.reason??'stopped');
+    // A plan left waiting on a choice: the model spoke to the owner instead of choosing.
+    const choice=this.bot.pendingChoice;
     return {native_finished:true,objective_verified:false,response:this.nativeResponse,
+      ...(choice?{waiting_owner:{choice:choice.question,options:Object.keys(choice.options)}}:{}),
       inventory:inventory(this.bot)};
+  }
+
+  // The owner's words during a work, heard like any message from the owner; the pursue loop
+  // waits for the reply (trackReplies) and the commands it starts.
+  tell(id, text) {
+    const c=this.current;
+    if(!c||c.id!==id||c.skill!=='pursue'||c.token.cancelled||!this.agent)return false;
+    this.activity(c,'thinking');
+    void this.agent.handleMessage(this.owner||'user',text).catch(e=>console.warn('Owner message failed:',e.message));
+    return true;
   }
 
   activity(c, stage, command = '') {

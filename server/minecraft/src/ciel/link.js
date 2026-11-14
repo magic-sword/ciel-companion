@@ -196,6 +196,14 @@ export class CielLink {
     return m.type === 'timeout' ? { status: 'no_answer' } : refused(m);
   }
 
+  // The owner's words to the body command running for requestId (a work's operation).
+  tell(requestId, text) {
+    const match = [...this._tasks].find(([, value]) => value.requestId === requestId);
+    if (!match) return { status: 'error', reason: 'not_running' };
+    this.command(JSON.stringify({ v: 1, type: 'tell', task: match[0], text }));
+    return { status: 'told' };
+  }
+
   stop(task, requestId) {
     if (requestId) {
       this._cancelledRequests.add(requestId);

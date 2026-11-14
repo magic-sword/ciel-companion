@@ -147,3 +147,34 @@ test('a work waits for the reply a mode asks for after interrupting its action',
   assert.deepEqual(order, ['first', 'reply']);
   assert.equal(result.response, 'carried on');
 });
+
+test('a pursue left at a plan choice says so, and the owner speaks into the running pursue', async () => {
+  const runner = new MindcraftRunner(() => {}, 'Owner');
+  const heard = [];
+  let reply;
+  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false },
+    async handleMessage(source, text) {
+      heard.push([source, text]);
+      if (text === 'shear them') { runner.bot.pendingChoice = null; runner.nativeResponse = 'Shearing them.'; return; }
+      runner.bot.pendingChoice = { question: 'how to get 3 white_wool', options: { 'kill:sheep': () => {}, 'shear:sheep': () => {} } };
+      runner.nativeResponse = 'Kill or shear?';
+      reply = new Promise(r => setTimeout(r, 100));
+      await reply;
+    } };
+  runner.agent = agent;
+  runner.trackReplies(agent);
+  runner.coreModel = {};
+  runner.activity = () => {};
+  runner.bot = { inventory: { items: () => [] } };
+  const c = { id: 3, skill: 'pursue', args: { request: 'Build a dirt shelter.' }, token: { cancelled: false } };
+  runner.current = c;
+  const asked = await runner.pursue(c);
+  assert.deepEqual(asked.waiting_owner, { choice: 'how to get 3 white_wool', options: ['kill:sheep', 'shear:sheep'] });
+  assert.equal(runner.tell(9, 'not this one'), false);
+  const again = runner.pursue({ ...c, args: { request: 'shear them' } });
+  const done = await again;
+  assert.equal(done.waiting_owner, undefined);
+  assert.equal(runner.tell(3, 'shear them'), true);
+  await new Promise(r => setTimeout(r, 10));
+  assert.deepEqual(heard.map(h => h[0]), ['Owner', 'Owner', 'Owner']);
+});

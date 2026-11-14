@@ -48,7 +48,7 @@ export function profile() {
     link_tool: 'minecraft_link', stop_tool: 'minecraft_stop_moving',
     inference: { version: 1, bind_tool: 'minecraft_bind_core' },
     work: { version: TASK_VERSION, submit: 'minecraft_task_submit', status: 'minecraft_task_status',
-      answer: 'minecraft_task_answer', cancel: 'minecraft_task_cancel', capabilities: CAPABILITIES },
+      answer: 'minecraft_task_answer', cancel: 'minecraft_task_cancel', say: 'minecraft_task_say', capabilities: CAPABILITIES },
     talker_examples: ROUTES.talker ?? [],
     reasons, quiet_reasons: QUIET_REASONS,
   };
@@ -165,9 +165,13 @@ export function makeServer(hub, sessionId) {
   server.registerTool('minecraft_task_status', { description: '作業の最新状態と根拠を取得する。',
     inputSchema: { task_id: z.string() }, ...WORK },
   ({ task_id }) => work(w => w.tasks.has(task_id) ? w.view(w.tasks.get(task_id)) : { status: 'error', reason: 'unknown_task' }));
-  server.registerTool('minecraft_task_answer', { description: 'ゲームからの判断要求に回答する。期限と制約は変更しない。',
-    inputSchema: { task_id: z.string(), decision_id: z.string(), action: z.enum(['retry', 'cancel']) }, ...WORK },
-  ({ task_id, decision_id, action }) => work(w => w.answer(task_id, decision_id, action)));
+  server.registerTool('minecraft_task_answer', { description: 'ゲームからの判断要求に回答する。質問（decision.kind=question）にはreplyとオーナーの言葉で答える。期限と制約は変更しない。',
+    inputSchema: { task_id: z.string(), decision_id: z.string(), action: z.enum(['retry', 'reply', 'cancel']),
+      message: z.string().min(1).max(2000).optional() }, ...WORK },
+  ({ task_id, decision_id, action, message }) => work(w => w.answer(task_id, decision_id, action, message)));
+  server.registerTool('minecraft_task_say', { description: '実行中の作業へオーナーの言葉を渡す（方法の変更など）。体はオーナーの発言として聞き、計画を変えることがある。',
+    inputSchema: { task_id: z.string(), message: z.string().min(1).max(2000) }, ...WORK },
+  ({ task_id, message }) => work(w => w.tell(task_id, message)));
   server.registerTool('minecraft_task_cancel', { description: '作業を中止し、体の停止を確認する。',
     inputSchema: { task_id: z.string() }, ...WORK }, ({ task_id }) => work(w => w.cancel(task_id)));
 
