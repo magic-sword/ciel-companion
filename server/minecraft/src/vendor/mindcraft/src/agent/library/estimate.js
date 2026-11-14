@@ -4,20 +4,23 @@
  * 90th percentile with slack, so a slow step stops on its own time; a plan's estimate, which may
  * lengthen the work that runs it, is the sum of its steps' 90th percentiles.
  */
+// Measured 2026-11-15 on the dedicated benchmark (seeds 11-13: the mc_* and long tasks, the farm,
+// the bed and the house tasks; 1371 steps). Successful steps only where failures end at once.
 export const TIMES = {
-    craft: { median: 1.0, p90: 8.6 },              // per craft, with placing and taking back the table
-    smelt: { median: 13.8, p90: 33.9 },            // per smelt step of a few items
-    smelt_item: { median: 10, p90: 12 },           // each further item in the furnace
+    craft: { median: 1.1, p90: 8.2 },              // per craft, with placing and taking back the table (n=546)
+    smelt: { median: 12.4, p90: 21.5 },            // the first item, with fuel and the walk to the furnace
+    smelt_item: { median: 12.4, p90: 12.4 },       // each further item (n=23 smelt steps)
     mine: {                                        // per block, with walking between blocks
         default: { median: 6.0, p90: 11.0 },
-        oak_log: { median: 7.1, p90: 10.8 },
-        cobblestone: { median: 1.8, p90: 4.6 },
-        coal: { median: 5.6, p90: 6.1 },
-        raw_iron: { median: 9.5, p90: 29.0 },
+        dirt: { median: 1.6, p90: 2.4 },           // n=89
+        cobblestone: { median: 1.8, p90: 2.8 },    // n=69
+        coal: { median: 6.0, p90: 6.0 },           // the blocks gained (n=9)
+        oak_log: { median: 5.5, p90: 10.0 },       // n=137
+        raw_iron: { median: 9.0, p90: 24.3 },      // n=33
     },
-    mob: { kill: { median: 15, p90: 40 }, shear: { median: 20, p90: 75 } },
-    explore_leg: { median: 15, p90: 30 },
-    cell: { default: { median: 3, p90: 15 } },
+    mob: { kill: { median: 9.7, p90: 11.4 }, shear: { median: 22.8, p90: 24.3 } },  // one sheep, found
+    explore_leg: { median: 9.1, p90: 9.7 },        // n=10 legs reached
+    cell: { default: { median: 1.0, p90: 1.3 }, clear: { median: 0.9, p90: 1.2 } },  // placed or cleared (n=102)
 };
 // A step may run this much past its 90th percentile before it is stopped, and never less than FLOOR.
 export const SLACK = 1.5;

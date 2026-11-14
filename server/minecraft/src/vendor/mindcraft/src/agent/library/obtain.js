@@ -149,9 +149,10 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
     const lines = step.options.map(id => {
         const chosen = { ...choices, [step.item]: id };
         const plan = mc.getCraftingActions(itemName, num, inventory, tableAvailable, chosen) || [];
-        const further = plan.some(a => a.type === 'choose') ? ', then another choice' : '';
+        const next = plan.find(a => a.type === 'choose');
+        const further = next ? `, then a choice for ${next.item}: ${nextWays(bot, itemName, num, inventory, tableAvailable, chosen, next)}` : '';
         const unseen = unseenSources(bot, plan);
-        const missing = unseen.length ? `, no ${unseen.join(' or ')} seen nearby to mine` : '';
+        const missing = unseen.length ? `, cannot be done here: no ${unseen.join(' or ')} in sight to mine` : '';
         if (id === 'make') return `make: craft or mine ${step.item} instead (${plan.length} steps in all${missing}${further})`;
         const way = ways.find(w => w.id === id);
         const seen = countSuitable(bot, way);
@@ -160,7 +161,7 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         if (way.tool && !(inventory[way.tool] > 0)) facts.push(`a ${way.tool} to make first`);
         if (way.stays) facts.push(`the ${way.mob} stay`);
         if (way.hostile) facts.push('it fights back');
-        if (unseen.length) facts.push(`no ${unseen.join(' or ')} seen nearby to mine`);
+        if (unseen.length) facts.push(`cannot be done here: no ${unseen.join(' or ')} in sight to mine`);
         facts.push(`${plan.length} steps in all${further}`);
         const notes = [MOBS[way.mob].methods[way.method].note, MOBS[way.mob].spawn.note].filter(Boolean).join(' ');
         return `${id}: ${facts.join(', ')}. ${notes}`.trim();
@@ -174,6 +175,19 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
             [id, () => obtainItem(bot, itemName, num, { choices: { ...choices, [step.item]: id } })])),
     };
     skills.log(bot, text);
+}
+
+// The ways of the choice that comes after one, in short: whether each can be done from here.
+function nextWays(bot, itemName, num, inventory, tableAvailable, chosen, next) {
+    const ways = mobWays(next.item);
+    return next.options.map(id => {
+        const plan = mc.getCraftingActions(itemName, num, inventory, tableAvailable, { ...chosen, [next.item]: id }) || [];
+        const unseen = unseenSources(bot, plan);
+        const way = ways.find(w => w.id === id);
+        const notes = [unseen.length ? `no ${unseen.join(' or ')} in sight` : null,
+            way && countSuitable(bot, way) === 0 ? `no ${way.mob} seen` : null, way?.hostile ? 'fights back' : null].filter(Boolean);
+        return notes.length ? `${id} (${notes.join(', ')})` : id;
+    }).join(', ');
 }
 
 // Blocks a plan would mine that are not within 64 blocks, so a way that cannot be done here shows.
