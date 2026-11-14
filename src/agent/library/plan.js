@@ -3,6 +3,7 @@ import * as world from './world.js';
 import * as skills from './skills.js';
 import { obtainItem, obtainSeconds } from './obtain.js';
 import { within } from './deadline.js';
+import { recordTime } from './timing.js';
 
 /**
  * A plan is an ordered list of steps. Each step names the steps it needs, says whether the
@@ -39,6 +40,7 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
         const asked = bot.pendingChoice;
         if (!await within(bot, () => step.run(bot), seconds))
             skills.log(bot, `Timed out on "${step.label}" after ${Math.round((Date.now() - began) / 1000)}s.`);
+        recordTime('plan_step', began, { id: step.id, budget: Math.round(seconds), ok: step.done(bot) });
         if (bot.pendingChoice && bot.pendingChoice !== asked) {
             continueAfterChoice(bot, steps, { tries });
             const rest = steps.filter(other => !other.done(bot)).map(other => other.label);

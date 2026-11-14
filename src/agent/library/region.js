@@ -2,6 +2,7 @@ import { Vec3 } from 'vec3';
 import * as skills from './skills.js';
 import * as world from './world.js';
 import { within } from './deadline.js';
+import { recordTime } from './timing.js';
 import { Blueprint } from '../tasks/construction_tasks.js';
 
 /**
@@ -78,8 +79,11 @@ export async function buildRegion(bot, blueprint, { passes = 2 } = {}) {
                 const [x, y, z] = cell.coordinates;
                 const current = bot.blockAt(new Vec3(x, y, z))?.name ?? 'air';
                 if (same(blueprint, cell.expected, current) || !phase.wants({ ...cell, actual: current })) continue;
+                const began = Date.now();
                 await within(bot, () => phase.act(bot, x, y, z, cell.expected, expectedAt), CELL_SECONDS,
                     `${phase.name} at ${x}, ${y}, ${z}`);
+                recordTime('cell', began, { phase: phase.name, block: cell.expected,
+                    ok: same(blueprint, cell.expected, bot.blockAt(new Vec3(x, y, z))?.name ?? 'air') });
             }
         }
         const left = remaining(blueprint, bot);

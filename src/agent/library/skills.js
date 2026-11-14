@@ -54,6 +54,20 @@ function toolHint(blockName) {
         : ` It needs a ${tool} or better.`;
 }
 
+// Take back a crafting table this craft placed, and wait until it is in the inventory: the next
+// plan is made from the inventory at once, and a table still lying on the ground made it craft
+// another one.
+async function recoverTable(bot, waitMs = 3000) {
+    const count = () => world.getInventoryCounts(bot)['crafting_table'] || 0;
+    const before = count();
+    await collectBlock(bot, 'crafting_table', 1);
+    for (const until = Date.now() + waitMs; count() <= before && Date.now() < until && !bot.interrupt_code;) {
+        await pickupNearbyItems(bot);
+        if (count() <= before) await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    if (count() <= before) log(bot, `The crafting table was not picked up.`);
+}
+
 export async function craftRecipe(bot, itemName, num=1) {
     /**
      * Attempt to craft the given item name from a recipe. May craft many items.
@@ -104,9 +118,7 @@ export async function craftRecipe(bot, itemName, num=1) {
     }
     if (!recipes || recipes.length === 0) {
         log(bot, `You do not have the resources to craft a ${itemName}. It requires: ${Object.entries(mc.getItemCraftingRecipes(itemName)[0][0]).map(([key, value]) => `${key}: ${value}`).join(', ')}.${obtainHint(itemName, num)}`);
-        if (placedTable) {
-            await collectBlock(bot, 'crafting_table', 1);
-        }
+        if (placedTable) await recoverTable(bot);
         return false;
     }
     
@@ -124,9 +136,7 @@ export async function craftRecipe(bot, itemName, num=1) {
     await bot.craft(recipe, Math.min(craftLimit.num, num), craftingTable);
     if(craftLimit.num<num) log(bot, `Not enough ${craftLimit.limitingResource} to craft ${num}, crafted ${craftLimit.num}. You now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
     else log(bot, `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
-    if (placedTable) {
-        await collectBlock(bot, 'crafting_table', 1);
-    }
+    if (placedTable) await recoverTable(bot);
 
     //Equip any armor the bot may have crafted.
     //There is probablly a more efficient method than checking the entire inventory but this is all mineflayer-armor-manager provides. :P
