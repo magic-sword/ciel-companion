@@ -97,3 +97,11 @@ test('legacy construction is not advertised or substituted for native Agent exec
   const result=work.submit(request({capability:'minecraft.edit_region',arguments:{plan_id:'11111111-1111-4111-8111-111111111111'},constraints:{failure_policy:'stop'}}));
   assert.equal(result.reason,'unsupported_skill');assert.equal(link.calls.length,0);work.close();
 });
+
+test('one work may last up to the contract ceiling, and no longer', () => {
+  const f = fixture();
+  assert.equal(f.work.submit(request({ request_id: 'too-long', budget_ms: 600001 })).reason, 'invalid_request');
+  const long = f.work.submit(request({ request_id: 'long', budget_ms: 600000 }));
+  assert.notEqual(long.status, 'error');
+  f.work.cancel(long.task_id, 'test');
+});

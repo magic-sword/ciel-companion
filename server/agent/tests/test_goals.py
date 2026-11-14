@@ -69,6 +69,7 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.env._call.assert_not_awaited()
         self.env.profile['work']['version'] = 1
         self.assertEqual((await self.runner.start('puzzle.solve', {}, seconds=True))['reason'], 'invalid_budget')
+        self.assertEqual((await self.runner.start('puzzle.solve', {}, seconds=601))['reason'], 'invalid_budget')
         self.env._call.assert_not_awaited()
 
     async def test_transport_error_does_not_report_success(self):

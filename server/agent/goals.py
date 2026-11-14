@@ -9,6 +9,8 @@ import debug_log
 
 TOPIC = 'ciel.goal'
 TERMINAL = frozenset(('succeeded', 'failed', 'cancelled'))
+# The work contract's ceiling for one work (the game enforces the same limit).
+MAX_SECONDS = 600
 ACTIVE = frozenset(('accepted', 'running', 'needs_decision', 'cancelling'))
 STATES = ACTIVE | TERMINAL
 
@@ -46,7 +48,7 @@ class GoalRunner:
                 return {'status': 'busy'}
             if not self.env or (self.env.profile.get('work') or {}).get('version') != 1:
                 return {'status': 'error', 'reason': 'work_protocol_mismatch'}
-            if type(seconds) not in (int, float) or not 0 < seconds <= 120:
+            if type(seconds) not in (int, float) or not 0 < seconds <= MAX_SECONDS:
                 return {'status': 'error', 'reason': 'invalid_budget'}
             self._deadline = time.monotonic() + seconds
             self.title = title or capability

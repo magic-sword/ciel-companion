@@ -13,6 +13,9 @@ const definitions = [{
 }];
 export const CAPABILITIES=definitions;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+// One work may run up to 10 minutes: long multi-step requests (an iron tool from scratch).
+// The conversation's handoff still asks for 120 s; only callers that need more pass more.
+export const MAX_BUDGET_MS = 600000;
 const validId = s => typeof s === 'string' && s.length > 0 && s.length <= 160;
 const keys = (o, allowed) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
@@ -60,7 +63,7 @@ export class GameTasks {
         && typeof r.arguments.request==='string' && r.arguments.request.trim().length>0 && r.arguments.request.length<=2000
         && keys(r.constraints,[]);
     if (!keys(r, ['request_id', 'capability', 'arguments', 'budget_ms', 'constraints']) || !validId(r.request_id)
-        || !validArguments || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > 120000) {
+        || !validArguments || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > MAX_BUDGET_MS) {
       return { status: 'error', reason: 'invalid_request' };
     }
     const signature = JSON.stringify([r.capability, r.arguments, r.constraints]);
