@@ -235,6 +235,7 @@ export class Agent {
     }
 
     requestInterrupt() {
+        this.bot.deadlineStop = null;  // a step's deadline must not lower this stop again (deadline.js)
         this.bot.interrupt_code = true;
         this.bot.stopDigging();
         this.bot.collectBlock.cancelTask();

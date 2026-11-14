@@ -70,6 +70,25 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
     return false;
 }
 
+/**
+ * The time obtaining num items may take: the sum of the deadlines of the plan's steps, as
+ * obtainItem runs them (the mining of one block in one trip). A choice ends the plan there.
+ */
+export function obtainSeconds(bot, itemName, num = 1) {
+    const inventory = world.getInventoryCounts(bot);
+    const tableAvailable = (inventory['crafting_table'] || 0) > 0 || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
+    const actions = mc.getCraftingActions(itemName, num, inventory, tableAvailable) || [];
+    const mined = new Map();
+    let total = 0;
+    for (const step of actions) {
+        if (step.type === 'choose') break;
+        if (step.type === 'mine') mined.set(step.item, { ...step, count: (mined.get(step.item)?.count || 0) + step.count });
+        else total += stepSeconds(bot, step);
+    }
+    for (const step of mined.values()) total += stepSeconds(bot, step);
+    return total;
+}
+
 function describe(step) {
     if (step.type === 'craft') return `craft ${step.produces} ${step.item}`;
     if (step.type === 'smelt') return `smelt ${step.count} ${step.input}`;

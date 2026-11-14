@@ -1,7 +1,7 @@
 import * as mc from '../../utils/mcdata.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
-import { obtainItem } from './obtain.js';
+import { obtainItem, obtainSeconds } from './obtain.js';
 import { within } from './deadline.js';
 
 /**
@@ -76,10 +76,11 @@ const count = (bot, name) => world.getInventoryCounts(bot)[name] || 0;
 // so a step stays done once what it gathered has been used up.
 const amount = (num, bot) => typeof num === 'function' ? num(bot) : num;
 
-// Seconds per executor step, the same basis as the long-horizon benchmark deadlines.
+// Seconds per executor step, the same basis as the long-horizon benchmark deadlines; the
+// least a "have" step gets.
 export const SECONDS_PER_ITEM_STEP = 40;
 
-/** Have num of an item, made or mined by the crafting-plan executor. */
+/** Have num of an item, made or mined by the crafting-plan executor, in the time its steps take. */
 export function haveStep(id, item, num = 1, { needs = [], satisfiedBy = [item] } = {}) {
     return {
         id, needs, label: `get ${typeof num === 'function' ? 'enough' : num} ${item}`,
@@ -88,12 +89,7 @@ export function haveStep(id, item, num = 1, { needs = [], satisfiedBy = [item] }
             return n <= 0 || satisfiedBy.reduce((sum, name) => sum + count(bot, name), 0) >= n;
         },
         run: bot => obtainItem(bot, item, amount(num, bot)),
-        seconds: bot => {
-            const inventory = world.getInventoryCounts(bot);
-            const table = (inventory.crafting_table || 0) > 0 || world.getNearestBlock(bot, 'crafting_table', 16) !== null;
-            const actions = mc.getCraftingActions(item, Math.max(1, amount(num, bot)), inventory, table) || [];
-            return SECONDS_PER_ITEM_STEP * Math.max(1, actions.length);
-        },
+        seconds: bot => Math.max(SECONDS_PER_ITEM_STEP, obtainSeconds(bot, item, Math.max(1, amount(num, bot)))),
     };
 }
 
