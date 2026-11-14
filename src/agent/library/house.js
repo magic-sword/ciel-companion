@@ -109,6 +109,8 @@ export async function buildHouse(agent, name) {
 async function houseAt(bot, house, name, site) {
     skills.log(bot, `Building the ${name} at ${site.corner.x}, ${site.corner.y}, ${site.corner.z}.`);
     bot.houses = { ...(bot.houses ?? {}), [name]: site };
+    // Items the house still needs are kept from modes that would spend them (torch placing).
+    bot.keepItems = item => materials(blueprint, bot)[item] || 0;
     const blueprint = houseBlueprint(bot, house, site.corner, site.turns);
     reserve(bot, blueprint);
     return await runPlan(bot, houseSteps(blueprint, bot));
