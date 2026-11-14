@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "bdc26be0dc797f269cf4e8c8907d0746423357f2",
+  "fork_commit": "a585605061f66277cef42fff594f8fa8555a76d4",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -11,7 +11,12 @@
     "src/agent/agent.js",
     "src/agent/commands/actions.js",
     "src/agent/commands/queries.js",
+    "src/agent/library/deadline.js",
+    "src/agent/library/farm.js",
     "src/agent/library/obtain.js",
+    "src/agent/library/plan.js",
+    "src/agent/library/region.js",
+    "src/agent/library/sites.js",
     "src/agent/library/skills.js",
     "src/agent/modes.js",
     "src/agent/npc/controller.js",
@@ -149,7 +154,7 @@
       "upstream_sha256": "418ad6b04c7d49b767b6cb61ba7551f4ca1823e9adb437af6f3b4eeb462165b6"
     },
     "src/agent/commands/actions.js": {
-      "sha256": "08c42922494ce9077a70abc9dec331c9873e8f6334ce1f27b545cb5901fe5c0f",
+      "sha256": "953605f9d7455e0deabb9f1ef498b66679ed3fcf3e215fd6694433f9da721d66",
       "upstream_sha256": "85e10a7d0c81be65966777fd2b67a1b89427f35826ea89f71efe9658417402a7"
     },
     "src/agent/commands/index.js": {
@@ -172,6 +177,12 @@
       "sha256": "5360fc1a4f4d845f7f717ddbe2170d1f69e3d9c61b7448e4a9d0f14444027c3e",
       "upstream_sha256": "5360fc1a4f4d845f7f717ddbe2170d1f69e3d9c61b7448e4a9d0f14444027c3e"
     },
+    "src/agent/library/deadline.js": {
+      "sha256": "c0612fd954f34c52c74a188bf915e4ccc5ac27a82582dd07e2d869a9166083df"
+    },
+    "src/agent/library/farm.js": {
+      "sha256": "c4474bcf229fae3c507eba6d809ee3f170fc8dfc3c1145b9a0c735c8461567ea"
+    },
     "src/agent/library/full_state.js": {
       "sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901",
       "upstream_sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901"
@@ -185,7 +196,16 @@
       "upstream_sha256": "1329dc6967600c501b0f2be637e83b5957edd86bd9ef77be95596ec69f5f4068"
     },
     "src/agent/library/obtain.js": {
-      "sha256": "c1f71ebdeb7b9cec5a0b51f7188d5f31200ed780410995dcf37df26cbc8ec73c"
+      "sha256": "258928604e1d5d19406dcdc893512f50da6d697173f82e3ddeaf639d9ca2b6a6"
+    },
+    "src/agent/library/plan.js": {
+      "sha256": "e0199c3e194f70dd86368eb2a8ce5183b64aabaf604ef69420da0e0ef0e868a6"
+    },
+    "src/agent/library/region.js": {
+      "sha256": "9d3c90c7a100912522821e0bf91fbc29e8372b762f67c3affd7fd79cc650e6df"
+    },
+    "src/agent/library/sites.js": {
+      "sha256": "7ca88b79fe8e4b65ff07c0062630fe1611203a65884e04545135c256cc8bf086"
     },
     "src/agent/library/skill_library.js": {
       "sha256": "ef52fe70e640c079a38f5b319582f356cd782149358f32a93117d38df0f5e32e",

@@ -1,5 +1,6 @@
 import * as skills from '../library/skills.js';
 import { obtainItem } from '../library/obtain.js';
+import { makeFarm } from '../library/farm.js';
 import settings from '../settings.js';
 import convoManager from '../conversation.js';
 
@@ -273,6 +274,37 @@ export const actionsList = [
         },
         perform: runAsAction(async (agent, item_name, num) => {
             await obtainItem(agent.bot, item_name, num);
+        })
+    },
+    {
+        name: '!buildFarm',
+        description: 'Make a wheat farm of size by size blocks with water in the middle, near you. Picks a flat grass place, gets a hoe, seeds and a water bucket, then clears, levels, tills and sows it. When every place needs the land changed, it lists the places to choose from with !chooseOption.',
+        params: {
+            'size': { type: 'int', description: 'The width and depth of the farm, an odd number from 3 to 9.', domain: [3, 10] }
+        },
+        perform: runAsAction(async (agent, size) => {
+            await makeFarm(agent, size % 2 === 1 ? size : size - 1);
+        })
+    },
+    {
+        name: '!chooseOption',
+        description: 'Choose one of the options a plan is waiting on, by its id (such as "site_2"), and carry the plan on.',
+        params: {
+            'option_id': { type: 'string', description: 'The id of the option to choose.' }
+        },
+        perform: runAsAction(async (agent, option_id) => {
+            const choice = agent.pendingChoice;
+            if (!choice) {
+                skills.log(agent.bot, 'Nothing is waiting for a choice.');
+                return;
+            }
+            const go = choice.options[option_id];
+            if (!go) {
+                skills.log(agent.bot, `${option_id} is not one of the options for ${choice.question}: ${Object.keys(choice.options).join(', ')}.`);
+                return;
+            }
+            agent.pendingChoice = null;
+            await go();
         })
     },
     {
