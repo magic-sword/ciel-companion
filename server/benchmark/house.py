@@ -21,6 +21,8 @@ LANE_Z = (-2, 1)
 LANE_X = (48, 103)
 PASTURE = (104, -6, 115, 5)
 FAR_END = 140
+# The land beyond the arena wall that house tasks use: x1, z1, x2, z2.
+LAND = (48, -17, FAR_END, 17)
 
 
 def load(name):

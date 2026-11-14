@@ -12,7 +12,7 @@ import time
 import uuid
 
 from .farm import layout as farm_layout, commands as farm_commands, checks as farm_checks
-from .house import layout as house_layout, commands as house_commands, checks as house_checks, mob_spot as pasture_spot
+from .house import layout as house_layout, commands as house_commands, checks as house_checks, mob_spot as pasture_spot, LAND as PASTURE_LAND
 
 MARKER = 'ciel-benchmark-v1'
 OBJECTIVE = 'cielbench'
@@ -164,6 +164,10 @@ class World:
         for command in [f'gamemode creative {self.player}', f'tp {self.player} 0.5 85 0.5',
                         'forceload add -48 -48 48 48',
                         'kill @e[type=!minecraft:player,x=-48,y=59,z=-48,dx=96,dy=40,dz=96]',
+                        # Animals a house task left in the pasture beyond the wall would be counted
+                        # by the next task's mobs, so that land is cleared for every task.
+                        f'forceload add {PASTURE_LAND[0]} {PASTURE_LAND[1]} {PASTURE_LAND[2]} {PASTURE_LAND[3]}',
+                        f'kill @e[type=!minecraft:player,x={PASTURE_LAND[0]},y=59,z={PASTURE_LAND[1]},dx={PASTURE_LAND[2]-PASTURE_LAND[0]},dy=40,dz={PASTURE_LAND[3]-PASTURE_LAND[1]}]',
                         f'clear {self.player}', f'effect clear {self.player}']:
             self._write(command)
         self._write(f'scoreboard players set {self.player} cieldeaths 0')
