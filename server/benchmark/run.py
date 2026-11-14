@@ -54,6 +54,10 @@ class Trace:
 ORES = ('coal_ore', 'iron_ore', 'gold_ore', 'copper_ore')
 
 
+# The arena is on peaceful difficulty, so only mobs that are not hostile can be placed.
+PASSIVE_MOBS = {'sheep', 'cow', 'chicken', 'pig'}
+
+
 def load_tasks(path=SUITE):
     suite = json.loads(path.read_text(encoding='utf-8'))
     if suite['version'] != 1 or len({t['id'] for t in suite['tasks']}) != len(suite['tasks']):
@@ -67,6 +71,9 @@ def load_tasks(path=SUITE):
             validate_spatial(task)
         if task.get('farm'):
             validate_farm(task)
+        mobs = task.get('mobs', {})
+        if any(name not in PASSIVE_MOBS or not isinstance(n, int) or not 1 <= n <= 8 for name, n in mobs.items()) or (mobs and task['forest'] != 'near'):
+            raise ValueError('Mobs must be passive mobs, 1..8 each, beside a near forest')
         if task['forest'] not in ('near','far','many','none') or task.get('surface','grass_block') not in ('grass_block','sand','stone'):
             raise ValueError('Unknown fixture layout')
         ores = task.get('ores', {})

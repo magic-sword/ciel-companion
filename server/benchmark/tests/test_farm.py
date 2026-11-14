@@ -48,5 +48,13 @@ class FarmTaskTest(unittest.TestCase):
         self.assertEqual(watch.last_progress, 20)
 
 
+class MobTaskTest(unittest.TestCase):
+    def test_bed_tasks_place_one_or_three_white_sheep_under_the_long_policy(self):
+        tasks = {t['id']: t for t in load_tasks()}
+        self.assertEqual(tasks['long_white_bed']['mobs'], {'sheep': 3})
+        self.assertEqual(tasks['long_white_bed_one_sheep']['mobs'], {'sheep': 1})
+        self.assertEqual(tasks['long_white_bed']['policy'], 'long-horizon-v1')
+
+
 if __name__ == '__main__':
     unittest.main()

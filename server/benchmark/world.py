@@ -148,6 +148,7 @@ class World:
         self.navigation = task.get('navigation')
         self.spatial = task.get('spatial')
         self.farm = None
+        self.mobs = dict(task.get('mobs', {}))
         if self.navigation:
             if not self.scalar('execute if entity Bench_Owner', success=True):
                 raise RuntimeError('Benchmark fixture owner is not online')
@@ -203,6 +204,13 @@ class World:
                         break
                 ores.append((name, x, z))
                 self._write(f'setblock {x} 63 {z} minecraft:{name}')
+        # Passive mobs on the side away from the trees; sheep are white, so their wool is.
+        mobs = []
+        for name, count in sorted(self.mobs.items()):
+            for _ in range(count):
+                x, z = -side*rng.randint(4, 14), rng.randint(-8, 8)
+                mobs.append((name, x, z))
+                self._write(f'summon minecraft:{name} {x}.5 64 {z}.5' + (' {Color:0b}' if name == 'sheep' else ''))
         if task.get('farm'):
             self.farm = farm_layout(rng, side, task['farm']['size'])
             for command in farm_commands(self.farm):
@@ -226,6 +234,9 @@ class World:
         for name, x, z in ores:
             if not self.scalar(f'execute if block {x} 63 {z} minecraft:{name}', success=True):
                 raise RuntimeError('Fixture ore placement failed')
+        for name, count in self.mobs.items():
+            if self.scalar(f'execute if entity @e[type=minecraft:{name}]') != count:
+                raise RuntimeError('Fixture mob placement failed')
         for x, y, z, name in farm_checks(self.farm) if self.farm else []:
             if not self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True):
                 raise RuntimeError('Fixture farm placement failed')
@@ -233,7 +244,8 @@ class World:
             self.move_target(self.navigation['targets'][0])
         return {'layout_seed': seed, 'trees': trees, 'arena': [-48,60,-48,48,81,48],
                 **({'ores': [[name, x, 63, z] for name, x, z in ores]} if ores else {}),
-                **({'farm': self.farm} if self.farm else {})}
+                **({'farm': self.farm} if self.farm else {}),
+                **({'mobs': [[name, x, 64, z] for name, x, z in mobs]} if mobs else {})}
 
     def move_target(self, position):
         self.guard()
@@ -260,6 +272,8 @@ class World:
             for key, group in [('spatial_expected','expected'),('spatial_preserved','preserve')]:
                 result[key] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
                                for x,y,z,name in self.spatial[group]]
+        if getattr(self, 'mobs', None):
+            result['mobs'] = {name: self.scalar(f'execute if entity @e[type=minecraft:{name}]') for name in sorted(self.mobs)}
         if getattr(self, 'farm', None):
             result['goal_blocks'] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
                                      for x, y, z, name in self.farm['goal_blocks']]
