@@ -171,6 +171,8 @@ smokeはすべてcontrolターンなので、反復の全体点・発症率はnu
 
 `mind.local_context`の既定を`trailing_notes=True`とし、通常の`agent.py`へ適用する。利用者の採用判断に基づき、配置の方針と反復問題を分ける。今回の比較は反復への有意な効果の検定ではなく、今後は反復・状態理解を別に調整し、必要な質問・ツール・停止等を保護評価する。重みは変更しない。配布・稼働確認は[確認状況](verification-status-ja.md)を参照する。
 
+補足の本文は、その後`SYSTEM: `＋普通の文章へ変えた。注釈の誘因を減らすためで、同じ21件（`context-layout-06`、HEADと作業ツリーの比較）で自動check 19/21が同じことを確認した。04の平文ラベルで出た注入対照の不要な呼び出しは、06では出なかった。比較の詳細は[プロンプトの書き方](../../.claude/skills/ciel-prompt-writing/SKILL.md)。
+
 生データは`server/benchmark/data/context-layout-03/`、`context-layout-04/`、最終比較の`context-layout-05/{report.json,input.json,runner.py,review.json}`。04の入力・runnerは`context-layout-input-04.json`・`context-layout-runner-04.py`、03の入力は同ディレクトリの`input.json`。最終入力のhashをreportと照合し、inputに変換前後のソース本文・hash・5promptと実JSONを保存した。reviewは`Codex/exploratory-nonblind/context-layout-v1`、reportと各応答hashへ結び付けた。各1回の既知dev課題で、独立盲検・本番入力の再現・全機能の非劣化の証明ではない。
 
 ## 質問への回答と現在の必要性の比較

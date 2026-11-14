@@ -37,7 +37,7 @@ class EventHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(next(i for i,t in enumerate(texts) if 'ありがとう' in t),
                         next(i for i,t in enumerate(texts) if 'シエルが倒れた' in t))
         self.assertLess(next(i for i,t in enumerate(texts) if 'シエルが倒れた' in t), texts.index('別の返答'))
-        self.assertIn('利用者の発言・依頼ではありません', next(t for t in texts if 'シエルが倒れた' in t))
+        self.assertEqual(next(t for t in texts if 'シエルが倒れた' in t), 'SYSTEM: シエルが倒れた')
 
     async def test_deduplication_and_occurrence_time(self):
         hub = self.mouth.reactions
@@ -77,7 +77,7 @@ class EventHistoryTests(unittest.IsolatedAsyncioTestCase):
         chat = llm.ChatContext()
         chat.add_message(role='system', content='固定指示')
         messages = local_context(Mind(self.history).build(chat)).items
-        text = '\n'.join(json.loads(m.text_content.split('\n',1)[1])['text']
-                         for m in messages if (m.text_content or '').startswith('[内部補足'))
-        self.assertIn('"role": "self"', text)
-        self.assertIn('"role": "owner"', text)
+        notes = [m.text_content for m in messages if (m.text_content or '').startswith('SYSTEM: ')]
+        # The record keeps subject and observation; the model reads the fact sentence the body wrote from them.
+        self.assertEqual(notes.count('SYSTEM: 体の出来事'), 3)
+        self.assertFalse(any('"role"' in n for n in notes))

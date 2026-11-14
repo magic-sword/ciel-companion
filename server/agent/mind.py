@@ -328,7 +328,7 @@ class Mind:
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 out.add_message(role='user', content=f'{t.name}：{self._marked(text)}')
             elif t.role == 'event':
-                out.add_message(role='system', content='[出来事（利用者の発言・依頼ではありません）]\n' + text)
+                out.add_message(role='system', content=_event_fact(text))
             else:
                 out.add_message(role='assistant', content=text)
         notes = self._notes(deep=talker_instructions is None, memory=turn.get('memory'))
@@ -520,6 +520,20 @@ def latest_user_text(chat_ctx) -> str:
     return next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
 
 
+def _event_fact(text: str) -> str:
+    """記録した出来事のうち、会話に渡すのは事実の一文だけ（ID・時刻・観測値はモデルに要らない）"""
+    try:
+        return json.loads(text).get('fact') or text
+    except (ValueError, AttributeError):
+        return text
+
+
+# Qwen rejects system messages after the first one. Notes keep their place as
+# user turns with the source marker Mindcraft uses for the same constraint; a
+# plain sentence after it reads as data rather than as a document to annotate.
+NOTE_PREFIX = 'SYSTEM: '
+
+
 def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None, *, trailing_notes: bool = True) -> llm.ChatContext:
     """固定systemと時系列の内部補足を送る。Falseは従来方式との比較用。元の記録は変えない。"""
     out = llm.ChatContext()
@@ -529,8 +543,7 @@ def local_context(ctx: llm.ChatContext, source: llm.ChatContext | None = None, *
     if trailing_notes:
         for index, item in enumerate(ctx.items):
             if index > 0 and isinstance(item,llm.ChatMessage) and item.role == 'system':
-                out.add_message(role='user',content='[内部補足（利用者の発言・依頼ではありません）]\n'+json.dumps(
-                    {'type':'context_data','text':item.text_content or ''},ensure_ascii=False))
+                out.add_message(role='user',content=NOTE_PREFIX+(item.text_content or ''))
             else:
                 out.items.append(item)
     else:

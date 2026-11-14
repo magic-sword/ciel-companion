@@ -3,7 +3,6 @@ import argparse
 import base64
 import hashlib
 import importlib.util
-import inspect
 import json
 from pathlib import Path
 import random
@@ -44,8 +43,8 @@ def prepare(path):
         for i,m in enumerate(messages):
             if i==len(messages)-1:ctx.add_message(role='system',content=context)
             ctx.add_message(role=m['role'],content=m['content'])
-        legacy_options={'trailing_notes':False} if 'trailing_notes' in inspect.signature(before.local_context).parameters else {}
-        for arm,convert in [('base',lambda c,source:before.local_context(c,source=source,**legacy_options)),('trailing',lambda c,source:mind.local_context(c,source=source,trailing_notes=True))]:
+        # HEAD against the working tree: both send notes after the fixed system, so only the note format differs.
+        for arm,convert in [('head',lambda c,source:before.local_context(c,source=source)),('candidate',lambda c,source:mind.local_context(c,source=source))]:
             wire,_=convert(ctx,source=ctx).to_provider_format('openai')
             jobs.append(dict(id=case['id'],arm=arm,group='topic' if case in topic else 'guard',case=case,wire=wire))
     sources={'mind-before.py':old.decode('utf-8'),'mind-after.py':Path(mind.__file__).read_text(encoding='utf-8')}
@@ -73,12 +72,12 @@ def run(path,output):
             w.write(output/'report.json',report);print(j['id'],j['arm'],row['status'],flush=True)
         # Paired synthetic prefix probes: only state changes, no tools execute.
         marker='cache-layout-'+str(time.time_ns())
-        for arm in ('base','trailing'):
+        for arm in ('head','candidate'):
             wire=next(j['wire'] for j in jobs if j['id']=='pending' and j['arm']==arm)
             for i in range(4):
                 messages=json.loads(json.dumps(wire))
                 messages[0]['content']=marker+'\n'+messages[0]['content']
-                at=0 if arm=='base' else len(messages)-2
+                at=len(messages)-2
                 messages[at]['content']+='\n[state version '+str(i)+']'
                 payload=dict(model='local',messages=messages,temperature=0,max_tokens=1,seed=1733,
                              id_slot=0,cache_prompt=True,chat_template_kwargs={'enable_thinking':False})
@@ -93,7 +92,7 @@ def run(path,output):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('prepare','remote','run'));a=p.parse_args()
-    path=ROOT/'server/benchmark/data/context-layout-input.json';label='context-layout-05'
+    path=ROOT/'server/benchmark/data/context-layout-input.json';label='context-layout-06'
     if a.mode=='prepare':prepare(path)
     elif a.mode=='run':run(path,ROOT/'results'/label)
     else:

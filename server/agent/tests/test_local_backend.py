@@ -22,7 +22,7 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         messages,_=mind.local_context(ctx).to_provider_format('openai')
         self.assertEqual([m['role'] for m in messages],['system','user','user'])
         self.assertEqual(messages[0]['content'],'fixed')
-        self.assertEqual(json.loads(messages[-1]['content'].split('\n',1)[1])['text'],'state')
+        self.assertEqual(messages[-1]['content'],'SYSTEM: state')
 
     async def test_changing_notes_preserves_fixed_system_and_recovers_real_request(self):
         import mind
@@ -40,7 +40,7 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
             systems.append(out.items[0].text_content)
             self.assertEqual(out.items[1].text_content,'original request')
             self.assertIn(note,out.items[2].text_content)
-            self.assertEqual(json.loads(out.items[2].text_content.split('\n',1)[1]),{'type':'context_data','text':note})
+            self.assertEqual(out.items[2].text_content,'SYSTEM: '+note)
             self.assertEqual(out.items[-2:],[call,result])
             self.assertEqual(ctx.to_dict(),before)
         self.assertEqual(systems,['fixed persona','fixed persona'])
@@ -102,7 +102,7 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         out = mind.local_context(ctx, source=ctx,trailing_notes=True)
         self.assertEqual(out.items[-1].role,'user')
         self.assertIn('[internal notice] greet the newly connected person',out.items[-1].text_content)
-        self.assertIn('利用者の発言・依頼ではありません',out.items[-1].text_content)
+        self.assertTrue(out.items[-1].text_content.startswith('SYSTEM: '))
         self.assertEqual(ctx.to_dict(),before)
 
     async def test_local_assistant_merge_keeps_tool_boundaries(self):
