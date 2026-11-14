@@ -176,6 +176,7 @@ export class MindcraftRunner extends BodyCommands {
   interrupt(bot = this.bot) {
     if (!bot) return;
     this.actionScope?.interrupt();
+    bot.deadlineStop = null;   // a plan step's deadline must not lower this stop again
     bot.interrupt_code = true;
     bot.pathfinder.setGoal(null);
     bot.clearControlStates();

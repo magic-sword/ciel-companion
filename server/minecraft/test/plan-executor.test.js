@@ -59,7 +59,7 @@ test('a step that does not reach its state stops the plan after two tries and na
 test('a step that runs past its own time is stopped there, not at the end of the plan', async () => {
   const { bot } = fixture();
   const state = { log: [] };
-  const slow = step('a', [], state, { run: () => new Promise(() => {}), seconds: () => 0.05 });
+  const slow = step('a', [], state, { run: async () => { while (!bot.interrupt_code) await new Promise(r => setTimeout(r, 20)); }, seconds: () => 0.05 });
   const began = Date.now();
   assert.equal(await runPlan(bot, [slow], { tries: 1 }), false);
   assert.ok(Date.now() - began < 4000);
