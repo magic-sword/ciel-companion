@@ -1,6 +1,7 @@
 import * as mc from '../../utils/mcdata.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
+import { within } from './deadline.js';
 
 /**
  * Obtain an item by executing its crafting plan step by step.
@@ -51,7 +52,7 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
         }
         const before = inventory[step.item] || 0;
         const began = Date.now();
-        if (!await performWithin(bot, step, stepSeconds(step)))
+        if (!await within(bot, () => perform(bot, step), stepSeconds(step), describe(step)))
             skills.log(bot, `Timed out trying to ${describe(step)} after ${Math.round((Date.now() - began) / 1000)}s.`);
         done++;
         if ((world.getInventoryCounts(bot)[step.item] || 0) > before) repeats = 0;
@@ -73,22 +74,6 @@ function stepSeconds(step) {
     if (step.type === 'craft') return 20;
     if (step.type === 'smelt') return 20 + 12 * step.count;
     return 20 + 15 * step.count;
-}
-
-async function performWithin(bot, step, seconds) {
-    let timer;
-    const work = perform(bot, step).then(() => true, err => {
-        skills.log(bot, `Failed to ${describe(step)}: ${err?.message ?? err}.`);
-        return true;
-    });
-    const expired = new Promise(resolve => { timer = setTimeout(() => resolve(false), seconds * 1000); });
-    const finished = await Promise.race([work, expired]);
-    clearTimeout(timer);
-    if (finished) return true;
-    skills.haltMovement(bot);
-    // Let the stopped step settle before planning again; never wait on it forever.
-    await Promise.race([work, new Promise(resolve => setTimeout(resolve, 3000))]);
-    return false;
 }
 
 async function perform(bot, step) {
