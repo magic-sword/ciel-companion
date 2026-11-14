@@ -139,9 +139,8 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
         const notes = [MOBS[way.mob].methods[way.method].note, MOBS[way.mob].spawn.note].filter(Boolean).join(' ');
         return `${id}: ${facts.join(', ')}. ${notes}`.trim();
     });
-    // The owner is asked only where the design says so: a fight with a mob that fights back.
-    const ask = ways.some(w => w.hostile && step.options.includes(w.id)) ? ', and ask the owner first before one that fights back' : '';
-    const text = `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. The choice is yours: reply with !chooseOption("id") using one id below${ask}.\n${lines.join('\n')}`;
+    // Whether to choose or to ask the owner is the model's judgement; a choice made is told.
+    const text = `To get ${num} ${itemName} I need ${step.count} ${step.item}, which can come several ways. Choose one with !chooseOption("id") using an id below and tell the owner in a few words which way you took, or ask the owner when it is theirs to decide.\n${lines.join('\n')}`;
     bot.pendingChoice = {
         question: `how to get ${step.count} ${step.item}`,
         text,
