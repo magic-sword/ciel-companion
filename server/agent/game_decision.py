@@ -5,10 +5,14 @@ The conversation model reads the whole conversation and writes one structured ou
   no work         a work capability, or one of the game's direct actions
   running work    words passed to the work, or stopping it
   waiting work    the answers the work's decision accepts
-Not acting is the kind `none`. Starting, checking and stopping stay with the work runner and the
-game environment, as for the intake (game_intake.py), which still handles stop words, games whose
-work needs preparation, and actions aimed at what the owner pointed at or named as coordinates
-(the decision chooses such an action; the intake then resolves its target).
+Not acting is the kind `none`. `say` is what Ciel speaks, also when the action could not be done or
+a stop word already stopped the body: then a second decision that can only speak tells it in her words.
+
+Starting, checking and stopping stay with the work runner and the game environment. The intake
+(game_intake.py) keeps two parts the decision builds on: stopping at once when a stop word is heard,
+and capturing what the owner pointed at when the speech ended. An action aimed at a target (pointed,
+or coordinates in the words) takes a target id; target_candidates binds the real value, the model
+never writes it. Games whose work needs preparation are left to the intake as a whole.
 """
 import copy
 import json
@@ -21,9 +25,10 @@ import models
 
 STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
 ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
-# Results that did not do what was chosen; the reply then says so instead of the planned words.
+# Results that did not do what was chosen.
 FAILED = ('error', 'unavailable', 'busy', 'goal_running', 'no_task', 'refused', 'failed')
 FORMS = ('say_first', 'act_first')
+NONE = {'type': 'object', 'additionalProperties': False, 'properties': {'kind': {'const': 'none'}}, 'required': ['kind']}
 
 
 def supported(env) -> bool:
@@ -37,18 +42,38 @@ def supported(env) -> bool:
 
 
 def targeted(env, name) -> bool:
-    """An action whose target comes from the owner's pointing or coordinates; the intake resolves it."""
+    """An action whose target comes from the owner's pointing or from coordinates in the words."""
     meta = getattr(env, 'meta', {}).get(name, {})
     return bool(meta.get('ciel/reference_argument') or meta.get('ciel/target_binding'))
+
+
+def _act_tools(env):
+    return [fn for fn in getattr(env, 'tools', []) if getattr(env, 'meta', {}).get(fn.id, {}).get('ciel/role') == 'act']
+
+
+def bind_targets(env, text, references, request_id):
+    """The targets of this utterance for the game's targeted actions, keyed by action name."""
+    from target_candidates import TargetCandidates
+    definitions = {}
+    for fn in _act_tools(env):
+        if targeted(env, fn.id):
+            meta = env.meta[fn.id]
+            params = copy.deepcopy(fn.info.raw_schema['parameters'])
+            params['additionalProperties'] = False
+            definitions[fn.id] = {'kind': 'tool', 'name': fn.id, 'arguments': params,
+                                  'reference_argument': meta.get('ciel/reference_argument'),
+                                  'target_binding': copy.deepcopy(meta.get('ciel/target_binding'))}
+    return TargetCandidates(request_id, text, references, definitions)
 
 
 def _alt(properties):
     return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
 
 
-def acts(env, work):
-    """The kinds a decision may take in this work state, as (schema alternative, line for the prompt)."""
-    out = [(_alt({'kind': {'const': 'none'}}), 'none：話すだけ')]
+def acts(env, work, targets=None):
+    """The kinds a decision may take in this work state, as (schema alternative, line for the prompt).
+    A targeted action is offered only when this utterance has its target (targets from bind_targets)."""
+    out = [(NONE, 'none：話すだけ')]
     state = (work or {}).get('state')
     if state in ('accepted', 'running'):
         out += [(_alt({'kind': {'const': 'tell'}, 'message': STRING}),
@@ -68,12 +93,19 @@ def acts(env, work):
             out.append((_alt({'kind': {'const': 'work'}, 'request': STRING}),
                         # The name is how the game's own instructions refer to this capability.
                         f"work：{capability['name']}。{capability.get('description', '')} requestに相手の頼み"))
-        for fn in getattr(env, 'tools', []):
-            if getattr(env, 'meta', {}).get(fn.id, {}).get('ciel/role') == 'act':
-                raw = copy.deepcopy(fn.info.raw_schema)
-                raw['parameters']['additionalProperties'] = False
-                out.append((_alt({'kind': {'const': fn.id}, 'arguments': raw['parameters']}),
-                            f"{fn.id}：{raw.get('description', '')}"))
+        for fn in _act_tools(env):
+            description = fn.info.raw_schema.get('description', '')
+            if targeted(env, fn.id):
+                bound = (targets.definitions.get(fn.id) if targets is not None else None) or {}
+                if not bound.get('target_ids'):
+                    continue   # Nothing was pointed at or named for it in this utterance.
+                out.append((_alt({'kind': {'const': fn.id}, 'arguments': bound['arguments']}),
+                            f"{fn.id}：{description} 行き先はarguments.target_id"
+                            f"（{json.dumps(targets.targets, ensure_ascii=False)}）"))
+                continue
+            params = copy.deepcopy(fn.info.raw_schema['parameters'])
+            params['additionalProperties'] = False
+            out.append((_alt({'kind': {'const': fn.id}, 'arguments': params}), f"{fn.id}：{description}"))
     return out
 
 
@@ -108,33 +140,82 @@ def operations(act, work, env):
 
 
 class GameDecision:
-    """Decides and carries out one owner utterance; the intake keeps stop words and the rest."""
+    """Decides and carries out one owner utterance, and returns what Ciel says about it."""
     TEMPERATURE = 0
 
     def __init__(self, intake, template, *, form='say_first'):
         self.intake, self.template, self.form = intake, template, form
         self.runner = intake.runner
+        self._items = {}
 
     def supported(self) -> bool:
         return models.is_local('mind') and supported(self.runner.env)
 
     async def handle(self, item, system: str, messages) -> str | None:
         """system: the fixed instructions; messages: the rest of the conversation as sent to the model.
-        Returns what to say, or None to let the conversation model answer as usual."""
+        Returns what to say, or None to let the conversation model answer as usual.
+        One user item is decided once; a second call for it returns the same words."""
+        if item.id in self._items:
+            return self._items[item.id]
+        reply = await self._handle(item, system, messages)
+        self._items[item.id] = reply
+        while len(self._items) > 128:
+            del self._items[next(iter(self._items))]
+        return reply
+
+    async def _handle(self, item, system, messages):
         from game_intake import STOP
         text = item.text_content or ''
-        if STOP.fullmatch(text.strip()):
-            return await self.intake.handle(item)
         if not self.intake.authorized():
             return None
         env, generation = self.runner.env, self.intake._generation
+        if STOP.fullmatch(text.strip()):
+            # The body was stopped when the words were heard (game_intake.on_transcribed); Ciel says so.
+            fast, self.intake._fast_stop = self.intake._fast_stop, None
+            r = await fast if fast is not None else await self.intake._stop()
+            fact = r.get('message') or '停止を確認できませんでした。'
+            return await self._speak(system, messages, f'相手の言葉を受けて、体を止めました。結果：{fact}') or fact
+        if not env.playing():
+            return None
         work = self.runner.work
-        alternatives = acts(env, work)
-        wire = [{'role': 'system', 'content': system + '\n\n' + instructions(self.template, alternatives)}, *messages]
+        references = await self._references(item)
+        targets = bind_targets(env, text, references, item.id)
+        alternatives = acts(env, work, targets)
+        out = await self._decide(system, messages, alternatives, work)
+        if out is None:
+            return None   # The conversation model answers as before; nothing was started.
+        act, say = out.get('act') or {}, str(out.get('say') or '').strip()
+        if generation != self.intake._generation or not self.intake.authorized():
+            return await self._speak(system, messages, '確かめている間に止める指示があったので、何も始めませんでした。') \
+                or '止める指示があったので、何も始めませんでした。'
+        failure = await self._carry_out(operations(act, work, env), text, targets, references)
+        if failure:
+            return await self._speak(system, messages, f'選んだ行動は、できませんでした。理由：{failure}') or failure
+        return say or None
+
+    async def _references(self, item):
+        """What was pointed at when the owner finished speaking, captured by the intake."""
+        env = self.runner.env
+        if not env.profile.get('reference_context'):
+            return None
+        try:
+            capture = self.intake._reference_items.pop(item.id, None)
+            if capture:
+                task, epoch = capture
+                references = await task
+                return references if epoch == getattr(env, '_connection_epoch', None) else None
+            return await self.intake._capture_references()
+        except Exception:
+            debug_log.record('game_decision_error', error='references_unavailable')
+            return None
+
+    async def _decide(self, system, messages, alternatives, work, note=''):
+        wire = [{'role': 'system', 'content': system + '\n\n' + instructions(self.template, alternatives)
+                 + (('\n\n' + note) if note else '')}, *messages]
         if self.intake._client is None:
             self.intake._client = models.create_client('mind')
         request, began = uuid.uuid4().hex, time.monotonic()
-        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide',
+        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide' if not note else 'decide_speak',
                          state=(work or {}).get('state'), temperature=self.TEMPERATURE)
         try:
             options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20,
@@ -148,23 +229,24 @@ class GameDecision:
                 raise ValueError('Expected object')
         except Exception as e:
             debug_log.record('game_decision_error', error=type(e).__name__)
-            return None   # The conversation model answers as before; nothing was started.
+            return None
         finally:
             debug_log.record('model_response', role='game_decision', id=request, seconds=round(time.monotonic()-began, 3))
-        act, say = out.get('act') or {}, str(out.get('say') or '').strip()
-        debug_log.record('work_decision', stage='decide', operation=act.get('kind'))
-        if generation != self.intake._generation or not self.intake.authorized():
-            return '依頼の確認中に中止の指示があったため、作業を開始しませんでした。'
-        if act.get('kind') and targeted(env, act['kind']):
-            # The intake holds what was pointed at when the owner spoke and checks the target's source.
-            return await self.intake.handle(item)
-        done =await self._carry_out(operations(act, work, env), work, text)
-        if done is not True:
-            return done
-        return say or None
+        debug_log.record('work_decision', stage='decide', operation=(out.get('act') or {}).get('kind'))
+        return out
 
-    async def _carry_out(self, ops, work, text):
-        """True when done (or nothing to do); otherwise the words that say it was not done."""
+    async def _speak(self, system, messages, note):
+        """Ciel's own words about what happened, from a decision that can only speak."""
+        out = await self._decide(system, messages, [(NONE, 'none：話すだけ')], self.runner.work, note)
+        return str((out or {}).get('say') or '').strip() or None
+
+    def _why(self, r):
+        r = r if isinstance(r, dict) else {}
+        reason = r.get('reason')
+        return r.get('message') or self.runner.env.profile.get('reasons', {}).get(reason, reason) or r.get('status') or '結果が分からない'
+
+    async def _carry_out(self, ops, text, targets, references):
+        """None when done (or nothing to do); otherwise why it was not done."""
         runner, env = self.runner, self.runner.env
         for name, args in ops:
             if name == 'tell_game_task':
@@ -175,7 +257,7 @@ class GameDecision:
                 r = await runner.answer(args['decision_id'], args['action'],
                                         str(args.get('message') or text)[:2000] if args['action'] == 'reply' else None)
             elif runner.body_step():
-                return '今の作業を中止してから、新しい操作を依頼してください。'
+                return '今の作業の途中なので、先に止める必要がある'
             elif name == 'submit_game_task':
                 capability = ((env.profile.get('work') or {}).get('capabilities') or [{}])[0]
                 handoff = capability['handoff']
@@ -184,15 +266,20 @@ class GameDecision:
                                        constraints=copy.deepcopy(handoff['constraints']), title=request[:100],
                                        seconds=handoff['seconds'], request_id=uuid.uuid4().hex)
             else:
-                fn = next((f for f in getattr(env, 'tools', []) if f.id == name), None)
+                fn = next((f for f in _act_tools(env) if f.id == name), None)
                 if fn is None:
-                    return '操作を受け付けられませんでした。'
+                    return 'その行動は今は使えない'
                 try:
+                    if targeted(env, name):
+                        args = targets.resolve(name, args)
+                        ref_arg = env.meta[name].get('ciel/reference_argument')
+                        if ref_arg and (not references or args.get(ref_arg) != references.get('selection_id')):
+                            return '指し示した対象を確かめられなかった'
                     jsonschema.validate(args, fn.info.raw_schema['parameters'])
-                except jsonschema.ValidationError:
-                    return '操作の引数を確認できませんでした。'
+                except (ValueError, jsonschema.ValidationError):
+                    return '行き先や対象を確かめられなかった'
                 r = await env.use(name, args)
-            debug_log.record('game_decision_result', operation=name, status=(r or {}).get('status'))
+            debug_log.record('game_decision_result', operation=name, status=(r or {}).get('status') if isinstance(r, dict) else None)
             if not isinstance(r, dict) or r.get('status') in FAILED:
-                return (r or {}).get('message') or '操作を受け付けられませんでした。'
-        return True
+                return self._why(r)
+        return None

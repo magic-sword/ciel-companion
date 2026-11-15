@@ -292,10 +292,10 @@ class Harness:
         return reply, decision, runner.calls
 
     # ---- one typed decision per state (server/agent/game_decision.py) ----
-    def _acts(self, world, work, form=None):
+    def _acts(self, world, work, form=None, targets=None):
         """The production kinds; the optional form drops none (not acting is then leaving act out)."""
         import game_decision
-        alternatives = game_decision.acts(world, work)
+        alternatives = game_decision.acts(world, work, targets)
         return alternatives[1:] if (form or DECIDE_FORM) == 'optional' else alternatives
 
     @staticmethod
@@ -307,7 +307,8 @@ class Harness:
         import game_decision
         fake, _ = self._agent(world)
         work = work_of(case)
-        alternatives = self._acts(world, work)
+        # Nothing is pointed at in these cases; coordinates in the words still bind a target.
+        alternatives = self._acts(world, work, targets=game_decision.bind_targets(world, case['text'], None, case['id']))
         template = ((HERE / 'intent_routing_decide_optional.md').read_text(encoding='utf-8') if DECIDE_FORM == 'optional'
                     else self.persona.game_decide_instructions)
         # The same system the conversation server sends (agent.py): the conversation's instructions, the game's

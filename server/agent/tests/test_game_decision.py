@@ -30,9 +30,23 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.intake = GameIntake(self.runner, 'i', client=client)
         self.decision = GameDecision(self.intake, 'decide\n{actions}')
 
-    def respond(self, value):
-        self.create.return_value = types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
+    @staticmethod
+    def reply(value):
+        return types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
             message=types.SimpleNamespace(content=json.dumps(value, ensure_ascii=False)))])
+
+    def respond(self, value):
+        self.create.return_value = self.reply(value)
+
+    def sequence(self, *values):
+        self.create.side_effect = [self.reply(v) for v in values]
+
+    def go_tool(self):
+        self.env.tools.append(types.SimpleNamespace(id='game_go', info=types.SimpleNamespace(raw_schema={
+            'name': 'game_go', 'description': 'go', 'parameters': {'type': 'object', 'required': ['x', 'z'],
+                'properties': {'x': {'type': 'integer'}, 'z': {'type': 'integer'}}}})))
+        self.env.meta['game_go'] = {'ciel/role': 'act', 'ciel/target_binding': {
+            'kind': 'axes', 'point': True, 'fields': {'x': ['x', 0], 'z': ['z', 0]}}}
 
     async def say(self, text):
         return await self.decision.handle(llm.ChatMessage(role='user', content=[text]), 'system', [{'role': 'user', 'content': text}])
@@ -52,12 +66,17 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': '家を作る'}))
         self.assertEqual(self.runner.start.await_args.kwargs['seconds'], 120)
 
-    async def test_a_direct_action_is_used_and_a_refusal_replaces_the_words(self):
+    async def test_a_direct_action_is_used_and_a_refusal_is_told_in_her_words(self):
         self.respond({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}})
         self.assertEqual(await self.say('来て'), '行きますね')
         self.assertEqual(self.env.use.await_args.args, ('game_come', {}))
-        self.env.use.return_value = {'status': 'unavailable'}
-        self.assertEqual(await self.say('来て'), '操作を受け付けられませんでした。')
+        self.env.use.return_value = {'status': 'busy'}
+        self.sequence({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}},
+                      {'say': 'ごめんなさい、今は動けないのです', 'act': {'kind': 'none'}})
+        self.assertEqual(await self.say('来て'), 'ごめんなさい、今は動けないのです')
+        told = self.create.await_args.kwargs
+        self.assertIn('できませんでした。理由：busy', told['messages'][0]['content'])
+        self.assertEqual(told['response_format']['json_schema']['schema']['properties']['act']['anyOf'], [game_decision.NONE])
 
     async def test_kinds_follow_the_work_state(self):
         kinds = lambda work: [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, work)]
@@ -82,11 +101,14 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await self.say('こんにちは'))
         self.runner.start.assert_not_awaited()
 
-    async def test_stop_words_keep_the_intakes_fast_path(self):
-        with patch.object(self.intake, 'handle', AsyncMock(return_value='停止しました。')) as handle:
-            self.assertEqual(await self.say('止まって'), '停止しました。')
-        handle.assert_awaited_once()
-        self.create.assert_not_awaited()
+    async def test_stop_words_stop_at_once_and_she_says_it(self):
+        with patch.object(self.intake, '_stop', AsyncMock(return_value={'message': '停止しました。'})) as stop:
+            self.respond({'say': '止まりました！', 'act': {'kind': 'none'}})
+            self.assertEqual(await self.say('止まって'), '止まりました！')
+            stop.assert_awaited_once()
+            self.assertIn('結果：停止しました。', self.create.await_args.kwargs['messages'][0]['content'])
+            self.create.side_effect = TimeoutError()
+            self.assertEqual(await self.say('止まって'), '停止しました。')   # without the model, the fact itself
 
     def test_games_whose_work_needs_preparation_stay_with_the_intake(self):
         self.env.profile['reference_context'] = True   # pointing alone does not hand the game to the intake
@@ -94,13 +116,15 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.env.profile['work']['capabilities'][0]['preparation'] = {'version': 1}
         self.assertFalse(game_decision.supported(self.env))
 
-    async def test_an_action_aimed_at_a_pointed_target_goes_to_the_intake(self):
-        self.env.meta['game_come']['ciel/target_binding'] = {'kind': 'axes', 'point': True}
-        self.respond({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}})
-        with patch.object(self.intake, 'handle', AsyncMock(return_value='操作を受け付けました。')) as handle:
-            self.assertEqual(await self.say('あそこへ行って'), '操作を受け付けました。')
-        handle.assert_awaited_once()
-        self.env.use.assert_not_awaited()
+    async def test_an_action_aimed_at_named_coordinates_gets_the_bound_target(self):
+        self.go_tool()
+        kinds = lambda text: [a['properties']['kind']['const'] for a, _ in
+                              game_decision.acts(self.env, None, game_decision.bind_targets(self.env, text, None, 'r'))]
+        self.assertNotIn('game_go', kinds('あっちへ行って'))   # no target in the words: not offered
+        self.assertIn('game_go', kinds('x 10 z -4 へ行って'))
+        self.respond({'say': '向かいますね', 'act': {'kind': 'game_go', 'arguments': {'target_id': 'T1'}}})
+        self.assertEqual(await self.say('x 10 z -4 へ行って'), '向かいますね')
+        self.assertEqual(self.env.use.await_args.args, ('game_go', {'x': 10, 'z': -4}))
 
 
 if __name__ == '__main__':

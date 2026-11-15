@@ -560,6 +560,8 @@ Mindcraft固定版`e1c1fc3ffa481506c2445fc639e16dba504b5920`の身体基盤へ�
 
 生データは`run-20261115T213239`（ゲームの指示なし）、`run-20261115T215927`（能力名だけ足した版）、`run-20261115T222141`（採用した形）。
 
+そのあと、行き先のある行動（`minecraft_go_to_place`）を、発言に座標があるときだけ、対象の番号で選ぶ形にした（指示棒の対象も同じ形）。同じ条件で、作成43件0.930・実発言86件0.802（雑談で動いた14/38、見逃し0/48、別の行動3/48）・作業中の作成31件0.903・作業中の実発言6/7。前の形と同じ水準だった。生データは`run-20261115T230212`。実際の指示棒での行き先は、この評価器では測っていない。
+
 ## 体と中核APIの受け渡しの書式
 
 2026-11-14、体の`CielModel`と中核APIのホストが送る文脈を、JSONの包み（`execution_context`・`execution_observation`・`execution_reference`・会話の`{"type":…}`・`permitted_memory`）から、上流Mindcraftの`strictFormat`の形へ変えた。Mindcraftの指示とsystem履歴は`SYSTEM: `で始まるuser、会話の記録は心と同じ`名前：発言`と出来事の一文、記憶はホストのsystem（ローカルでは`SYSTEM: `）。会話の注釈を減らした書式（[プロンプトの書き方](../../../agent-skills/skills/ciel-prompt-writing/SKILL.md)）にそろえたもの。
