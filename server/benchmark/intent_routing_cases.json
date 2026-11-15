@@ -585,5 +585,1276 @@
   "expect": "chat",
   "families": [],
   "work": "idle"
+ },
+ {
+  "id": "work-keep-after-stop-question",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "体力が減っているのです……この作業を止めますか？"
+   ]
+  ],
+  "text": "続けてでいいよ",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none",
+   "tell"
+  ]
+ },
+ {
+  "id": "work-keep-plain",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "体力が減っているのです……この作業を止めますか？"
+   ]
+  ],
+  "text": "いいよ、そのまま続けて",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none",
+   "tell"
+  ]
+ },
+ {
+  "id": "work-keep-cheer",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "体力が減っているのです……この作業を止めますか？"
+   ]
+  ],
+  "text": "大丈夫、がんばって",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none",
+   "tell"
+  ]
+ },
+ {
+  "id": "work-keep-yes",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "このまま続けてもいいですか？"
+   ]
+  ],
+  "text": "うん",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none",
+   "tell"
+  ]
+ },
+ {
+  "id": "work-tell-shear",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "羊は倒さないで、刈ってね",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell"
+  ]
+ },
+ {
+  "id": "work-tell-place",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "木は家の近くの森で切ってね",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell"
+  ]
+ },
+ {
+  "id": "work-tell-door",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "ドアはオークで作ってほしいな",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell"
+  ]
+ },
+ {
+  "id": "work-tell-style",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "原木から集めますね！ハカセさん、どんな家にしてほしいですか？"
+   ]
+  ],
+  "text": "小さくていいから、窓をつけてほしいな",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell"
+  ]
+ },
+ {
+  "id": "work-tell-leave-it",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "原木から集めますね！ハカセさん、どんな家にしてほしいですか？"
+   ]
+  ],
+  "text": "シエルにお任せするよ",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell",
+   "none"
+  ]
+ },
+ {
+  "id": "work-tell-also-logs",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "原木もついでに多めに集めておいて",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "tell",
+   "stop"
+  ]
+ },
+ {
+  "id": "work-stop-change-mind",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "やっぱりやめよう",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "stop"
+  ]
+ },
+ {
+  "id": "work-stop-no-house",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "家はもういいや、作るのやめておこう",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "stop"
+  ]
+ },
+ {
+  "id": "work-stop-wait",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "ちょっと待って、一回作業を中止して",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "stop"
+  ]
+ },
+ {
+  "id": "work-stop-after-question",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "体力が減っているのです……この作業を止めますか？"
+   ]
+  ],
+  "text": "うん、止めておこう",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "stop"
+  ]
+ },
+ {
+  "id": "work-status-progress",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "今どこまで進んだ？",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-status-time",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "あとどれくらいかかりそう？",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-praise-working",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "がんばってるね、えらいよ",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-how-house",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ]
+  ],
+  "text": "家ってどうやって作るの？",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-inform-surface",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "水の中で体力が1しかないのです！止めたほうがいいですか？"
+   ]
+  ],
+  "text": "もう陸に上がってるよ、シエル",
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "原木を集めています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "obtain oak_log ×12"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [],
+    "done": 2,
+    "steps": 9
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none",
+   "tell"
+  ]
+ },
+ {
+  "id": "work-answer-shear",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？"
+   ]
+  ],
+  "text": "刈ってあげて",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "羊毛の手に入れ方を聞いています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "decide white_wool"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [
+     {
+      "about": "white_wool",
+      "options": [
+       "kill_sheep",
+       "shear_sheep"
+      ]
+     }
+    ],
+    "done": 2,
+    "steps": 9
+   },
+   "decision": {
+    "decision_id": "d-wool",
+    "kind": "question",
+    "actions": [
+     "reply",
+     "cancel"
+    ],
+    "message": "羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:reply"
+  ]
+ },
+ {
+  "id": "work-answer-kill",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？"
+   ]
+  ],
+  "text": "倒しちゃっていいよ",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "羊毛の手に入れ方を聞いています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "decide white_wool"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [
+     {
+      "about": "white_wool",
+      "options": [
+       "kill_sheep",
+       "shear_sheep"
+      ]
+     }
+    ],
+    "done": 2,
+    "steps": 9
+   },
+   "decision": {
+    "decision_id": "d-wool",
+    "kind": "question",
+    "actions": [
+     "reply",
+     "cancel"
+    ],
+    "message": "羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:reply"
+  ]
+ },
+ {
+  "id": "work-answer-up-to-you",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？"
+   ]
+  ],
+  "text": "どっちでもいいよ、任せる",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "羊毛の手に入れ方を聞いています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "decide white_wool"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [
+     {
+      "about": "white_wool",
+      "options": [
+       "kill_sheep",
+       "shear_sheep"
+      ]
+     }
+    ],
+    "done": 2,
+    "steps": 9
+   },
+   "decision": {
+    "decision_id": "d-wool",
+    "kind": "question",
+    "actions": [
+     "reply",
+     "cancel"
+    ],
+    "message": "羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:reply"
+  ]
+ },
+ {
+  "id": "work-answer-question-back",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？"
+   ]
+  ],
+  "text": "どっちが早いの？",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "羊毛の手に入れ方を聞いています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "decide white_wool"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [
+     {
+      "about": "white_wool",
+      "options": [
+       "kill_sheep",
+       "shear_sheep"
+      ]
+     }
+    ],
+    "done": 2,
+    "steps": 9
+   },
+   "decision": {
+    "decision_id": "d-wool",
+    "kind": "question",
+    "actions": [
+     "reply",
+     "cancel"
+    ],
+    "message": "羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-answer-cancel",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "家を作って"
+   ],
+   [
+    "assistant",
+    "家を作り始めますね！"
+   ],
+   [
+    "assistant",
+    "羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？"
+   ]
+  ],
+  "text": "じゃあ家はやめよう",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "家を作って",
+   "message": "羊毛の手に入れ方を聞いています。",
+   "plan": {
+    "title": "家を作って",
+    "now": [
+     "decide white_wool"
+    ],
+    "next": [
+     "make white_bed ×1",
+     "build house"
+    ],
+    "choice": [
+     {
+      "about": "white_wool",
+      "options": [
+       "kill_sheep",
+       "shear_sheep"
+      ]
+     }
+    ],
+    "done": 2,
+    "steps": 9
+   },
+   "decision": {
+    "decision_id": "d-wool",
+    "kind": "question",
+    "actions": [
+     "reply",
+     "cancel"
+    ],
+    "message": "羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:cancel",
+   "stop"
+  ]
+ },
+ {
+  "id": "work-retry-yes",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "原木を10個集めて"
+   ],
+   [
+    "assistant",
+    "原木を期限内に集められなかったのです……もう一度やってみますか？"
+   ]
+  ],
+  "text": "もう一回やってみて",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を10個集めて",
+   "message": "原木を期限内に集められませんでした。",
+   "decision": {
+    "decision_id": "d-retry",
+    "kind": "failure",
+    "actions": [
+     "retry",
+     "cancel"
+    ],
+    "message": "原木を期限内に集められませんでした。もう一度試しますか？"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:retry"
+  ]
+ },
+ {
+  "id": "work-retry-no",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "原木を10個集めて"
+   ],
+   [
+    "assistant",
+    "原木を期限内に集められなかったのです……もう一度やってみますか？"
+   ]
+  ],
+  "text": "もういいよ、ありがとう",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を10個集めて",
+   "message": "原木を期限内に集められませんでした。",
+   "decision": {
+    "decision_id": "d-retry",
+    "kind": "failure",
+    "actions": [
+     "retry",
+     "cancel"
+    ],
+    "message": "原木を期限内に集められませんでした。もう一度試しますか？"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "answer:cancel",
+   "stop"
+  ]
+ },
+ {
+  "id": "work-retry-chat",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "原木を10個集めて"
+   ],
+   [
+    "assistant",
+    "原木を期限内に集められなかったのです……もう一度やってみますか？"
+   ]
+  ],
+  "text": "何がだめだったんだろうね",
+  "work": {
+   "state": "needs_decision",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を10個集めて",
+   "message": "原木を期限内に集められませんでした。",
+   "decision": {
+    "decision_id": "d-retry",
+    "kind": "failure",
+    "actions": [
+     "retry",
+     "cancel"
+    ],
+    "message": "原木を期限内に集められませんでした。もう一度試しますか？"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-idle-house",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "家を作って",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-idle-logs",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "原木を集めて",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-idle-how-house",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "家ってどうやって作るの？",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
+ },
+ {
+  "id": "work-idle-accept-offer",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "assistant",
+    "近くの木を集めたので、今から家を作ってもいいですか？"
+   ]
+  ],
+  "text": "いいよ、お願い",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
  }
 ]

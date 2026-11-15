@@ -9,6 +9,9 @@ Systems
           with the tools the pipeline exposes after an intake check.
   mind    the conversation model answers directly with the tools the pipeline exposes, without a
           separate intake decision.
+  decide  prototype of the state machine design (docs/conversation/agent-state-machine-ja.md): one
+          structured output {act, say} from the conversation model, where act is required and its
+          kinds are the actions of the current work state. Exists only in this evaluator.
 The case file and labels are described in intent_routing_build.py.
 """
 import argparse
@@ -30,7 +33,18 @@ FAMILY = {
     'minecraft_come_here': 'come', 'minecraft_follow_me': 'follow', 'minecraft_go_to_place': 'goto',
     'minecraft_find_blocks': 'find', 'minecraft_give_item': 'give', 'minecraft_dig_down': 'dig',
     'minecraft_stop_moving': 'stop', 'stop_game_task': 'stop', 'submit_game_task': 'work', 'answer_game_task': 'answer',
+    'tell_game_task': 'tell',
 }
+ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
+# The written cases of the first measurement: "running" was a log-gathering work.
+LEGACY_RUNNING = {'state': 'running', 'capability': 'minecraft.pursue_goal', 'title': '原木を集めて', 'message': '原木を集めている'}
+STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
+DECIDE_TEMPERATURE = float(os.environ['CIEL_BENCH_DECIDE_TEMPERATURE']) if os.environ.get('CIEL_BENCH_DECIDE_TEMPERATURE') else None
+
+
+def work_of(case):
+    w = case.get('work')
+    return copy.deepcopy(LEGACY_RUNNING if w == 'running' else w if isinstance(w, dict) else None)
 READ_ONLY = {'game_task_status', 'current_time', 'minecraft_look_around', 'minecraft_look_at_view',
              'minecraft_facts', 'minecraft_search'}
 NOW = '[今：2026年11月13日（金）・夜・秋（日本時間）]'
@@ -84,15 +98,18 @@ class World:
 
 
 class Runner:
-    def __init__(self, env, work_state):
+    """The work runner as the intake sees it (goals.Goals): status, the busy check and the four controls."""
+
+    def __init__(self, env, work):
         self.env, self.calls = env, []
-        self.work = {'state': 'running', 'capability': 'minecraft.pursue_goal'} if work_state == 'running' else None
+        self.work = {k: v for k, v in work.items() if k not in ('plan', 'title')} if work else None
+        self.title = work.get('title') if work else None
 
     def status(self):
-        return {'state': self.work['state'], 'capability': self.work['capability']} if self.work else {}
+        return self.work or {'status': 'no_task'}
 
     def body_step(self):
-        return None
+        return self.title if self.work and self.work['state'] in ACTIVE else None
 
     async def start(self, name, arguments, **kwargs):
         self.calls.append(('submit_game_task', {'capability': name, 'arguments': copy.deepcopy(arguments)}))
@@ -102,8 +119,13 @@ class Runner:
         self.calls.append(('stop_game_task', {}))
         return {'status': 'stopped'}
 
-    async def answer(self, decision_id, action):
-        self.calls.append(('answer_game_task', {'decision_id': decision_id, 'action': action}))
+    async def answer(self, decision_id, action, message=None):
+        self.calls.append(('answer_game_task', {'decision_id': decision_id, 'action': action,
+                                                **({'message': message} if message else {})}))
+        return {'status': 'accepted'}
+
+    async def tell(self, message):
+        self.calls.append(('tell_game_task', {'message': message}))
         return {'status': 'accepted'}
 
 
@@ -156,8 +178,15 @@ class Harness:
         c.add_message(role='system', content=system)
         for role, text in case['context']:
             c.add_message(role=role, content=text)
-        doing = '原木を集めている' if case['work'] == 'running' else 'なし'
-        c.add_message(role='system', content=NOW + '\n\n' + BODY.format(doing=doing))
+        work = work_of(case)
+        doing = work['message'] if work and work['state'] in ACTIVE else 'なし'
+        note = NOW + '\n\n' + BODY.format(doing=doing)
+        if work:
+            # The same line goals.Goals.context() gives the conversation model.
+            plan = work.get('plan')
+            note += '\n' + '[今の作業] ' + json.dumps({'title': work['title'], 'work': {k: v for k, v in work.items() if k not in ('plan', 'title')},
+                                                    **({'plan': plan} if plan else {})}, ensure_ascii=False)
+        c.add_message(role='system', content=note)
         c.add_message(role='user', content=case['text'])
         return c
 
@@ -208,7 +237,7 @@ class Harness:
 
     def _intake(self, world, work):
         from game_intake import GameIntake
-        runner = Runner(world, work)
+        runner = Runner(world, work_of({'work': work}))
         p = self.persona
         return runner, GameIntake(runner, p.game_intake_instructions, select_instructions=p.game_select_instructions,
                                   draft_instructions=p.game_draft_instructions)
@@ -238,9 +267,85 @@ class Harness:
                 reply = await intake.handle(item, conversation=[tuple(c) for c in case['context']])
             else:
                 reply = await intake.handle(item)
+            if decision.get('operation') == 'select' and not runner.calls and not world.calls and runner.body_step():
+                # A new action chosen while work runs is refused with a fixed reply; it is still the choice made.
+                chosen = intake._capabilities().get(decision.get('capability')) or {}
+                name = 'submit_game_task' if chosen.get('kind') == 'work' else chosen.get('name', 'other')
+                runner.calls.append((name, {'refused_while_busy': True}))
         finally:
             await intake.close()
         return reply, decision, runner.calls
+
+    # ---- the prototype: one typed decision per state ----
+    def _acts(self, world, work):
+        """The kinds a decision may take in this work state, as (schema alternative, line for the prompt)."""
+        def alt(properties):
+            return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
+        acts = [(alt({'kind': {'const': 'none'}}), 'none：話すだけ')]
+        state = (work or {}).get('state')
+        if state in ('accepted', 'running'):
+            acts += [(alt({'kind': {'const': 'tell'}, 'message': STRING}),
+                      'tell：今の作業へ相手の言葉を渡す（やり方・好み・続けてよいこと）。messageに渡す言葉'),
+                     (alt({'kind': {'const': 'cancel'}}), 'cancel：今の作業を止める')]
+        elif state == 'needs_decision':
+            decision = work['decision']
+            for action in decision.get('actions') or ['retry', 'cancel']:
+                if action == 'reply':
+                    acts.append((alt({'kind': {'const': 'reply'}, 'message': STRING}),
+                                 f"reply：作業からの質問（{decision['message']}）へ相手の答えを渡す。messageに相手の答え"))
+                else:
+                    acts.append((alt({'kind': {'const': action}}),
+                                 {'retry': 'retry：作業をもう一度試す', 'cancel': 'cancel：作業をやめる'}[action]))
+        else:
+            for capability in (world.profile.get('work') or {}).get('capabilities', []):
+                acts.append((alt({'kind': {'const': 'work'}, 'request': STRING}),
+                             f"work：{capability.get('description', '')} requestに相手の頼み"))
+            for fn in world.tools:
+                if world.meta.get(fn.id, {}).get('ciel/role') == 'act':
+                    raw = copy.deepcopy(fn.info.raw_schema)
+                    raw['parameters']['additionalProperties'] = False
+                    acts.append((alt({'kind': {'const': fn.id}, 'arguments': raw['parameters']}),
+                                 f"{fn.id}：{raw.get('description', '')}"))
+        return acts
+
+    @staticmethod
+    def _decided(act, work, world):
+        kind = act.get('kind')
+        decision = (work or {}).get('decision') or {}
+        if kind in (None, 'none'):
+            return []
+        if kind == 'tell':
+            return [('tell_game_task', {'message': act.get('message')})]
+        if kind == 'cancel' and work and work['state'] in ('accepted', 'running'):
+            return [('stop_game_task', {})]
+        if kind in ('reply', 'retry', 'cancel'):
+            return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind,
+                                          **({'message': act.get('message')} if kind == 'reply' else {})})]
+        if kind == 'work':
+            name = ((world.profile.get('work') or {}).get('capabilities') or [{}])[0].get('name')
+            return [('submit_game_task', {'capability': name, 'arguments': {'request': act.get('request')}})]
+        return [(kind, act.get('arguments') or {})]
+
+    async def decide(self, case, world):
+        fake, _ = self._agent(world)
+        work = work_of(case)
+        acts = self._acts(world, work)
+        template = (HERE / 'intent_routing_decide.md').read_text(encoding='utf-8')
+        game = '\n\n'.join(p for p in (self.persona.game_instructions, world.instructions) if p)
+        system = '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), game,
+                                template.replace('{actions}', '\n'.join('- ' + line for _, line in acts))))
+        wire = self.mind_mod.local_context(self._context(case, system)).to_provider_format('openai')[0]
+        schema = {'type': 'object', 'additionalProperties': False, 'required': ['act', 'say'],
+                  'properties': {'act': {'anyOf': [a for a, _ in acts]}, 'say': {'type': 'string'}}}
+        body = {'model': 'local', 'messages': wire, 'max_tokens': 800,
+                'response_format': {'type': 'json_schema', 'json_schema': {'name': 'decision', 'schema': schema}},
+                'chat_template_kwargs': {'enable_thinking': False}}
+        if DECIDE_TEMPERATURE is not None:
+            # The intake decides at temperature 0; the conversation model uses the server default.
+            body['temperature'] = DECIDE_TEMPERATURE
+        message = self._post(body)['choices'][0]['message']
+        out = json.loads(message.get('content') or '{}')
+        return self._decided(out.get('act') or {}, work, world), out.get('say') or '', out.get('act')
 
     async def run(self, case, system):
         world = World(self.catalog_json, self.function_tool)
@@ -259,6 +364,9 @@ class Harness:
                 row.update(reply=text, rounds=rounds)
             else:
                 row.update(reply=reply, rounds=0)
+        elif system == 'decide':
+            actions, text, act = await self.decide(case, world)
+            row.update(reply=text, rounds=1, act=act)
         else:
             actions, text, rounds = await self.mind(case, world, after_intake=False)
             row.update(reply=text, rounds=rounds)
@@ -272,7 +380,22 @@ def families(actions):
     return [FAMILY.get(name, 'other') for name, _ in actions if name not in READ_ONLY]
 
 
+def outcome(actions):
+    """Families of the actions taken, with the answer's action: tell, stop, work, answer:reply, ..."""
+    return [f"answer:{a.get('action')}" if name == 'answer_game_task' else FAMILY.get(name, 'other')
+            for name, a in actions if name not in READ_ONLY]
+
+
 def score(case, actions):
+    if case['expect'] == 'accept':
+        got, accept = outcome(actions), case['accept']
+        if not got:
+            verdict = 'ok' if 'none' in accept else 'missed'
+        elif all(f in accept for f in got):
+            verdict = 'ok'
+        else:
+            verdict = 'false_action' if accept == ['none'] else 'wrong'
+        return {'families': got, 'verdict': verdict}
     got = families(actions)
     moved = [f for f in got if f not in ('stop', 'answer')]
     stopped = 'stop' in got
@@ -301,7 +424,15 @@ def summarize(rows, cases):
             part = [r for r in rs if by_id[r['id']]['split'] == split]
             chat = [r for r in part if by_id[r['id']]['expect'] == 'chat']
             act = [r for r in part if by_id[r['id']]['expect'] in ('move', 'stop')]
+            seconds = sorted(r['seconds'] for r in part)
+            if all(by_id[r['id']]['expect'] == 'accept' for r in part):
+                s[split] = {'scored': len(part), 'accuracy': round(sum(r['verdict'] == 'ok' for r in part) / max(1, len(part)), 3),
+                            **{v: sum(r['verdict'] == v for r in part) for v in ('missed', 'wrong', 'false_action', 'error')},
+                            'median_seconds': seconds[len(seconds) // 2] if seconds else 0,
+                            'p90_seconds': seconds[min(len(seconds) - 1, int(len(seconds) * .9))] if seconds else 0}
+                continue
             s[split] = {
+                'median_seconds': seconds[len(seconds) // 2] if seconds else 0,
                 'scored': sum(r['verdict'] != 'unscored' for r in part),
                 'accuracy': round(sum(r['verdict'] == 'ok' for r in part) / max(1, sum(r['verdict'] != 'unscored' for r in part)), 3),
                 'chat_cases': len(chat), 'chat_false_action': sum(r['verdict'].startswith('false') for r in chat),
@@ -320,6 +451,11 @@ def load_cases(splits):
         if not real.exists():
             raise SystemExit('recorded cases are missing; run intent_routing_build.py with the recorded utterances')
         cases += json.loads(real.read_text(encoding='utf-8'))
+    real_work = HERE.parents[1] / '.local/intent-routing/work_cases.json'
+    if 'real_work' in splits:
+        if not real_work.exists():
+            raise SystemExit('recorded work cases are missing; run intent_routing_build.py with the recorded utterances')
+        cases += json.loads(real_work.read_text(encoding='utf-8'))
     return [c for c in cases if c['split'] in splits]
 
 
@@ -343,7 +479,8 @@ async def main(args):
                 row['repeat'] = repeat
                 rows.append(row)
                 print(json.dumps({k: row.get(k) for k in ('system', 'id', 'verdict', 'families', 'seconds')}, ensure_ascii=False), flush=True)
-                report = {'suite': 'intent-routing-v1', 'agent_source': str(args.agent_source),
+                report = {'suite': 'intent-routing-v2', 'agent_source': str(args.agent_source),
+                          'decide_temperature': DECIDE_TEMPERATURE,
                           'cases_sha256': hashlib.sha256((HERE / 'intent_routing_cases.json').read_bytes()).hexdigest(),
                           'catalog_sha256': hashlib.sha256(args.catalog.read_bytes()).hexdigest(),
                           'rows': rows, 'summary': summarize(rows, cases)}
@@ -353,8 +490,8 @@ async def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--system', action='append', choices=['intake', 'mind'], required=True)
-    parser.add_argument('--split', action='append', choices=['dev', 'real'], default=None)
+    parser.add_argument('--system', action='append', choices=['intake', 'mind', 'decide'], required=True)
+    parser.add_argument('--split', action='append', choices=['dev', 'real', 'work', 'real_work'], default=None)
     parser.add_argument('--case', action='append', default=[])
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--catalog', type=Path, required=True, help='Body MCP catalog: {profile, tools, play}')

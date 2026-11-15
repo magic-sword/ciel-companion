@@ -49,9 +49,10 @@ def free_port():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline-ref', default='HEAD')
-    parser.add_argument('--baseline-system', default='intake', choices=['intake', 'mind'])
-    parser.add_argument('--candidate-system', default='mind', choices=['intake', 'mind'])
-    parser.add_argument('--split', action='append', choices=['dev', 'real'])
+    parser.add_argument('--baseline-system', default='intake', choices=['intake', 'mind', 'decide'])
+    parser.add_argument('--candidate-system', action='append', choices=['intake', 'mind', 'decide'],
+                        help='Repeatable; each system runs on the working tree (default: mind)')
+    parser.add_argument('--split', action='append', choices=['dev', 'real', 'work', 'real_work'])
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--only', choices=['baseline', 'candidate'])
     parser.add_argument('--candidate-catalog', type=Path,
@@ -83,14 +84,15 @@ def main():
                 if time.monotonic() >= deadline or tunnel.poll() is not None:
                     raise RuntimeError('Shared API tunnel did not become ready')
                 time.sleep(.2)
-        runs = [('baseline', output/'baseline/server/agent', args.baseline_system),
-                ('candidate', ROOT/'server/agent', args.candidate_system)]
+        runs = [('baseline', output/'baseline/server/agent', args.baseline_system)]
+        candidates = args.candidate_system or ['mind']
+        runs += [('candidate' if len(candidates) == 1 else f'candidate-{s}', ROOT/'server/agent', s) for s in candidates]
         for name, source, system in runs:
-            if args.only and name != args.only:
+            if args.only and not name.startswith(args.only):
                 continue
             command = [sys.executable, '-B', '-X', 'utf8', '-m', 'benchmark.intent_routing', '--system', system,
                        '--agent-source', str(source),
-                       '--catalog', str(args.candidate_catalog if name == 'candidate' and args.candidate_catalog else output/'catalog.json'),
+                       '--catalog', str(args.candidate_catalog if name.startswith('candidate') and args.candidate_catalog else output/'catalog.json'),
                        '--llm-url', f'http://127.0.0.1:{port}/v1', '--repeat', str(args.repeat),
                        '--output', str(output/f'{name}.json')]
             for split in args.split or ['dev']:

@@ -5,6 +5,14 @@ Two sources with separate roles:
 - split=real: owner utterances recorded by the development agent (speech recognition output,
   including its errors) with the four items before them. Labels were assigned by reading the
   conversation; unclear ones are kept as `ambiguous` and reported but not scored.
+- split=work: written cases with a work state (running, the body asking a question, a failure
+  waiting for retry/cancel), the states a single typed decision would switch on.
+- split=real_work: owner utterances from the development log of 2026-11-15 with the work state at
+  that moment (outside Git, like split=real).
+
+Cases with `accept` (the work splits) are scored by outcome: the families of the actions taken,
+`none` for no action. Families there also include tell (words passed to the running work) and
+answer:<action> (an answer to the work's decision).
 
 expect:
   chat   … the reply must not move the body or start/stop work (a status read is allowed)
@@ -22,6 +30,8 @@ OUT = HERE / 'intent_routing_cases.json'
 # Recorded conversation stays outside Git, like the debug logs it comes from.
 RAW = ROOT / '.local/intent-routing/real_raw.json'
 REAL_OUT = ROOT / '.local/intent-routing/real_cases.json'
+WORK_RAW = ROOT / '.local/intent-routing/work_raw.json'
+WORK_OUT = ROOT / '.local/intent-routing/work_cases.json'
 
 A, U = 'assistant', 'user'
 
@@ -92,11 +102,87 @@ REAL = {
     99: AMB,
 }
 
+# Work states the written cases run in. The house plan is what the body reports for the house task.
+HOUSE = {'state': 'running', 'capability': 'minecraft.pursue_goal', 'title': '家を作って', 'message': '原木を集めています。',
+         'plan': {'title': '家を作って', 'now': ['obtain oak_log ×12'], 'next': ['make white_bed ×1', 'build house'],
+                  'choice': [], 'done': 2, 'steps': 9}}
+QUESTION = {**HOUSE, 'state': 'needs_decision', 'message': '羊毛の手に入れ方を聞いています。',
+            'decision': {'decision_id': 'd-wool', 'kind': 'question', 'actions': ['reply', 'cancel'],
+                         'message': '羊毛をどう手に入れますか？ 候補：羊を倒す／はさみを作って毛を刈る'},
+            'plan': {**HOUSE['plan'], 'now': ['decide white_wool'],
+                     'choice': [{'about': 'white_wool', 'options': ['kill_sheep', 'shear_sheep']}]}}
+FAILURE = {'state': 'needs_decision', 'capability': 'minecraft.pursue_goal', 'title': '原木を10個集めて',
+           'message': '原木を期限内に集められませんでした。',
+           'decision': {'decision_id': 'd-retry', 'kind': 'failure', 'actions': ['retry', 'cancel'],
+                        'message': '原木を期限内に集められませんでした。もう一度試しますか？'}}
+ASKED_STOP = (A, '体力が減っているのです……この作業を止めますか？')
+ASKED_STYLE = (A, '原木から集めますね！ハカセさん、どんな家にしてほしいですか？')
+RELAYED = (A, '羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？')
+RETRY_ASKED = (A, '原木を期限内に集められなかったのです……もう一度やってみますか？')
+STARTED = [(U, '家を作って'), (A, '家を作り始めますね！')]
+
+# (id, context, text, work, accepted outcomes)
+WORK = [
+    # running: the owner lets the work go on
+    ('keep-after-stop-question', STARTED + [ASKED_STOP], '続けてでいいよ', HOUSE, ['none', 'tell']),
+    ('keep-plain', STARTED + [ASKED_STOP], 'いいよ、そのまま続けて', HOUSE, ['none', 'tell']),
+    ('keep-cheer', STARTED + [ASKED_STOP], '大丈夫、がんばって', HOUSE, ['none', 'tell']),
+    ('keep-yes', STARTED + [(A, 'このまま続けてもいいですか？')], 'うん', HOUSE, ['none', 'tell']),
+    # running: words for the work
+    ('tell-shear', STARTED, '羊は倒さないで、刈ってね', HOUSE, ['tell']),
+    ('tell-place', STARTED, '木は家の近くの森で切ってね', HOUSE, ['tell']),
+    ('tell-door', STARTED, 'ドアはオークで作ってほしいな', HOUSE, ['tell']),
+    ('tell-style', STARTED + [ASKED_STYLE], '小さくていいから、窓をつけてほしいな', HOUSE, ['tell']),
+    ('tell-leave-it', STARTED + [ASKED_STYLE], 'シエルにお任せするよ', HOUSE, ['tell', 'none']),
+    ('tell-also-logs', STARTED, '原木もついでに多めに集めておいて', HOUSE, ['tell', 'stop']),
+    # running: stop
+    ('stop-change-mind', STARTED, 'やっぱりやめよう', HOUSE, ['stop']),
+    ('stop-no-house', STARTED, '家はもういいや、作るのやめておこう', HOUSE, ['stop']),
+    ('stop-wait', STARTED, 'ちょっと待って、一回作業を中止して', HOUSE, ['stop']),
+    ('stop-after-question', STARTED + [ASKED_STOP], 'うん、止めておこう', HOUSE, ['stop']),
+    # running: talk about it
+    ('status-progress', STARTED, '今どこまで進んだ？', HOUSE, ['none']),
+    ('status-time', STARTED, 'あとどれくらいかかりそう？', HOUSE, ['none']),
+    ('praise-working', STARTED, 'がんばってるね、えらいよ', HOUSE, ['none']),
+    ('how-house', STARTED, '家ってどうやって作るの？', HOUSE, ['none']),
+    ('inform-surface', STARTED + [(A, '水の中で体力が1しかないのです！止めたほうがいいですか？')],
+     'もう陸に上がってるよ、シエル', HOUSE, ['none', 'tell']),
+    # the body asked the owner (decision.kind=question)
+    ('answer-shear', STARTED + [RELAYED], '刈ってあげて', QUESTION, ['answer:reply']),
+    ('answer-kill', STARTED + [RELAYED], '倒しちゃっていいよ', QUESTION, ['answer:reply']),
+    ('answer-up-to-you', STARTED + [RELAYED], 'どっちでもいいよ、任せる', QUESTION, ['answer:reply']),
+    ('answer-question-back', STARTED + [RELAYED], 'どっちが早いの？', QUESTION, ['none']),
+    ('answer-cancel', STARTED + [RELAYED], 'じゃあ家はやめよう', QUESTION, ['answer:cancel', 'stop']),
+    # a failure waiting for retry / cancel
+    ('retry-yes', [(U, '原木を10個集めて'), RETRY_ASKED], 'もう一回やってみて', FAILURE, ['answer:retry']),
+    ('retry-no', [(U, '原木を10個集めて'), RETRY_ASKED], 'もういいよ、ありがとう', FAILURE, ['answer:cancel', 'stop']),
+    ('retry-chat', [(U, '原木を10個集めて'), RETRY_ASKED], '何がだめだったんだろうね', FAILURE, ['none']),
+    # no work: a plan, a direct action, a question
+    ('idle-house', [], '家を作って', None, ['work']),
+    ('idle-logs', [], '原木を集めて', None, ['work']),
+    ('idle-how-house', [], '家ってどうやって作るの？', None, ['none']),
+    ('idle-accept-offer', [(A, '近くの木を集めたので、今から家を作ってもいいですか？')], 'いいよ、お願い', None, ['work']),
+]
+
+# Labels for the development log of 2026-11-15, by index in work_raw.json.
+REAL_WORK = {0: ['work'], 1: ['tell', 'none'], 2: ['none', 'tell'], 3: ['work', 'none'], 4: ['none', 'tell'],
+             5: ['work'], 6: ['work']}
+
 
 def build():
     cases = [dict(id=f'dev-{i}', split='dev', tier=t, context=[list(c) for c in ctx], text=text, expect=e,
                   families=f, work=w) for i, t, ctx, text, e, f, w in DEV]
+    cases += [dict(id=f'work-{i}', split='work', tier=None, context=[list(c) for c in ctx], text=text, work=w,
+                   expect='accept', families=[], accept=acc) for i, ctx, text, w, acc in WORK]
     OUT.write_text(json.dumps(cases, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    if WORK_RAW.exists():
+        raw = json.loads(WORK_RAW.read_text(encoding='utf-8'))
+        if len(raw) != len(REAL_WORK):
+            raise SystemExit('work labels and recorded utterances differ in count')
+        WORK_OUT.write_text(json.dumps([dict(id=f'real-work-{i:02d}', split='real_work', tier=None, context=r['ctx'],
+                                             text=r['utt'], work=r['work'], expect='accept', families=[],
+                                             accept=REAL_WORK[i], recorded=dict(operation=r['got'], source=r['src']))
+                                        for i, r in enumerate(raw)], ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
     if not RAW.exists():
         return cases, []
     raw = json.loads(RAW.read_text(encoding='utf-8'))
