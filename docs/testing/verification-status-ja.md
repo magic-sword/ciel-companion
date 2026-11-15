@@ -332,4 +332,9 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
 - **作り直し：** 古いワールド3つを`~/work/ciel-companion/server/minecraft/world-resets/20261116-012941/`へ退避した。体の拠点の記憶は空だった。サーバーの`compose.yaml`は種を足したコミットの版にそろえた（前の版は`compose.yaml.before-world-reset`）。
 - **確認：** `seed`は8675309、`server.properties`の`level-seed=8675309`、`advance_time`はfalse、時刻6000。Cielが初期地点（7.5, 64, 80.5、森）に入った。体のimageは`9d01026b68cf`のまま、再起動0。会話サーバーは作り直していない。
 - **未確認：** 持ち主の入り直しと、新しいワールドでの採集・農場。
+
+同日、配信中にあいさつを頼まれたとき視聴者へ自己紹介するよう、YouTubeのコメントが配信につながっているあいだだけ会話の補足へ`[配信]`の1行を置いた（コミット`db02362`、文は`config/prompts/stream_note.md`）。
+- **比べたこと：** 評価器の決定と会話モデルで、配信の始めの「挨拶して」など6発言を、補足の有無で各1回生成した。補足なしでは「シエル、挨拶して」がハカセさんへのあいさつになった（決定で4/6が視聴者向け）。補足ありでは決定・会話モデルとも6/6で視聴者へ名乗った。注釈は0件。注釈の書き出し確率と、補足があるときの振り分けは未測定。
+- **配布：** 利用者の依頼により、開発（`deploy-agent.py --dev`、196ファイル一致・health・worker登録、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-db0236262770-1794763954931868123`）と本番（`deploy-server.sh`、image `de2fe9535a54…`、再起動0・Traceback 0・worker登録、`youtube_chat.py`と`stream_note.md`のSHA-256一致）へ配布した。
+- **本番のOpenAI：** 利用者の依頼で本番の返答だけOpenAIへ切り替える前に、本番の鍵で1回だけ短く問い合わせたところ、401（`expired_secret_key`、鍵の期限切れ）だった。設定は変えていない。
 - **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
