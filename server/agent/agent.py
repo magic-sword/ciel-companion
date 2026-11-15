@@ -55,6 +55,7 @@ import activity as activity_
 import app_env
 import game_env
 import goals
+import game_decision
 import game_intake
 from capabilities import CapabilityCatalog
 from session_mcp import SessionMCP
@@ -290,7 +291,19 @@ class Ciel(Agent):
             tail = mind._tail(list(chat_ctx.items))
             user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
             if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
-                reply = await intake.handle(user_item)
+                decision = getattr(self, 'game_decision', None)
+                if decision is not None and decision.supported():
+                    # One decision with the whole conversation: what to say and what to do (game_decision.py).
+                    style = self.style
+                    wire = mind.local_context(self.mind.build(chat_ctx, turn=turn), source=chat_ctx).to_provider_format('openai')[0]
+                    # The game's instructions travel with loaded capabilities, not in the fixed instructions;
+                    # the decision needs them next to its actions (they say which capability does what).
+                    system = '\n\n'.join(t for t in (self.instructions_for(
+                        style.talk if style else 'normal', style.presence if style else 'solo'), self._game_text()) if t)
+                    reply = await decision.handle(user_item, system,
+                                                  [m for m in wire if m is not wire[0] or m.get('role') != 'system'])
+                else:
+                    reply = await intake.handle(user_item)
                 intake_checked = True
                 if reply is not None:
                     yield reply
@@ -729,6 +742,8 @@ async def entrypoint(ctx: JobContext) -> None:
             session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
             session.on('user_state_changed', agent.game_intake.on_user_state)
             ctx.add_shutdown_callback(agent.game_intake.close)
+            if os.environ.get('CIEL_GAME_DECISION', 'intake') == 'decide':
+                agent.game_decision = game_decision.GameDecision(agent.game_intake, agent.persona.game_decide_instructions)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 

@@ -50,6 +50,7 @@ class Persona:
     game_intake_instructions: str
     game_select_instructions: str
     game_draft_instructions: str
+    game_decide_instructions: str
     execution_instructions: str
     tool_discovery_instructions: str
     tasks_instructions: str
@@ -82,7 +83,7 @@ class Persona:
              self.minutes_voice_instructions,
              self.conversation_instructions, self.research_instructions, self.research_voice_instructions,
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
-             self.mind_brief_instructions, self.listener_instructions, self.game_intake_instructions, self.game_select_instructions, self.game_draft_instructions, self.tool_discovery_instructions, self.tasks_instructions,
+             self.mind_brief_instructions, self.listener_instructions, self.game_intake_instructions, self.game_select_instructions, self.game_draft_instructions, self.game_decide_instructions, self.tool_discovery_instructions, self.tasks_instructions,
              self.initiative_open_nudge, self.research_found_nudge, self.game_instructions, self.app_instructions, self.execution_instructions,
              self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions, self.voice_warmup, self.voice_first_sentence, self.stt_vocabulary, self.reply_frame,
              hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
@@ -112,7 +113,7 @@ def load_persona() -> Persona:
                 'minutes_instructions', 'minutes_live_instructions', 'minutes_voice_instructions',
                 'conversation_instructions',
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
-                'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'game_intake_instructions', 'game_select_instructions', 'game_draft_instructions', 'tool_discovery_instructions', 'tasks_instructions',
+                'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'game_intake_instructions', 'game_select_instructions', 'game_draft_instructions', 'game_decide_instructions', 'tool_discovery_instructions', 'tasks_instructions',
                 'initiative_open_nudge', 'research_found_nudge', 'game_instructions', 'app_instructions', 'execution_instructions',
                 'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'voice_warmup', 'voice_first_sentence', 'stt_vocabulary', 'reply_frame'):
         file_key = f'{key}_file'

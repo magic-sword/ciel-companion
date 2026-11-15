@@ -1,9 +1,12 @@
 import json
+import sys
 import types
 import unittest
 from pathlib import Path
 
 from server.benchmark import intent_routing as ir
+
+sys.path.insert(0, str(Path(ir.HERE).parent / 'agent'))   # game_decision, as the evaluator's setup() does
 
 CASES = json.loads((Path(ir.HERE) / 'intent_routing_cases.json').read_text(encoding='utf-8'))
 

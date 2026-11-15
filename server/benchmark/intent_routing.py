@@ -38,13 +38,13 @@ FAMILY = {
 ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
 # The written cases of the first measurement: "running" was a log-gathering work.
 LEGACY_RUNNING = {'state': 'running', 'capability': 'minecraft.pursue_goal', 'title': '原木を集めて', 'message': '原木を集めている'}
-STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
-DECIDE_TEMPERATURE = float(os.environ['CIEL_BENCH_DECIDE_TEMPERATURE']) if os.environ.get('CIEL_BENCH_DECIDE_TEMPERATURE') else None
+# The conversation server decides at temperature 0 (game_decision.GameDecision.TEMPERATURE).
+DECIDE_TEMPERATURE = float(os.environ.get('CIEL_BENCH_DECIDE_TEMPERATURE', '0'))
 # How the prototype's decision is written:
 #   act_first  {act, say}, act required (none is one of its kinds)
 #   say_first  {say, act}, act required: the words are written before the choice
 #   optional   {say, act?}: no act means speaking only, so not acting needs no choice at all
-DECIDE_FORM = os.environ.get('CIEL_BENCH_DECIDE_FORM', 'act_first')
+DECIDE_FORM = os.environ.get('CIEL_BENCH_DECIDE_FORM', 'say_first')   # say_first is what the server uses
 if DECIDE_FORM not in ('act_first', 'say_first', 'optional'):
     raise SystemExit(f'unknown CIEL_BENCH_DECIDE_FORM: {DECIDE_FORM}')
 
@@ -60,7 +60,7 @@ REAL_BAND = os.environ.get('CIEL_BENCH_REAL_BAND', '夜')
 GAME_TIME = os.environ.get('CIEL_BENCH_GAME_TIME', '夜（敵が出る）')
 # How the game time is labelled in the body's state (server/minecraft/src/ciel/words.js), and whether the
 # real time is given at all (CIEL_BENCH_REAL_TIME=off), to compare ways of keeping the two apart.
-GAME_TIME_LABEL = os.environ.get('CIEL_BENCH_GAME_TIME_LABEL', '時刻')
+GAME_TIME_LABEL = os.environ.get('CIEL_BENCH_GAME_TIME_LABEL', 'マイクラの中の時刻')
 REAL_TIME = os.environ.get('CIEL_BENCH_REAL_TIME', 'on') != 'off'
 NOW = f'[今：2026年11月13日（金）・{REAL_BAND}・秋（日本時間）]'
 BODY = ('[マイクラの様子]\nシエル：体力 20/20・空腹 20/20・持ち物 なし・していること {doing}\n' + GAME_TIME_LABEL + '：' + GAME_TIME + '\n'
@@ -291,75 +291,36 @@ class Harness:
             await intake.close()
         return reply, decision, runner.calls
 
-    # ---- the prototype: one typed decision per state ----
-    def _acts(self, world, work, form='act_first'):
-        """The kinds a decision may take in this work state, as (schema alternative, line for the prompt)."""
-        def alt(properties):
-            return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
-        acts = [] if form == 'optional' else [(alt({'kind': {'const': 'none'}}), 'none：話すだけ')]
-        state = (work or {}).get('state')
-        if state in ('accepted', 'running'):
-            acts += [(alt({'kind': {'const': 'tell'}, 'message': STRING}),
-                      'tell：今の作業へ相手の言葉を渡す（やり方・好み・続けてよいこと）。messageに渡す言葉'),
-                     (alt({'kind': {'const': 'cancel'}}), 'cancel：今の作業を止める')]
-        elif state == 'needs_decision':
-            decision = work['decision']
-            for action in decision.get('actions') or ['retry', 'cancel']:
-                if action == 'reply':
-                    acts.append((alt({'kind': {'const': 'reply'}, 'message': STRING}),
-                                 f"reply：作業からの質問（{decision['message']}）へ相手の答えを渡す。messageに相手の答え"))
-                else:
-                    acts.append((alt({'kind': {'const': action}}),
-                                 {'retry': 'retry：作業をもう一度試す', 'cancel': 'cancel：作業をやめる'}[action]))
-        else:
-            for capability in (world.profile.get('work') or {}).get('capabilities', []):
-                acts.append((alt({'kind': {'const': 'work'}, 'request': STRING}),
-                             f"work：{capability.get('description', '')} requestに相手の頼み"))
-            for fn in world.tools:
-                if world.meta.get(fn.id, {}).get('ciel/role') == 'act':
-                    raw = copy.deepcopy(fn.info.raw_schema)
-                    raw['parameters']['additionalProperties'] = False
-                    acts.append((alt({'kind': {'const': fn.id}, 'arguments': raw['parameters']}),
-                                 f"{fn.id}：{raw.get('description', '')}"))
-        return acts
+    # ---- one typed decision per state (server/agent/game_decision.py) ----
+    def _acts(self, world, work, form=None):
+        """The production kinds; the optional form drops none (not acting is then leaving act out)."""
+        import game_decision
+        alternatives = game_decision.acts(world, work)
+        return alternatives[1:] if (form or DECIDE_FORM) == 'optional' else alternatives
 
     @staticmethod
     def _decided(act, work, world):
-        kind = act.get('kind')
-        decision = (work or {}).get('decision') or {}
-        if kind in (None, 'none'):
-            return []
-        if kind == 'tell':
-            return [('tell_game_task', {'message': act.get('message')})]
-        if kind == 'cancel' and work and work['state'] in ('accepted', 'running'):
-            return [('stop_game_task', {})]
-        if kind in ('reply', 'retry', 'cancel'):
-            return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind,
-                                          **({'message': act.get('message')} if kind == 'reply' else {})})]
-        if kind == 'work':
-            name = ((world.profile.get('work') or {}).get('capabilities') or [{}])[0].get('name')
-            return [('submit_game_task', {'capability': name, 'arguments': {'request': act.get('request')}})]
-        return [(kind, act.get('arguments') or {})]
+        import game_decision
+        return game_decision.operations(act, work, world)
 
     async def decide(self, case, world):
+        import game_decision
         fake, _ = self._agent(world)
         work = work_of(case)
-        acts = self._acts(world, work, DECIDE_FORM)
-        template = (HERE / ('intent_routing_decide_optional.md' if DECIDE_FORM == 'optional' else 'intent_routing_decide.md')).read_text(encoding='utf-8')
-        game = '\n\n'.join(p for p in (self.persona.game_instructions, world.instructions) if p)
-        system = '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), game,
-                                template.replace('{actions}', '\n'.join('- ' + line for _, line in acts))))
+        alternatives = self._acts(world, work)
+        template = ((HERE / 'intent_routing_decide_optional.md').read_text(encoding='utf-8') if DECIDE_FORM == 'optional'
+                    else self.persona.game_decide_instructions)
+        # The same system the conversation server sends (agent.py): the conversation's instructions, the game's
+        # (with a capability catalog they are not in the fixed instructions), then the decision's.
+        system = '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), fake._game_text(),
+                              game_decision.instructions(template, alternatives)))
         wire = self.mind_mod.local_context(self._context(case, system)).to_provider_format('openai')[0]
-        act, say = {'anyOf': [a for a, _ in acts]}, {'type': 'string'}
-        properties = {'act': act, 'say': say} if DECIDE_FORM == 'act_first' else {'say': say, 'act': act}
-        schema = {'type': 'object', 'additionalProperties': False, 'properties': properties,
-                  'required': ['say'] if DECIDE_FORM == 'optional' else list(properties)}
+        schema = game_decision.schema(alternatives, 'act_first' if DECIDE_FORM == 'act_first' else 'say_first')
+        if DECIDE_FORM == 'optional':
+            schema['required'] = ['say']
         body = {'model': 'local', 'messages': wire, 'max_tokens': 800,
                 'response_format': {'type': 'json_schema', 'json_schema': {'name': 'decision', 'schema': schema}},
-                'chat_template_kwargs': {'enable_thinking': False}}
-        if DECIDE_TEMPERATURE is not None:
-            # The intake decides at temperature 0; the conversation model uses the server default.
-            body['temperature'] = DECIDE_TEMPERATURE
+                'chat_template_kwargs': {'enable_thinking': False}, 'temperature': DECIDE_TEMPERATURE}
         message = self._post(body)['choices'][0]['message']
         out = json.loads(message.get('content') or '{}')
         return self._decided(out.get('act') or {}, work, world), out.get('say') or '', out.get('act')

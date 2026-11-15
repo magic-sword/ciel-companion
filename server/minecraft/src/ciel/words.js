@@ -160,7 +160,7 @@ export function stateText(s, owner, linked = true) {
   const players = s.players ?? [];
   const near = players.map((p) => `${p.name}${p.name === owner ? '（持ち主）' : ''} ${p.distance} ブロック`)
     .concat((s.hostiles ?? []).map((h) => `${h.name} ${h.distance} ブロック`));
-  const lines = ['シエル：' + me.join('・'), `時刻：${when}`, '近く：' + (near.length ? near.join('、') : 'だれもいない')];
+  const lines = ['シエル：' + me.join('・'), `マイクラの中の時刻：${when}`, '近く：' + (near.length ? near.join('、') : 'だれもいない')];
   if (s.footing?.on) lines.push(`足元：${s.footing.on}`);
   const blocks = counts(s.blocks).slice(0, BLOCKS_SHOWN);
   if (blocks.length) lines.push('近くのブロック：' + blocks.map(([k, n]) => `${k}×${n}`).join('、'));

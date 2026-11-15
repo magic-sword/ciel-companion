@@ -38,6 +38,8 @@ services:
       - CIEL_INFERENCE_TRACE=1
       - CIEL_TRACE_RUNTIME_MANIFEST=${CIEL_TRACE_RUNTIME_MANIFEST:-unavailable}
       # 本番に入れる前の設定を試すときは、ここに環境変数を足す（例：CIEL_TURN_CONTEXT・CIEL_SETTLE_SECONDS。turns.py）
+      # ゲーム中の持ち主の発言を、受付の代わりに一つの決定（話す言葉と行動）で扱う（game_decision.py）。本番は未設定（受付）
+      - CIEL_GAME_DECISION=${CIEL_GAME_DECISION:-decide}
       - CIEL_DB_URL=postgresql://ciel:${CIEL_DB_PASSWORD:?本番の server/.env.shared に CIEL_DB_PASSWORD がない}@127.0.0.1:5433/ciel
       - CIEL_MEMORY_SCOPE=dev
       # ゲームの環境（MCP。docs/games/game-environment-mcp-design-ja.md）。マイクラは体の MCP の入口
