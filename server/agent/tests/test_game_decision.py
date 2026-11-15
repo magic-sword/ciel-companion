@@ -88,13 +88,19 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         handle.assert_awaited_once()
         self.create.assert_not_awaited()
 
-    def test_games_that_need_preparation_or_pointing_stay_with_the_intake(self):
+    def test_games_whose_work_needs_preparation_stay_with_the_intake(self):
+        self.env.profile['reference_context'] = True   # pointing alone does not hand the game to the intake
         self.assertTrue(game_decision.supported(self.env))
         self.env.profile['work']['capabilities'][0]['preparation'] = {'version': 1}
         self.assertFalse(game_decision.supported(self.env))
-        del self.env.profile['work']['capabilities'][0]['preparation']
-        self.env.meta['game_come']['ciel/reference_argument'] = 'target'
-        self.assertFalse(game_decision.supported(self.env))
+
+    async def test_an_action_aimed_at_a_pointed_target_goes_to_the_intake(self):
+        self.env.meta['game_come']['ciel/target_binding'] = {'kind': 'axes', 'point': True}
+        self.respond({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}})
+        with patch.object(self.intake, 'handle', AsyncMock(return_value='操作を受け付けました。')) as handle:
+            self.assertEqual(await self.say('あそこへ行って'), '操作を受け付けました。')
+        handle.assert_awaited_once()
+        self.env.use.assert_not_awaited()
 
 
 if __name__ == '__main__':

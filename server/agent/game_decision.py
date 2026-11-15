@@ -6,8 +6,9 @@ The conversation model reads the whole conversation and writes one structured ou
   running work    words passed to the work, or stopping it
   waiting work    the answers the work's decision accepts
 Not acting is the kind `none`. Starting, checking and stopping stay with the work runner and the
-game environment, as for the intake (game_intake.py), which still handles stop words, pointing and
-games whose work needs preparation.
+game environment, as for the intake (game_intake.py), which still handles stop words, games whose
+work needs preparation, and actions aimed at what the owner pointed at or named as coordinates
+(the decision chooses such an action; the intake then resolves its target).
 """
 import copy
 import json
@@ -26,17 +27,19 @@ FORMS = ('say_first', 'act_first')
 
 
 def supported(env) -> bool:
-    """The decision covers games whose work takes the request as it is and whose actions need no pointing."""
-    if not env.playing() or env.profile.get('reference_context'):
+    """The decision covers games whose work takes the request as it is (a declared handoff)."""
+    if not env.playing():
         return False
     work = env.profile.get('work') or {}
     if work.get('version') != 1:
         return False
-    if any((c.get('handoff') or {}).get('version') != 1 or c.get('preparation') for c in work.get('capabilities', [])):
-        return False
-    meta = getattr(env, 'meta', {})
-    return not any(m.get('ciel/role') == 'act' and (m.get('ciel/reference_argument') or m.get('ciel/target_binding'))
-                   for m in meta.values())
+    return not any((c.get('handoff') or {}).get('version') != 1 or c.get('preparation') for c in work.get('capabilities', []))
+
+
+def targeted(env, name) -> bool:
+    """An action whose target comes from the owner's pointing or coordinates; the intake resolves it."""
+    meta = getattr(env, 'meta', {}).get(name, {})
+    return bool(meta.get('ciel/reference_argument') or meta.get('ciel/target_binding'))
 
 
 def _alt(properties):
@@ -152,7 +155,10 @@ class GameDecision:
         debug_log.record('work_decision', stage='decide', operation=act.get('kind'))
         if generation != self.intake._generation or not self.intake.authorized():
             return '依頼の確認中に中止の指示があったため、作業を開始しませんでした。'
-        done = await self._carry_out(operations(act, work, env), work, text)
+        if act.get('kind') and targeted(env, act['kind']):
+            # The intake holds what was pointed at when the owner spoke and checks the target's source.
+            return await self.intake.handle(item)
+        done =await self._carry_out(operations(act, work, env), work, text)
         if done is not True:
             return done
         return say or None
