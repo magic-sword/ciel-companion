@@ -337,4 +337,11 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
 - **比べたこと：** 評価器の決定と会話モデルで、配信の始めの「挨拶して」など6発言を、補足の有無で各1回生成した。補足なしでは「シエル、挨拶して」がハカセさんへのあいさつになった（決定で4/6が視聴者向け）。補足ありでは決定・会話モデルとも6/6で視聴者へ名乗った。注釈は0件。注釈の書き出し確率と、補足があるときの振り分けは未測定。
 - **配布：** 利用者の依頼により、開発（`deploy-agent.py --dev`、196ファイル一致・health・worker登録、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-db0236262770-1794763954931868123`）と本番（`deploy-server.sh`、image `de2fe9535a54…`、再起動0・Traceback 0・worker登録、`youtube_chat.py`と`stream_note.md`のSHA-256一致）へ配布した。
 - **本番のOpenAI：** 利用者の依頼で本番の返答だけOpenAIへ切り替える前に、本番の鍵で1回だけ短く問い合わせたところ、401（`expired_secret_key`、鍵の期限切れ）だった。設定は変えていない。
+
+同日、利用者が鍵を更新した。受付（`GameIntake`）を撤去して一つの決定だけにし（コミット`49dfd70`）、決定のセリフを気持ちつきのまとまりにした（`610312b`、[表情の欄](minecraft-results-ja.md#表情の欄)）。
+- **テスト：** unit 797件・ベンチマーク・`check-capability-runtime`・`check-compose-backends`は成功。
+- **開発：** `deploy-agent.py --dev`で`610312b`を配布した（根拠`~/work/ciel-companion-dev/server/data/deployments/agent-610312b22210-1794766361711414888`）。使わなくなった`.env.dev`の`CIEL_GAME_DECISION`を外した。開発の返答はローカルのまま。
+- **本番：** 本番の`server/.env`だけに`CIEL_OPENAI_ROLES=mind`・`CIEL_MIND_MODEL=gpt-5.4-mini`・`CIEL_MIND_REASONING=none`を足し（変更前は`.env.before-openai-mind`）、`deploy-server.sh`で配布した（image `55e22c8b4d71…`、再起動0・Traceback 0・worker登録）。
+- **本番の確認：** 本番のコンテナで、決定を偽のゲームにつないで2回試した。返答の役目はOpenAI（`gpt-5.4-mini`）、「シエル、こっちに来て」は来る行動と`[happy]はい、行きます。`（1.99秒）、「えらいね、シエル」は話すだけ（1.93秒）。OpenAIでの振り分けの成績は測っていない（全課題で約1〜2米ドルの見込み）。
+- **未確認：** 実際の会話・ゲームでのOpenAIの返事と表情。
 - **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
