@@ -56,7 +56,7 @@ CIEL側で数量目標を固定したり、自動帰還・不足分の補充を�
 
 体がwork中に話した言葉は、命令を除いた文を通知 `work_message`（task_id、revision、text）で送る。会話サーバーは作業の結果と同じ経路でシエルに話させる。状態は変えない。
 
-会話サーバーでは、依頼の判定（`game_intake`）が判断待ちの質問への答えを `answer(action=reply, message)`、実行中の作業への言葉を `tell(message)` として選ぶ。どちらもmessageは入力の言葉のまま渡す。開発環境の一つの決定（`game_decision`）では、会話の流れを読んだ決定が書いた言葉を渡す（「刈ってあげて」を、聞かれた選択への答えとして渡すなど）。
+会話サーバーでは、依頼の判定（`game_intake`）が判断待ちの質問への答えを `answer(action=reply, message)`、実行中の作業への言葉を `tell(message)` として選ぶ。どちらもmessageは入力の言葉のまま渡す。一つの決定（`game_decision`）では、会話の流れを読んだ決定が書いた言葉を渡す（「刈ってあげて」を、聞かれた選択への答えとして渡すなど）。
 
 `minecraft_task_cancel` はtask_idを指定する。体へ対象を固定した停止を送り、現在・待機の操作がなくblockedでもないことを確認して `cancelled` とする。確認できないときは `cancelling / stop_unconfirmed` を保ち、新しい作業を拒否する。遅い計画・技の完了・判断回答で再開しない。
 

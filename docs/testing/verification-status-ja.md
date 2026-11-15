@@ -305,7 +305,7 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
   - **開発：** `deploy-agent.py --dev`で194ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `68a59830cd92…`）。
   - **アプリ：** Unity 6000.6.4f1の`CielBuild.WindowsAll`で日常版・配信版をビルドした（`CIEL_BUILD_OK`）。両方の`Assembly-CSharp.dll`に`CielPlanWindow`が入っていることを確認した。ビルドは手元の`unity/Builds/`にあり、Git対象外。
 
-同日、持ち主の発言を一つの決定（話す言葉と行動）で扱う`game_decision.py`を加え、開発環境だけで有効にした（コミット`f6776a9`。[開発環境での試用](../conversation/agent-state-machine-ja.md#開発環境での試用段階2)）。
+同日、持ち主の発言を一つの決定（話す言葉と行動）で扱う`game_decision.py`を加え、開発環境だけで有効にした（コミット`f6776a9`。[一つの決定の試用](../conversation/agent-state-machine-ja.md#一つの決定の試用段階2)）。
 - **テスト：** 会話サーバーのunit 851件・ベンチマーク94件・体のNode 185件・`check-capability-runtime`・`check-compose-backends`は成功。
 - **評価器：**（[実測](minecraft-results-ja.md#会話サーバーの部品での測定)）実発言の依頼の見逃し0/48・雑談で動いた15/38、作業中の作成課題0.903。
 - **配布：** 利用者の依頼により、開発の会話サーバーへ配布した。
