@@ -162,11 +162,18 @@ WORK = [
     ('idle-logs', [], '原木を集めて', None, ['work']),
     ('idle-how-house', [], '家ってどうやって作るの？', None, ['none']),
     ('idle-accept-offer', [(A, '近くの木を集めたので、今から家を作ってもいいですか？')], 'いいよ、お願い', None, ['work']),
+    # no work: a long plan asked as an invitation (the farm in the development log of 2026-11-15)
+    ('idle-farm-invite', [], 'よし、シエル、じゃあこの辺で農場を作ってみようか', None, ['work']),
+    ('idle-farm-together', [], 'シエルと一緒に畑を作りたいな', None, ['work']),
+    ('idle-farm-wheat', [(U, 'この辺で農場を作ってみようか'), (A, '農場ですか？どんな農場にしますか？')], '小麦の畑だよ', None, ['work']),
+    ('idle-farm-talk', [], '農場ってどうやって作るの？', None, ['none']),
 ]
 
 # Labels for the development log of 2026-11-15, by index in work_raw.json.
 REAL_WORK = {0: ['work'], 1: ['tell', 'none'], 2: ['none', 'tell'], 3: ['work', 'none'], 4: ['none', 'tell'],
-             5: ['work'], 6: ['work']}
+             5: ['work'], 6: ['work'],
+             # The farm: 農場 was heard as 納稿/納情 in the first two, so speaking only is also accepted there.
+             7: ['work', 'none'], 8: ['work', 'none'], 9: ['work'], 10: ['work'], 11: ['work']}
 
 
 def build():
@@ -174,7 +181,7 @@ def build():
                   families=f, work=w) for i, t, ctx, text, e, f, w in DEV]
     cases += [dict(id=f'work-{i}', split='work', tier=None, context=[list(c) for c in ctx], text=text, work=w,
                    expect='accept', families=[], accept=acc) for i, ctx, text, w, acc in WORK]
-    OUT.write_text(json.dumps(cases, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    OUT.write_text(json.dumps(cases, ensure_ascii=False, indent=1) + '\n', encoding='utf-8', newline='\n')
     if WORK_RAW.exists():
         raw = json.loads(WORK_RAW.read_text(encoding='utf-8'))
         if len(raw) != len(REAL_WORK):
@@ -182,7 +189,7 @@ def build():
         WORK_OUT.write_text(json.dumps([dict(id=f'real-work-{i:02d}', split='real_work', tier=None, context=r['ctx'],
                                              text=r['utt'], work=r['work'], expect='accept', families=[],
                                              accept=REAL_WORK[i], recorded=dict(operation=r['got'], source=r['src']))
-                                        for i, r in enumerate(raw)], ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+                                        for i, r in enumerate(raw)], ensure_ascii=False, indent=1) + '\n', encoding='utf-8', newline='\n')
     if not RAW.exists():
         return cases, []
     raw = json.loads(RAW.read_text(encoding='utf-8'))
@@ -193,7 +200,7 @@ def build():
         e, f = REAL[i]
         real.append(dict(id=f'real-{i:03d}', split='real', tier=None, context=[list(c) for c in r['ctx']],
                          text=r['utt'], expect=e, families=f, work='idle', recorded=dict(operation=r['got'], source=r['src'])))
-    REAL_OUT.write_text(json.dumps(real, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    REAL_OUT.write_text(json.dumps(real, ensure_ascii=False, indent=1) + '\n', encoding='utf-8', newline='\n')
     return cases, real
 
 

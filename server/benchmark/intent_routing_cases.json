@@ -1856,5 +1856,66 @@
   "accept": [
    "work"
   ]
+ },
+ {
+  "id": "work-idle-farm-invite",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "よし、シエル、じゃあこの辺で農場を作ってみようか",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-idle-farm-together",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "シエルと一緒に畑を作りたいな",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-idle-farm-wheat",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺で農場を作ってみようか"
+   ],
+   [
+    "assistant",
+    "農場ですか？どんな農場にしますか？"
+   ]
+  ],
+  "text": "小麦の畑だよ",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-idle-farm-talk",
+  "split": "work",
+  "tier": null,
+  "context": [],
+  "text": "農場ってどうやって作るの？",
+  "work": null,
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
  }
 ]
