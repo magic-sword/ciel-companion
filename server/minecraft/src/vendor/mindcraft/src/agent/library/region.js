@@ -130,19 +130,26 @@ async function placeBed(bot, item, cell, partner) {
         skills.log(bot, `Don't have any ${item} to place.`);
         return false;
     }
+    const head = foot.plus(foot.minus(stand));
+    skills.log(bot, `Placing the ${item}: foot at ${foot}, head at ${head}, standing at ${stand}.`);
     // Both cells must be empty (the ground the house is dug into may still be there).
-    for (const p of [foot, foot.plus(foot.minus(stand))]) {
+    for (const p of [foot, head]) {
         if (!EMPTY.has(bot.blockAt(p)?.name ?? 'air')) await skills.breakBlockAt(bot, p.x, p.y, p.z);
     }
     await skills.goToPosition(bot, stand.x, stand.y, stand.z, 0);
     await bot.equip(bed, 'hand');
     await bot.lookAt(foot.offset(0.5, 0, 0.5), true);
+    let error = null;
     try {
         await bot.placeBlock(bot.blockAt(foot.offset(0, -1, 0)), new Vec3(0, 1, 0));
     } catch (err) {
         // The placement event can time out although the bed was placed; the cell check decides.
+        error = err;
     }
-    return bot.blockAt(foot)?.name === item;
+    const placed = bot.blockAt(foot)?.name === item;
+    if (!placed) skills.log(bot, `The ${item} was not placed (foot ${bot.blockAt(foot)?.name}, head ${bot.blockAt(head)?.name}, `
+        + `below ${bot.blockAt(foot.offset(0, -1, 0))?.name}, bot at ${bot.entity.position.floored()}${error ? `: ${error.message}` : ''}).`);
+    return placed;
 }
 
 function describe({ coordinates: [x, y, z], expected, actual }) {
