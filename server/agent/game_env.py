@@ -578,6 +578,10 @@ class GameEnv:
             if self.goals is not None and self.goals.work:
                 self.goals.accept(e.get('work'))
             return
+        if kind == 'work_plan':
+            if self.goals is not None:
+                self.goals.plan(e)
+            return
         if kind == 'work_message':
             debug_log.record(kind, task_id=e.get('task_id'))
             if self.goals is not None:

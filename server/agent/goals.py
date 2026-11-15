@@ -33,6 +33,7 @@ class GoalRunner:
         self._unknown = False
         self.presence = lambda: 'solo'
         self.owner_name = lambda: None
+        self._plan = None   # the game's plan graph (plan v1) for the current work
 
     def _tool(self, key):
         return (self.env.profile.get('work') or {}).get(key)
@@ -167,6 +168,44 @@ class GoalRunner:
             self._publish(unknown=True)
         return r
 
+    def plan(self, e):
+        """The game's plan graph for the current work: a newer revision, or a new plan, is shown."""
+        w, p = self.work, e.get('plan') if isinstance(e, dict) else None
+        if (not w or e.get('task_id') != w['task_id'] or not isinstance(p, dict) or p.get('v') != 1
+                or not isinstance(p.get('plan_id'), str) or type(p.get('revision')) is not int or not isinstance(p.get('nodes'), list)):
+            return False
+        old = self._current_plan()
+        if old and old.get('plan_id') == p['plan_id'] and p['revision'] <= old.get('revision', 0):
+            return False
+        self._plan = {'task_id': w['task_id'], **p}
+        self._publish()
+        return True
+
+    def _current_plan(self):
+        """The newest plan of the current work, from the notices or the work state."""
+        w = self.work
+        if not w:
+            return None
+        mine = self._plan if self._plan and self._plan.get('task_id') == w['task_id'] else None
+        polled = w.get('plan') if isinstance(w.get('plan'), dict) else None
+        if mine and polled and polled.get('plan_id') == mine.get('plan_id'):
+            return mine if mine.get('revision', 0) >= polled.get('revision', 0) else polled
+        return mine or polled
+
+    def plan_summary(self):
+        """A few facts of the plan for Ciel to talk about: what she is doing, what comes next, what waits on a choice."""
+        p = self._current_plan()
+        if not p:
+            return None
+        nodes = [n for n in p.get('nodes', []) if isinstance(n, dict)]
+        label = lambda n: f"{n.get('kind')} {n.get('label')}"
+        waiting = [n for n in nodes if n.get('state') == 'waiting_choice' and n.get('choice')]
+        return {'title': p.get('title') or self.title,
+                'now': [label(n) for n in nodes if n.get('state') == 'running'][:3],
+                'next': [label(n) for n in nodes if n.get('state') in ('ready', 'pending') and not n.get('parent')][:3],
+                'choice': [{'about': n.get('label'), 'options': [o.get('id') for o in n['choice'].get('options', [])]} for n in waiting][:1],
+                'done': sum(n.get('state') == 'done' for n in nodes), 'steps': len(nodes)}
+
     def message(self, e):
         """What the body says to the owner while it works (which way it chose, what it is doing)."""
         w = self.work
@@ -181,7 +220,12 @@ class GoalRunner:
         return self.title if self.work and self.work['state'] in ACTIVE else None
 
     def context(self):
-        return '[今の作業] ' + json.dumps({'title': self.title, 'work': self.work}, ensure_ascii=False) if self.work else None
+        if not self.work:
+            return None
+        # The plan graph goes to the app whole; Ciel gets what she would say about it.
+        work = {k: v for k, v in self.work.items() if k != 'plan'}
+        plan = self.plan_summary()
+        return '[今の作業] ' + json.dumps({'title': self.title, 'work': work, **({'plan': plan} if plan else {})}, ensure_ascii=False)
 
     def status(self):
         return self.work or {'status': 'no_task'}
@@ -206,6 +250,10 @@ class GoalRunner:
                 can_stop=w['state'] in ACTIVE and w['state'] != 'cancelling',
                 can_retry=(confirmed and w['state'] == 'needs_decision' and bool(decision.get('decision_id'))
                            and 'retry' in (decision.get('actions') or ('retry',))))
+            # The game's plan graph, as the game reported it (plan v1); the app only shows it.
+            plan = self._current_plan()
+            if plan:
+                task['plan'] = {k: v for k, v in plan.items() if k != 'task_id'}
         return {'v': 2, 'type': 'goal.state', 'stream_id': self._stream_id,
                 'revision': self._display_revision, 'confirmed': confirmed,
                 'confirmed_ago_ms': int(age * 1000), 'valid_for_ms': 10000, 'has_task': bool(w), 'task': task}

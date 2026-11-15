@@ -92,6 +92,26 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.runner.accept({**self.remote, 'revision': 3, 'remaining_ms': 1000})
         self.assertGreater(self.runner._deadline, first + 800, 'an estimate never shortens the work')
 
+    async def test_the_plan_graph_of_the_game_is_shown_and_summarised_for_ciel(self):
+        await self.runner.start('puzzle.solve', {})
+        plan = {'v': 1, 'plan_id': 'p', 'revision': 2, 'title': 'tower', 'finished': False, 'current': ['b'],
+                'nodes': [{'id': 'a', 'kind': 'obtain', 'label': 'stone x4', 'state': 'done', 'needs': []},
+                          {'id': 'b', 'kind': 'decide', 'label': 'roof', 'state': 'waiting_choice', 'needs': ['a'],
+                           'choice': {'question': 'which roof', 'options': [{'id': 'flat'}, {'id': 'peaked'}]}},
+                          {'id': 'c', 'kind': 'build', 'label': 'tower', 'state': 'pending', 'needs': ['b']}]}
+        self.assertFalse(self.runner.plan({'task_id': 'other', 'plan': plan}))
+        self.assertTrue(self.runner.plan({'task_id': 'task', 'plan': plan}))
+        self.assertFalse(self.runner.plan({'task_id': 'task', 'plan': {**plan, 'revision': 1}}), 'older revision')
+        shown = self.runner.state()['task']['plan']
+        self.assertEqual((shown['plan_id'], shown['revision'], len(shown['nodes'])), ('p', 2, 3))
+        summary = self.runner.plan_summary()
+        self.assertEqual(summary['next'], ['build tower'])
+        self.assertEqual(summary['choice'], [{'about': 'roof', 'options': ['flat', 'peaked']}])
+        self.assertEqual((summary['done'], summary['steps']), (1, 3))
+        context = self.runner.context()
+        self.assertNotIn('"nodes"', context)
+        self.assertIn('build tower', context)
+
     async def test_unsupported_version_and_invalid_budget_do_not_submit(self):
         self.env.profile['work']['version'] = 99
         self.assertEqual((await self.runner.start('puzzle.solve', {}))['reason'], 'work_protocol_mismatch')
