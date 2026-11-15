@@ -283,3 +283,20 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
 ## 更新のしかた
 
 新しい確認で該当行・条件・参照先を置き換える。以前の詳細はGit履歴で追えるようにし、日付付きの報告書を増やさない。未実施は未実施のまま残し、ソース変更・コンパイル・実モデル・実機・配布・本番稼働を別々に示す。
+
+同日、計画グラフ（plan v1）を加えた（コミット`a6693ff`まで）。
+- **ゲーム：** 実行器の計画（`runPlan`の節、`obtainItem`の段、選択）を版付きのグラフで出し、作業の様子と`work_plan`通知に載せる。
+- **会話サーバー：** `goal.state`の`task.plan`へそのまま渡し、シエルの心へ要約を渡す。
+- **Unity：**
+  - 配信版に別ウィンドウ「CIEL Broadcast 計画グラフ」を加えた。
+  - 状態カードには、いまの段・選択を出す。
+- **テスト：**
+  - 体のNode 185件、会話サーバーのunit 843件、`work-display-check` 44件は成功。
+  - Unity 6000.6.4f1のEditorで`CielPlanWindowCheck` 26件・`CielAudienceCardCheck` 57件・`CielStreamStatusCheck` 11件・構成42件が成功。
+  - 描画は`.local/app-refactor/plan-graph-house.png`で目視した。
+  - 既存のEditor確認2件が完了の旧表記（できた）を期待していたので、今の表記（処理終了）に直した。
+- **未確認：**
+  - 実際の作業中に別ウィンドウへ映ること。
+  - OBSでの取り込み。
+  - 長い計画の見え方。
+- **配布：** 開発・本番・アプリには未配布。
