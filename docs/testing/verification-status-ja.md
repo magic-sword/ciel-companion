@@ -313,4 +313,6 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
   - **本番：** 標準`deploy-server.sh`で`DEPLOY_SERVER_DONE`（コミット`29d3ef7`）。agentを作り直し（image `917858d9c65e…`）、再起動0・Traceback 0・worker登録。コンテナ内で`CIEL_GAME_DECISION=decide`・`CIEL_LLM_BACKEND=local`と、`game_decision.py`・`agent.py`・`game_decide.md`のSHA-256がコミットと一致することを確認した。
   - **体：** `deploy-body.py`でサーバー上のテスト通過・157ファイル一致・他コンテナ不変・参加済み（image `be246816a921…`、根拠`~/work/ciel-companion/server/data/deployments/body-29d3ef71e316-1794750066979072012`）。コンテナ内の`words.js`に見出し「マイクラの中の時刻」があることを確認した。
   - **開発の確認：** `29d3ef7`は会話サーバーのコードを変えていない。`deploy-agent.py --dev --check`で196ファイルの一致を確認した。
+- **誤り：** 配布後の開発ログでは、一つの決定が使われず受付が答えていた。指示棒（`reference_context`）と座標で行き先を決める行動（`minecraft_go_to_place`）があるゲームを丸ごと受付に任せる判定だったため、マイクラが対象外になっていた。配布の確認はコンテナ内の設定だけを見ていた。
+- **修正：** コミット`bcc833e`で、指した対象が要る行動を選んだときだけ受付へ渡すようにした。unit 852件・ベンチマーク成功。実際の体の能力一覧で、決定が使えること・行き先の行動だけが受付へ渡ることを確認した。`deploy-agent.py --dev`で196ファイル一致・health・worker登録（根拠`~/work/ciel-companion-dev/server/data/deployments/agent-bcc833ee1aa0-1794750721475038739`）。本番は`29d3ef7`のままで、受付が答えている。実会話で決定が使われることは未確認。
 - **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
