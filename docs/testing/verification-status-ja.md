@@ -326,4 +326,10 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
     - **開発：** `deploy-agent.py --dev`で196ファイル一致・health・worker登録・再起動0・他コンテナ不変（根拠`~/work/ciel-companion-dev/server/data/deployments/agent-9d01026b68cf-1794759287364743523`）。
     - **本番：** 標準`deploy-server.sh`で`DEPLOY_SERVER_DONE`。agentを作り直し（image `08912c8835af…`）、再起動0・Traceback 0・worker登録。コンテナ内の`game_decision.py`・`goals.py`のSHA-256がコミットと一致。
     - **未確認：** 実際のゲームでの長い返事待ちと、始め直した作業。
+
+2026-11-16、配信の前に、利用者の依頼で普段のワールドを作り直した（コミット`1ef9b1a`の`scripts/server/reset-minecraft-world.sh`）。
+- **種：** 使い捨てのサーバーで10個の種を比べ（`scripts/server/minecraft_seed_probe.py`）、8675309を選んだ。初期地点は森、半径32ブロックにオーク約390・シラカバ約70の原木と水がある。草原に原木がそろう種は、この10個には無かった。
+- **作り直し：** 古いワールド3つを`~/work/ciel-companion/server/minecraft/world-resets/20261116-012941/`へ退避した。体の拠点の記憶は空だった。サーバーの`compose.yaml`は種を足したコミットの版にそろえた（前の版は`compose.yaml.before-world-reset`）。
+- **確認：** `seed`は8675309、`server.properties`の`level-seed=8675309`、`advance_time`はfalse、時刻6000。Cielが初期地点（7.5, 64, 80.5、森）に入った。体のimageは`9d01026b68cf`のまま、再起動0。会話サーバーは作り直していない。
+- **未確認：** 持ち主の入り直しと、新しいワールドでの採集・農場。
 - **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
