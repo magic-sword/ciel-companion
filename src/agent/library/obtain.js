@@ -3,6 +3,7 @@ import * as world from './world.js';
 import * as skills from './skills.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
+import { beginPlan, activePlan, setNode, setChildren, publish, finishPlan } from './planview.js';
 import { getFromMob, countSuitable, untilSpawn, neverSpawns } from './hunt.js';
 import { searchBlocks, digsFor, EXPLORE_LEGS, TUNNELS, ORE_DEPTH } from './search.js';
 import { MOBS, mobWays, mobsNeeded } from './mobs.js';
@@ -25,30 +26,50 @@ import { expected, SLACK, FLOOR } from './estimate.js';
  * await obtainItem(bot, "stone_pickaxe", 1);
  **/
 export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats=2, choices={} }={}) {
+    // Shown under the plan step that runs it, or as a plan of its own.
+    // A choice made carries on under the step that waited for it.
+    const running = activePlan(bot)?.nodes.find(n => !n.parent && (n.state === 'running' || n.state === 'waiting_choice'));
+    if (running?.state === 'waiting_choice') setNode(bot, running.id, { state: 'running' });
+    const parent = running?.id ?? 'obtain';
+    if (!running) beginPlan(bot, [{ id: 'obtain', kind: 'obtain', label: `${itemName} ×${num}` }], `${itemName} ×${num}`);
+    const finish = ok => {
+        if (!running) {
+            setNode(bot, 'obtain', { state: ok ? 'done' : 'failed' });
+            finishPlan(bot);
+        }
+        return ok;
+    };
+    if (!running) setNode(bot, 'obtain', { state: 'running' });
+    const made = [];
     // A step that leaves its item count unchanged is a failure; the same step failing
     // maxRepeats times in a row stops the plan so the caller can choose what to do.
     let previous = null, repeats = 0, done = 0;
     for (let i = 0; i < maxSteps; i++) {
         if (bot.interrupt_code) {
             skills.log(bot, `Stopped obtaining ${itemName}.`);
-            return false;
+            return finish(false);
         }
         const inventory = world.getInventoryCounts(bot);
         if ((inventory[itemName] || 0) >= num) {
             skills.log(bot, `Obtained ${num} ${itemName} (${done} steps).`);
-            return true;
+            showSteps(bot, parent, made, [], choices);
+            return finish(true);
         }
         const tableAvailable = stations(bot, inventory);
         const actions = mc.getCraftingActions(itemName, num, inventory, tableAvailable, choices);
         if (!actions || actions.length === 0) {
             skills.log(bot, `There is no known way to obtain ${itemName}.`);
-            return false;
+            return finish(false);
         }
         let step = actions[0];
         if (step.type === 'choose') {
-            offerChoice(bot, itemName, num, step, choices, inventory, tableAvailable);
+            const options = offerChoice(bot, itemName, num, step, choices, inventory, tableAvailable);
+            showSteps(bot, parent, made, actions, choices, options);
+            if (!running) setNode(bot, 'obtain', { state: 'waiting_choice' });
+            publish(bot, true);
             return false;
         }
+        showSteps(bot, parent, made, actions, choices);
         // Mine everything the plan needs of that block in one trip, not one batch at a time.
         if (step.type === 'mine') {
             const count = actions.filter(a => a.type === 'mine' && a.item === step.item).reduce((n, a) => n + a.count, 0);
@@ -59,7 +80,8 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
         previous = key;
         if (repeats >= maxRepeats) {
             skills.log(bot, `Could not ${describe(step)} after ${maxRepeats} tries; ${actions.length} steps remain for ${num} ${itemName}.`);
-            return false;
+            showSteps(bot, parent, made, actions, choices, null, true);
+            return finish(false);
         }
         const before = inventory[step.item] || 0;
         const began = Date.now();
@@ -69,11 +91,42 @@ export async function obtainItem(bot, itemName, num=1, { maxSteps=40, maxRepeats
         const gained = (world.getInventoryCounts(bot)[step.item] || 0) - before;
         recordTime(step.type, began, { item: step.item, count: step.count ?? step.produces ?? 1, gained,
             ...(step.method ? { method: step.method, mob: step.mob } : {}) });
-        if (gained > 0) repeats = 0;
+        if (gained > 0) {
+            repeats = 0;
+            made.push(step);
+        }
         else repeats++;
     }
     skills.log(bot, `Gave up obtaining ${itemName} after ${maxSteps} steps.`);
-    return false;
+    return finish(false);
+}
+
+// The plan graph's kind for each of obtainItem's steps, and the object it is about.
+const STEP_KIND = { craft: 'make', smelt: 'make', mine: 'obtain', mob: 'obtain', choose: 'decide' };
+const stepLabel = a => a.type === 'mob' ? `${a.item} ×${a.count} (${a.method} ${a.mob})`
+    : a.type === 'mine' ? `${a.item} ×${a.count}` : a.type === 'smelt' ? `${a.item} ×${a.count} (${a.input})`
+    : `${a.item} ×${a.produces ?? a.count ?? 1}`;
+
+// Show what obtainItem has done, is doing and still has to do, under the plan step running it:
+// a line in order, the choices made, and a choice waiting (with its options) where the plan stops.
+function showSteps(bot, parent, made, actions, choices, options = null, failed = false) {
+    let id = 0, before = null;
+    const node = (a, state, extra = {}) => {
+        const n = { id: `${parent}/${id++}`, kind: STEP_KIND[a.type] ?? 'do', label: stepLabel(a), state,
+            needs: before ? [before] : [], ...extra };
+        before = n.id;
+        return n;
+    };
+    const chosen = Object.entries(choices).map(([item, way]) =>
+        node({ type: 'choose', item, count: '' }, 'done', { label: item, choice: { question: `how to get ${item}`, options: [], chosen: way } }));
+    const nodes = [...chosen, ...made.map(a => node(a, 'done'))];
+    actions.forEach((a, i) => {
+        if (a.type === 'choose') nodes.push(node(a, 'waiting_choice', { label: `${a.item} ×${a.count}`,
+            choice: { question: `how to get ${a.count} ${a.item}`, options: options ?? a.options.map(o => ({ id: o, summary: '' })), chosen: null } }));
+        else nodes.push(node(a, i === 0 ? (failed ? 'failed' : 'running') : 'pending', { estimate_s: Math.round(stepEstimate(bot, a)) }));
+    });
+    setChildren(bot, parent, nodes);
+    publish(bot);
 }
 
 // The plan's steps as obtainItem runs them: the mining of one block in one trip. A choice ends it.
@@ -200,6 +253,7 @@ function offerChoice(bot, itemName, num, step, choices, inventory, tableAvailabl
             [id, () => obtainItem(bot, itemName, num, { choices: { ...choices, [step.item]: id } })])),
     };
     skills.log(bot, text);
+    return step.options.map((id, i) => ({ id, summary: lines[i].slice(id.length + 2, id.length + 2 + 200) }));
 }
 
 // The ways of the choice that comes after one, in short: whether each can be done from here.

@@ -5,6 +5,7 @@ import { obtainItem, obtainSeconds, obtainEstimate } from './obtain.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
 import { SLACK } from './estimate.js';
+import { beginPlan, activePlan, setNode, publish, finishPlan } from './planview.js';
 
 /**
  * A plan is an ordered list of steps. Each step names the steps it needs, says whether the
@@ -14,10 +15,23 @@ import { SLACK } from './estimate.js';
  * lost again is redone. The plan's time is the sum of its steps' times: one slow step can
  * use only its own time, never the whole plan's.
  *
- * step: { id, label, needs: [ids], done(bot) -> bool, run(bot) -> Promise, seconds(bot) -> number }
+ * step: { id, label, kind, needs: [ids], done(bot) -> bool, run(bot) -> Promise, seconds(bot) -> number,
+ *         estimate(bot) -> number }. The plan is shown as a graph (planview.js) while it runs.
  */
-export async function runPlan(bot, steps, { tries = 2 } = {}) {
+export async function runPlan(bot, steps, { tries = 2, title = '' } = {}) {
     const byId = new Map(steps.map(step => [step.id, step]));
+    // The same plan carried on after a choice keeps its view; another plan starts its own.
+    const key = steps.map(step => step.id).join('|');
+    if (activePlan(bot)?.key !== key) beginPlan(bot, steps, title).key = key;
+    const show = (running = null) => {
+        for (const step of steps) {
+            const state = step.done(bot) ? 'done' : step === running ? 'running'
+                : (failures.get(step.id) || 0) >= tries ? 'failed'
+                : step.needs.every(id => byId.get(id).done(bot)) ? 'ready' : 'pending';
+            setNode(bot, step.id, { state, estimate_s: Math.round((step.estimate ?? step.seconds)(bot)) });
+        }
+        publish(bot);
+    };
     // A step's estimate is its usual time; its seconds are its deadline, the most it may take.
     const remaining = () => steps.filter(step => !step.done(bot)).reduce((sum, step) => sum + (step.estimate ?? step.seconds)(bot), 0);
     const total = remaining();
@@ -31,18 +45,25 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
     for (;;) {
         if (bot.interrupt_code) {
             skills.log(bot, 'Stopped the plan.');
+            show();
+            finishPlan(bot);
             return false;
         }
         const pending = steps.filter(step => !step.done(bot));
         if (pending.length === 0) {
             skills.log(bot, 'Finished the plan.');
+            show();
+            finishPlan(bot);
             return true;
         }
         const step = pending.find(step => step.needs.every(id => byId.get(id).done(bot)));
         if (!step) {
             skills.log(bot, `Cannot continue: ${pending.map(step => step.label).join(', ')} still need earlier steps that are no longer done.`);
+            show();
+            finishPlan(bot);
             return false;
         }
+        show(step);
         const seconds = step.seconds(bot);
         const began = Date.now();
         const asked = bot.pendingChoice;
@@ -51,9 +72,12 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
         recordTime('plan_step', began, { id: step.id, budget: Math.round(seconds), ok: step.done(bot) });
         report();
         if (bot.pendingChoice && bot.pendingChoice !== asked) {
-            continueAfterChoice(bot, steps, { tries });
+            continueAfterChoice(bot, steps, { tries, title });
             const rest = steps.filter(other => !other.done(bot)).map(other => other.label);
             skills.log(bot, `The plan waits for that choice; choosing carries it on: ${rest.join(', ')}.`);
+            show();
+            setNode(bot, step.id, { state: 'waiting_choice' });
+            publish(bot, true);
             return false;
         }
         if (step.done(bot)) continue;
@@ -62,6 +86,8 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
         if (count >= tries) {
             const rest = steps.filter(other => !other.done(bot) && other !== step).map(other => other.label);
             skills.log(bot, `Could not ${step.label} after ${count} tries.` + (rest.length ? ` Not done yet: ${rest.join(', ')}.` : ''));
+            show();
+            finishPlan(bot);
             return false;
         }
     }
@@ -94,7 +120,8 @@ export const SECONDS_PER_ITEM_STEP = 40;
 /** Have num of an item, made or mined by the crafting-plan executor, in the time its steps take. */
 export function haveStep(id, item, num = 1, { needs = [], satisfiedBy = [item] } = {}) {
     return {
-        id, needs, label: `get ${typeof num === 'function' ? 'enough' : num} ${item}`,
+        id, needs, kind: 'obtain', label: `get ${typeof num === 'function' ? 'enough' : num} ${item}`,
+        subject: typeof num === 'function' ? item : `${item} ×${num}`,
         done: bot => {
             const n = amount(num, bot);
             return n <= 0 || satisfiedBy.reduce((sum, name) => sum + count(bot, name), 0) >= n;
@@ -109,7 +136,8 @@ export function haveStep(id, item, num = 1, { needs = [], satisfiedBy = [item] }
 export function dropStep(id, item, num, sources, { needs = [], perBlockSeconds = 2, batch = 8 } = {}) {
     const missing = bot => Math.max(0, amount(num, bot) - count(bot, item));
     return {
-        id, needs, label: `get ${typeof num === 'function' ? 'enough' : num} ${item} from ${sources.join(' or ')}`,
+        id, needs, kind: 'obtain', label: `get ${typeof num === 'function' ? 'enough' : num} ${item} from ${sources.join(' or ')}`,
+        subject: `${item} (${sources.join(' / ')})`,
         done: bot => missing(bot) === 0,
         run: async bot => {
             let barren = 0;
@@ -132,7 +160,7 @@ export function dropStep(id, item, num, sources, { needs = [], perBlockSeconds =
 /** Fill an empty bucket at the nearest water source while water is still wanted. */
 export function fillBucketStep(id, wanted, { needs = [] } = {}) {
     return {
-        id, needs, label: 'fill a bucket with water',
+        id, needs, kind: 'do', label: 'fill a bucket with water', subject: 'water_bucket',
         done: bot => !wanted(bot) || count(bot, 'water_bucket') > 0,
         run: bot => skills.useToolOn(bot, 'bucket', 'water'),
         seconds: () => 60,

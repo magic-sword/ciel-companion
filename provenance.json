@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "9a3dd485e232e19a0cf8f6f0e4ac96d9a8d7c121",
+  "fork_commit": "db32ed178d7cc89c6fc63294e61fd7ff80d33ebb",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -20,6 +20,7 @@
     "src/agent/library/mobs.js",
     "src/agent/library/obtain.js",
     "src/agent/library/plan.js",
+    "src/agent/library/planview.js",
     "src/agent/library/region.js",
     "src/agent/library/search.js",
     "src/agent/library/sites.js",
@@ -194,14 +195,14 @@
       "sha256": "6b9b1cf74012ec0a389bbf35c2f042d881bdf5b698929ecea27eff91ececb536"
     },
     "src/agent/library/farm.js": {
-      "sha256": "65b19189ea99a5b25975e0af8e91d5dddd4cecd17a1ac6f577612ea4fe047984"
+      "sha256": "547bd1a2fb94abf5000cddf51e3114b33f868a007b48a34644c70f7d3eaa5db8"
     },
     "src/agent/library/full_state.js": {
       "sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901",
       "upstream_sha256": "571b69f07535b8861750e1769af7d64ecdf7c7223b60885fdd83424f7cd0d901"
     },
     "src/agent/library/house.js": {
-      "sha256": "4e6fbacca1ecc10599ca38e10ab9bb3464a59b9d28e4739522eaf581ce56ba18"
+      "sha256": "21a8f34e1d312818ca48505e29c0ae82692e46882ec31fa97f8782716c0e925f"
     },
     "src/agent/library/hunt.js": {
       "sha256": "0f40b1ad3d341041edcba30c9a7352655e5b4e29349f8a1e1eec342dd56ed20e"
@@ -218,10 +219,13 @@
       "sha256": "6c90f43dd30e04cbbb6b80a966284dc76556bdf036603302b1f110193dce3c14"
     },
     "src/agent/library/obtain.js": {
-      "sha256": "d79ef8cdad06cd19aaf3433dee1f4ef51edeb25907e27517271763fe3ff6e8d8"
+      "sha256": "63cf9644a9c52989ac379e2f025813900936aee205533852804f46203316b79f"
     },
     "src/agent/library/plan.js": {
-      "sha256": "7bb2794290b2678feaa2c422ed837c3dc012d330f49bdf06fb8aa1cf0118fdaa"
+      "sha256": "2712725bae1694e72cf351a5c4ef51b1cc04cb81860a92090fa29de5b5ab2c39"
+    },
+    "src/agent/library/planview.js": {
+      "sha256": "807a357e13917e8880f1e08f3fe26a270320f1f0613ab2ff28dc289effa9dd30"
     },
     "src/agent/library/region.js": {
       "sha256": "276d49314f39b234e8d52dbfc0a99f172c96a06b675e2c4a9dc2e72dc4162c3f"
