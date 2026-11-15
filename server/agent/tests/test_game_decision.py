@@ -7,7 +7,6 @@ from livekit.agents import llm
 
 import game_decision
 from game_decision import GameDecision
-from game_intake import GameIntake
 
 HANDOFF = {'version': 1, 'argument': 'request', 'constraints': {}, 'seconds': 120}
 
@@ -27,8 +26,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.create = AsyncMock()
         client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=self.create)),
                                        close=AsyncMock())
-        self.intake = GameIntake(self.runner, 'i', client=client)
-        self.decision = GameDecision(self.intake, 'decide\n{actions}')
+        self.decision = GameDecision(self.runner, 'decide\n{actions}', client=client)
 
     @staticmethod
     def reply(value):
@@ -112,7 +110,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.runner.start.assert_not_awaited()
 
     async def test_stop_words_stop_at_once_and_she_says_it(self):
-        with patch.object(self.intake, '_stop', AsyncMock(return_value={'message': '停止しました。'})) as stop:
+        with patch.object(self.decision, '_stop', AsyncMock(return_value={'message': '停止しました。'})) as stop:
             self.respond({'say': '止まりました！', 'act': {'kind': 'none'}})
             self.assertEqual(await self.say('止まって'), '止まりました！')
             stop.assert_awaited_once()
@@ -120,11 +118,33 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
             self.create.side_effect = TimeoutError()
             self.assertEqual(await self.say('止まって'), '停止しました。')   # without the model, the fact itself
 
-    def test_games_whose_work_needs_preparation_stay_with_the_intake(self):
-        self.env.profile['reference_context'] = True   # pointing alone does not hand the game to the intake
-        self.assertTrue(game_decision.supported(self.env))
+    def test_only_work_that_takes_the_request_is_offered(self):
+        self.assertEqual([c['name'] for c in game_decision.capabilities(self.env)], ['game.goal'])
         self.env.profile['work']['capabilities'][0]['preparation'] = {'version': 1}
-        self.assertFalse(game_decision.supported(self.env))
+        self.assertEqual(game_decision.capabilities(self.env), [])
+        self.assertNotIn('work', [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, None)])
+
+    async def test_a_cloud_model_is_asked_for_the_schema_and_its_answer_is_checked(self):
+        with patch('models.is_local', return_value=False):
+            self.respond({'say': 'こんにちは', 'act': {'kind': 'none'}})
+            self.assertEqual(await self.say('こんにちは'), 'こんにちは')
+            sent = self.create.await_args.kwargs
+            self.assertNotIn('temperature', sent)
+            self.assertIn('reasoning_effort', sent)
+            self.assertFalse(sent['response_format']['json_schema']['strict'])
+            self.respond({'say': 'x', 'act': {'kind': 'fly_away'}})   # not one of the kinds
+            self.assertIsNone(await self.say('飛んで'))
+            self.env.use.assert_not_awaited()
+
+    async def test_a_stop_word_stops_when_heard_and_only_for_the_owner(self):
+        with patch.object(self.decision, '_stop', AsyncMock(return_value={'message': '停止しました。'})) as stop:
+            before = self.decision._generation
+            self.decision.on_transcribed(types.SimpleNamespace(transcript='止まって', is_final=True, item_id='i'), owner=False)
+            stop.assert_not_awaited()
+            self.decision.on_transcribed(types.SimpleNamespace(transcript='止まって', is_final=True, item_id='i'))
+            await self.decision._fast_stop
+            stop.assert_awaited_once()
+            self.assertEqual(self.decision._generation, before + 1)
 
     async def test_an_action_aimed_at_named_coordinates_gets_the_bound_target(self):
         self.go_tool()

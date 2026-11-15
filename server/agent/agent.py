@@ -56,7 +56,6 @@ import app_env
 import game_env
 import goals
 import game_decision
-import game_intake
 from capabilities import CapabilityCatalog
 from session_mcp import SessionMCP
 import mind
@@ -285,26 +284,24 @@ class Ciel(Agent):
         if work is not None and work.body_step() and self.mind.reply_origin == 'initiative':
             yield '[silent]'
             return
-        intake = getattr(self, 'game_intake', None)
-        intake_checked = False
-        if intake is not None and self.mind.is_owner() and not self.mind.from_comment and self.mind.reply_origin == 'reply':
+        decision = getattr(self, 'game_decision', None)
+        decided = False
+        if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
+                and self.mind.reply_origin == 'reply'):
             tail = mind._tail(list(chat_ctx.items))
             user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
             if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
-                decision = getattr(self, 'game_decision', None)
-                if decision is not None and decision.supported():
-                    # One decision with the whole conversation: what to say and what to do (game_decision.py).
-                    style = self.style
-                    wire = mind.local_context(self.mind.build(chat_ctx, turn=turn), source=chat_ctx).to_provider_format('openai')[0]
-                    # The game's instructions travel with loaded capabilities, not in the fixed instructions;
-                    # the decision needs them next to its actions (they say which capability does what).
-                    system = '\n\n'.join(t for t in (self.instructions_for(
-                        style.talk if style else 'normal', style.presence if style else 'solo'), self._game_text()) if t)
-                    reply = await decision.handle(user_item, system,
-                                                  [m for m in wire if m is not wire[0] or m.get('role') != 'system'])
-                else:
-                    reply = await intake.handle(user_item)
-                intake_checked = True
+                # One decision with the whole conversation: what to say and what to do (game_decision.py).
+                style = self.style
+                wire = mind.local_context(self.mind.build(chat_ctx, turn=turn), source=chat_ctx).to_provider_format('openai')[0] \
+                    if models.is_local('mind') else self.mind.build(chat_ctx, turn=turn).to_provider_format('openai')[0]
+                # The game's instructions travel with loaded capabilities, not in the fixed instructions;
+                # the decision needs them next to its actions (they say which capability does what).
+                system = '\n\n'.join(t for t in (self.instructions_for(
+                    style.talk if style else 'normal', style.presence if style else 'solo'), self._game_text()) if t)
+                reply = await decision.handle(user_item, system,
+                                              [m for m in wire if m is not wire[0] or m.get('role') != 'system'])
+                decided = True
                 if reply is not None:
                     yield reply
                     return
@@ -315,7 +312,8 @@ class Ciel(Agent):
         if self.activity is not None:
             self.activity.thinking(who, self.mind.reply_origin)
         ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
-        if intake_checked:
+        if decided:
+            # The decision already chose not to act; the conversation model answers in words.
             fns = [fn for fn in fns if getattr(fn, 'id', None) not in mind.GOAL_MOVING]
         if who == 'mind' and self.capabilities is not None:
             state = self.session.userdata
@@ -735,15 +733,12 @@ async def entrypoint(ctx: JobContext) -> None:
         if body is not None:
             agent.mind.is_owner = lambda: (book is None or book.owner_id is None
                                            or (book.last is not None and book.last.person_id == book.owner_id))
-            agent.game_intake = game_intake.GameIntake(goal_runner, agent.persona.game_intake_instructions,
-                                                    select_instructions=agent.persona.game_select_instructions,
-                                                    draft_instructions=agent.persona.game_draft_instructions,
+            # The owner's words while a game is played: one decision of what to say and do (game_decision.py)
+            agent.game_decision = game_decision.GameDecision(goal_runner, agent.persona.game_decide_instructions,
                 authorized=lambda: agent.mind.is_owner() and not agent.mind.from_comment)
-            session.on('user_input_transcribed', lambda ev: agent.game_intake.on_transcribed(ev, agent.mind.is_owner()))
-            session.on('user_state_changed', agent.game_intake.on_user_state)
-            ctx.add_shutdown_callback(agent.game_intake.close)
-            if os.environ.get('CIEL_GAME_DECISION', 'intake') == 'decide':
-                agent.game_decision = game_decision.GameDecision(agent.game_intake, agent.persona.game_decide_instructions)
+            session.on('user_input_transcribed', lambda ev: agent.game_decision.on_transcribed(ev, agent.mind.is_owner()))
+            session.on('user_state_changed', agent.game_decision.on_user_state)
+            ctx.add_shutdown_callback(agent.game_decision.close)
         voice.before_say = agent.mind.on_say   # 議事録・歌の知らせ・声の登録の一言は心が作る
         agent.mind.waiting = voice.waiting     # 切れ目を待っている知らせは、相手への返事の中で伝える
 

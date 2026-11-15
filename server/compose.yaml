@@ -24,8 +24,6 @@ services:
       # 会話の組み立て：1 つの音声検出・途中から文字が出る文字起こし・小脳と心（mind.py）。2026-10-31 に realtime から切り替えた
       # （docs/conversation/conversation-pipeline-ja.md）。戻すときは realtime にする
       - CIEL_MODEL=${CIEL_MODEL:-pipeline}
-      # ゲーム中の持ち主の発言を、一つの決定（話す言葉と行動）で扱う（game_decision.py）。受付へ戻すときは intake にする
-      - CIEL_GAME_DECISION=${CIEL_GAME_DECISION:-decide}
       # 本番は.env、開発は.env.dev。同じ変数名を使い、資格情報だけ.env.sharedを共有する。
       - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-openai}
       - CIEL_INPUT=${CIEL_INPUT:-}

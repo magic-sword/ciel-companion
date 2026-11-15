@@ -37,7 +37,7 @@
 | `server/agent/config/prompts/reply_frame.md` | 返事の前提（書いたとおりに読み上げられて相手に届く）。`agent.py`が能力一覧のあと、固定systemの最後に付ける。前へ移すと注釈を減らす効果が消えた |
 | `server/agent/config/prompts/talker.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline`の共通会話指示（会話と必要な道具の選択）、背景の短いまとめ、付箋と依頼の印の読み方。`listener.md`は独立モジュール用に残すが、通常pipelineの途中文字起こしには接続しない。処理は`mind.py`・`board.py`。[会話の処理構造](conversation-pipeline-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
-| `server/agent/config/prompts/game_select.md`・`game_intake.md`・`game_draft.md` | ゲーム受付の能力選択・選択済み能力の引数生成・確認への補足。draftのある選択時だけ補足用本文を追加し、通常の指示を維持する |
+| `server/agent/config/prompts/game_decide.md` | ゲーム中の発言の決定（話す言葉と行動）の書き方。`{actions}`に、その作業の状態で選べる行動が入る |
 | `server/agent/agent.py` | 声の方式に応じた指示の組み合わせと会話への適用 |
 
 Markdown は HTML に変換せず、そのソースをモデルへ渡す。見出し・箇条書きは利用できる。コメントや front matter を取り除く処理、テンプレート処理はない。変数展開は `greeting_owner.md`・`enroll_done.md` の `{name}` だけ（名前を別の行のデータとして渡すだけでは、名前を呼ばないことがあったため）。編集者向けの説明・出典は README やこの文書に置く。

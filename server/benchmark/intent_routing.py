@@ -5,13 +5,12 @@ take. Nothing is executed in a world: game tools, work submission and stop are r
 answered with a neutral acknowledgement.
 
 Systems
-  intake  current host: GameIntake decides first; if it passes, the conversation model answers
-          with the tools the pipeline exposes after an intake check.
+  decide  the conversation server's decision (server/agent/game_decision.py): one structured output
+          {say, act} from the conversation model, where act is one of the actions of the work state.
   mind    the conversation model answers directly with the tools the pipeline exposes, without a
-          separate intake decision.
-  decide  prototype of the state machine design (docs/conversation/agent-state-machine-ja.md): one
-          structured output {act, say} from the conversation model, where act is required and its
-          kinds are the actions of the current work state. Exists only in this evaluator.
+          separate decision.
+  intake  the earlier host, GameIntake deciding first. Removed from the server on 2026-11-16; it runs
+          only on a baseline source from before (--baseline-ref).
 The case file and labels are described in intent_routing_build.py.
 """
 import argparse

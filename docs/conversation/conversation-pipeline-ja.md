@@ -28,7 +28,7 @@ flowchart TD
 
 1. `agent.make_pipeline`が入力部品を組み立てる。voiceではVAD、OpenAIまたはVoskの途中結果・確定結果、発話区切りを使用する。textではマイクを購読せずmanual入力とする。
 2. `conversation_recording.py`と`Conversation`が、確定状態・発言ID・話者・時刻を記録する。途中の認識と確定した依頼を区別する。
-3. 議事録は通常の会話推論から能力を読み込み、ツールで受け付ける。文字起こし断片ごとの別LLMによる並列受付は使用しない。`game_intake.py`はworkと体の操作の短い説明から能力を選ぶ。依頼文をそのまま渡せるゲームの持ち主の発言を、`game_decision.py`が全履歴から一つの決定（話す言葉と行動）で扱う（[一つの決定の試用](agent-state-machine-ja.md#一つの決定の試用段階2)）。自然文handoffを宣言する能力には元の依頼を渡し、その他は選択した詳細だけで引数を生成する。明示停止を推論の完了まで待たせない。権限・期限と実行の検証は[能力カタログ](capability-runtime-ja.md#ゲーム依頼の段階的な受付)を参照する。
+3. 議事録は通常の会話推論から能力を読み込み、ツールで受け付ける。文字起こし断片ごとの別LLMによる並列受付は使用しない。ゲームを遊んでいる間の持ち主の発言は、`game_decision.py`が全履歴から一つの決定（話す言葉と行動）で扱う。明示停止を推論の完了まで待たせない。権限・対象・検査は[能力カタログ](capability-runtime-ja.md#ゲーム中の発言の決定)を参照する。
 4. `turns.py`が声の区間、本人確認、記憶、接触等を返答の補足へまとめる。話者不明・「たぶん」を確かな本人に昇格させない。
 5. `Ciel._pipeline_llm`が`Mind.route/build/tools_for`を使用する。付箋に受け付け済みの依頼を重複実行しない。
 6. サービスの結果や発話要求は`Mouth`で順番・取消を管理し、`emotion.py`とIrodori経由で声・表情を送る。生成完了と最後まで発話したことは別に確認する。
@@ -81,7 +81,7 @@ mindへは能力の概要と少数の個別操作を渡す。他の道具は`loa
 | 経路と履歴の組み立て | `mind.py`、`turns.py`、`conversation.py` |
 | 指示本文 | [プロンプト管理](prompt-management-ja.md)、`config/persona.toml` |
 | 本人確認・保存 | `speakers.py`、`speaker_store.py`、`tools/memory.py` |
-| 受付・付箋・発話 | `listener.py`、`game_intake.py`、`game_decision.py`、`board.py`、`mouth.py` |
+| 受付・付箋・発話 | `listener.py`、`game_decision.py`、`board.py`、`mouth.py` |
 | 反応・音声・表情 | `reactions.py`、`emotion.py`、`irodori_tts.py` |
 
 試験コマンドは[回帰テスト](../testing/regression-tests-ja.md)、確認済み範囲と未確認項目は[確認状況](../testing/verification-status-ja.md)を参照する。

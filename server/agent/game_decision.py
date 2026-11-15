@@ -9,14 +9,19 @@ The conversation model reads the whole conversation and writes one structured ou
 Not acting is the kind `none`. `say` is what Ciel speaks, also when the action could not be done or
 a stop word already stopped the body: then a second decision that can only speak tells it in her words.
 
-Starting, checking and stopping stay with the work runner and the game environment. The intake
-(game_intake.py) keeps two parts the decision builds on: stopping at once when a stop word is heard,
-and capturing what the owner pointed at when the speech ended. An action aimed at a target (pointed,
-or coordinates in the words) takes a target id; target_candidates binds the real value, the model
-never writes it. Games whose work needs preparation are left to the intake as a whole.
+Starting, checking and stopping stay with the work runner and the game environment. Two things do
+not wait for the model: a stop word stops the body as soon as it is heard (on_transcribed), and what
+the owner pointed at is captured when the speech ends (on_user_state). An action aimed at a target
+(pointed, or coordinates in the words) takes a target id; target_candidates binds the real value, the
+model never writes it. Work is offered for a capability that takes the request as it is (a handoff).
+The local model writes the decision under the schema; a cloud model is asked for the same schema and
+its answer is checked against it.
 """
+import asyncio
 import copy
 import json
+import os
+import re
 import time
 import uuid
 
@@ -31,16 +36,18 @@ ENDED = ('failed', 'cancelled')   # an ended work that may be started again with
 FAILED = ('error', 'unavailable', 'busy', 'goal_running', 'no_task', 'refused', 'failed')
 FORMS = ('say_first', 'act_first')
 NONE = {'type': 'object', 'additionalProperties': False, 'properties': {'kind': {'const': 'none'}}, 'required': ['kind']}
+# Stop words stop the body when they are heard, before any model (a plain stop, nothing else in it).
+STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*'
+                  r'(?:(?:その場で待ってください|こちらが頼むまで再開しないでください)[。\s、]*)*$')
+REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')   # a cloud mind's reasoning effort (agent.MIND_REASONING)
 
 
-def supported(env) -> bool:
-    """The decision covers games whose work takes the request as it is (a declared handoff)."""
-    if not env.playing():
-        return False
+def capabilities(env):
+    """Work capabilities the decision can start: those that take the request as it is."""
     work = env.profile.get('work') or {}
     if work.get('version') != 1:
-        return False
-    return not any((c.get('handoff') or {}).get('version') != 1 or c.get('preparation') for c in work.get('capabilities', []))
+        return []
+    return [c for c in work.get('capabilities', []) if (c.get('handoff') or {}).get('version') == 1 and not c.get('preparation')]
 
 
 def targeted(env, name) -> bool:
@@ -95,7 +102,7 @@ def acts(env, work, targets=None):
             request = json.dumps(work['arguments'], ensure_ascii=False)
             out.append((_alt({'kind': {'const': 'resume'}}),
                         f"resume：止まった作業（{request}）を、同じ依頼でもう一度始める。体は進んだ分を見て続きから計画する"))
-        for capability in (env.profile.get('work') or {}).get('capabilities', []):
+        for capability in capabilities(env)[:1]:   # one work kind: a game declares one entry that takes the request
             out.append((_alt({'kind': {'const': 'work'}, 'request': STRING}),
                         # The name is how the game's own instructions refer to this capability.
                         f"work：{capability['name']}。{capability.get('description', '')} requestに相手の頼み"))
@@ -117,7 +124,7 @@ def acts(env, work, targets=None):
 
 def _handoff(env, name):
     # The capability's declared handoff, or None.
-    return next((c.get('handoff') for c in (env.profile.get('work') or {}).get('capabilities', []) if c.get('name') == name), None)
+    return next((c.get('handoff') for c in capabilities(env) if c.get('name') == name), None)
 
 
 def instructions(template, alternatives):
@@ -147,23 +154,104 @@ def operations(act, work, env):
     if kind == 'resume':
         return [('resume_game_task', {'capability': work.get('capability'), 'arguments': copy.deepcopy(work.get('arguments') or {})})]
     if kind == 'work':
-        name = ((env.profile.get('work') or {}).get('capabilities') or [{}])[0].get('name')
+        name = (capabilities(env) or [{}])[0].get('name')
         return [('submit_game_task', {'capability': name, 'arguments': {'request': act.get('request')}})]
     return [(kind, act.get('arguments') or {})]
 
 
 class GameDecision:
     """Decides and carries out one owner utterance, and returns what Ciel says about it."""
-    TEMPERATURE = 0
+    TEMPERATURE = 0   # the local model; a cloud reasoning model takes its own
 
-    def __init__(self, intake, template, *, form='say_first'):
-        self.intake, self.template, self.form = intake, template, form
-        self.runner = intake.runner
+    def __init__(self, runner, template, *, client=None, authorized=lambda: True, form='say_first'):
+        self.runner, self.template, self.form = runner, template, form
+        self.authorized = authorized
+        self._client = client
         self._items = {}
+        self._generation = 0          # a stop word heard while deciding cancels what was decided
+        self._fast_stop = None
+        self._speech_reference = None
+        self._reference_items = {}
+        self._reference_tasks = set()
+        self._speech_item = None
 
     def supported(self) -> bool:
-        return models.is_local('mind') and supported(self.runner.env)
+        return self.runner.env is not None and self.runner.env.playing()
 
+    # ---- what is heard before the decision ----
+    async def _capture_references(self):
+        env = self.runner.env
+        if not env.playing() or not env.profile.get('reference_context'):
+            return None
+        epoch = getattr(env, '_connection_epoch', None)
+        if await asyncio.wait_for(env._refresh(), 2) is False or epoch != getattr(env, '_connection_epoch', None):
+            raise RuntimeError('Reference observation unavailable')
+        return copy.deepcopy(env.state.get('references'))
+
+    def on_user_state(self, event):
+        """When the owner stops speaking, capture what they point at (the words arrive after)."""
+        if event.new_state == 'speaking':
+            self._speech_reference = None
+            self._speech_item = None
+            return
+        if getattr(event, 'old_state', None) != 'speaking':
+            return
+        self._begin_reference_capture()
+
+    def _begin_reference_capture(self):
+        task = asyncio.create_task(self._capture_references())
+        self._speech_reference = (time.monotonic(), task)
+        self._speech_item = None
+        self._reference_tasks.add(task)
+
+        def finished(t):
+            self._reference_tasks.discard(t)
+            if not t.cancelled():
+                t.exception()   # observed again by the matching words; no orphan warning
+        task.add_done_callback(finished)
+
+    def on_transcribed(self, event, owner=True):
+        """Bind the captured pointing to the words; a plain stop word stops the body at once."""
+        if not owner or not getattr(event, 'is_final', False):
+            return
+        if STOP.fullmatch(event.transcript.strip()):
+            self._generation += 1
+            self._fast_stop = asyncio.create_task(self._stop())
+            return
+        item_id = getattr(event, 'item_id', None)
+        if item_id and self.runner.env is not None and self.runner.env.profile.get('reference_context'):
+            if (not self._speech_reference or time.monotonic() - self._speech_reference[0] >= 10
+                    or self._speech_item not in (None, item_id)):
+                self._begin_reference_capture()
+            captured_at, task = self._speech_reference
+            if time.monotonic() - captured_at < 10:
+                self._speech_item = item_id
+                self._reference_items[item_id] = (task, getattr(self.runner.env, '_connection_epoch', None))
+                while len(self._reference_items) > 16:
+                    del self._reference_items[next(iter(self._reference_items))]
+
+    async def _stop(self):
+        """Stop the work, or the body's direct action when no work runs."""
+        if self.runner.body_step():
+            return await self.runner.stop()
+        env = self.runner.env
+        name = env.profile.get('stop_tool')
+        if env.playing() and name and getattr(env, 'meta', {}).get(name, {}).get('ciel/stops'):
+            result = await env.use(name, {})
+            if not result.get('message') and result.get('status') in ('stopped', 'stopping'):
+                result = {**result, 'message': '停止しました。' if result['status'] == 'stopped'
+                          else '停止を依頼しました。停止の確認を待っています。'}
+            return result
+        return await self.runner.stop()
+
+    async def close(self):
+        for task in self._reference_tasks:
+            task.cancel()
+        await asyncio.gather(*self._reference_tasks, return_exceptions=True)
+        if self._client is not None:
+            await self._client.close()
+
+    # ---- the decision ----
     async def handle(self, item, system: str, messages) -> str | None:
         """system: the fixed instructions; messages: the rest of the conversation as sent to the model.
         Returns what to say, or None to let the conversation model answer as usual.
@@ -177,15 +265,14 @@ class GameDecision:
         return reply
 
     async def _handle(self, item, system, messages):
-        from game_intake import STOP
         text = item.text_content or ''
-        if not self.intake.authorized():
+        if not self.authorized():
             return None
-        env, generation = self.runner.env, self.intake._generation
+        env, generation = self.runner.env, self._generation
         if STOP.fullmatch(text.strip()):
-            # The body was stopped when the words were heard (game_intake.on_transcribed); Ciel says so.
-            fast, self.intake._fast_stop = self.intake._fast_stop, None
-            r = await fast if fast is not None else await self.intake._stop()
+            # The body was stopped when the words were heard (on_transcribed); Ciel says so.
+            fast, self._fast_stop = self._fast_stop, None
+            r = await fast if fast is not None else await self._stop()
             fact = r.get('message') or '停止を確認できませんでした。'
             return await self._speak(system, messages, f'相手の言葉を受けて、体を止めました。結果：{fact}') or fact
         if not env.playing():
@@ -198,7 +285,7 @@ class GameDecision:
         if out is None:
             return None   # The conversation model answers as before; nothing was started.
         act, say = out.get('act') or {}, str(out.get('say') or '').strip()
-        if generation != self.intake._generation or not self.intake.authorized():
+        if generation != self._generation or not self.authorized():
             return await self._speak(system, messages, '確かめている間に止める指示があったので、何も始めませんでした。') \
                 or '止める指示があったので、何も始めませんでした。'
         failure = await self._carry_out(operations(act, work, env), text, targets, references)
@@ -207,17 +294,17 @@ class GameDecision:
         return say or None
 
     async def _references(self, item):
-        """What was pointed at when the owner finished speaking, captured by the intake."""
+        """What was pointed at when the owner finished speaking."""
         env = self.runner.env
         if not env.profile.get('reference_context'):
             return None
         try:
-            capture = self.intake._reference_items.pop(item.id, None)
+            capture = self._reference_items.pop(item.id, None)
             if capture:
                 task, epoch = capture
                 references = await task
                 return references if epoch == getattr(env, '_connection_epoch', None) else None
-            return await self.intake._capture_references()
+            return await self._capture_references()
         except Exception:
             debug_log.record('game_decision_error', error='references_unavailable')
             return None
@@ -225,21 +312,24 @@ class GameDecision:
     async def _decide(self, system, messages, alternatives, work, note=''):
         wire = [{'role': 'system', 'content': system + '\n\n' + instructions(self.template, alternatives)
                  + (('\n\n' + note) if note else '')}, *messages]
-        if self.intake._client is None:
-            self.intake._client = models.create_client('mind')
+        if self._client is None:
+            self._client = models.create_client('mind')
+        local = models.is_local('mind')
+        decision_schema = schema(alternatives, self.form)
         request, began = uuid.uuid4().hex, time.monotonic()
         debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide' if not note else 'decide_speak',
-                         state=(work or {}).get('state'), temperature=self.TEMPERATURE)
+                         state=(work or {}).get('state'), temperature=self.TEMPERATURE if local else None)
         try:
-            options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20,
-                                     messages=wire, temperature=self.TEMPERATURE,
+            # A cloud schema is not strict (the game's own argument schemas may leave fields optional);
+            # its answer is checked against the same schema below.
+            options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20, messages=wire,
                                      response_format={'type': 'json_schema', 'json_schema': {
-                                         'name': 'decision', 'schema': schema(alternatives, self.form)}})
-            response = await self.intake._client.chat.completions.create(**options)
+                                         'name': 'decision', 'schema': decision_schema, **({} if local else {'strict': False})}},
+                                     **({'temperature': self.TEMPERATURE} if local else {'reasoning_effort': REASONING}))
+            response = await self._client.chat.completions.create(**options)
             models.record('mind', models.model('mind'), getattr(response, 'usage', None))
             out = json.loads(response.choices[0].message.content or '')
-            if not isinstance(out, dict):
-                raise ValueError('Expected object')
+            jsonschema.validate(out, decision_schema)
         except Exception as e:
             debug_log.record('game_decision_error', error=type(e).__name__)
             return None
@@ -265,7 +355,7 @@ class GameDecision:
             if name == 'tell_game_task':
                 r = await runner.tell(str(args.get('message') or text)[:2000])
             elif name == 'stop_game_task':
-                r = await self.intake._stop()
+                r = await self._stop()
             elif name == 'answer_game_task':
                 r = await runner.answer(args['decision_id'], args['action'],
                                         str(args.get('message') or text)[:2000] if args['action'] == 'reply' else None)
@@ -279,7 +369,7 @@ class GameDecision:
                                        title=getattr(runner, 'title', '') or str(args['arguments'].get(handoff['argument']) or '')[:100],
                                        seconds=handoff['seconds'], request_id=uuid.uuid4().hex)
             elif name == 'submit_game_task':
-                capability = ((env.profile.get('work') or {}).get('capabilities') or [{}])[0]
+                capability = (capabilities(env) or [{}])[0]
                 handoff = capability['handoff']
                 request = str(args['arguments'].get('request') or text)
                 r = await runner.start(capability['name'], {handoff['argument']: request[:2000]},

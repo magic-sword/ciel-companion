@@ -240,7 +240,7 @@ commit `30951b8`を標準`deploy-server.sh --dev`、続いて`deploy-server.sh`�
 
 最終証跡は`~/work/ciel-companion-dev/server/data/deployments/minecraft-stage1-final-1794395358159843124/`のbefore/after/source-files/verification JSON、回収先は`server/benchmark/data/stage1-dev-final-verification/`。DBバックアップは`~/work/ciel-db-backups/ciel-20261111-201955.sql.gz`。資格情報・DB・ワールドは回収していない。これは配布・登録・読取疎通の確認であり、通常ワールドの施工や実マイクの合格記録ではない。
 
-実マイク・指示棒・音声停止の確認はまだ行っていない。利用者は準備が整ったら手順の案内を希望しており、[G3の操作手順](../games/minecraft/minecraft-benchmark-ja.md#g3の操作手順)を案内する。開発反映だけで段階1完了とはしない。
+実マイク・指示棒・音声停止の確認はまだ行っていない。利用者は準備が整ったら手順の案内を希望しており、[G3の操作手順](../games/minecraft/minecraft-benchmark-ja.md#段階1施工の評価)を案内する。開発反映だけで段階1完了とはしない。
 
 ## 本番・開発のローカル推論への反映
 

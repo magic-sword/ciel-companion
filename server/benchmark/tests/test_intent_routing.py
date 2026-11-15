@@ -53,7 +53,7 @@ class Decide(unittest.TestCase):
     def world(self):
         fn = types.SimpleNamespace(id='minecraft_come_here', info=types.SimpleNamespace(
             raw_schema={'description': 'come', 'parameters': {'type': 'object', 'properties': {}}}))
-        return types.SimpleNamespace(profile={'work': {'capabilities': [{'name': 'minecraft.pursue_goal', 'description': 'd'}]}},
+        return types.SimpleNamespace(profile={'work': {'version': 1, 'capabilities': [{'name': 'minecraft.pursue_goal', 'description': 'd', 'handoff': {'version': 1, 'argument': 'request', 'constraints': {}, 'seconds': 120}}]}},
                                      tools=[fn], meta={fn.id: {'ciel/role': 'act'}})
 
     def kinds(self, work):

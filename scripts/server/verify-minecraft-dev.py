@@ -35,8 +35,8 @@ mismatches=[name for name,v in sources.items()if v['expected']!=v['actual']]
 def python(container,code):
     return json.loads(subprocess.check_output(['docker','exec',container,'python','-c',code],text=True))
 agent_files={name.removeprefix('agent/'):value for name,value in EXPECTED.items()if name in (
-    'agent/agent.py','agent/persona.py','agent/game_intake.py','agent/target_candidates.py',
-    'agent/config/persona.toml','agent/config/prompts/game_select.md','agent/config/prompts/game_intake.md','agent/config/prompts/game_draft.md')}
+    'agent/agent.py','agent/persona.py','agent/game_decision.py','agent/target_candidates.py',
+    'agent/config/persona.toml','agent/config/prompts/game_decide.md')}
 actual_agent=python('ciel-dev-agent-dev-1',"from pathlib import Path;import json,hashlib;print(json.dumps({p:hashlib.sha256(Path(p).read_bytes()).hexdigest()for p in "+repr(list(agent_files))+"}))")
 body_files={name.removeprefix('minecraft/'):digest for name,digest in EXPECTED.items()if name.startswith('minecraft/src/')}
 actual_body=json.loads(subprocess.check_output(['docker','exec',BODY_CONTAINER,'node','--input-type=module','-e',

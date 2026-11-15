@@ -81,22 +81,23 @@ def explicit_axes(text):
 
 
 class TargetCandidates:
-    """Private bindings and model-facing schemas are distinct from MCP schemas."""
+    """Private bindings and model-facing schemas are distinct from MCP schemas.
+
+    One utterance's target (coordinates in its words, or what the owner pointed at) is bound to the
+    actions that declare a target binding; the model sees only the id T1, never the value."""
     def __init__(self, request_id, text, references, definitions):
         self.request_id = request_id
         self.bindings = {}
         self.definitions = copy.deepcopy(definitions)
-        self.roles = {}
-        self.role_candidates = {}
         self.text = text
         try:
-            self.mentions = coordinate_mentions(text)
-            self.dimensions = dimension_mentions(text)
-            self.valid_mentions = True
+            coordinate_mentions(text)   # malformed or corrected coordinates bind nothing
+            valid = True
         except ValueError:
-            self.mentions, self.dimensions, self.valid_mentions = [], [], False
+            valid = False
         explicit, axes = explicit_axes(text)
-        if not self.valid_mentions:axes={}
+        if not valid:
+            axes = {}
         self.targets = []
         if explicit and axes:
             self.targets.append({'id': 'T1', 'source': 'explicit_coordinates', 'axes': axes})
@@ -104,10 +105,6 @@ class TargetCandidates:
             self.targets.append({'id': 'T1', 'source': references.get('source', 'pointer'),
                                  'points': copy.deepcopy(references.get('points', []))})
         for key, definition in self.definitions.items():
-            preparation = definition.get('preparation')
-            if preparation:
-                self._prepare_roles(key, definition, preparation, references)
-                continue
             spec = definition.get('target_binding')
             if not spec:
                 continue
@@ -139,179 +136,9 @@ class TargetCandidates:
             self.bindings[key] = bound
 
     def resolve(self, capability, arguments):
-        if capability in self.roles:
-            return self._resolve_roles(capability, arguments)
         if capability not in self.bindings:
             return arguments
         bound = self.bindings[capability]
         if not bound or arguments.get('target_id') != 'T1':
             raise ValueError('Target is not bound to this request and capability')
         return {**{k: v for k, v in arguments.items() if k != 'target_id'}, **bound}
-
-    def _prepare_roles(self, capability, definition, preparation, references):
-        if preparation.get('version') != 1 or preparation.get('target_binding', {}).get('kind') != 'region_roles':
-            definition['target_ids'] = []
-            return
-        self.roles[capability] = copy.deepcopy(references)
-        role_targets = copy.deepcopy(self.mentions + self.dimensions)
-        previous = references.get('confirmed_spec') if references and preparation.get('allow_repeat') else None
-        if previous:
-            role_targets.append({'id':'R1','source':'previous_work','operation':previous['operation'],
-                                 **{k:copy.deepcopy(previous[k])for k in ('block','clear_blocks')if k in previous},
-                                 'summary':references.get('summary','')})
-        elif references and references.get('selection_id'):
-            role_targets.append({'id': 'P1', 'source': references.get('source', 'pointer'),
-                                 'points': copy.deepcopy(references.get('points', []))})
-        self.targets.extend(t for t in role_targets if not any(v['id'] == t['id'] for v in self.targets))
-        axes = {a: {'type': 'string', 'enum': [m['id'] for m in self.mentions if m['axis'] == a]} for a in 'xyz'}
-        role = {'type': 'object', 'additionalProperties': False, 'properties': axes}
-        schema = copy.deepcopy(preparation['intent_schema'])
-        missing=[]
-        if not previous:
-            for field,choices in preparation.get('source_values',{}).items():
-                if field not in schema.get('properties',{}):continue
-                spans=[];values=set()
-                aliases=sorted(((alias,value)for value,names in choices.items()for alias in names),key=lambda v:-len(v[0]))
-                for alias,value in aliases:
-                    for match in re.finditer(re.escape(alias),self.text,re.I):
-                        if not any(match.start()<end and match.end()>start for start,end in spans):
-                            spans.append(match.span());values.add(value)
-                entry=schema['properties'][field]
-                (entry['items']if entry.get('type')=='array'else entry)['enum']=sorted(values)
-                if field in schema.get('required',[]) and not values:missing.append(field)
-            axes_present={m['axis']for m in self.mentions}
-            if not references or self.mentions:
-                reference_axes=preparation.get('reference_axes',[])if references and axes_present<={'y'}else []
-                missing.extend(a for a in preparation.get('required_axes',[])if a not in axes_present and a not in reference_axes)
-            if sum(m['axis']=='y'for m in self.mentions)<preparation.get('required_height_mentions',0):missing.append('ground/top')
-        if missing:definition['missing_fields']=missing
-        edit_role=copy.deepcopy(role)
-        required_axes=preparation.get('required_axes')
-        if required_axes is not None:
-            edit_role['properties']={a:v for a,v in edit_role['properties'].items()if a in required_axes and v['enum']}
-            if all(a in edit_role['properties']for a in required_axes):edit_role['required']=list(required_axes)
-        schema['properties']['target_roles'] = {'type': 'object', 'additionalProperties': False,
-            'properties': {'edit': edit_role, 'preserve': {'type': 'array', 'maxItems': 4, 'items': role},
-                           'reference': {'type': 'string', 'enum': ['P1'] if references and references.get('selection_id') else []},
-                           'ground': axes['y'], 'top': axes['y'],
-                           'dimensions': {'type': 'string', 'enum': [d['id'] for d in self.dimensions]}}}
-        if required_axes and all(a in edit_role.get('required',[])for a in required_axes):
-            # A sole explicit value for a required edit axis belongs to edit.
-            # Preserved regions inherit it; emitting that ID again is invalid.
-            saved_role=schema['properties']['target_roles']['properties']['preserve']['items']
-            saved_role['properties']={a:v for a,v in saved_role['properties'].items()
-                if a not in required_axes or len(v.get('enum',[]))!=1}
-        permitted = preparation.get('roles')
-        role_properties = schema['properties']['target_roles']['properties']
-        # Service-declared labels constrain source roles independently of the LLM.
-        normalized=unicodedata.normalize('NFKC',self.text)
-        labelled={}
-        for name,prefixes in preparation.get('role_prefixes',{}).items():
-            if name not in role_properties:continue
-            matches=[m['id']for m in self.mentions if any(
-                re.search(re.escape(prefix)+r'\s*$',normalized[:m['span'][0]],re.I)for prefix in prefixes)]
-            if matches:
-                role_properties[name]={**role_properties[name],'enum':matches}
-                labelled[name]=matches
-        self.role_candidates[capability]=labelled
-        for name,aliases in preparation.get('source_roles',{}).items():
-            if not any(alias.casefold()in self.text.casefold()for alias in aliases):
-                role_properties.pop(name,None)
-                if name=='preserve'and required_axes is not None and len(self.mentions)>len(required_axes)+preparation.get('required_height_mentions',0):
-                    definition['missing_fields']=[*definition.get('missing_fields',[]),'coordinate_roles']
-        if previous:
-            role_properties.clear()
-            role_properties['previous']={'const':'R1'}
-            permitted=['previous']
-        if permitted is not None:
-            for name in list(role_properties):
-                if name not in permitted:
-                    del role_properties[name]
-        if len({m['axis'] for m in self.mentions}) == len(self.mentions):
-            role_properties.pop('preserve', None)
-        if required_axes is not None and len(self.mentions)<=len(required_axes)+preparation.get('required_height_mentions',0):
-            role_properties.pop('preserve',None)
-        if not self.dimensions:
-            role_properties.pop('dimensions', None)
-        for name,entry in list(role_properties.items()):
-            if entry.get('enum')==[]:del role_properties[name]
-        for axis in list(axes):
-            if not axes[axis]['enum']:del axes[axis]
-        required_roles=['previous']if previous else []
-        if not previous:
-            if self.dimensions:required_roles.append('dimensions')
-            if required_axes and all(a in {m['axis']for m in self.mentions}for a in required_axes):required_roles.append('edit')
-            elif references and references.get('selection_id'):required_roles.append('reference')
-            if preparation.get('required_height_mentions'):required_roles+=['ground','top']
-        schema['properties']['target_roles']['required']=required_roles
-        schema['required'] = [*schema.get('required', []), 'target_roles']
-        definition['arguments'] = schema
-        definition['preparation'] = {k: v for k, v in preparation.items() if k not in ('intent_schema', 'target_binding', 'variants', 'roles', 'source_values', 'source_roles','role_prefixes', 'required_axes', 'required_height_mentions', 'reference_axes')}
-        definition['target_ids'] = [m['id'] for m in role_targets]
-        # Still expose incomplete intentions so the model can ask for missing fields.
-        definition['target_ids'] = definition['target_ids'] or ['needs_target']
-
-    def _resolve_roles(self, capability, arguments):
-        if not self.valid_mentions:
-            raise ValueError('Malformed coordinates require clarification')
-        by_id = {m['id']: m for m in self.mentions}
-        roles = arguments.get('target_roles', {})
-        for name,allowed in self.role_candidates.get(capability,{}).items():
-            if name in roles and roles[name]not in allowed:
-                raise ValueError('Coordinate role conflicts with its source label')
-        reference = self.roles[capability]
-        if roles.get('previous'):
-            if roles!={'previous':'R1'} or not reference or not reference.get('confirmed_spec') or self.mentions or self.dimensions:
-                raise ValueError('Previous work cannot replace newly specified coordinates')
-            original=reference['confirmed_spec']
-            for name,value in arguments.items():
-                if name=='target_roles':continue
-                before=original.get(name)
-                if (sorted(value)!=sorted(before) if isinstance(value,list) and isinstance(before,list) else value!=before):
-                    raise ValueError('Continuing cannot silently change the confirmed specification')
-            return copy.deepcopy(original)
-        used = set()
-
-        def axes(values, inherited=None):
-            result = dict(inherited or {})
-            for axis, ref in values.items():
-                if ref not in by_id or by_id[ref]['axis'] != axis or ref in used:
-                    raise ValueError('Invalid or reused coordinate role')
-                used.add(ref)
-                result[axis] = list(by_id[ref]['range'])
-            return result
-
-        edit = axes(roles.get('edit', {}))
-        spec = {k: copy.deepcopy(v) for k, v in arguments.items() if k != 'target_roles'}
-        if self.dimensions:
-            if len(self.dimensions) != 1 or roles.get('dimensions') != self.dimensions[0]['id']:
-                raise ValueError('Dimensions need one explicit role')
-            spec['expected_dimensions'] = self.dimensions[0]['dimensions']
-        if roles.get('reference'):
-            if roles['reference'] != 'P1' or not reference or edit:
-                raise ValueError('Conflicting pointer and explicit target')
-            spec['selection_id'] = reference['selection_id']
-        else:
-            if set(edit) != set('xyz') and not (spec['operation'] == 'level' and set(edit) == set('xz')):
-                raise ValueError('Missing coordinate axes')
-            spec['region'] = {axis+str(end+1): values[end] for axis, values in edit.items() for end in range(2)}
-        preserve = []
-        for saved in roles.get('preserve', []):
-            protected = axes(saved, edit)
-            if set(protected) != set('xyz'):
-                raise ValueError('Missing preserve axes')
-            preserve.append({axis+str(end+1): values[end] for axis, values in protected.items() for end in range(2)})
-        if 'ground' in roles or 'top' in roles:
-            if not all(k in roles for k in ('ground','top')) or spec['operation'] != 'level':
-                raise ValueError('Ground and top are required for level')
-            heights = axes({'y': roles['ground']})['y'], axes({'y': roles['top']})['y']
-            if any(lo != hi for lo, hi in heights):
-                raise ValueError('Ground and top must be single heights')
-            spec.pop('region', None)
-            spec['level'] = {axis+str(end+1): bounds[end] for axis, bounds in edit.items() if axis in 'xz' for end in range(2)}
-            spec['level'].update(ground_y=heights[0][0], top_y=heights[1][0])
-        if preserve:
-            spec['preserve_regions'] = preserve
-        if used != set(by_id):
-            raise ValueError('Every mentioned coordinate needs an explicit role')
-        return spec
