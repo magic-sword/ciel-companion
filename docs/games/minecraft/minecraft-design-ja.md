@@ -296,4 +296,6 @@ Mindcraftの`!getCraftingPlan`は、3×3のレシピが必要で作業台を持�
 
 サービス定義は`server/compose.yaml`等、固定するMinecraft・Node・SDK版はComposeとpackage-lockが正本。秘密・モデル・ワールドはGitへ入れない。EULA同意と既存の接続設定を維持する。
 
+普段のワールドは`scripts/server/reset-minecraft-world.sh`で作り直す。種は`server/compose.yaml`の`SEED`（既定は`MINECRAFT_SEED`の8675309。初期地点がオークの多い森で、すぐそばに水場がある）。作り直しでは、今のワールドと体の拠点の記憶を`server/minecraft/world-resets/<日時>/`へ退避し、ゲーム内の時間を止めて昼（6000）にする。種の候補は`scripts/server/minecraft_seed_probe.py`で、本番に触らない使い捨てのサーバーを起動して、初期地点の地形・周りの原木と水・村までの距離を比べる。
+
 通常ワールドの調査は[デバッグスキル](../../../../agent-skills/skills/ciel-minecraft-debug/SKILL.md)、復元を伴う評価は[ベンチマーク](minecraft-benchmark-ja.md)を使う。自宅の専用環境で確認し、手元PCで新しいMinecraftを起動して代用しない。現在の確認済み範囲は[確認状況](../../testing/verification-status-ja.md)を参照する。
