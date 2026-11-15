@@ -160,3 +160,29 @@ test('the estimate of a plan lengthens the work within the ceiling from its star
   release({ok:true,note:{native_finished:true,objective_verified:false,response:'Done',inventory:{}}});
   await wait(()=>work.active.state==='succeeded');work.close();
 });
+
+test('the body plan graph is kept checked in the work view and told as a plan notice', async()=>{
+  const {link,work}=fixture();let release;
+  link.runSkill=()=>new Promise(r=>{release=r;});
+  const id=work.submit(request()).task_id;await wait(()=>release);
+  const op=work.active.operation;
+  const plan={v:1,plan_id:'p1',revision:1,title:'house',finished:false,current:['bed','ghost'],
+    nodes:[{id:'bed',parent:null,kind:'obtain',label:'white_bed ×1',state:'running',needs:[],estimate_s:120.4,
+      choice:{question:'how',options:[{id:'shear:sheep',summary:'x'.repeat(500)}],chosen:null}},
+      {id:'odd',kind:'teleport',label:'x',state:'running',needs:[]}]};
+  work.activity({request_id:op,stage:'plan',plan});
+  const shown=work.view().plan;
+  assert.deepEqual(shown.nodes.map(n=>n.id),['bed'],'an unknown kind is left out');
+  assert.deepEqual(shown.current,['bed']);
+  assert.equal(shown.nodes[0].estimate_s,120);
+  assert.equal(shown.nodes[0].choice.options[0].summary.length,200);
+  assert.equal(link.events.filter(e=>e.kind==='work_plan').length,1);
+  work.activity({request_id:op,stage:'plan',plan:{...plan,revision:1}});
+  assert.equal(link.events.filter(e=>e.kind==='work_plan').length,1,'an old revision is not told again');
+  work.activity({request_id:op,stage:'plan',plan:{...plan,revision:2,nodes:[{...plan.nodes[0],state:'done'}]}});
+  assert.equal(work.view().plan.nodes[0].state,'done');
+  release({ok:true,note:{native_finished:true,objective_verified:false,response:'Done',inventory:{}}});
+  await wait(()=>work.active.state==='succeeded');
+  assert.equal(work.view().plan.revision,2,'the last plan stays with the finished work');
+  work.close();
+});

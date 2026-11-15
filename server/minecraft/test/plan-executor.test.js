@@ -112,3 +112,21 @@ test('a place counts the blocks to level and is left out when the ground rises m
   set(1, 65, 1, 'grass_block');
   assert.deepEqual(findSites(bot, 3, 3, { radius: 1 }), []);
 });
+
+test('a running plan is shown as a graph: states from the world, obtain steps under their plan step', async () => {
+  const { bot } = fixture();
+  const shown = [];
+  bot.reportPlan = plan => shown.push(plan);
+  const state = { log: [] };
+  const steps = [
+    { id: 'a', kind: 'obtain', label: 'get a', subject: 'a ×1', needs: [], done: () => Boolean(state.a), run: async () => { state.a = true; }, seconds: () => 5 },
+    { id: 'b', kind: 'build', label: 'build b', subject: 'b', needs: ['a'], done: () => Boolean(state.b), run: async () => { state.b = true; }, seconds: () => 5 },
+  ];
+  assert.equal(await runPlan(bot, steps, { title: 'test' }), true);
+  const last = shown.at(-1);
+  assert.equal(last.v, 1);
+  assert.equal(last.finished, true);
+  assert.deepEqual(last.nodes.map(n => [n.id, n.kind, n.label, n.state, n.needs]),
+    [['a', 'obtain', 'a ×1', 'done', []], ['b', 'build', 'b', 'done', ['a']]]);
+  assert.ok(shown.every((p, i) => i === 0 || p.revision > shown[i - 1].revision));
+});

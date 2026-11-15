@@ -144,6 +144,9 @@ export class MindcraftRunner extends BodyCommands {
     agent.bot=bot;
     this.trackReplies(agent);
     agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};
+    // The plan graph the executor shows (planview.js), for the app's plan view (ciel/tasks.js).
+    bot.reportPlan=plan=>{const c=this.current;if(c&&!c.token.cancelled)this.report('activity',{id:c.id,
+      request_id:c.request_id,command_scope:c.scope??'',stage:'plan',command:'',plan});};
     // A plan's own estimate of its remaining time, for the work's deadline (ciel/tasks.js).
     bot.reportEstimate=seconds=>{const c=this.current;if(c&&!c.token.cancelled)this.report('activity',{id:c.id,
       request_id:c.request_id,command_scope:c.scope??'',stage:'estimate',command:'',seconds:Math.round(seconds)});};

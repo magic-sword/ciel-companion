@@ -25,6 +25,26 @@ const validMessage = s => typeof s === 'string' && s.trim().length > 0 && s.leng
 const MAX_REPLIES = 8;
 const keys = (o, allowed) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
+// plan v1: what the body's executor is doing, as a graph for people to see. Fields are bounded
+// and the vocabulary closed, so a display never shows more than a fact the body reported.
+export const PLAN_KINDS = ['obtain', 'make', 'build', 'find', 'wait', 'decide', 'do'];
+export const PLAN_STATES = ['pending', 'ready', 'running', 'done', 'failed', 'waiting_choice'];
+const text = (s, n) => (typeof s === 'string' ? s : '').slice(0, n);
+export function checkedPlan(p) {
+  if (!p || typeof p !== 'object' || p.v !== 1 || !validId(p.plan_id) || !Number.isInteger(p.revision) || p.revision < 1
+      || !Array.isArray(p.nodes)) return null;
+  const nodes = p.nodes.slice(0, 64).filter(n => n && validId(n.id) && PLAN_KINDS.includes(n.kind) && PLAN_STATES.includes(n.state))
+    .map(n => ({ id: n.id, parent: validId(n.parent) ? n.parent : null, kind: n.kind, label: text(n.label, 80), state: n.state,
+      needs: Array.isArray(n.needs) ? n.needs.filter(validId).slice(0, 8) : [],
+      estimate_s: Number.isFinite(n.estimate_s) && n.estimate_s >= 0 ? Math.round(n.estimate_s) : null,
+      choice: n.choice && typeof n.choice === 'object' ? { question: text(n.choice.question, 120),
+        options: (Array.isArray(n.choice.options) ? n.choice.options : []).slice(0, 6).map(o => ({ id: text(o?.id, 40), summary: text(o?.summary, 200) })),
+        chosen: typeof n.choice.chosen === 'string' ? text(n.choice.chosen, 40) : null } : null }));
+  const ids = new Set(nodes.map(n => n.id));
+  return { v: 1, plan_id: p.plan_id, revision: p.revision, title: text(p.title, 80), finished: Boolean(p.finished),
+    nodes, current: (Array.isArray(p.current) ? p.current : []).filter(id => ids.has(id)).slice(0, 8) };
+}
+
 export class GameTasks {
   constructor(link, { clock = () => performance.now(), stopMs = 4500 } = {}) {
     this.link = link;
@@ -53,7 +73,8 @@ export class GameTasks {
     if (t.reason === 'body_changed') message = '準備中に別の動作へ切り替わったため、この作業は開始しませんでした。';
     return structuredClone({ version: TASK_VERSION, session: this.link.session, task_id: t.id, request_id: t.request.request_id, message,
       revision: t.revision, state: t.state, capability: t.request.capability, arguments: t.request.arguments,
-      reason: t.reason, evidence: t.evidence, decision: t.decision, remaining_ms: Math.max(0, t.deadline - this.clock()) });
+      reason: t.reason, evidence: t.evidence, decision: t.decision, remaining_ms: Math.max(0, t.deadline - this.clock()),
+      plan: t.plan ?? null });
   }
 
   changed(t, state, reason = '', evidence = t.evidence) {
@@ -114,6 +135,19 @@ export class GameTasks {
     this.changed(t, 'running', '', { ...t.evidence, estimate: { seconds: Math.round(seconds) } });
   }
 
+  // The body's plan graph (plan v1), kept checked and bounded for the work view; a newer
+  // revision of the same plan, or a new plan, replaces it. Notified apart from the work state,
+  // which it does not change.
+  plan(t, plan) {
+    const clean = checkedPlan(plan);
+    if (!clean) return;
+    const old = t.plan;
+    if (old && old.plan_id === clean.plan_id && clean.revision <= old.revision) return;
+    t.plan = clean;
+    this.link.notice({ kind: 'work_plan', task_id: t.id, plan: structuredClone(clean) });
+    this.link.changed();
+  }
+
   current(t, generation) { return !this.closed && this.active === t && t.generation === generation && t.state === 'running'; }
 
   activity(event) {
@@ -126,6 +160,7 @@ export class GameTasks {
       return;
     }
     if(event.stage==='estimate')return this.estimate(t,Number(event.seconds));
+    if(event.stage==='plan')return this.plan(t,event.plan);
     if(!['thinking','executing','returning'].includes(event.stage))return;
     const activity={stage:event.stage,command:String(event.command??'').slice(0,64)};
     this.link.notice({kind:'work_activity',task_id:t.id,...activity});

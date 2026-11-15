@@ -72,6 +72,11 @@ test('obtaining an item with several ways lists them with costs and waits for a 
     findBlocks: () => [], blockAt: () => null };
   assert.equal(await obtainItem(bot, 'white_bed', 1), false);
   assert.deepEqual(Object.keys(bot.pendingChoice.options), ['kill:sheep', 'shear:sheep', 'make']);
+  // The plan graph shows the choice waiting, with each way and what it costs.
+  const wait = bot.planView.nodes.find(n => n.state === 'waiting_choice' && n.kind === 'decide');
+  assert.deepEqual(wait.choice.options.map(o => o.id), ['kill:sheep', 'shear:sheep', 'make']);
+  assert.match(wait.choice.options[0].summary, /about 3 sheep needed/);
+  assert.equal(bot.planView.nodes.find(n => n.id === 'obtain').state, 'waiting_choice');
   assert.match(bot.output, /kill:sheep: about 3 sheep needed, 2 suitable sheep seen nearby/);
   assert.match(bot.output, /shear:sheep: about 2 sheep needed, 1 suitable sheep seen nearby, a shears to make first, the sheep stay/);
   // The choice that follows says which of its ways can be done from here.
