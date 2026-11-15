@@ -23,7 +23,7 @@
 
 配置先は[資料一覧のフォルダ担当表](../README.md#フォルダの担当範囲)に従う。`docs/`直下は索引だけにし、共通仕様は親分野、Minecraft・Live2D等の固有仕様は対応するサブフォルダへ置く。画像は`docs/assets/`、正式モデルの台帳は引き続き成果物に隣接して管理する。フォルダごとのREADMEや同じ仕様のコピーは増やさず、この一覧で役割を管理する。
 
-文書の追加・統合・移動・削除、実装変更に伴う仕様更新には[ciel-documentation](../../.claude/skills/ciel-documentation/SKILL.md)を使う。共有手順の正本は`.claude/skills/<name>/SKILL.md`、Codexの同名の入口は`.agents/skills/<name>/SKILL.md`とする。文書管理もこの構成に従う。共通手順を両方へ複製せず、管理方針の変更もこの文書へ集約する。
+文書の追加・統合・移動・削除、実装変更に伴う仕様更新には[ciel-documentation](../../../agent-skills/skills/ciel-documentation/SKILL.md)を使う。共有手順の正本は専用Gitの `agent-skills/skills/<name>/SKILL.md`、両ツールのユーザー用スキルは正本を読む入口とする。共通手順は専用Git、本リポジトリの文書管理方針はこの文書へ集約し、本文を複製しない。
 
 ## 更新する手順
 

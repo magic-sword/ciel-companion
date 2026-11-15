@@ -518,7 +518,7 @@ Mindcraft固定版`e1c1fc3ffa481506c2445fc639e16dba504b5920`の身体基盤へ�
 
 ## 体と中核APIの受け渡しの書式
 
-2026-11-14、体の`CielModel`と中核APIのホストが送る文脈を、JSONの包み（`execution_context`・`execution_observation`・`execution_reference`・会話の`{"type":…}`・`permitted_memory`）から、上流Mindcraftの`strictFormat`の形へ変えた。Mindcraftの指示とsystem履歴は`SYSTEM: `で始まるuser、会話の記録は心と同じ`名前：発言`と出来事の一文、記憶はホストのsystem（ローカルでは`SYSTEM: `）。会話の注釈を減らした書式（[プロンプトの書き方](../../.claude/skills/ciel-prompt-writing/SKILL.md)）にそろえたもの。
+2026-11-14、体の`CielModel`と中核APIのホストが送る文脈を、JSONの包み（`execution_context`・`execution_observation`・`execution_reference`・会話の`{"type":…}`・`permitted_memory`）から、上流Mindcraftの`strictFormat`の形へ変えた。Mindcraftの指示とsystem履歴は`SYSTEM: `で始まるuser、会話の記録は心と同じ`名前：発言`と出来事の一文、記憶はホストのsystem（ローカルでは`SYSTEM: `）。会話の注釈を減らした書式（[プロンプトの書き方](../../../agent-skills/skills/ciel-prompt-writing/SKILL.md)）にそろえたもの。
 
 条件：body・`mc_*`5課題・配置11・各2回・practical-v1、共有GPU API（Qwen3.5-35B-A3B Q4_K_M、32768/2、同じgeneration `a9d0a827`）、通常サービス稼働。基準はコミット`1995293`（source `e7b05e49528df8f1`）、変更版はその作業ツリー（source `7210bc10e7a5df63`）。
 

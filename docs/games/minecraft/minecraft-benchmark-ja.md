@@ -4,7 +4,7 @@
 
 入口は `server/benchmark/run.py`、課題は `server/benchmark/tasks.json`。自宅サーバーで専用の Minecraft・体・試験用会話サーバーを使う。普段のワールドや DB は復元・変更しない。
 
-Codex・Claude Code の作業手順は [共通の評価スキル](../../../.claude/skills/ciel-minecraft-benchmark/SKILL.md)。この文書を設定・採点・拡張方法の正本とする。ローカル推論の切替は [ローカル LLM](../../operations/local-runtime-ja.md)を参照する。
+Codex・Claude Code の作業手順は [共通の評価スキル](../../../../agent-skills/skills/ciel-minecraft-benchmark/SKILL.md)。この文書を設定・採点・拡張方法の正本とする。ローカル推論の切替は [ローカル LLM](../../operations/local-runtime-ja.md)を参照する。
 
 現在の終了条件は [実用性評価 practical-v1](minecraft-benchmark-ja.md)。課題別60〜120秒、操作未発行・不進行で早期終了し、既定は1配置・1回・実行全体10分。旧900秒条件の基準値とは直接比較しない。
 
@@ -17,7 +17,7 @@ Codex・Claude Code の作業手順は [共通の評価スキル](../../../.clau
 `server/benchmark/data/`の実行結果・ログ・ソーススナップショット、実際の`.env.benchmark`・認証情報・専用ワールド・モデル重みはGit対象外。過去の測定IDや当時の構成に固定された調査用スクリプトも、この結果領域にあるものは現行の再実行手順に含めない。繰り返し必要な実行・集計処理は`scripts/server/`または`server/benchmark/`へ組み込み、手順書と一緒に追跡する。モデル・Minecraftイメージ等は、ここで指定する版・取得元とライセンスに従い各環境で準備する。
 
 - リポジトリ直下の `AGENTS.md` が共通案内、`CLAUDE.md` がその参照口。
-- 共通手順の正本は `.claude/skills/ciel-minecraft-benchmark/SKILL.md`。Codexの `.agents/skills/ciel-minecraft-benchmark/SKILL.md` は正本を読む入口。作業手順は正本へ集約し、仕様やコマンドはこの文書で管理する。
+- 共通手順の正本は `../agent-skills/skills/ciel-minecraft-benchmark/SKILL.md`。Codexの `../agent-skills/skills/ciel-minecraft-benchmark/SKILL.md` は正本を読む入口。作業手順は正本へ集約し、仕様やコマンドはこの文書で管理する。
 - 稼働中のワールド固有の不具合調査は `ciel-minecraft-debug`。再現課題の評価には本ベンチマークを使う。
 
 ## 評価の3段構成

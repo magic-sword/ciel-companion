@@ -296,4 +296,4 @@ Mindcraftの`!getCraftingPlan`は、3×3のレシピが必要で作業台を持�
 
 サービス定義は`server/compose.yaml`等、固定するMinecraft・Node・SDK版はComposeとpackage-lockが正本。秘密・モデル・ワールドはGitへ入れない。EULA同意と既存の接続設定を維持する。
 
-通常ワールドの調査は[デバッグスキル](../../../.claude/skills/ciel-minecraft-debug/SKILL.md)、復元を伴う評価は[ベンチマーク](minecraft-benchmark-ja.md)を使う。自宅の専用環境で確認し、手元PCで新しいMinecraftを起動して代用しない。現在の確認済み範囲は[確認状況](../../testing/verification-status-ja.md)を参照する。
+通常ワールドの調査は[デバッグスキル](../../../../agent-skills/skills/ciel-minecraft-debug/SKILL.md)、復元を伴う評価は[ベンチマーク](minecraft-benchmark-ja.md)を使う。自宅の専用環境で確認し、手元PCで新しいMinecraftを起動して代用しない。現在の確認済み範囲は[確認状況](../../testing/verification-status-ja.md)を参照する。

@@ -431,4 +431,4 @@ runの終了コード0は自動check通過、1は自動失敗、引数エラー�
 
 同じIDの正解音声・正解文で、(1) Voskのみ、(2)正解テキスト→LLM、(3)Vosk認識テキスト→LLM、(4)live音声を測る。人/合成・話者・雑音・距離・小声・途中の間・無音を分ける。既存コーパスには否定・名前・数量が含まれる。録音と注釈がない台本だけでは音声評価準備完了とは扱わない。
 
-音声の実行は[音声仕様](voice-benchmark-ja.md)と[音声スキル](../../.claude/skills/ciel-voice-benchmark/SKILL.md)、実Minecraftは[practical-v1](../games/minecraft/minecraft-benchmark-ja.md)を使う。appの実動作・画像による自己同定・追加の人の録音は初期suiteの測定範囲外。全ターンの応答生成は前述の会話suiteで別に測る。未実施を自動合格に含めない。
+音声の実行は[音声仕様](voice-benchmark-ja.md)と[音声スキル](../../../agent-skills/skills/ciel-voice-benchmark/SKILL.md)、実Minecraftは[practical-v1](../games/minecraft/minecraft-benchmark-ja.md)を使う。appの実動作・画像による自己同定・追加の人の録音は初期suiteの測定範囲外。全ターンの応答生成は前述の会話suiteで別に測る。未実施を自動合格に含めない。

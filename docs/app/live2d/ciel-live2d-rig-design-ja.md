@@ -39,7 +39,7 @@ python -I scripts/live2d/official.py assets/ciel/rig/ciel.cmo3
 
 候補からSDK一式を書き出し、manifestへモデル・素材・SDK全ファイルのSHA-256を記録する。採用時にcurrent/rig/runtimeと現行確認図を一式で更新する。正式なSDK一覧・アトラスと表情数はruntime manifestを正本とする。
 
-Unityでは`CIEL > Model > Validate Current Package`で検証し、`CIEL > Model > Apply Current Package`で更新する。既存.metaとシーン参照を引き継ぎ、退避先は`.local/unity-model-update/`。手順の細部は[更新スキル](../../../.claude/skills/ciel-live2d-update/SKILL.md)に従う。
+Unityでは`CIEL > Model > Validate Current Package`で検証し、`CIEL > Model > Apply Current Package`で更新する。既存.metaとシーン参照を引き継ぎ、退避先は`.local/unity-model-update/`。手順の細部は[更新スキル](../../../../agent-skills/skills/ciel-live2d-update/SKILL.md)に従う。
 
 ```sh
 python -I scripts/live2d/render-moc.py <model3.json> <出力.png> --scale 0.5 "ParamAngleX=30;ParamAngleY=30"

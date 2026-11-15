@@ -4,7 +4,7 @@
 
 入口は `scripts/server/benchmark-voice.py`。同じ正解付きWAVをCPU Vosk単体（`stt`）と名前付き試験ワーカー（`live`）へ再生し、`report.json`へ試行と集計を保存する。通常会話の設定や認識モデルは変更しない。実測済みの条件・結果は[音声の実測](voice-results-ja.md)、現在の配布範囲は[確認状況](verification-status-ja.md)、音声入力の契約は[CPU音声認識](../services/local-stt-ja.md)。
 
-エージェントの作業手順は[共有評価スキル](../../.claude/skills/ciel-voice-benchmark/SKILL.md)。Codexは[参照用入口](../../.agents/skills/ciel-voice-benchmark/SKILL.md)から同じ正本を読む。コマンド・採点仕様はこの文書で管理する。
+エージェントの作業手順は[共有評価スキル](../../../agent-skills/skills/ciel-voice-benchmark/SKILL.md)。Codexは[参照用入口](../../../agent-skills/skills/ciel-voice-benchmark/SKILL.md)から同じ正本を読む。コマンド・採点仕様はこの文書で管理する。
 
 ## 認識モデルと呼びかけの比較
 

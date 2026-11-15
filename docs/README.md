@@ -6,7 +6,7 @@
 
 ## 読む順番
 
-設計変更は[設計方針](project/design-policy-ja.md)と対象の契約から、導入は[開発環境](development/development-setup-ja.md)から始める。本番・開発の切替は[実行設定](operations/local-runtime-ja.md)、性能評価の全体像は[ベンチマーク案内](testing/benchmark-guide-ja.md)、条件と生データはカテゴリ別の実測資料、現在の配布範囲は[確認状況](testing/verification-status-ja.md)を参照する。文書を整理・追加するときは[共有スキル](../.claude/skills/ciel-documentation/SKILL.md)を使う。
+設計変更は[設計方針](project/design-policy-ja.md)と対象の契約から、導入は[開発環境](development/development-setup-ja.md)から始める。本番・開発の切替は[実行設定](operations/local-runtime-ja.md)、性能評価の全体像は[ベンチマーク案内](testing/benchmark-guide-ja.md)、条件と生データはカテゴリ別の実測資料、現在の配布範囲は[確認状況](testing/verification-status-ja.md)を参照する。文書を整理・追加するときは[共有スキル](../../agent-skills/skills/ciel-documentation/SKILL.md)を使う。
 
 ## フォルダの担当範囲
 

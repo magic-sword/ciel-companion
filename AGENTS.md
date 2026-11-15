@@ -1,22 +1,25 @@
 # ciel-companion を扱うエージェントへ
 
+共有スキルの正本は [agent-skills](../agent-skills/README.md) の `skills/<name>/`。Claude Code・Codexはユーザー共通の参照入口から使い、手順の改善は専用Gitの正本へ直接反映する。プロジェクトの設定・実装・制作物は本Gitで管理する。文書整理には `documentation`、スキル管理には `claude-shared-skills` を使う。
+
+
 設計・実装の変更前に[現在の設計方針（正本）](docs/project/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
 
-- Minecraft の動作評価、課題の追加、モデル・プロンプト・体の変更前後の比較では、[ciel-minecraft-benchmark スキル](.agents/skills/ciel-minecraft-benchmark/SKILL.md)を読む。
-- 音声認識精度・発話確定・返答音声の遅延の測定や前後比較では、[ciel-voice-benchmark スキル](.agents/skills/ciel-voice-benchmark/SKILL.md)を読む。
-- ローカルLLMの重み直接編集、人格・身体性・ツール性能の比較では、[ciel-weight-space-programming スキル](.agents/skills/ciel-weight-space-programming/SKILL.md)を読む。
-- ベンチマークの達成度採点・改善量の比較を設計または見直すときは、[ciel-benchmark-progress スキル](.agents/skills/ciel-benchmark-progress/SKILL.md)を読む。難易度段階と採点の分解能を分け、既存課題の感度を確認する。
+- Minecraft の動作評価、課題の追加、モデル・プロンプト・体の変更前後の比較では、[ciel-minecraft-benchmark スキル](../agent-skills/skills/ciel-minecraft-benchmark/SKILL.md)を読む。
+- 音声認識精度・発話確定・返答音声の遅延の測定や前後比較では、[ciel-voice-benchmark スキル](../agent-skills/skills/ciel-voice-benchmark/SKILL.md)を読む。
+- ローカルLLMの重み直接編集、人格・身体性・ツール性能の比較では、[ciel-weight-space-programming スキル](../agent-skills/skills/ciel-weight-space-programming/SKILL.md)を読む。
+- ベンチマークの達成度採点・改善量の比較を設計または見直すときは、[ciel-benchmark-progress スキル](../agent-skills/skills/ciel-benchmark-progress/SKILL.md)を読む。難易度段階と採点の分解能を分け、既存課題の感度を確認する。
 - 終了条件は [practical-v1](docs/games/minecraft/minecraft-benchmark-ja.md)。既定1配置・1回、課題60〜120秒、操作未発行30秒、全体10分。CPU待ちや失敗を救済して課題期限を延長しない。旧900秒条件の基準値と直接比較しない。
 - ローカル推論は [共通GPU API](docs/operations/shared-llm-api-ja.md) を参照。既定のベンチマーク会話もシエルと同じ8094を使う。追加のCPUモデル起動は明示した場合だけ。共有負荷・歌によるCPU切替を評価条件に記録する。
 - 文字の推論と道具呼び出しはローカル LLM に切り替えて試験できる。設定は [ローカル LLM](docs/operations/local-runtime-ja.md)。Minecraft の実機評価は自宅サーバーの専用環境を使う。手元PCへの Minecraft の新規起動や、普段のワールドの初期化で代用しない。
 - ゲーム実行の構成は[作業契約](docs/games/game-work-contract-ja.md)を読む。profile 2 / work 1で、シエル側は受付・作業管理、ゲーム側は計画・実行・修復を担当する。旧goal_plan/step/repairと直接の採集・製作APIは撤去済み。評価器や試行初期化を変えた比較は旧アプリ側も同条件で測り直す。
-- 稼働中の Minecraft で発生した不具合の現場調査には、[ciel-minecraft-debug](.claude/skills/ciel-minecraft-debug/SKILL.md)を使う。専用ベンチマークとは接続先・復元範囲が異なる。
+- 稼働中の Minecraft で発生した不具合の現場調査には、[ciel-minecraft-debug](../agent-skills/skills/ciel-minecraft-debug/SKILL.md)を使う。専用ベンチマークとは接続先・復元範囲が異なる。
 - 会話サーバーを変更するときは、追加で [server/agent/AGENTS.md](server/agent/AGENTS.md)を読む。通常の検証方法は [回帰テスト](docs/testing/regression-tests-ja.md)、全体の入口は [資料一覧](docs/README.md)。
 
-- シエルの会話モデルへ渡すプロンプト（`server/agent/config/prompts`、persona.toml、会話へ差し込む補足の文言）を書く・直すときは、[ciel-prompt-writing スキル](.agents/skills/ciel-prompt-writing/SKILL.md)を読む。言わせたくない言葉を挙げず、してほしいことを書き、変更前後を注釈の書き出し確率で比べる。
+- シエルの会話モデルへ渡すプロンプト（`server/agent/config/prompts`、persona.toml、会話へ差し込む補足の文言）を書く・直すときは、[ciel-prompt-writing スキル](../agent-skills/skills/ciel-prompt-writing/SKILL.md)を読む。言わせたくない言葉を挙げず、してほしいことを書き、変更前後を注釈の書き出し確率で比べる。
 
 - 作業・目標や会話中の表示を変更するときは[表示契約](docs/app/work-display-contract-ja.md)を読む。goal.state / goal.control v2、元のwork状態と確認の有効期間、表示対象のID・版を維持する。旧段一覧・paused集約へ戻さない。
 
-- 文書の追加・整理・更新には[ciel-documentation共有スキル](.agents/skills/ciel-documentation/SKILL.md)を使う。文書は[管理ルール](docs/project/documentation-policy-ja.md)と[資料一覧](docs/README.md)の責務に従い、既存の正本を更新する。日付付きの設計書・実装記録・旧仕様の併記を増やさず、履歴はGit、測定の条件と未確認範囲は[分野別の実測資料](docs/README.md#テストと確認状況)、現在の配布・確認範囲は[確認状況](docs/testing/verification-status-ja.md)へ置く。
+- 文書の追加・整理・更新には[ciel-documentation共有スキル](../agent-skills/skills/ciel-documentation/SKILL.md)を使う。文書は[管理ルール](docs/project/documentation-policy-ja.md)と[資料一覧](docs/README.md)の責務に従い、既存の正本を更新する。日付付きの設計書・実装記録・旧仕様の併記を増やさず、履歴はGit、測定の条件と未確認範囲は[分野別の実測資料](docs/README.md#テストと確認状況)、現在の配布・確認範囲は[確認状況](docs/testing/verification-status-ja.md)へ置く。
 
-- 共有スキルの正本は`.claude/skills/<name>/SKILL.md`。Codexは`.agents/skills/<name>/SKILL.md`から参照する。手順の本文は正本だけへ更新し、Codexの入口へ複製しない。
+- 共有スキルの正本は専用Gitの `skills/<name>/SKILL.md`。両ツールのユーザー用入口から正本を読む。本文は正本だけへ更新する。

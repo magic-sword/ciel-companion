@@ -1,8 +1,11 @@
 # 会話サーバーを扱うエージェントへ
 
+共有スキルの正本は [agent-skills](../../../agent-skills/README.md) の `skills/<name>/`。スキルの改善は専用Gitの正本へ直接反映する。
+
+
 設計・実装の変更前に[現在の設計方針（正本）](../../docs/project/design-policy-ja.md)を参照する。方針を変えたら、正本と対応する契約・実装状況を同じ変更で更新する。
 
-Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベンチマークスキル](../../.agents/skills/ciel-minecraft-benchmark/SKILL.md)と [評価仕様](../../docs/games/minecraft/minecraft-benchmark-ja.md)を読む。実機は自宅サーバーの専用環境を使う。ローカルへの切替設定は [ローカル LLM](../../docs/operations/local-runtime-ja.md)。
+Minecraft のローカル LLM 試験・課題追加・性能比較は、[ベンチマークスキル](../../../agent-skills/skills/ciel-minecraft-benchmark/SKILL.md)と [評価仕様](../../docs/games/minecraft/minecraft-benchmark-ja.md)を読む。実機は自宅サーバーの専用環境を使う。ローカルへの切替設定は [ローカル LLM](../../docs/operations/local-runtime-ja.md)。
 
 会話の組み立て（pipeline：小脳と心・聞く係・付箋・口）を直す前に、[会話の組み立て（pipeline）の仕組み](../../docs/conversation/conversation-pipeline-ja.md) を読んでください。
 
