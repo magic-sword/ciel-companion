@@ -327,7 +327,10 @@ class Harness:
                 'chat_template_kwargs': {'enable_thinking': False}, 'temperature': DECIDE_TEMPERATURE}
         message = self._post(body)['choices'][0]['message']
         out = json.loads(message.get('content') or '{}')
-        return self._decided(out.get('act') or {}, work, world), game_decision.spoken(out.get('say')), out.get('act')
+        say = out.get('say')
+        # A source from before the feeling parts (610312b) writes say as plain words.
+        words = game_decision.spoken(say) if hasattr(game_decision, 'spoken') else str(say or '')
+        return self._decided(out.get('act') or {}, work, world), words, out.get('act')
 
     async def run(self, case, system):
         world = World(self.catalog_json, self.function_tool)
