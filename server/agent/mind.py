@@ -75,6 +75,7 @@ class Mind:
         self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.body = body              # game_env.GameEnv（ゲームの体。つなぐ先があるときだけ）
         self.goals = None             # goals.GoalRunner（長い目的の係。agent.py が置く）
+        self.stream = None            # youtube_chat.YouTubeChat（配信中か。agent.py が置く）
         self.eyes = eyes              # eyes.Eyes（見せてもらった画像）
         # シエル自身の姿の絵（data URL）。指示のすぐ後ろにいつも置き、自分の姿を絵としても知っているようにする。
         # 毎回同じ始まりなので、OpenAI のキャッシュで安くなる。画像を見せたときだけ添えると、関係ない画像にも
@@ -396,6 +397,8 @@ class Mind:
             lines.append(self.body.context())    # マイクラの様子（小脳も、見ていないことを言わないように読む）
         if self.goals is not None:
             lines.append(self.goals.context())   # 今の目的（goals.py。小脳も、していないことを言わないように読む）
+        if self.stream is not None:
+            lines.append(self.stream.context())  # 配信中なら、視聴者がいること（youtube_chat.py）
         if deep and self.minutes is not None:
             lines.append(self.minutes.context())
             note = self.minutes.take_note()

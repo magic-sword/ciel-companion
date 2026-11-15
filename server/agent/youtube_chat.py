@@ -254,11 +254,12 @@ def instructions(choice: dict, head: str) -> str:
 
 class YouTubeChat:
     def __init__(self, say_when_free: Callable, *, history=None, notify: Callable[[dict], None] | None = None,
-                 head: str = '', tool_choice: str | None = None, key: str | None = None) -> None:
+                 head: str = '', note: str = '', tool_choice: str | None = None, key: str | None = None) -> None:
         self.say_when_free = say_when_free   # mouth.Mouth.say_when_free
         self.history = history               # conversation.Conversation（返したコメントを発言として入れる）
         self.notify = notify                 # アプリへの知らせ（youtube.state）
         self.head = head                     # 指示の頭（config/prompts/comment.md）
+        self.note = note                     # 配信中の補足（config/prompts/stream_note.md）
         self.tool_choice = tool_choice       # 心の無い組み立てでは 'none'（道具を使わせない）
         # 環境変数は会話サーバーが .env を読んだあと（作るとき）に読む
         self.key = os.environ.get('YOUTUBE_API_KEY', '') if key is None else key
@@ -292,6 +293,10 @@ class YouTubeChat:
             self.notify({'v': VERSION, 'type': 'youtube.state', 'state': self.state, 'reason': self.reason,
                          'title': self.title, 'video': self.video, 'received': self.pool.received,
                          'replied': self.replied})
+
+    def context(self) -> str | None:
+        """会話の補足：配信のコメント欄につながっているあいだ、視聴者がいることを心と小脳が知る（mind._notes）"""
+        return self.note if self.state == 'live' and self.note else None
 
     def _set(self, state: str, reason: str = '') -> None:
         self.state, self.reason = state, reason

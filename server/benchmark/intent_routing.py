@@ -62,6 +62,8 @@ GAME_TIME = os.environ.get('CIEL_BENCH_GAME_TIME', '夜（敵が出る）')
 # real time is given at all (CIEL_BENCH_REAL_TIME=off), to compare ways of keeping the two apart.
 GAME_TIME_LABEL = os.environ.get('CIEL_BENCH_GAME_TIME_LABEL', 'マイクラの中の時刻')
 REAL_TIME = os.environ.get('CIEL_BENCH_REAL_TIME', 'on') != 'off'
+# CIEL_BENCH_STREAM=on adds the note the server gives while a YouTube stream is live (youtube_chat.context).
+STREAM = os.environ.get('CIEL_BENCH_STREAM', 'off') == 'on'
 NOW = f'[今：2026年11月13日（金）・{REAL_BAND}・秋（日本時間）]'
 BODY = ('[マイクラの様子]\nシエル：体力 20/20・空腹 20/20・持ち物 なし・していること {doing}\n' + GAME_TIME_LABEL + '：' + GAME_TIME + '\n'
         '近く：magic_sword（持ち主） 3 ブロック\n足元：grass_block\n近くのブロック：oak_log×12、grass_block×40、dirt×30')
@@ -196,6 +198,8 @@ class Harness:
         work = work_of(case)
         doing = work['message'] if work and work['state'] in ACTIVE else 'なし'
         note = (NOW + '\n\n' if REAL_TIME else '') + BODY.format(doing=doing)
+        if STREAM:
+            note += '\n\n' + self.persona.stream_note.strip()
         if work:
             # The same line goals.Goals.context() gives the conversation model.
             plan = work.get('plan')
@@ -459,7 +463,7 @@ async def main(args):
                 rows.append(row)
                 print(json.dumps({k: row.get(k) for k in ('system', 'id', 'verdict', 'families', 'seconds')}, ensure_ascii=False), flush=True)
                 report = {'suite': 'intent-routing-v2', 'agent_source': str(args.agent_source),
-                          'decide_temperature': DECIDE_TEMPERATURE, 'decide_form': DECIDE_FORM, 'real_band': REAL_BAND if REAL_TIME else None, 'game_time': GAME_TIME, 'game_time_label': GAME_TIME_LABEL,
+                          'decide_temperature': DECIDE_TEMPERATURE, 'decide_form': DECIDE_FORM, 'real_band': REAL_BAND if REAL_TIME else None, 'game_time': GAME_TIME, 'game_time_label': GAME_TIME_LABEL, 'stream': STREAM,
                           'cases_sha256': hashlib.sha256((HERE / 'intent_routing_cases.json').read_bytes()).hexdigest(),
                           'catalog_sha256': hashlib.sha256(args.catalog.read_bytes()).hexdigest(),
                           'rows': rows, 'summary': summarize(rows, cases)}

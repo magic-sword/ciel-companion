@@ -110,6 +110,14 @@ class ChatTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.01)
         self.assertEqual(sent[-1]['state'], 'off')
 
+    def test_the_stream_note_is_given_only_while_the_chat_is_live(self):
+        chat = yt.YouTubeChat(None, note='[配信] 視聴者が見ている。', key='')
+        for state in ('off', 'connecting', 'waiting', 'error'):
+            chat.state = state
+            self.assertIsNone(chat.context())
+        chat.state = 'live'
+        self.assertEqual(chat.context(), '[配信] 視聴者が見ている。')
+
     async def test_reply_records_the_comment_and_speaks_as_comment(self):
         said = []
 

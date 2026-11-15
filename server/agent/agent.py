@@ -918,9 +918,11 @@ async def entrypoint(ctx: JobContext) -> None:
     # YouTube の配信のコメント（youtube_chat.py）。アプリの設定で配信の URL を選ぶとつなぎ、話の切れ目に返す（口の why comment）。
     # 心の無い組み立てでは、コメントから道具を使わせない（心ではコメントから使ってよい道具だけになる。tools/ の FROM_COMMENTS）
     comments = youtube_chat.YouTubeChat(voice.react_comment, history=history, notify=notify,
-                                        head=agent.persona.comment_instructions,
+                                        head=agent.persona.comment_instructions, note=agent.persona.stream_note,
                                         tool_choice=None if PIPELINE else 'none')
     ctx.room.on('data_received', comments.on_data)
+    if agent.mind is not None:
+        agent.mind.stream = comments   # 配信中の補足（mind._notes）
     ctx.add_shutdown_callback(comments.close)
     # 画像を見られない会話サーバー（pipeline でない）：送られたら、見られないと返す（eyes.py）
     if not PIPELINE:
