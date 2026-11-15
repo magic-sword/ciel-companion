@@ -327,7 +327,7 @@ class Harness:
                 'chat_template_kwargs': {'enable_thinking': False}, 'temperature': DECIDE_TEMPERATURE}
         message = self._post(body)['choices'][0]['message']
         out = json.loads(message.get('content') or '{}')
-        return self._decided(out.get('act') or {}, work, world), out.get('say') or '', out.get('act')
+        return self._decided(out.get('act') or {}, work, world), game_decision.spoken(out.get('say')), out.get('act')
 
     async def run(self, case, system):
         world = World(self.catalog_json, self.function_tool)

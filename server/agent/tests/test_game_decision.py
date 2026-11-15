@@ -30,6 +30,8 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
 
     @staticmethod
     def reply(value):
+        if isinstance(value.get('say'), str):   # the tests write plain words; the decision writes parts
+            value = {**value, 'say': [{'feeling': 'happy', 'text': value['say']}]}
         return types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
             message=types.SimpleNamespace(content=json.dumps(value, ensure_ascii=False)))])
 
@@ -51,7 +53,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_speaking_only_returns_the_words_and_starts_nothing(self):
         self.respond({'say': 'えへへ', 'act': {'kind': 'none'}})
-        self.assertEqual(await self.say('えらいね'), 'えへへ')
+        self.assertEqual(await self.say('えらいね'), '[happy]えへへ')
         self.runner.start.assert_not_awaited()
         self.env.use.assert_not_awaited()
         sent = self.create.await_args.kwargs
@@ -60,18 +62,18 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_work_is_started_with_the_decided_request(self):
         self.respond({'say': '作りますね', 'act': {'kind': 'work', 'request': '家を作る'}})
-        self.assertEqual(await self.say('いいよ、お願い'), '作りますね')
+        self.assertEqual(await self.say('いいよ、お願い'), '[happy]作りますね')
         self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': '家を作る'}))
         self.assertEqual(self.runner.start.await_args.kwargs['seconds'], 120)
 
     async def test_a_direct_action_is_used_and_a_refusal_is_told_in_her_words(self):
         self.respond({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}})
-        self.assertEqual(await self.say('来て'), '行きますね')
+        self.assertEqual(await self.say('来て'), '[happy]行きますね')
         self.assertEqual(self.env.use.await_args.args, ('game_come', {}))
         self.env.use.return_value = {'status': 'busy'}
         self.sequence({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}},
                       {'say': 'ごめんなさい、今は動けないのです', 'act': {'kind': 'none'}})
-        self.assertEqual(await self.say('来て'), 'ごめんなさい、今は動けないのです')
+        self.assertEqual(await self.say('来て'), '[happy]ごめんなさい、今は動けないのです')
         told = self.create.await_args.kwargs
         self.assertIn('できませんでした。理由：busy', told['messages'][0]['content'])
         self.assertEqual(told['response_format']['json_schema']['schema']['properties']['act']['anyOf'], [game_decision.NONE])
@@ -89,7 +91,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         kinds = [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, self.runner.work)]
         self.assertEqual(kinds, ['none', 'resume', 'work', 'game_come'])
         self.respond({'say': '続きをやりますね', 'act': {'kind': 'resume'}})
-        self.assertEqual(await self.say('ツルハシを渡したよ、続けて'), '続きをやりますね')
+        self.assertEqual(await self.say('ツルハシを渡したよ、続けて'), '[happy]続きをやりますね')
         self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': '農場を作って'}))
         self.runner.work = {'state': 'succeeded', 'capability': 'game.goal', 'arguments': {'request': 'x'}}
         self.assertNotIn('resume', [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, self.runner.work)])
@@ -112,7 +114,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
     async def test_stop_words_stop_at_once_and_she_says_it(self):
         with patch.object(self.decision, '_stop', AsyncMock(return_value={'message': '停止しました。'})) as stop:
             self.respond({'say': '止まりました！', 'act': {'kind': 'none'}})
-            self.assertEqual(await self.say('止まって'), '止まりました！')
+            self.assertEqual(await self.say('止まって'), '[happy]止まりました！')
             stop.assert_awaited_once()
             self.assertIn('結果：停止しました。', self.create.await_args.kwargs['messages'][0]['content'])
             self.create.side_effect = TimeoutError()
@@ -127,7 +129,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_cloud_model_is_asked_for_the_schema_and_its_answer_is_checked(self):
         with patch('models.is_local', return_value=False):
             self.respond({'say': 'こんにちは', 'act': {'kind': 'none'}})
-            self.assertEqual(await self.say('こんにちは'), 'こんにちは')
+            self.assertEqual(await self.say('こんにちは'), '[happy]こんにちは')
             sent = self.create.await_args.kwargs
             self.assertNotIn('temperature', sent)
             self.assertIn('reasoning_effort', sent)
@@ -153,8 +155,19 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('game_go', kinds('あっちへ行って'))   # no target in the words: not offered
         self.assertIn('game_go', kinds('x 10 z -4 へ行って'))
         self.respond({'say': '向かいますね', 'act': {'kind': 'game_go', 'arguments': {'target_id': 'T1'}}})
-        self.assertEqual(await self.say('x 10 z -4 へ行って'), '向かいますね')
+        self.assertEqual(await self.say('x 10 z -4 へ行って'), '[happy]向かいますね')
         self.assertEqual(self.env.use.await_args.args, ('game_go', {'x': 10, 'z': -4}))
+
+
+class SayTest(unittest.TestCase):
+    def test_each_part_is_led_by_its_feeling_and_stray_marks_are_taken_out(self):
+        self.assertEqual(game_decision.spoken([{'feeling': 'happy', 'text': '[relaxed]わあ！'},
+                                               {'feeling': 'thinking', 'text': 'ええと、'}, {'feeling': 'sad', 'text': '  '}]),
+                         '[happy]わあ！[thinking]ええと、')
+        self.assertEqual(game_decision.spoken('words without parts'), '')
+        feelings = game_decision.SAY['items']['properties']['feeling']['enum']
+        self.assertIn('neutral', feelings)
+        self.assertIn('jitome', feelings)
 
 
 if __name__ == '__main__':

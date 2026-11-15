@@ -6,7 +6,8 @@ The conversation model reads the whole conversation and writes one structured ou
   running work    words passed to the work, or stopping it
   waiting work    the answers the work's decision accepts
   ended work      as with no work, and starting the work that failed or was stopped again
-Not acting is the kind `none`. `say` is what Ciel speaks, also when the action could not be done or
+Not acting is the kind `none`. `say` is what Ciel speaks, written as parts that each carry their
+feeling (one of emotion.CAPTIONS), so every part reaches the face and the voice, also when the action could not be done or
 a stop word already stopped the body: then a second decision that can only speak tells it in her words.
 
 Starting, checking and stopping stay with the work runner and the game environment. Two things do
@@ -27,6 +28,7 @@ import uuid
 
 import debug_log
 import jsonschema
+import emotion
 import models
 
 STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
@@ -131,9 +133,22 @@ def instructions(template, alternatives):
     return template.replace('{actions}', '\n'.join('- ' + line for _, line in alternatives))
 
 
+# What Ciel says: parts of her words, each with its feeling. The feeling becomes the face and the voice.
+SAY = {'type': 'array', 'minItems': 1, 'maxItems': 6, 'items': {
+    'type': 'object', 'additionalProperties': False, 'required': ['feeling', 'text'],
+    'properties': {'feeling': {'enum': list(emotion.CAPTIONS)}, 'text': STRING}}}
+
+
+def spoken(say) -> str:
+    """The words to speak, each part led by its feeling as the voice pipeline reads it (emotion.py)."""
+    parts = say if isinstance(say, list) else []
+    return ''.join(f"[{p['feeling']}]{emotion.strip_tags(p['text']).strip()}" for p in parts
+                   if isinstance(p, dict) and emotion.strip_tags(str(p.get('text') or '')).strip())
+
+
 def schema(alternatives, form='say_first'):
     """say before act: the words are written first and the action chosen after them (fewer moves on praise)."""
-    act, say = {'anyOf': [a for a, _ in alternatives]}, {'type': 'string'}
+    act, say = {'anyOf': [a for a, _ in alternatives]}, SAY
     properties = {'say': say, 'act': act} if form == 'say_first' else {'act': act, 'say': say}
     return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
 
@@ -284,7 +299,7 @@ class GameDecision:
         out = await self._decide(system, messages, alternatives, work)
         if out is None:
             return None   # The conversation model answers as before; nothing was started.
-        act, say = out.get('act') or {}, str(out.get('say') or '').strip()
+        act, say = out.get('act') or {}, spoken(out.get('say'))
         if generation != self._generation or not self.authorized():
             return await self._speak(system, messages, '確かめている間に止める指示があったので、何も始めませんでした。') \
                 or '止める指示があったので、何も始めませんでした。'
@@ -341,7 +356,7 @@ class GameDecision:
     async def _speak(self, system, messages, note):
         """Ciel's own words about what happened, from a decision that can only speak."""
         out = await self._decide(system, messages, [(NONE, 'none：話すだけ')], self.runner.work, note)
-        return str((out or {}).get('say') or '').strip() or None
+        return spoken((out or {}).get('say')) or None
 
     def _why(self, r):
         r = r if isinstance(r, dict) else {}
