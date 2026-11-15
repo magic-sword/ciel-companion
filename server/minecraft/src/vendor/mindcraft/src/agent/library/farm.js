@@ -37,7 +37,7 @@ export function farmSteps(blueprint, crop = 'wheat') {
         haveStep('dirt', 'dirt', need('dirt')),
     ];
     steps.push({
-        id: 'farm', label: 'clear, level, water, till and sow the farm', needs: steps.map(step => step.id),
+        id: 'farm', kind: 'build', label: 'clear, level, water, till and sow the farm', subject: 'farm', needs: steps.map(step => step.id),
         done: bot => remaining(blueprint, bot).length === 0,
         run: bot => buildRegion(bot, blueprint),
         seconds: bot => seconds(blueprint, bot),
@@ -70,5 +70,5 @@ export async function makeFarm(agent, size, crop = 'wheat') {
 
 async function farmAt(bot, site, size, crop) {
     skills.log(bot, `Making the farm at ${site.corner.x}, ${site.corner.y}, ${site.corner.z}.`);
-    return await runPlan(bot, farmSteps(farmBlueprint(site.corner, size, crop), crop));
+    return await runPlan(bot, farmSteps(farmBlueprint(site.corner, size, crop), crop), { title: `${crop} farm ${size}x${size}` });
 }

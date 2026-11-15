@@ -69,7 +69,7 @@ export function houseSteps(blueprint, bot) {
     for (const item of Object.keys(materials(blueprint, bot)).sort())
         steps.push(haveStep(item, item, need(item)));
     steps.push({
-        id: 'house', label: 'clear the place and build the house', needs: steps.map(step => step.id),
+        id: 'house', kind: 'build', label: 'clear the place and build the house', subject: 'house', needs: steps.map(step => step.id),
         done: b => remaining(blueprint, b).length === 0,
         run: b => buildRegion(b, blueprint),
         seconds: b => seconds(blueprint, b),
@@ -114,7 +114,7 @@ async function houseAt(bot, house, name, site) {
     bot.keepItems = item => materials(blueprint, bot)[item] || 0;
     const blueprint = houseBlueprint(bot, house, site.corner, site.turns);
     reserve(bot, blueprint);
-    return await runPlan(bot, houseSteps(blueprint, bot));
+    return await runPlan(bot, houseSteps(blueprint, bot), { title: name });
 }
 
 // The house's own place is not dug up for materials, while it is built or after.
