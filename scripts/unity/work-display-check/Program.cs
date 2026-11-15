@@ -106,6 +106,28 @@ class Program
         Receive(c, "{\"v\":1,\"type\":\"goal.state\"}");
         Check(c.Goal.protocolError && !CielWorkPresentation.From(c.Goal).canRetry, "old version unknown");
         Check(!CielWorkPresentation.From(new CielConversation.GoalState {v=2, confirmed=true}).visible, "empty state has no phantom task");
+        // plan v1: the game's graph as reported, laid out by dependency, nothing made up beside it.
+        var planned = Work();
+        planned.task.plan = UnityEngine.JsonUtility.FromJson<CielConversation.PlanInfo>(
+            "{\"v\":1,\"plan_id\":\"p\",\"revision\":3,\"title\":\"dirt_shelter\",\"finished\":false,\"current\":[\"bed\"]," +
+            "\"nodes\":[{\"id\":\"pick\",\"parent\":null,\"kind\":\"obtain\",\"label\":\"wooden_pickaxe\",\"state\":\"done\",\"needs\":[],\"estimate_s\":-1,\"choice\":null}," +
+            "{\"id\":\"bed\",\"parent\":null,\"kind\":\"obtain\",\"label\":\"white_bed ×1\",\"state\":\"running\",\"needs\":[],\"estimate_s\":120,\"choice\":null}," +
+            "{\"id\":\"bed/0\",\"parent\":\"bed\",\"kind\":\"decide\",\"label\":\"white_wool ×3\",\"state\":\"waiting_choice\",\"needs\":[],\"estimate_s\":-1," +
+            "\"choice\":{\"question\":\"how\",\"chosen\":null,\"options\":[{\"id\":\"kill:sheep\",\"summary\":\"\"},{\"id\":\"shear:sheep\",\"summary\":\"\"}]}}," +
+            "{\"id\":\"house\",\"parent\":null,\"kind\":\"build\",\"label\":\"house\",\"state\":\"pending\",\"needs\":[\"pick\",\"bed\"],\"estimate_s\":130,\"choice\":null}]}");
+        var graph = CielPlanPresentation.From(planned);
+        Check(graph.visible && graph.nodes.Count == 3 && graph.columns == 2, "plan laid out by dependency");
+        Check(graph.nodes.Find(n => n.id == "house").column == 1 && graph.nodes.Find(n => n.id == "bed").current, "column and current");
+        Check(graph.nodes.Find(n => n.id == "bed").children.Count == 1 && graph.nodes.Find(n => n.id == "bed").estimate.Contains("120"), "children and estimate");
+        Check(graph.nodes.Find(n => n.id == "pick").estimate == "", "no estimate for a done step");
+        Check(graph.summary.StartsWith("選択待ち：white_wool ×3（kill:sheep / shear:sheep）") && graph.summary.Contains("完了 1/3"), "now line");
+        Check(!graph.summary.Contains("%"), "no percentage");
+        var plannedCard = CielAudienceCardState.From(planned, null, true, false);
+        Check(plannedCard.current.StartsWith("選択待ち"), "card shows the plan's step");
+        Check(!CielPlanPresentation.From(Work()).visible, "no plan, no graph");
+        UnityEngine.Time.unscaledTime += 11;
+        Check(CielPlanPresentation.From(planned).stale && !CielAudienceCardState.From(planned, null, true, false).current.StartsWith("選択待ち"), "stale plan is marked, not shown as now");
+        UnityEngine.Time.unscaledTime -= 11;
         Console.WriteLine($"WORK_DISPLAY_CHECK_OK {checks} checks (production C# with time/JSON/transport stubs)");
     }
 }

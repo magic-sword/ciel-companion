@@ -40,7 +40,7 @@ namespace Ciel.EditorTools
                 g.stream_id = "a"; g.revision = 3; Receive();
                 Check(c.Goal.stream_id == "b", "retired stream rejected");
                 g.stream_id = "b"; g.revision = 2; g.task.state = "succeeded"; Receive();
-                Check(Render(c.Goal, true, "").Contains("できた"), "completion briefly visible");
+                Check(Render(c.Goal, true, "").Contains("処理終了"), "completion briefly visible, without claiming the goal");
                 Check(Render(c.Goal, false, "") == "", "completion expires");
                 Check(Render(null, false, "いま：<鉄>").Contains("＜鉄＞"), "rich text escaped");
                 g.v = 1; Receive();

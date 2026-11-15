@@ -9,5 +9,6 @@
     <Compile Include="../../../unity/Assets/Scripts/Conversation/CielConversation.Goal.cs" Link="Work.cs" />
     <Compile Include="../../../unity/Assets/Scripts/Conversation/CielConversation.Activity.cs" Link="Activity.cs" />
     <Compile Include="../../../unity/Assets/Scripts/Conversation/CielAudienceCardState.cs" Link="Audience.cs" />
+    <Compile Include="../../../unity/Assets/Scripts/Conversation/CielPlanPresentation.cs" Link="Plan.cs" />
   </ItemGroup>
 </Project>

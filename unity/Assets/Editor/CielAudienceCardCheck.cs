@@ -65,7 +65,7 @@ namespace Ciel.EditorTools
             Check(!CielWorkPresentation.From(goal).canStop, "no terminal stop");
             var idle = new CielConversation.ActivityState { mind = "listening", detail_version = 1,
                 body = new CielConversation.ActivityBody { version = 1, phase = "idle" } };
-            Check(CielAudienceCardState.From(goal, idle, true, true).heading.Contains("できた"), "brief completion");
+            Check(CielAudienceCardState.From(goal, idle, true, true).heading.Contains("処理終了"), "brief completion, without claiming the goal");
             Check(CielAudienceCardState.From(goal, idle, true, false).phase == "idle", "completion expires");
             Check(CielAudienceCardState.From(null, activity, true, false).visible, "direct work remains visible");
             Check(CielAudienceCardState.From(goal, activity, false, true).phase == "disconnected", "disconnect explicit");

@@ -26,15 +26,24 @@ namespace Ciel.Conversation
         const string WidthKey = "ciel.streamWindow.width", HeightKey = "ciel.streamWindow.height";
         const int MaxSide = 2160;   // 絵の長い辺の上限（4K の縦）
         public const string CardTitle = "CIEL Broadcast 目的カード";
+        public const string PlanTitle = "CIEL Broadcast 計画グラフ";
         Camera _cardSource;
         bool _isCard;
+        // A card output draws its own camera (the status card, the plan graph) into its own window.
+        string _cardTitle = CardTitle, _cardClass = "CielStatusCardWindow", _cardPrefs = "ciel.statusCard";
+        Vector2Int _cardSize = new Vector2Int(900, 500);
         bool CardOutput => _isCard;
-        string OutputClass => CardOutput ? "CielStatusCardWindow" : ClassName;
-        string OutputTitle => CardOutput ? CardTitle : Title;
-        string OpenKey => CardOutput ? "ciel.statusCard.open" : PrefKey;
-        string OutputWidthKey => CardOutput ? "ciel.statusCard.width" : WidthKey;
-        string OutputHeightKey => CardOutput ? "ciel.statusCard.height" : HeightKey;
+        string OutputClass => CardOutput ? _cardClass : ClassName;
+        string OutputTitle => CardOutput ? _cardTitle : Title;
+        string OpenKey => CardOutput ? _cardPrefs + ".open" : PrefKey;
+        string OutputWidthKey => CardOutput ? _cardPrefs + ".width" : WidthKey;
+        string OutputHeightKey => CardOutput ? _cardPrefs + ".height" : HeightKey;
         public void ConfigureCard(Camera source) { _cardSource = source; _isCard = true; }
+        public void ConfigureCard(Camera source, string title, string windowClass, string prefs, Vector2Int size)
+        {
+            ConfigureCard(source);
+            _cardTitle = title; _cardClass = windowClass; _cardPrefs = prefs; _cardSize = size;
+        }
 
         public static bool Supported =>
             Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor;
@@ -97,8 +106,8 @@ namespace Ciel.Conversation
             if (!Supported || _hwnd != IntPtr.Zero) return;
             _main = CardOutput ? _cardSource : Camera.main;
             if (_main == null) return;
-            _hwnd = CreateNativeWindow(PlayerPrefs.GetInt(OutputWidthKey, CardOutput ? 900 : 540),
-                PlayerPrefs.GetInt(OutputHeightKey, CardOutput ? 500 : 960), OutputClass, OutputTitle);
+            _hwnd = CreateNativeWindow(PlayerPrefs.GetInt(OutputWidthKey, CardOutput ? _cardSize.x : 540),
+                PlayerPrefs.GetInt(OutputHeightKey, CardOutput ? _cardSize.y : 960), OutputClass, OutputTitle);
             if (_hwnd == IntPtr.Zero)
             {
                 Debug.LogWarning($"[CielStreamWindow] 配信用のウィンドウを開けなかった（エラー {Marshal.GetLastWin32Error()}）");

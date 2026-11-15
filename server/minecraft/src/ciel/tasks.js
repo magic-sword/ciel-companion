@@ -36,7 +36,7 @@ export function checkedPlan(p) {
   const nodes = p.nodes.slice(0, 64).filter(n => n && validId(n.id) && PLAN_KINDS.includes(n.kind) && PLAN_STATES.includes(n.state))
     .map(n => ({ id: n.id, parent: validId(n.parent) ? n.parent : null, kind: n.kind, label: text(n.label, 80), state: n.state,
       needs: Array.isArray(n.needs) ? n.needs.filter(validId).slice(0, 8) : [],
-      estimate_s: Number.isFinite(n.estimate_s) && n.estimate_s >= 0 ? Math.round(n.estimate_s) : null,
+      estimate_s: Number.isFinite(n.estimate_s) && n.estimate_s >= 0 ? Math.round(n.estimate_s) : -1,   // -1: not estimated (a number for every client)
       choice: n.choice && typeof n.choice === 'object' ? { question: text(n.choice.question, 120),
         options: (Array.isArray(n.choice.options) ? n.choice.options : []).slice(0, 6).map(o => ({ id: text(o?.id, 40), summary: text(o?.summary, 200) })),
         chosen: typeof n.choice.chosen === 'string' ? text(n.choice.chosen, 40) : null } : null }));

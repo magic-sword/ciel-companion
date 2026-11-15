@@ -33,7 +33,7 @@ namespace Ciel.Conversation
         readonly List<(Image fill, Image edge, Text label)> _backdropSegs = new List<(Image, Image, Text)>();
         Image _youtubeSwitch, _youtubeKnob;
         InputField _youtubeUrl;
-        Image _cardOutputSwitch, _cardOutputKnob;
+        Image _cardOutputSwitch, _cardOutputKnob, _planOutputSwitch, _planOutputKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -379,6 +379,15 @@ namespace Ciel.Conversation
                 card.Output.SetOpen(!card.Output.IsOpen);
                 Refresh();
             });
+            (_planOutputSwitch, _planOutputKnob) = SwitchRow(sec, "シエルの計画グラフを開く", () =>
+            {
+                var plan = GetComponent<CielPlanWindow>();
+                if (plan?.Output == null) return;
+                plan.Output.SetOpen(!plan.Output.IsOpen);
+                Refresh();
+            });
+            Note(sec, $"「{CielStreamWindow.PlanTitle}」は、シエルが進めている計画の全体（依存のつながり・いまの段・選択）を映します。"
+                + "表示だけで、計画の変更は言葉で頼みます");
             Note(sec, $"「{CielStreamWindow.CardTitle}」をOBSのウィンドウキャプチャで取り込みます。"
                 + "クロマキーで緑を抜くと、目的も作業もない間はカードが消えます。映像とは別に位置と大きさを調整できます");
             Note(sec, $"シエルと背景だけを映すウィンドウ「{CielStreamWindow.Title}」を開きます。"
@@ -607,6 +616,9 @@ namespace Ciel.Conversation
             var card = GetComponent<CielAudienceCard>();
             if (_cardOutputSwitch != null && card?.Output != null)
                 ShowSwitch(_cardOutputSwitch, _cardOutputKnob, card.Output.IsOpen);
+            var plan = GetComponent<CielPlanWindow>();
+            if (_planOutputSwitch != null && plan?.Output != null)
+                ShowSwitch(_planOutputSwitch, _planOutputKnob, plan.Output.IsOpen);
         }
     }
 }

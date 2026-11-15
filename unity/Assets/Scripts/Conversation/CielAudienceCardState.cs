@@ -125,6 +125,9 @@ namespace Ciel.Conversation
                 result.phase = view.phase;
                 result.heading = "シエル｜" + view.status;
                 result.current = view.message;
+                // 計画があれば、いまの段（選択待ちならその選択）を見せる。全体は計画グラフのウィンドウへ
+                var plan = goal.Fresh ? CielPlanPresentation.NowLine(goal.task?.plan) : "";
+                if (!string.IsNullOrEmpty(plan) && view.phase == "running") result.current = plan;
                 if (activity?.calls?.Length > 0) result.current += "\n機能：" + activity.calls[0].label + "・応答待ち";
                 result.progress = view.budget;
                 result.elapsed = "";

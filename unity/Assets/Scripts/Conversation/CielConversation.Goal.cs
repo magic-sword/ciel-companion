@@ -14,6 +14,34 @@ namespace Ciel.Conversation
             public string decision_id, decision_message;
             public int revision, remaining_ms;
             public bool remaining_known, can_stop, can_retry;
+            // The game's plan graph (plan v1), shown as the game reported it; absent when it has none.
+            public PlanInfo plan;
+        }
+
+        [Serializable]
+        public class PlanOption { public string id, summary; }
+
+        [Serializable]
+        public class PlanChoice { public string question, chosen; public PlanOption[] options; }
+
+        [Serializable]
+        public class PlanNode
+        {
+            public string id, parent, kind, label, state;
+            public string[] needs;
+            public int estimate_s = -1;   // seconds the game expects the step to take; -1 when unknown
+            public PlanChoice choice;
+        }
+
+        [Serializable]
+        public class PlanInfo
+        {
+            public int v, revision;
+            public string plan_id, title;
+            public bool finished;
+            public PlanNode[] nodes;
+            public string[] current;
+            public bool Valid => v == 1 && !string.IsNullOrEmpty(plan_id) && revision > 0 && nodes != null && nodes.Length > 0;
         }
 
         [Serializable]
