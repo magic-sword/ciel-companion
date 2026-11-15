@@ -125,8 +125,8 @@ async function placeBed(bot, item, cell, partner) {
     const ends = [[cell, partner], [partner, cell]].map(([foot, head]) => ({ foot, head, stand: foot.minus(head.minus(foot)) }));
     const free = p => ['air', 'cave_air'].includes(bot.blockAt(p)?.name) && ['air', 'cave_air'].includes(bot.blockAt(p.offset(0, 1, 0))?.name);
     const { foot, stand } = ends.find(end => free(end.stand)) ?? ends[0];
-    const bed = bot.inventory.items().find(i => i.name === item);
-    if (!bed) {
+    const carried = () => bot.inventory.items().find(i => i.name === item);
+    if (!carried()) {
         skills.log(bot, `Don't have any ${item} to place.`);
         return false;
     }
@@ -137,7 +137,8 @@ async function placeBed(bot, item, cell, partner) {
         if (!EMPTY.has(bot.blockAt(p)?.name ?? 'air')) await skills.breakBlockAt(bot, p.x, p.y, p.z);
     }
     await skills.goToPosition(bot, stand.x, stand.y, stand.z, 0);
-    await bot.equip(bed, 'hand');
+    // Looked up again: breaking the cells equipped a tool, and the item found before was stale.
+    await bot.equip(carried(), 'hand');
     await bot.lookAt(foot.offset(0.5, 0, 0.5), true);
     let error = null;
     try {
