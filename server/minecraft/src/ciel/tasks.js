@@ -23,6 +23,10 @@ const MESSAGE_CHARS = 2000;
 const validMessage = s => typeof s === 'string' && s.trim().length > 0 && s.length <= MESSAGE_CHARS;
 // Replies to the body's questions within one work; each one runs the body again.
 const MAX_REPLIES = 8;
+// While the work waits for the owner (a question, or a failure to retry or cancel), the body is
+// not working: its time does not run, and it starts again from what was left when the owner
+// answers. A wait the owner never answers ends the work after this long.
+export const OWNER_WAIT_MS = 600000;
 const keys = (o, allowed) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
 // plan v1: what the body's executor is doing, as a graph for people to see. Fields are bounded
@@ -73,11 +77,14 @@ export class GameTasks {
     if (t.reason === 'body_changed') message = '準備中に別の動作へ切り替わったため、この作業は開始しませんでした。';
     return structuredClone({ version: TASK_VERSION, session: this.link.session, task_id: t.id, request_id: t.request.request_id, message,
       revision: t.revision, state: t.state, capability: t.request.capability, arguments: t.request.arguments,
-      reason: t.reason, evidence: t.evidence, decision: t.decision, remaining_ms: Math.max(0, t.deadline - this.clock()),
+      reason: t.reason, evidence: t.evidence, decision: t.decision,
+      remaining_ms: Math.max(0, t.deadline - (t.waitingSince ?? this.clock())),
       plan: t.plan ?? null });
   }
 
   changed(t, state, reason = '', evidence = t.evidence) {
+    if (state === 'needs_decision') this.wait(t);
+    else if (state !== 'cancelling' && !TERMINAL.has(state)) this.resume(t);
     t.state = state; t.reason = reason; t.evidence = evidence; t.revision++;
     this.link.notice({ kind: 'work_state', work: this.view(t) });
     this.link.changed();
@@ -113,6 +120,23 @@ export class GameTasks {
     this.arm(t);
     void this.run(t);
     return this.view(t);
+  }
+
+  // Waiting for the owner holds the work's time; the wait itself has its own limit.
+  wait(t) {
+    if (t.waitingSince != null) return;
+    t.waitingSince = this.clock();
+    clearTimeout(t.timer);
+    t.timer = setTimeout(() => { void this.cancel(t.id, 'owner_no_answer'); }, OWNER_WAIT_MS);
+    t.timer.unref?.();
+  }
+
+  resume(t) {
+    if (t.waitingSince == null) return;
+    const waited = this.clock() - t.waitingSince;
+    t.waitingSince = null;
+    t.deadline += waited; t.started += waited;   // the ceiling counts working time too
+    this.arm(t);
   }
 
   // The stop before the deadline leaves time to confirm the body has stopped.
@@ -243,6 +267,7 @@ export class GameTasks {
       return { status: 'error', reason: 'stale_decision' };
     if (!t.decision.actions.includes(action)) return { status: 'error', reason: 'invalid_decision' };
     if (action === 'cancel') return this.cancel(id);
+    this.resume(t);
     if (action === 'reply') {
       // The reply carries on the same work: same deadline and constraints, a bounded number of turns.
       if (!validMessage(message)) return { status: 'error', reason: 'invalid_message' };
@@ -273,7 +298,7 @@ export class GameTasks {
     if (!t) return Promise.resolve({ status: 'error', reason: 'unknown_task' });
     if (TERMINAL.has(t.state)) return Promise.resolve(this.view(t));
     if (t.stopping) return t.stopping;
-    t.generation++; t.decision = null;
+    t.generation++; t.decision = null; t.waitingSince = null;
     clearTimeout(t.timer);
     this.changed(t, 'cancelling', reason);
     t.stopping = this.stop(t, reason);

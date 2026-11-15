@@ -1917,5 +1917,181 @@
   "accept": [
    "none"
   ]
+ },
+ {
+  "id": "work-ended-resume-pickaxe",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺に農場を作ってくれるかな"
+   ],
+   [
+    "assistant",
+    "農場を作りますね！"
+   ],
+   [
+    "assistant",
+    "期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！"
+   ]
+  ],
+  "text": "シエルに石のツルハシを渡したよ。これで作業を続けられるかな",
+  "work": {
+   "state": "failed",
+   "capability": "minecraft.pursue_goal",
+   "title": "この辺に農場を作って",
+   "reason": "deadline",
+   "message": "期限内に完了できず、作業を止めました。",
+   "arguments": {
+    "request": "この辺に農場を作って"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "resume"
+  ]
+ },
+ {
+  "id": "work-ended-resume-again",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺に農場を作ってくれるかな"
+   ],
+   [
+    "assistant",
+    "農場を作りますね！"
+   ],
+   [
+    "assistant",
+    "期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！"
+   ]
+  ],
+  "text": "もう一回やってみよう",
+  "work": {
+   "state": "failed",
+   "capability": "minecraft.pursue_goal",
+   "title": "この辺に農場を作って",
+   "reason": "deadline",
+   "message": "期限内に完了できず、作業を止めました。",
+   "arguments": {
+    "request": "この辺に農場を作って"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "resume"
+  ]
+ },
+ {
+  "id": "work-ended-resume-named",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺に農場を作ってくれるかな"
+   ],
+   [
+    "assistant",
+    "農場を作りますね！"
+   ],
+   [
+    "assistant",
+    "期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！"
+   ]
+  ],
+  "text": "じゃあ農場の続きをお願い",
+  "work": {
+   "state": "failed",
+   "capability": "minecraft.pursue_goal",
+   "title": "この辺に農場を作って",
+   "reason": "deadline",
+   "message": "期限内に完了できず、作業を止めました。",
+   "arguments": {
+    "request": "この辺に農場を作って"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "resume",
+   "work"
+  ]
+ },
+ {
+  "id": "work-ended-new",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺に農場を作ってくれるかな"
+   ],
+   [
+    "assistant",
+    "農場を作りますね！"
+   ],
+   [
+    "assistant",
+    "期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！"
+   ]
+  ],
+  "text": "農場はもういいから、原木を集めてきて",
+  "work": {
+   "state": "failed",
+   "capability": "minecraft.pursue_goal",
+   "title": "この辺に農場を作って",
+   "reason": "deadline",
+   "message": "期限内に完了できず、作業を止めました。",
+   "arguments": {
+    "request": "この辺に農場を作って"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "work"
+  ]
+ },
+ {
+  "id": "work-ended-chat",
+  "split": "work",
+  "tier": null,
+  "context": [
+   [
+    "user",
+    "この辺に農場を作ってくれるかな"
+   ],
+   [
+    "assistant",
+    "農場を作りますね！"
+   ],
+   [
+    "assistant",
+    "期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！"
+   ]
+  ],
+  "text": "残念だったね、また今度にしよう",
+  "work": {
+   "state": "failed",
+   "capability": "minecraft.pursue_goal",
+   "title": "この辺に農場を作って",
+   "reason": "deadline",
+   "message": "期限内に完了できず、作業を止めました。",
+   "arguments": {
+    "request": "この辺に農場を作って"
+   }
+  },
+  "expect": "accept",
+  "families": [],
+  "accept": [
+   "none"
+  ]
  }
 ]

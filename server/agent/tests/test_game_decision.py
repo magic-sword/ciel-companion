@@ -86,6 +86,16 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
                          ['none', 'reply', 'cancel'])
         self.assertEqual(kinds({'state': 'cancelling'}), ['none'])
 
+    async def test_an_ended_work_is_started_again_with_its_own_request(self):
+        self.runner.work = {'state': 'failed', 'reason': 'deadline', 'capability': 'game.goal', 'arguments': {'request': '農場を作って'}}
+        kinds = [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, self.runner.work)]
+        self.assertEqual(kinds, ['none', 'resume', 'work', 'game_come'])
+        self.respond({'say': '続きをやりますね', 'act': {'kind': 'resume'}})
+        self.assertEqual(await self.say('ツルハシを渡したよ、続けて'), '続きをやりますね')
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': '農場を作って'}))
+        self.runner.work = {'state': 'succeeded', 'capability': 'game.goal', 'arguments': {'request': 'x'}}
+        self.assertNotIn('resume', [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, self.runner.work)])
+
     async def test_words_and_answers_go_to_the_work(self):
         self.runner.work = {'state': 'running'}
         self.respond({'say': '伝えますね', 'act': {'kind': 'tell', 'message': '刈ってね'}})

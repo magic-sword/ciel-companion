@@ -46,7 +46,7 @@ class WorkState(unittest.TestCase):
         self.assertGreaterEqual(len(work), 30)
         for case in work:
             self.assertTrue(case['accept'])
-            self.assertTrue(case['work'] is None or case['work']['state'] in ('running', 'needs_decision'))
+            self.assertTrue(case['work'] is None or case['work']['state'] in ('running', 'needs_decision', 'failed'))
 
 
 class Decide(unittest.TestCase):

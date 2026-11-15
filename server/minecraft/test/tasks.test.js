@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameTasks, CAPABILITIES, MAX_BUDGET_MS } from '../src/ciel/tasks.js';
+import { GameTasks, CAPABILITIES, MAX_BUDGET_MS, OWNER_WAIT_MS } from '../src/ciel/tasks.js';
 
 const request = (extra = {}) => ({ request_id: 'one', capability: 'minecraft.pursue_goal',
   arguments: { request: 'Make a stone pickaxe' },
@@ -50,9 +50,9 @@ test('runtime errors are surfaced without an outer recipe repair loop',async()=>
   work.submit(request());await wait(()=>work.active.state==='needs_decision');
   assert.equal(work.view().reason,'execution_error');
   assert.equal((await work.answer(work.active.id,'stale','retry')).reason,'stale_decision');
-  const deadline=work.active.deadline,id=work.active.id;
+  const left=work.view().remaining_ms,id=work.active.id;
   await work.answer(id,work.active.decision.decision_id,'retry');await wait(()=>work.active.state==='needs_decision');
-  assert.equal(work.active.deadline,deadline);assert.equal(work.active.id,id);work.close();
+  assert.ok(work.view().remaining_ms<=left);assert.equal(work.active.id,id);work.close();
 });
 
 test('follow stops before handing a goal to Mindcraft; pending or blocked bodies refuse work',async()=>{
@@ -119,11 +119,9 @@ test('a body that stops at a choice and speaks to the owner waits for the reply,
   assert.match(asked.message,/オーナーの返事を待っています。Kill the sheep or shear them\?/);
   assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'retry').reason,'invalid_decision');
   assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'reply','  ').reason,'invalid_message');
-  const deadline=work.active.deadline;
   work.answer(asked.task_id,asked.decision.decision_id,'reply','Kill them, that is fine.');
   await wait(()=>work.active.state==='succeeded');
   assert.equal(link.calls[1][1].request,'Kill them, that is fine.');
-  assert.equal(work.active.deadline,deadline);
   assert.equal(work.answer(asked.task_id,asked.decision.decision_id,'reply','again').reason,'stale_decision');
   work.close();
 });
@@ -185,4 +183,27 @@ test('the body plan graph is kept checked in the work view and told as a plan no
   await wait(()=>work.active.state==='succeeded');
   assert.equal(work.view().plan.revision,2,'the last plan stays with the finished work');
   work.close();
+});
+
+test('waiting for the owner holds the work time, and a wait never answered ends the work', async()=>{
+  let now=0;const {link,work:old}=fixture();old.close();
+  const work=new GameTasks(link,{stopMs:30,clock:()=>now});
+  const replies=[{ok:true,note:{native_finished:true,objective_verified:false,response:'Bring me a pickaxe?',
+    waiting_owner:{choice:'a stone pickaxe',options:[]},inventory:{}}},{ok:true,note:{native_finished:true,objective_verified:false,response:'Done.',inventory:{}}}];
+  link.runSkill=async()=>replies.shift();
+  work.submit(request());await wait(()=>work.active.state==='needs_decision');
+  const left=work.view().remaining_ms;
+  now+=300000;   // five minutes waiting for the owner
+  assert.equal(work.view().remaining_ms,left);
+  const asked=work.view();
+  work.answer(asked.task_id,asked.decision.decision_id,'reply','Here it is.');
+  assert.equal(work.view().remaining_ms,left);
+  await wait(()=>work.active.state==='succeeded');work.close();
+  const {link:link2,work:old2}=fixture();old2.close();
+  const waiting=new GameTasks(link2,{stopMs:30});
+  link2.runSkill=async()=>({ok:true,note:{native_finished:true,objective_verified:false,response:'?',waiting_owner:{choice:'x',options:[]},inventory:{}}});
+  waiting.submit(request());await wait(()=>waiting.active.state==='needs_decision');
+  assert.ok(OWNER_WAIT_MS>=60000);
+  clearTimeout(waiting.active.timer);await waiting.cancel(waiting.active.id,'owner_no_answer');
+  assert.equal(waiting.active.state,'cancelled');assert.equal(waiting.active.reason,'owner_no_answer');waiting.close();
 });

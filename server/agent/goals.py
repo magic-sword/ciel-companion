@@ -119,7 +119,10 @@ class GoalRunner:
     async def _poll(self, task_id):
         try:
             while self.work and self.work['task_id'] == task_id and self.work['state'] not in TERMINAL:
-                if time.monotonic() >= self._deadline and self.work['state'] != 'cancelling':
+                if self.work['state'] == 'needs_decision':
+                    # The game holds the work's time while it waits for the owner (and limits the wait).
+                    self._follow_deadline({**self.work, 'state': 'running'})
+                elif time.monotonic() >= self._deadline and self.work['state'] != 'cancelling':
                     await self.stop()
                 r = await self._call('status', {'task_id': task_id})
                 if not self.valid(r):

@@ -5,6 +5,7 @@ The conversation model reads the whole conversation and writes one structured ou
   no work         a work capability, or one of the game's direct actions
   running work    words passed to the work, or stopping it
   waiting work    the answers the work's decision accepts
+  ended work      as with no work, and starting the work that failed or was stopped again
 Not acting is the kind `none`. `say` is what Ciel speaks, also when the action could not be done or
 a stop word already stopped the body: then a second decision that can only speak tells it in her words.
 
@@ -25,6 +26,7 @@ import models
 
 STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
 ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
+ENDED = ('failed', 'cancelled')   # an ended work that may be started again with its own request
 # Results that did not do what was chosen.
 FAILED = ('error', 'unavailable', 'busy', 'goal_running', 'no_task', 'refused', 'failed')
 FORMS = ('say_first', 'act_first')
@@ -89,6 +91,10 @@ def acts(env, work, targets=None):
                 out.append((_alt({'kind': {'const': action}}),
                             {'retry': 'retry：作業をもう一度試す', 'cancel': 'cancel：作業をやめる'}[action]))
     elif state not in ACTIVE:
+        if state in ENDED and _handoff(env, work.get('capability')) and (work.get('arguments') or {}):
+            request = json.dumps(work['arguments'], ensure_ascii=False)
+            out.append((_alt({'kind': {'const': 'resume'}}),
+                        f"resume：止まった作業（{request}）を、同じ依頼でもう一度始める。体は進んだ分を見て続きから計画する"))
         for capability in (env.profile.get('work') or {}).get('capabilities', []):
             out.append((_alt({'kind': {'const': 'work'}, 'request': STRING}),
                         # The name is how the game's own instructions refer to this capability.
@@ -107,6 +113,11 @@ def acts(env, work, targets=None):
             params['additionalProperties'] = False
             out.append((_alt({'kind': {'const': fn.id}, 'arguments': params}), f"{fn.id}：{description}"))
     return out
+
+
+def _handoff(env, name):
+    # The capability's declared handoff, or None.
+    return next((c.get('handoff') for c in (env.profile.get('work') or {}).get('capabilities', []) if c.get('name') == name), None)
 
 
 def instructions(template, alternatives):
@@ -133,6 +144,8 @@ def operations(act, work, env):
     if kind in ('reply', 'retry', 'cancel'):
         return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind,
                                       **({'message': act.get('message')} if kind == 'reply' else {})})]
+    if kind == 'resume':
+        return [('resume_game_task', {'capability': work.get('capability'), 'arguments': copy.deepcopy(work.get('arguments') or {})})]
     if kind == 'work':
         name = ((env.profile.get('work') or {}).get('capabilities') or [{}])[0].get('name')
         return [('submit_game_task', {'capability': name, 'arguments': {'request': act.get('request')}})]
@@ -258,6 +271,13 @@ class GameDecision:
                                         str(args.get('message') or text)[:2000] if args['action'] == 'reply' else None)
             elif runner.body_step():
                 return '今の作業の途中なので、先に止める必要がある'
+            elif name == 'resume_game_task':
+                handoff = _handoff(env, args['capability'])
+                if handoff is None:
+                    return 'その作業は今は始め直せない'
+                r = await runner.start(args['capability'], args['arguments'], constraints=copy.deepcopy(handoff['constraints']),
+                                       title=getattr(runner, 'title', '') or str(args['arguments'].get(handoff['argument']) or '')[:100],
+                                       seconds=handoff['seconds'], request_id=uuid.uuid4().hex)
             elif name == 'submit_game_task':
                 capability = ((env.profile.get('work') or {}).get('capabilities') or [{}])[0]
                 handoff = capability['handoff']

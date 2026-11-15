@@ -63,6 +63,7 @@ export const WHY_FAILED = {
   replaced: 'ほかの頼みに替えた',
   mind_failed: '自分では進められなかった',
   no_answer: '体から返事が無い',
+  owner_no_answer: 'オーナーの返事を長く待った',
   disconnected: 'マイクラから出た',
   busy: 'ほかの会話が体を使っている',
   bad_args: '頼み方の形が違う',

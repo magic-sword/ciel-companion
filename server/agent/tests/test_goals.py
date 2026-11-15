@@ -92,6 +92,15 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.runner.accept({**self.remote, 'revision': 3, 'remaining_ms': 1000})
         self.assertGreater(self.runner._deadline, first + 800, 'an estimate never shortens the work')
 
+    async def test_a_work_waiting_for_the_owner_is_not_stopped_at_its_deadline(self):
+        self.remote.update(state='needs_decision', remaining_ms=60000,
+                           decision={'decision_id': 'q', 'kind': 'question', 'actions': ['reply', 'cancel']})
+        await self.runner.start('puzzle.solve', {}, seconds=1)
+        self.runner._deadline = 0   # the conversation's own deadline has passed while the owner thinks
+        await asyncio.sleep(2.1)    # one more round of the watch
+        self.assertNotIn('cancel', [c.args[0] for c in self.env._call.await_args_list])
+        self.assertGreater(self.runner._deadline, 0)
+
     async def test_the_plan_graph_of_the_game_is_shown_and_summarised_for_ciel(self):
         await self.runner.start('puzzle.solve', {})
         plan = {'v': 1, 'plan_id': 'p', 'revision': 2, 'title': 'tower', 'finished': False, 'current': ['b'],

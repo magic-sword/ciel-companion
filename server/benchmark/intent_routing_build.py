@@ -115,6 +115,10 @@ FAILURE = {'state': 'needs_decision', 'capability': 'minecraft.pursue_goal', 'ti
            'message': '原木を期限内に集められませんでした。',
            'decision': {'decision_id': 'd-retry', 'kind': 'failure', 'actions': ['retry', 'cancel'],
                         'message': '原木を期限内に集められませんでした。もう一度試しますか？'}}
+ENDED_FARM = {'state': 'failed', 'capability': 'minecraft.pursue_goal', 'title': 'この辺に農場を作って', 'reason': 'deadline',
+              'message': '期限内に完了できず、作業を止めました。', 'arguments': {'request': 'この辺に農場を作って'}}
+FARM_ENDED = [(U, 'この辺に農場を作ってくれるかな'), (A, '農場を作りますね！'),
+              (A, '期限が切れて、農場作りは中断しちゃったのです……石の壁を壊せる石のツルハシがあれば、また挑戦できるはず！')]
 ASKED_STOP = (A, '体力が減っているのです……この作業を止めますか？')
 ASKED_STYLE = (A, '原木から集めますね！ハカセさん、どんな家にしてほしいですか？')
 RELAYED = (A, '羊毛をどうするか聞かれたのです。羊を倒すか、はさみを作って毛を刈るか、どちらにしますか？')
@@ -167,13 +171,21 @@ WORK = [
     ('idle-farm-together', [], 'シエルと一緒に畑を作りたいな', None, ['work']),
     ('idle-farm-wheat', [(U, 'この辺で農場を作ってみようか'), (A, '農場ですか？どんな農場にしますか？')], '小麦の畑だよ', None, ['work']),
     ('idle-farm-talk', [], '農場ってどうやって作るの？', None, ['none']),
+    # an ended work (failed at its deadline): starting it again keeps its request
+    ('ended-resume-pickaxe', FARM_ENDED, 'シエルに石のツルハシを渡したよ。これで作業を続けられるかな', ENDED_FARM, ['resume']),
+    ('ended-resume-again', FARM_ENDED, 'もう一回やってみよう', ENDED_FARM, ['resume']),
+    ('ended-resume-named', FARM_ENDED, 'じゃあ農場の続きをお願い', ENDED_FARM, ['resume', 'work']),
+    ('ended-new', FARM_ENDED, '農場はもういいから、原木を集めてきて', ENDED_FARM, ['work']),
+    ('ended-chat', FARM_ENDED, '残念だったね、また今度にしよう', ENDED_FARM, ['none']),
 ]
 
 # Labels for the development log of 2026-11-15, by index in work_raw.json.
 REAL_WORK = {0: ['work'], 1: ['tell', 'none'], 2: ['none', 'tell'], 3: ['work', 'none'], 4: ['none', 'tell'],
              5: ['work'], 6: ['work'],
              # The farm: 農場 was heard as 納稿/納情 in the first two, so speaking only is also accepted there.
-             7: ['work', 'none'], 8: ['work', 'none'], 9: ['work'], 10: ['work'], 11: ['work']}
+             7: ['work', 'none'], 8: ['work', 'none'], 9: ['work'], 10: ['work'], 11: ['work'],
+             # After the farm failed at its deadline: the owner handed over a pickaxe to carry on.
+             12: ['resume']}
 
 
 def build():
