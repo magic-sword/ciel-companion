@@ -36,7 +36,13 @@
 - **専用環境：**（[実測](minecraft-results-ja.md#家の課題の完成期限の積み上げ拠点見えない物の探索)）
   - 家の課題：`long_dirt_shelter` 2/2（配置13は環境障害で除外）、`long_dirt_shelter_keep_sheep` 3/3。
   - 既存の課題：`mc_*`15/15、長い作業8/9、農地3/3、ベッド3/3。
-- **配布：** 開発・本番・普段の体には未配布。体の名前付きボリューム（拠点の記録）は、配布時に初めて作られる。
+- **配布：** 利用者の依頼により、コミット`0791835fdf9e341f8685fbd9c235ee3ac09b8c04`を配布した。
+  - **本番：** 標準`deploy-server.sh`で`DEPLOY_SERVER_DONE`。agentを作り直した（image `7c3881ed7bc2…`）。再起動0・Traceback 0・worker登録。コンテナ内の`MAX_SECONDS = 1800`と`GoalRunner.tell`を確認した。
+  - **体：** `deploy-body.py`でサーバー上のテスト通過・156ファイル一致・他コンテナ不変・参加済み（image `d90cbed27de4…`、根拠`~/work/ciel-companion/server/data/deployments/body-0791835fdf9e-1794712938459200754`）。
+    - 名前付きボリューム`ciel_minecraft-body-data`が`/app/body-data`に付き、`CIEL_BODY_DATA`が設定され、体から書けることを確かめた。
+    - `base.js`・`search.js`・`estimate.js`がコンテナ内にあることを確かめた。
+  - **開発：** `deploy-agent.py --dev`で194ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `a2a436a74530…`）。
+  - **未確認：** 普段のワールドでの家・拠点・見えない物の探索、会話モードでのオーナーの発話の判定。
 
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
