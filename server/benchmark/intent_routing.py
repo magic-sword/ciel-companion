@@ -40,6 +40,13 @@ ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
 LEGACY_RUNNING = {'state': 'running', 'capability': 'minecraft.pursue_goal', 'title': '原木を集めて', 'message': '原木を集めている'}
 STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
 DECIDE_TEMPERATURE = float(os.environ['CIEL_BENCH_DECIDE_TEMPERATURE']) if os.environ.get('CIEL_BENCH_DECIDE_TEMPERATURE') else None
+# How the prototype's decision is written:
+#   act_first  {act, say}, act required (none is one of its kinds)
+#   say_first  {say, act}, act required: the words are written before the choice
+#   optional   {say, act?}: no act means speaking only, so not acting needs no choice at all
+DECIDE_FORM = os.environ.get('CIEL_BENCH_DECIDE_FORM', 'act_first')
+if DECIDE_FORM not in ('act_first', 'say_first', 'optional'):
+    raise SystemExit(f'unknown CIEL_BENCH_DECIDE_FORM: {DECIDE_FORM}')
 
 
 def work_of(case):
@@ -277,11 +284,11 @@ class Harness:
         return reply, decision, runner.calls
 
     # ---- the prototype: one typed decision per state ----
-    def _acts(self, world, work):
+    def _acts(self, world, work, form='act_first'):
         """The kinds a decision may take in this work state, as (schema alternative, line for the prompt)."""
         def alt(properties):
             return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
-        acts = [(alt({'kind': {'const': 'none'}}), 'none：話すだけ')]
+        acts = [] if form == 'optional' else [(alt({'kind': {'const': 'none'}}), 'none：話すだけ')]
         state = (work or {}).get('state')
         if state in ('accepted', 'running'):
             acts += [(alt({'kind': {'const': 'tell'}, 'message': STRING}),
@@ -329,14 +336,16 @@ class Harness:
     async def decide(self, case, world):
         fake, _ = self._agent(world)
         work = work_of(case)
-        acts = self._acts(world, work)
-        template = (HERE / 'intent_routing_decide.md').read_text(encoding='utf-8')
+        acts = self._acts(world, work, DECIDE_FORM)
+        template = (HERE / ('intent_routing_decide_optional.md' if DECIDE_FORM == 'optional' else 'intent_routing_decide.md')).read_text(encoding='utf-8')
         game = '\n\n'.join(p for p in (self.persona.game_instructions, world.instructions) if p)
         system = '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), game,
                                 template.replace('{actions}', '\n'.join('- ' + line for _, line in acts))))
         wire = self.mind_mod.local_context(self._context(case, system)).to_provider_format('openai')[0]
-        schema = {'type': 'object', 'additionalProperties': False, 'required': ['act', 'say'],
-                  'properties': {'act': {'anyOf': [a for a, _ in acts]}, 'say': {'type': 'string'}}}
+        act, say = {'anyOf': [a for a, _ in acts]}, {'type': 'string'}
+        properties = {'act': act, 'say': say} if DECIDE_FORM == 'act_first' else {'say': say, 'act': act}
+        schema = {'type': 'object', 'additionalProperties': False, 'properties': properties,
+                  'required': ['say'] if DECIDE_FORM == 'optional' else list(properties)}
         body = {'model': 'local', 'messages': wire, 'max_tokens': 800,
                 'response_format': {'type': 'json_schema', 'json_schema': {'name': 'decision', 'schema': schema}},
                 'chat_template_kwargs': {'enable_thinking': False}}
@@ -480,7 +489,7 @@ async def main(args):
                 rows.append(row)
                 print(json.dumps({k: row.get(k) for k in ('system', 'id', 'verdict', 'families', 'seconds')}, ensure_ascii=False), flush=True)
                 report = {'suite': 'intent-routing-v2', 'agent_source': str(args.agent_source),
-                          'decide_temperature': DECIDE_TEMPERATURE,
+                          'decide_temperature': DECIDE_TEMPERATURE, 'decide_form': DECIDE_FORM,
                           'cases_sha256': hashlib.sha256((HERE / 'intent_routing_cases.json').read_bytes()).hexdigest(),
                           'catalog_sha256': hashlib.sha256(args.catalog.read_bytes()).hexdigest(),
                           'rows': rows, 'summary': summarize(rows, cases)}

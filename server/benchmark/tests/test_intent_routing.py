@@ -62,6 +62,11 @@ class Decide(unittest.TestCase):
         question = {'state': 'needs_decision', 'decision': {'decision_id': 'd', 'actions': ['reply', 'cancel'], 'message': 'q'}}
         self.assertEqual(self.kinds(question), ['none', 'reply', 'cancel'])
 
+    def test_optional_form_has_no_none_kind(self):
+        kinds = [a['properties']['kind']['const'] for a, _ in ir.Harness._acts(None, self.world(), None, 'optional')]
+        self.assertEqual(kinds, ['work', 'minecraft_come_here'])
+        self.assertEqual(ir.Harness._decided({}, None, self.world()), [])
+
     def test_decisions_become_recorded_actions(self):
         world = self.world()
         running = {'state': 'running'}
