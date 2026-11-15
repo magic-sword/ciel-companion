@@ -4,6 +4,7 @@ import * as skills from './skills.js';
 import { obtainItem, obtainSeconds, obtainEstimate } from './obtain.js';
 import { within } from './deadline.js';
 import { recordTime } from './timing.js';
+import { SLACK } from './estimate.js';
 
 /**
  * A plan is an ordered list of steps. Each step names the steps it needs, says whether the
@@ -18,11 +19,14 @@ import { recordTime } from './timing.js';
 export async function runPlan(bot, steps, { tries = 2 } = {}) {
     const byId = new Map(steps.map(step => [step.id, step]));
     // A step's estimate is its usual time; its seconds are its deadline, the most it may take.
-    const pending = steps.filter(step => !step.done(bot));
-    const total = pending.reduce((sum, step) => sum + (step.estimate ?? step.seconds)(bot), 0);
+    const remaining = () => steps.filter(step => !step.done(bot)).reduce((sum, step) => sum + (step.estimate ?? step.seconds)(bot), 0);
+    const total = remaining();
     skills.log(bot, `Plan: ${steps.map(step => step.label).join(', ')}. About ${Math.round(total)}s.`);
-    // The work that runs the plan may last as long as its steps usually take (CIEL's work deadline).
-    bot.reportEstimate?.(total);
+    // The work that runs the plan may last as long as its steps take, with the slack each step
+    // has (CIEL's work deadline). Told again after every step, as what is left can grow
+    // (a sheep to look for); a work is never shortened by it.
+    const report = () => bot.reportEstimate?.(remaining() * SLACK);
+    report();
     const failures = new Map();
     for (;;) {
         if (bot.interrupt_code) {
@@ -45,6 +49,7 @@ export async function runPlan(bot, steps, { tries = 2 } = {}) {
         if (!await within(bot, () => step.run(bot), seconds))
             skills.log(bot, `Timed out on "${step.label}" after ${Math.round((Date.now() - began) / 1000)}s.`);
         recordTime('plan_step', began, { id: step.id, budget: Math.round(seconds), ok: step.done(bot) });
+        report();
         if (bot.pendingChoice && bot.pendingChoice !== asked) {
             continueAfterChoice(bot, steps, { tries });
             const rest = steps.filter(other => !other.done(bot)).map(other => other.label);
