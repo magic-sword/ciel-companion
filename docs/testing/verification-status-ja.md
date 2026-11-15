@@ -31,6 +31,13 @@
 - **未確認：** 会話モードでのオーナーの発話の判定。
 - **配布：** 開発・本番・普段の体には未配布。
 
+2026-11-15、作業の期限を計画から積み上げる仕組み（上限30分）、実測した段の所要時間、拠点と設備の再利用、見えない物の探索を加えた（コミット`86f02c2`まで）。
+- **テスト：** 体のNode 183件・会話サーバーのunit 842件・ベンチマークは成功。
+- **専用環境：**（[実測](minecraft-results-ja.md#家の課題の完成期限の積み上げ拠点見えない物の探索)）
+  - 家の課題：`long_dirt_shelter` 2/2（配置13は環境障害で除外）、`long_dirt_shelter_keep_sheep` 3/3。
+  - 既存の課題：`mc_*`15/15、長い作業8/9、農地3/3、ベッド3/3。
+- **配布：** 開発・本番・普段の体には未配布。体の名前付きボリューム（拠点の記録）は、配布時に初めて作られる。
+
 同日、コミット`82beb89ec7ce29c19d0ed909318e402ed95bcfde`を共有Minecraft bodyへ配布した。imageは`97a0e69d81d8039bfcc199ea490747f019739e0d5da4e246e47ed19191f61592`。144ソースファイルの一致、Cielの再入場、他コンテナ不変を確認した。根拠は共有serverの`data/deployments/body-82beb89ec7ce-1794563097757397608`。開発agentは`e22ed8c`のままで、`server/agent`の193ファイルが現行と一致する（変更なし）。
 
 同日、利用者の依頼により同じコミットを標準`deploy-server.sh`で本番へ配布した。本番agentはMindcraftへの切り替え以前の版からの更新で、Mindcraftへの切り替え・中核APIの統合・依頼受付の変更が本番に初めて出た。`DEPLOY_SERVER_DONE`、Git管理server 585ファイルの一致（118ファイルは改行形式だけの差）、実コンテナ内のagent.py・game_intake.pyの一致、HTTP 200、LiveKitへのworker登録、再起動0、Traceback・ERRORなしを確認した。作り直したのはagent（image `3411d0dd9c070cd337377a6f59649f0ad9dae179e8e078bfe6b10638cb56867c`）とsinging（`8b21524dcfa04a012390e411ec38106e6df7f615d40b57ed8567a91dd46858c3`）。tts・DB・共有LLM・Minecraftの体/ワールド/知識・開発agentはID・image・起動時刻を維持した。作業終了時の表示の見出しの変更に合わせたUnityアプリの更新と、本番での会話・実音声・ゲーム操作は未確認。
