@@ -347,6 +347,7 @@ namespace Ciel.Conversation
             DevServer = PlayerPrefs.GetInt(DevServerPrefKey, 0) == 1;
             LoadGame();
             LoadYouTube();
+            LoadMicSideButton();
             if (_connectOnStart) StartConversation();
         }
 
@@ -1479,6 +1480,7 @@ namespace Ciel.Conversation
 
         void Update()
         {
+            PollMicSideButton();   // CielConversation.MicButton.cs
             if (_volumeDirty && Time.realtimeSinceStartup - _volumeSentAt > 0.15f) SendVolume();
             if (_mouth == null) return;
             // 会話サーバーが声を小さくしても、口の開きは変えない

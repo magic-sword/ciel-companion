@@ -113,7 +113,7 @@ namespace Ciel.Conversation
                 ("声と会話", c => { BuildVolumeSection(c); BuildTalkSection(c); BuildPresenceSection(c); }),
                 ("背景", BuildBackgroundSection),
                 ("議事録", BuildMinutesSection),
-                ("そのほか", c => { BuildDevicesSection(c); BuildGameSection(c); BuildDevSection(c); }),
+                ("そのほか", c => { BuildDevicesSection(c); BuildMicSideButtonSection(c); BuildGameSection(c); BuildDevSection(c); }),
             };
             if (Broadcast) pages.Insert(3, ("配信", c => { BuildStreamSection(c); BuildYouTubeSection(c); }));
             for (int i = 0; i < pages.Count; i++)
@@ -447,6 +447,19 @@ namespace Ciel.Conversation
 
         // ゲームで一緒に遊ぶ（CielConversation.Game.cs。docs/games/game-environment-mcp-design-ja.md の 6.4）。
         // ゲームの名前は会話サーバーの一覧（env.list）から出す。届くまで・以前の会話サーバーでは「ゲーム」
+        readonly List<(Image fill, Image edge, Text label)> _micSideButtonSegs = new List<(Image, Image, Text)>();
+
+        // マウスの横ボタンでマイクを入れる・切る（Windows。CielConversation.MicButton.cs）
+        void BuildMicSideButtonSection(RectTransform content)
+        {
+            if (!CielConversation.CanUseMicSideButton) return;
+            var sec = Section(content);
+            SectionLabel(Row(sec, 20), "マウスの横ボタンでマイクを切り替える");
+            Segmented(sec, CielConversation.MicSideButtonLabels,
+                i => _conversation.SelectMicSideButton((CielConversation.MicSideButton)i), _micSideButtonSegs);
+            Note(sec, "ゲームなど、ほかの画面を操作したままでも効きます。配信で解説するあいだだけ、シエルに聞かせないようにできます");
+        }
+
         void BuildGameSection(RectTransform content)
         {
             var sec = Section(content);
@@ -556,6 +569,7 @@ namespace Ciel.Conversation
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
             ShowSwitch(_gameSwitch, _gameKnob, c.GameWanted);
+            if (_micSideButtonSegs.Count > 0) ShowSelected(_micSideButtonSegs, (int)c.MicSideButtonChoice);
             _gameNow.text = GameNow(c);
             if (_gameTitle != null) _gameTitle.text = GameLabelOf(c);
             if (_gameSwitchLabel != null) _gameSwitchLabel.text = $"{GameLabelOf(c)}で一緒に遊ぶ";
