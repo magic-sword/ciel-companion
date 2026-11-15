@@ -304,3 +304,11 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
   - **体：** `deploy-body.py`でサーバー上のテスト通過・157ファイル一致・他コンテナ不変・参加済み（image `52d97657587b…`、根拠`~/work/ciel-companion/server/data/deployments/body-cdbcd387c064-1794714846836343531`）。`planview.js`がコンテナ内にあることを確認。
   - **開発：** `deploy-agent.py --dev`で194ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `68a59830cd92…`）。
   - **アプリ：** Unity 6000.6.4f1の`CielBuild.WindowsAll`で日常版・配信版をビルドした（`CIEL_BUILD_OK`）。両方の`Assembly-CSharp.dll`に`CielPlanWindow`が入っていることを確認した。ビルドは手元の`unity/Builds/`にあり、Git対象外。
+
+同日、持ち主の発言を一つの決定（話す言葉と行動）で扱う`game_decision.py`を加え、開発環境だけで有効にした（コミット`f6776a9`。[開発環境での試用](../conversation/agent-state-machine-ja.md#開発環境での試用段階2)）。
+- **テスト：** 会話サーバーのunit 851件・ベンチマーク94件・体のNode 185件・`check-capability-runtime`・`check-compose-backends`は成功。
+- **評価器：**（[実測](minecraft-results-ja.md#会話サーバーの部品での測定)）実発言の依頼の見逃し0/48・雑談で動いた15/38、作業中の作成課題0.903。
+- **配布：** 利用者の依頼により、開発の会話サーバーへ配布した。
+  - **開発：** サーバーの`.env.dev`に`CIEL_GAME_DECISION=decide`を足した（変更前は`.env.dev.before-game-decision`）。`deploy-agent.py --dev`で196ファイル一致・health・worker登録・再起動0・他コンテナ不変（image `f1c287a5051e…`、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-f6776a9d9e33-1794749773233470146`）。コンテナ内で`CIEL_GAME_DECISION=decide`・`CIEL_LLM_BACKEND=local`と、決定の指示の読み込みを確認した。
+  - **本番・体：** 配布していない。体の様子の見出し「マイクラの中の時刻」（`words.js`）は、本番と共有する体の更新で入る。
+- **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
