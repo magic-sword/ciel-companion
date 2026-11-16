@@ -33,13 +33,10 @@ class Score(unittest.TestCase):
 
 
 class WorkState(unittest.TestCase):
-    def test_runner_reports_the_case_state(self):
-        runner = ir.Runner(None, ir.work_of({'work': 'running'}))
-        self.assertTrue(runner.body_step())
-        self.assertNotIn('title', runner.status())
-        self.assertEqual(ir.Runner(None, None).status(), {'status': 'no_task'})
-        failed = ir.Runner(None, {'state': 'failed', 'title': 'x', 'capability': 'c'})
-        self.assertIsNone(failed.body_step())
+    def test_cases_hold_the_work_as_the_runner_reports_it(self):
+        self.assertTrue(all(c['work'] is None or isinstance(c['work'], dict) for c in CASES))
+        running = next(c for c in CASES if c['split'] == 'dev' and c['work'])
+        self.assertEqual(ir.work_of(running)['state'], 'running')
 
     def test_work_cases_carry_a_state_and_accepted_outcomes(self):
         work = [c for c in CASES if c['split'] == 'work']
@@ -57,7 +54,7 @@ class Decide(unittest.TestCase):
                                      tools=[fn], meta={fn.id: {'ciel/role': 'act'}})
 
     def kinds(self, work):
-        return [a['properties']['kind']['const'] for a, _ in ir.Harness._acts(None, self.world(), work)]
+        return [a['properties']['kind']['const'] for a, _ in ir.Harness._acts(self.world(), work)]
 
     def test_kinds_follow_the_work_state(self):
         self.assertEqual(self.kinds(None), ['none', 'work', 'minecraft_come_here'])
@@ -65,9 +62,7 @@ class Decide(unittest.TestCase):
         question = {'state': 'needs_decision', 'decision': {'decision_id': 'd', 'actions': ['reply', 'cancel'], 'message': 'q'}}
         self.assertEqual(self.kinds(question), ['none', 'reply', 'cancel'])
 
-    def test_optional_form_has_no_none_kind(self):
-        kinds = [a['properties']['kind']['const'] for a, _ in ir.Harness._acts(None, self.world(), None, 'optional')]
-        self.assertEqual(kinds, ['work', 'minecraft_come_here'])
+    def test_not_acting_is_recorded_as_no_action(self):
         self.assertEqual(ir.Harness._decided({}, None, self.world()), [])
 
     def test_decisions_become_recorded_actions(self):

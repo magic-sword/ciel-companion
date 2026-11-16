@@ -35,6 +35,9 @@ WORK_OUT = ROOT / '.local/intent-routing/work_cases.json'
 
 A, U = 'assistant', 'user'
 
+# The work the first written cases run in, when their state is 'running': gathering logs.
+LOGS = {'state': 'running', 'capability': 'minecraft.pursue_goal', 'title': '原木を集めて', 'message': '原木を集めている'}
+
 # (id, tier, context, text, expect, families, work_state)
 DEV = [
     # tier 1: explicit request / plain chat
@@ -190,7 +193,7 @@ REAL_WORK = {0: ['work'], 1: ['tell', 'none'], 2: ['none', 'tell'], 3: ['work', 
 
 def build():
     cases = [dict(id=f'dev-{i}', split='dev', tier=t, context=[list(c) for c in ctx], text=text, expect=e,
-                  families=f, work=w) for i, t, ctx, text, e, f, w in DEV]
+                  families=f, work=dict(LOGS) if w == 'running' else None) for i, t, ctx, text, e, f, w in DEV]
     cases += [dict(id=f'work-{i}', split='work', tier=None, context=[list(c) for c in ctx], text=text, work=w,
                    expect='accept', families=[], accept=acc) for i, ctx, text, w, acc in WORK]
     OUT.write_text(json.dumps(cases, ensure_ascii=False, indent=1) + '\n', encoding='utf-8', newline='\n')
@@ -211,7 +214,7 @@ def build():
     for i, r in enumerate(raw):
         e, f = REAL[i]
         real.append(dict(id=f'real-{i:03d}', split='real', tier=None, context=[list(c) for c in r['ctx']],
-                         text=r['utt'], expect=e, families=f, work='idle', recorded=dict(operation=r['got'], source=r['src'])))
+                         text=r['utt'], expect=e, families=f, work=None, recorded=dict(operation=r['got'], source=r['src'])))
     REAL_OUT.write_text(json.dumps(real, ensure_ascii=False, indent=1) + '\n', encoding='utf-8', newline='\n')
     return cases, real
 

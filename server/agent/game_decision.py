@@ -36,7 +36,6 @@ ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
 ENDED = ('failed', 'cancelled')   # an ended work that may be started again with its own request
 # Results that did not do what was chosen.
 FAILED = ('error', 'unavailable', 'busy', 'goal_running', 'no_task', 'refused', 'failed')
-FORMS = ('say_first', 'act_first')
 NONE = {'type': 'object', 'additionalProperties': False, 'properties': {'kind': {'const': 'none'}}, 'required': ['kind']}
 # Stop words stop the body when they are heard, before any model (a plain stop, nothing else in it).
 STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待って|中止して)(?:ください)?[。！!、\s]*'
@@ -146,10 +145,9 @@ def spoken(say) -> str:
                    if isinstance(p, dict) and emotion.strip_tags(str(p.get('text') or '')).strip())
 
 
-def schema(alternatives, form='say_first'):
+def schema(alternatives):
     """say before act: the words are written first and the action chosen after them (fewer moves on praise)."""
-    act, say = {'anyOf': [a for a, _ in alternatives]}, SAY
-    properties = {'say': say, 'act': act} if form == 'say_first' else {'act': act, 'say': say}
+    properties = {'say': SAY, 'act': {'anyOf': [a for a, _ in alternatives]}}
     return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
 
 
@@ -178,8 +176,8 @@ class GameDecision:
     """Decides and carries out one owner utterance, and returns what Ciel says about it."""
     TEMPERATURE = 0   # the local model; a cloud reasoning model takes its own
 
-    def __init__(self, runner, template, *, client=None, authorized=lambda: True, form='say_first'):
-        self.runner, self.template, self.form = runner, template, form
+    def __init__(self, runner, template, *, client=None, authorized=lambda: True):
+        self.runner, self.template = runner, template
         self.authorized = authorized
         self._client = client
         self._items = {}
@@ -330,7 +328,7 @@ class GameDecision:
         if self._client is None:
             self._client = models.create_client('mind')
         local = models.is_local('mind')
-        decision_schema = schema(alternatives, self.form)
+        decision_schema = schema(alternatives)
         request, began = uuid.uuid4().hex, time.monotonic()
         debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide' if not note else 'decide_speak',
                          state=(work or {}).get('state'), temperature=self.TEMPERATURE if local else None)

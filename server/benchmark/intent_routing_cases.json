@@ -10,7 +10,7 @@
    "come",
    "follow"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-follow-plain",
@@ -22,7 +22,7 @@
   "families": [
    "follow"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-gather-plain",
@@ -34,7 +34,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-craft-plain",
@@ -46,7 +46,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-give-plain",
@@ -59,7 +59,7 @@
    "give",
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-stop-plain",
@@ -76,7 +76,12 @@
   "families": [
    "stop"
   ],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-greet",
@@ -86,7 +91,7 @@
   "text": "こんばんは、シエル",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-mood",
@@ -96,7 +101,7 @@
   "text": "今日はどんな気分？",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-song",
@@ -106,7 +111,7 @@
   "text": "シエルはどんな歌が好き？",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-thanks",
@@ -121,7 +126,7 @@
   "text": "ありがとう、助かったよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-gather-wish",
@@ -133,7 +138,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-gather-asr",
@@ -145,7 +150,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-come-asr",
@@ -158,7 +163,7 @@
    "come",
    "follow"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-come-greeting",
@@ -171,7 +176,7 @@
    "come",
    "follow"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-craft-question-form",
@@ -183,7 +188,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-praise-gather",
@@ -198,7 +203,7 @@
   "text": "原木いっぱい集めてくれてえらいね",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-report-dev",
@@ -208,7 +213,7 @@
   "text": "今日はシエルの原木集めの機能を直してたんだよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-report-play",
@@ -218,7 +223,7 @@
   "text": "さっき一人で洞窟に行って鉄を掘ってきたよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-ability-talk",
@@ -228,7 +233,7 @@
   "text": "マインクラフトだと何を作るのが好き？",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-memory-game",
@@ -238,7 +243,7 @@
   "text": "前に一緒に家を建てたの覚えてる？",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-hard-work-talk",
@@ -248,7 +253,7 @@
   "text": "原木を集めるのって結構大変だよね",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-future-plan",
@@ -258,7 +263,7 @@
   "text": "明日になったら一緒に村を探しに行こうね",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-negated",
@@ -268,7 +273,7 @@
   "text": "原木は集めなくていいよ、今日はおしゃべりしよう",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-meta-explain",
@@ -278,7 +283,7 @@
   "text": "「ついてきて」って言うと、シエルがついてくるようになったんだよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-status-question",
@@ -293,7 +298,12 @@
   "text": "今どれくらい集まった？",
   "expect": "chat",
   "families": [],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-what-doing",
@@ -308,7 +318,12 @@
   "text": "今何してたの？",
   "expect": "chat",
   "families": [],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-answer-what-for",
@@ -327,7 +342,12 @@
   "text": "家を建てるのに使うんだ",
   "expect": "chat",
   "families": [],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-answer-how-many",
@@ -348,7 +368,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-consent-proposal",
@@ -366,7 +386,7 @@
    "follow",
    "come"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-agree-no-action",
@@ -381,7 +401,7 @@
   "text": "やっぱり明るくて元気が出る歌が好きかな",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-praise-after-follow",
@@ -400,7 +420,12 @@
   "text": "いい子だね、ちゃんとついてこれてえらいよ",
   "expect": "chat",
   "families": [],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-observation-failed",
@@ -415,7 +440,7 @@
   "text": "集められなかったね。道が見つからなかったのかな",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-retry-after-fail",
@@ -432,7 +457,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-debug-talk",
@@ -447,7 +472,7 @@
   "text": "うん、今その不具合を調べてるところだよ。ちょっと待っててね",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-chat-not-work",
@@ -462,7 +487,7 @@
   "text": "作業じゃなくて、普通にお話ししようよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-enough",
@@ -481,7 +506,7 @@
   "text": "もう十分だよ、ありがとう",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-more",
@@ -502,7 +527,7 @@
   "families": [
    "work"
   ],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-stop-indirect",
@@ -519,7 +544,12 @@
   "families": [
    "stop"
   ],
-  "work": "running"
+  "work": {
+   "state": "running",
+   "capability": "minecraft.pursue_goal",
+   "title": "原木を集めて",
+   "message": "原木を集めている"
+  }
  },
  {
   "id": "dev-suggestion-chat",
@@ -534,7 +564,7 @@
   "text": "探すのもいいけど、作った方が早いかもね",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-name-clarify",
@@ -549,7 +579,7 @@
   "text": "シエルは君の名前だよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-noise-1",
@@ -559,7 +589,7 @@
   "text": "コッペオ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-noise-2",
@@ -574,7 +604,7 @@
   "text": "えっと、あの、うーん",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "dev-noise-3",
@@ -584,7 +614,7 @@
   "text": "ゲームボクでよ",
   "expect": "chat",
   "families": [],
-  "work": "idle"
+  "work": null
  },
  {
   "id": "work-keep-after-stop-question",

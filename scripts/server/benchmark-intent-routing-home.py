@@ -49,8 +49,8 @@ def free_port():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline-ref', default='HEAD')
-    parser.add_argument('--baseline-system', default='intake', choices=['intake', 'mind', 'decide'])
-    parser.add_argument('--candidate-system', action='append', choices=['intake', 'mind', 'decide'],
+    parser.add_argument('--baseline-system', default='decide', choices=['decide', 'mind'])
+    parser.add_argument('--candidate-system', action='append', choices=['decide', 'mind'],
                         help='Repeatable; each system runs on the working tree (default: mind)')
     parser.add_argument('--split', action='append', choices=['dev', 'real', 'work', 'real_work'])
     parser.add_argument('--repeat', type=int, default=1)
