@@ -16,7 +16,7 @@
 
 利用者の指定で`gemini-2.5-flash-lite`を試す。`scripts/server/probe-gemini-search.py`は本番を変更しない単発試験で、既存の`research.md`を使い、GoogleのgenerateContent APIへ`google_search`を指定する。モデル・接続先は固定し、既定1要求・最大3要求、出力1,600トークン、要求timeout45秒。エラー・上限・検索の根拠不足で停止し、再試行や別モデルへの切替は行わない。
 
-APIキーは環境変数`GEMINI_API_KEY`またはGit対象外の`scripts/server/.env.local`に設定する。キーから課金プランは判別できないため、AI Studioで対象プロジェクトの無料プランと利用可能枠を確認してから`--free-tier-confirmed`を指定する。この引数は確認の記録であり、Google側の請求を強制的に止める機能ではない。
+APIキーは環境変数`GEMINI_API_KEY`またはGit対象外の`server/.env.shared`に設定する。キーから課金プランは判別できないため、AI Studioで対象プロジェクトの無料プランと利用可能枠を確認してから`--free-tier-confirmed`を指定する。この引数は確認の記録であり、Google側の請求を強制的に止める機能ではない。
 
 ```powershell
 .\.venv\Scripts\python.exe -B -X utf8 scripts/server/probe-gemini-search.py --check-config

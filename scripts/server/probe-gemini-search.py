@@ -117,7 +117,8 @@ if __name__ == '__main__':
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--check-config', action='store_true')
     mode.add_argument('--run', action='store_true')
-    parser.add_argument('--env-file', type=Path, default=ROOT / 'scripts/server/.env.local')
+    parser.add_argument('--env-file', type=Path, default=ROOT / 'server/.env.shared',
+                        help='API credentials (default: server/.env.shared); process environment takes precedence')
     parser.add_argument('--free-tier-confirmed', action='store_true')
     parser.add_argument('--limit', type=int, choices=(1, 2, 3), default=1)
     parser.add_argument('--output', type=Path)

@@ -24,14 +24,18 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 | ファイル | 内容 | 読む環境 |
 |---|---|---|
-| 本番`server/.env.shared` | LiveKit・OpenAI・YouTubeの資格情報、DBパスワード | 本番・開発・専用ベンチマーク |
+| 本番`server/.env.shared` | LiveKit・OpenAI・Gemini・YouTubeの資格情報、DBパスワード | 本番・開発・専用ベンチマーク |
 | 本番`server/.env` | 本番の推論、入力、モデル、Webhook、共有LLMサービスの配置・容量 | 本番だけ |
 | 開発`server/.env.dev` | 開発の推論、入力、モデル、Webhook | 開発だけ |
 | 各端末の`server/agent/.env` | Pythonを直接起動する場合の資格情報と動作設定 | その直接起動だけ。Composeは読まない |
 
-本番は`~/work/ciel-companion/server`、開発は`~/work/ciel-companion-dev/server`。共有ファイルは本番側に一つ置く。`.env.shared`に置ける名前は`LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`OPENAI_API_KEY`、`YOUTUBE_API_KEY`、`CIEL_DB_PASSWORD`だけ。backend・モデル・Webhook・記憶スコープは共有しない。モデル・DB・LiveKitを共用することと、本番の動作設定を開発へ継承することを区別する。
+本番は`~/work/ciel-companion/server`、開発は`~/work/ciel-companion-dev/server`。共有ファイルは本番側に一つ置く。`.env.shared`に置ける名前は`LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`OPENAI_API_KEY`、`GEMINI_API_KEY`、`YOUTUBE_API_KEY`、`CIEL_DB_PASSWORD`だけ。backend・モデル・Webhook・記憶スコープは共有しない。モデル・DB・LiveKitを共用することと、本番の動作設定を開発へ継承することを区別する。
 
 見本は[共通資格情報](../../server/.env.shared.example)、[本番](../../server/.env.example)、[開発](../../server/.env.dev.example)。既存の設定へ見本を丸ごと上書きしない。ベンチマークは`.env.benchmark`を独立して読み、資格情報だけ共有する。`CIEL_BENCH_*`は評価器の制御用であり、本番・開発の変数名の別名ではない。
+
+手元PCでもAPIキーの配置先は`server/.env.shared`とする。Gemini検索の試験はこのファイルを作業ディレクトリに依存せず読み、プロセス環境変数を優先する。別の資格情報ファイルを使うときだけ`--env-file`で指定する。サーバーの資格情報は自動転送・取得しない。
+
+`scripts/server/.env.local`は`CIEL_SERVER_HOST`・`CIEL_SSH_KEY`というSSH接続設定専用。検索APIキーは置かない。本番・開発の動作設定も検索試験には読み込まない。Python直接起動用の`server/agent/.env`は別の起動方式に必要な設定で、Composeや検索試験へ複製する必要はない。APIキーの設定だけでは検索プロバイダーの切替や本番配布は行わない。
 
 ## 本番・開発で共通の変数名
 
