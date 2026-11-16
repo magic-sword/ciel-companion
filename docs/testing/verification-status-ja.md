@@ -344,4 +344,5 @@ Unity 6000.6.4f1で`CielMicrophoneReconnectCheck.Run`の10検証が成功。公�
 - **本番：** 本番の`server/.env`だけに`CIEL_OPENAI_ROLES=mind`・`CIEL_MIND_MODEL=gpt-5.4-mini`・`CIEL_MIND_REASONING=none`を足し（変更前は`.env.before-openai-mind`）、`deploy-server.sh`で配布した（image `55e22c8b4d71…`、再起動0・Traceback 0・worker登録）。
 - **本番の確認：** 本番のコンテナで、決定を偽のゲームにつないで2回試した。返答の役目はOpenAI（`gpt-5.4-mini`）、「シエル、こっちに来て」は来る行動と`[happy]はい、行きます。`（1.99秒）、「えらいね、シエル」は話すだけ（1.93秒）。OpenAIでの振り分けの成績は測っていない（全課題で約1〜2米ドルの見込み）。
 - **未確認：** 実際の会話・ゲームでのOpenAIの返事と表情。
+- **互換の処理の撤去：** 表情の欄を本番のまま使うことにし、古い受付の評価・採らなかった決定の書き方・書き方の切り替えを取り除いた（コミット`09182ff`、会話サーバーの動きは変えていない）。利用者の依頼で開発（`deploy-agent.py --dev`、193ファイル一致・health・worker登録・再起動0、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-09182ffffb91-1794789997169408473`）と本番（`deploy-server.sh`、image `8711275670e6…`、再起動0・Traceback 0・worker登録、`game_decision.py`のSHA-256一致、返答はOpenAIの`gpt-5.4-mini`のまま）へ配布した。
 - **未確認：** 実音声での会話、話し始めまでの時間、普段のワールドでの作業の成否。
