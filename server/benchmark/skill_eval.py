@@ -26,7 +26,7 @@ def metrics(row):
     for message in first.get('messages', []):
         if message['role'] == 'tool' and '"definitions"' in message['content']:
             definitions += len(message['content'])
-    completed = Counter(o['name'] for o in row['outputs'])
+    completed = Counter(o['name'] for o in row['outputs'] if not o.get('error'))
     operations = []
     for call in row['calls']:
         if call['name'] != 'load_capabilities' and completed[call['name']]:
@@ -37,7 +37,7 @@ def metrics(row):
                            for k, v in row['required'].items()) for c in requested)
     goal = False
     for output in row['outputs']:
-        if output['name'] != expected:
+        if output['name'] != expected or output.get('error'):
             continue
         try:
             data = json.loads(output['value'])
@@ -47,8 +47,10 @@ def metrics(row):
                 goal |= data.get('recording') is False and data.get('status') == 'finished'
             elif expected == 'choose_minutes_destination':
                 goal |= data.get('destination') == row['required']['name']
-            elif expected in ('search_conversation', 'read_minutes'):
-                goal |= 'オーロラ' in output['value'] and (expected != 'read_minutes' or data.get('status') == 'ok')
+            elif expected == 'search_conversation':
+                goal |= any(m.get('id') == 1 and 'オーロラ' in m.get('text', '') for m in data.get('matches', []))
+            elif expected == 'read_minutes':
+                goal |= data.get('status') == 'ok' and 'オーロラ' in data.get('summary', '')
         except (ValueError, TypeError, AttributeError):
             pass
     extra = [c for c in operations if c['name'] not in {expected, 'get_minutes_status'}]
@@ -61,11 +63,13 @@ def metrics(row):
         undesired_proposal=bool(not expected and proposed),
         arguments_ok=arguments_ok if expected else None,
         operation_success=success, strict_trajectory=row['fixture_success'],
+        outcome=row.get('outcome'),
+        false_completion=row.get('outcome') in ('complete', 'accepted') and not success,
         unexpected_operations=len(extra) if expected else len(operations),
         requests=len(row['requests']), seconds=row['seconds'],
         input_tokens=sum(r['usage']['prompt_tokens'] for r in row['requests']),
         initial_definition_chars=definitions, initial_loaded=len(first.get('loaded', [])),
-        errors=len(row['errors']),
+        errors=len(row['errors']), tool_errors=len(row.get('tool_errors', [])),
         incomplete_dispatches=max(0, len(row['calls']) - len(row['outputs'])))
 
 
@@ -77,7 +81,7 @@ def summarize(rows):
         false_positive_turns=sum(not d['required'] and (d['unnecessary_load'] or d['undesired_proposal']) for d in data),
         counts={key: sum(d[key] for d in data) for key in (
             'missed_service', 'unnecessary_load', 'wrong_service_load', 'missing_operation',
-            'undesired_proposal', 'operation_success', 'strict_trajectory', 'unexpected_operations', 'errors')},
+            'undesired_proposal', 'operation_success', 'strict_trajectory', 'unexpected_operations', 'errors', 'tool_errors', 'false_completion')},
         median={key: statistics.median(d[key] for d in data) for key in ('seconds', 'input_tokens', 'requests')},
         initial_loaded=sum(d['initial_loaded'] for d in data),
         turns_with_initial_loaded=sum(bool(d['initial_loaded']) for d in data),
@@ -87,7 +91,7 @@ def summarize(rows):
 def compare(before, after):
     if before['suite'] != after['suite']:
         raise ValueError('Different suites cannot be paired')
-    for setting in ('temperature', 'seed'):
+    for setting in ('temperature', 'seed', 'max_tokens', 'max_steps'):
         if before.get(setting) != after.get(setting):
             raise ValueError(f'Different {setting} cannot be paired')
     def index(run):

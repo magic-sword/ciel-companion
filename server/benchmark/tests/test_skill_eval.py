@@ -66,3 +66,18 @@ class SkillEvaluationTests(unittest.TestCase):
         after['suite'] = {'changed': True}
         with self.assertRaises(ValueError):
             compare(before, after)
+
+    def test_search_must_return_the_original_fact_not_just_echo_query(self):
+        row = fixture()
+        row.update(expected='search_conversation', required={'query': 'オーロラ'},
+            calls=[dict(name='search_conversation', arguments={'query': 'オーロラ'})],
+            outputs=[dict(name='search_conversation', value='{"query":"オーロラ","matches":[]}')], outcome='complete')
+        self.assertFalse(metrics(row)['operation_success'])
+        self.assertTrue(metrics(row)['false_completion'])
+        row['outputs'][0]['value'] = json.dumps({'matches': [{'id': 1, 'text': '次の企画名はオーロラです。'}]})
+        self.assertTrue(metrics(row)['operation_success'])
+
+    def test_error_feedback_is_not_a_successful_dispatch(self):
+        row = fixture()
+        row['outputs'][0]['error'] = True
+        self.assertFalse(metrics(row)['operation_success'])

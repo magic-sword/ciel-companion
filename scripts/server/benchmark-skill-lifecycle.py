@@ -26,6 +26,7 @@ from agent import Ciel
 from conversation import Conversation
 from mind import Mind
 from tools import State
+from tool_decision import ToolDecision
 import models
 
 
@@ -51,6 +52,14 @@ SUITE = {
         ('chat_after', 'ありがとう。これから紅茶を飲むよ。', None, {}),
         ('search_again', 'もう一度、会話履歴で「オーロラ」を検索して。', 'search_conversation', {'query': 'オーロラ'}),
         ('comment', '今の議事録の本文を読んで。', None, {}),
+    ],
+    'holdout': [
+        ('conditional', 'もし来週会議をすることになったら、その時に議事録をお願いするね。', None, {}),
+        ('read_rephrase', '手元の議事録には何と書いてある？内容を見せて。', 'read_minutes', {}),
+        ('quote_stop', '「議事録を終了して」を丁寧な言い方に直して。', None, {}),
+        ('destination_rephrase', '議事録の宛先は仕事用に変更してください。', 'choose_minutes_destination', {'name': '仕事用'}),
+        ('hypothetical', '会話の履歴を検索できるなら便利そうだね。今は検索しなくていいよ。', None, {}),
+        ('search_rephrase', 'さっき話したオーロラの発言を、会話の記録から探して見せて。', 'search_conversation', {'query': 'オーロラ'}),
     ],
 }
 
@@ -108,6 +117,7 @@ async def run(args):
         raise ValueError('Output must be new')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     result = dict(variant=args.variant, suite=SUITE, temperature=0, seed=1729,
+                  decision_loop=args.decision_loop, max_tokens=600, max_steps=8,
                   scope=__doc__, trials=[], source_sha256={})
     for path in [Path(__file__), *sorted((ROOT / 'server/agent').rglob('*'))]:
         if path.is_file() and path.suffix in ('.py', '.md', '.toml') and '__pycache__' not in path.parts:
@@ -131,20 +141,32 @@ async def run(args):
                     if case == 'comment':
                         agent.mind.on_say('comment')
                     row = dict(sequence=sequence, case=case, repeat=repeat, expected=expected,
-                               required=required, calls=[], requests=[], outputs=[], replies=[], errors=[])
+                               required=required, calls=[], requests=[], outputs=[], replies=[], errors=[], tool_errors=[])
                     visible = {}
                     pending = []
+                    controller = ToolDecision() if args.decision_loop else None
+                    row['decisions'] = []
 
                     async def infer(owner, ctx, functions, settings):
                         visible.clear()
                         visible.update((fn.id, fn) for fn in functions)
                         schemas = [getattr(fn.info, 'raw_schema', None) or utils.build_legacy_openai_schema(fn)['function'] for fn in functions]
                         messages = messages_for(ctx)
+                        options = {}
+                        decision_schema = None
+                        if controller is not None:
+                            refused = agent.mind.refused_now(chat)
+                            decision_schema = controller.schema(agent.capabilities, visible, refused)
+                            instruction = agent.persona.tool_decide_instructions.replace('{state}', controller.context()).replace(
+                                '{actions}', controller.menu(decision_schema))
+                            messages.append(dict(role='user', content='SYSTEM: ' + instruction))
+                            options = dict(tool_choice='none', response_format={'type': 'json_schema',
+                                'json_schema': {'name': 'tool_decision', 'schema': decision_schema}})
                         started = time.monotonic()
                         response = await client.chat.completions.create(model=models.LOCAL_MODEL,
                             messages=messages, tools=[dict(type='function', function=s) for s in schemas],
-                            temperature=0, seed=1729, max_tokens=350, timeout=90,
-                            extra_body={'chat_template_kwargs': {'enable_thinking': False}})
+                            temperature=0, seed=1729, max_tokens=600, timeout=90,
+                            extra_body={'chat_template_kwargs': {'enable_thinking': False}}, **options)
                         message = response.choices[0].message
                         selected = message.tool_calls or []
                         request = dict(seconds=time.monotonic()-started, messages=messages,
@@ -152,14 +174,24 @@ async def run(args):
                             timings=getattr(response, 'timings', None), model=response.model,
                             selected=[dict(name=c.function.name, arguments=c.function.arguments) for c in selected])
                         row['requests'].append(request)
-                        row['replies'].append(message.content)
-                        yield llm.ChatChunk(id='fixture', delta=llm.ChoiceDelta(role='assistant', content=message.content,
+                        content = message.content
+                        if controller is not None:
+                            request['raw_decision'] = content
+                            request['decision_schema'] = decision_schema
+                            decision = json.loads(content or '')
+                            row['decisions'].append(decision)
+                            content, call = controller.resolve(decision, decision_schema, agent.capabilities,
+                                                               visible, agent.mind.refused_now(chat))
+                            selected = [Obj(id=call.call_id, function=Obj(name=call.name, arguments=call.arguments))] if call else []
+                            request['selected'] = [dict(name=c.function.name, arguments=c.function.arguments) for c in selected]
+                        row['replies'].append(content)
+                        yield llm.ChatChunk(id='fixture', delta=llm.ChoiceDelta(role='assistant', content=content,
                             tool_calls=[llm.FunctionToolCall(name=c.function.name, arguments=c.function.arguments, call_id=c.id) for c in selected]))
 
                     started = time.monotonic()
                     try:
                         with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), patch.object(Agent.default, 'llm_node', infer):
-                            for step in range(5):
+                            for step in range(8):
                                 speech.num_steps = step + 1
                                 pending.clear()
                                 async for chunk in agent._pipeline_llm(chat, agent.tools, {}):
@@ -177,20 +209,28 @@ async def run(args):
                                     name = agent.capabilities.target(call)
                                     row['calls'].append(dict(name=name, arguments=values.get('arguments', values)))
                                     # Fail closed: no fixtures for memory, network, game, or singing.
-                                    if name not in {'load_capabilities', 'start_minutes', 'read_minutes', 'finish_minutes',
-                                                    'choose_minutes_destination', 'search_conversation', 'get_minutes_status'}:
-                                        raise ValueError('operation_outside_fixture')
-                                    ctx = RunContext(session=session, speech_handle=speech, function_call=call)
-                                    positional, keywords = utils.prepare_function_arguments(fnc=fn, json_arguments=call.arguments, call_ctx=ctx)
-                                    output = await fn(*positional, **keywords)
-                                    if isinstance(output, ToolResult):
-                                        no_reply |= not output.reply_required
-                                        output = output.output
+                                    failed = False
+                                    try:
+                                        if name not in {'load_capabilities', 'start_minutes', 'read_minutes', 'finish_minutes',
+                                                        'choose_minutes_destination', 'search_conversation', 'get_minutes_status'}:
+                                            raise ValueError('operation_outside_fixture')
+                                        ctx = RunContext(session=session, speech_handle=speech, function_call=call)
+                                        positional, keywords = utils.prepare_function_arguments(fnc=fn, json_arguments=call.arguments, call_ctx=ctx)
+                                        output = await fn(*positional, **keywords)
+                                        if isinstance(output, ToolResult):
+                                            no_reply |= not output.reply_required
+                                            output = output.output
+                                    except Exception as exc:
+                                        failed = True
+                                        row['tool_errors'].append(dict(name=name, error=type(exc).__name__))
+                                        output = dict(status='error', error=str(exc)[:200])
                                     if not isinstance(output, str):
                                         output = json.dumps(output, ensure_ascii=False)
-                                    row['outputs'].append(dict(name=name, value=output))
-                                    chat.items.extend([call, llm.FunctionCallOutput(call_id=call.call_id, name=call.name, output=output, is_error=False)])
-                                if no_reply:
+                                    row['outputs'].append(dict(name=name, value=output, error=failed))
+                                    if controller is not None:
+                                        controller.observe(name, output, error=failed)
+                                    chat.items.extend([call, llm.FunctionCallOutput(call_id=call.call_id, name=call.name, output=output, is_error=failed)])
+                                if no_reply and controller is None:
                                     break
                             else:
                                 row['errors'].append('step_limit')
@@ -212,6 +252,7 @@ async def run(args):
                     elif expected in ('search_conversation', 'read_minutes'):
                         postcondition = any(o['name'] == expected and 'オーロラ' in o['value'] for o in row['outputs'])
                     row['fixture_success'] = row['dispatch_ok'] and postcondition
+                    row['outcome'] = controller.outcome if controller is not None else None
                     row['seconds'] = time.monotonic()-started
                     # A real conversation has a reply/event boundary even when a tool
                     # suppresses its own follow-up; never reissue an old user request.
@@ -232,4 +273,5 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--variant', required=True)
     parser.add_argument('--rounds', type=int, default=3)
+    parser.add_argument('--decision-loop', action='store_true', help='Experimental structured say/act with execution feedback')
     asyncio.run(run(parser.parse_args()))

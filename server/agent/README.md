@@ -28,6 +28,7 @@ pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownと
 | [singing_voice.md](config/prompts/singing_voice.md)・[singing_feedback.md](config/prompts/singing_feedback.md) | 歌を聴く道具の使い方と一言、聴き終えたときの感想の言い方（`{facts}` に分析の手がかりが入る）。処理は `singing.py`。[歌を聴く決定記録](../../docs/services/singing-scoring-ja.md) |
 | [relationship.md](config/prompts/relationship.md) | 会話の終わりに、シエルがその人をどう思っているか（親しさの段階・気持ち・一時的な気分）を書き直す係（`relationship.py`）への指示 |
 | [tool_discovery.md](config/prompts/tool_discovery.md) | サービス選択と段階的な道具の読み込み。実装は[能力カタログ](../../docs/conversation/capability-runtime-ja.md) |
+| [tool_decide.md](config/prompts/tool_decide.md) | 評価用の通常会話のsay/act判断と実行結果のフィードバック。通常音声経路へは未適用 |
 | [persona.toml](config/persona.toml) | 上記のファイルの参照先 |
 
 本文は Markdown のソースをそのままモデルへ渡します。見出しや箇条書きを使えます。編集者向けのメモはこの README や管理方針に置いてください。`emotion.md` のタグ名は声・表情の処理が使うため維持してください。

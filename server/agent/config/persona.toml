@@ -47,6 +47,7 @@ mind_brief_instructions_file = "prompts/mind_brief.md"
 listener_instructions_file = "prompts/listener.md"
 # ゲーム中の持ち主の発言に、話す言葉としてすることを一つの決定で返す（game_decision.py）。{actions} にその状態でできることが入る
 game_decide_instructions_file = "prompts/game_decide.md"
+tool_decide_instructions_file = "prompts/tool_decide.md"
 execution_instructions_file = "prompts/execution_api.md"
 # 付箋（board.py）：「[今のタスク]」と、頼みの発言に付く印の読み方（心と小脳の両方に渡す）
 tasks_instructions_file = "prompts/tasks.md"
