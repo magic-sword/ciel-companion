@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "sources": {
+    "wikipedia-ja": {
+      "endpoint": "https://ja.wikipedia.org/w/api.php",
+      "reviewed_on": "2026-11-17",
+      "review_before": "2027-02-15",
+      "scope": "search_snippets_only",
+      "permission_url": "https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines",
+      "api_url": "https://www.mediawiki.org/wiki/API:Search",
+      "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "permission_basis": "Published Action API search and API usage policy; identify the client, obey throttling and preserve attribution."
+    },
+    "wikipedia-en": {
+      "endpoint": "https://en.wikipedia.org/w/api.php",
+      "reviewed_on": "2026-11-17",
+      "review_before": "2027-02-15",
+      "scope": "search_snippets_only",
+      "permission_url": "https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines",
+      "api_url": "https://www.mediawiki.org/wiki/API:Search",
+      "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "permission_basis": "Published Action API search and API usage policy; identify the client, obey throttling and preserve attribution."
+    }
+  }
+}

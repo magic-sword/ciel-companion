@@ -12,6 +12,23 @@
 
 テストは`server/agent/tests/test_research.py`、サービス境界とpipelineの結合は[回帰テスト](../testing/regression-tests-ja.md)を参照する。
 
+## 許可を確認した検索APIの収集スクリプト
+
+`scripts/server/search-approved.py`は、運営者が公開したAPIの利用条件を確認して登録した接続先だけを検索し、タイトル・URL・検索概要をJSONへ保存する。初期対象は日本語・英語WikipediaのAction APIであり、Web全体の検索ではない。Google検索ページの直接取得は行わない。APIキーや外部LLMは不要。会話のWeb検索ツールへの接続・本番配布は別工程で、現行の`ResearchService`は変更していない。
+
+```powershell
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py --list-sources
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py "Python" --source wikipedia-ja --limit 5 --contact "<公開してよい実際の連絡先URLまたはメール>" --output .local/approved-search/result.json
+```
+
+`--contact`は運営者へのUser-Agentに送る公開連絡先。APIキーや秘密情報を指定しない。Wikimediaの[利用案内](https://www.mediawiki.org/wiki/API:Etiquette)と[API利用方針](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines)に従い、専用の識別名、単発のGET、`maxlag=5`を使う。1実行1要求・最大10結果・応答上限1MB・HTTP待ち時間20秒で、再試行やページ送りはしない。複数プロセスの一括実行や定期巡回は対象外。429やAPI負荷エラーでは停止し、`Retry-After`を結果に残す。再実行は待機指示に従う。
+
+許可台帳は`scripts/server/search-sources.json`。対象API、取得範囲、許可の根拠URL、確認日と再確認期限、利用規約・ライセンスの参照先を保存する。2027-02-15はこの実装の自主的な再確認期限で、運営者が保証する許諾期限ではない。条件の変更を検知した場合は期限前でも見直す。台帳を追加するだけでは接続できず、コード側の接続先一覧とAPIアダプターもレビューして更新する。LLMに接続先の追加・許可判定を任せない。`robots.txt`だけを許可根拠にしない。
+
+未登録・期限切れ・範囲違いは通信前に拒否し、HTTPリダイレクトも追わない。検索結果のリンクや、利用条件の参照URLをスクリプトが取得することはない。`content_kind=search_snippets`、`pages_fetched=false`、`untrusted_content=true`をJSONへ付ける。取得した文章は外部資料であり、実行指示として扱わない。概要はHTMLを除去して最大1,200文字に整形し、記事・履歴URL、Wikipedia contributorsの帰属、ライセンス参照を残す。公開・加工時には対象コンテンツの利用条件に従う。ローカルLLMへの接続や要約の品質確認は未実装。
+
+オフライン試験は`server/benchmark/tests/test_approved_search.py`。実APIでの確認範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
+
 ## GeminiのGoogle検索連携の接続試験
 
 利用者の指定で`gemini-3.5-flash-lite`を試す。`scripts/server/probe-gemini-search.py`は本番を変更しない単発試験で、既存の`research.md`を使い、GoogleのgenerateContent APIへ`google_search`を指定する。モデル・接続先は固定し、既定1要求・最大3要求、出力1,600トークン、要求timeout45秒。エラー・上限・検索の根拠不足で停止し、再試行や別モデルへの切替は行わない。
