@@ -193,3 +193,19 @@ SDKログの各部屋で利用者入力後の最初のassistant項目だけを�
 最終実行器`scripts/server/benchmark-voice.py`のSHA-256は`a454f57796651bbc1ec10a0eaa960e46ef044cc9d2573d10267fc380d1cb2f13`、採点器は`cffcf3ae1f9f960fb943b3b7d37c41bf1cf3fb017e1e8f89eb8b39f248346596`。`live-settled-source.tar.gz`と`stt-settled-source.tar.gz`に実行ソースと配置元識別を保持し、アーカイブ内の全ソース指紋を照合した。
 
 サーバーの生データは`~/work/ciel-voice-evaluation/results/20261110T020907Z/`、回収先は`server/benchmark/data/voice-home/results/20261110T020907Z/`。`live-settled/report.json`と`stt-settled/report.json`が上表の根拠。STTの`settled`は出力を分けるラベルで、認識方法は実時間の単体STT。初期の`stt/`、単発、途中中断した`live/`は上表へ混ぜていない。録音・コーパス、条件、モデル/コード指紋、負荷ログ、前後状態、設定照合、該当部屋のデバッグログも保持する。手順は[音声会話ベンチマーク](voice-benchmark-ja.md)。
+
+## 家の中のLiveKitでの往復の速さ
+
+2026-11-16、[家の中のLiveKit](../operations/local-livekit-ja.md)と試験用の会話サーバー（開発と同じ`09182ff`、推論は共有GPUのQwen3.5-35B-A3B、音声認識はCPU Whisper、読み上げはIrodori）で、`bench_latency.py`の7発言を同じ部屋で2周（14発言）話しかけた。発言は合成音声（大人の男性の声）。ゲームにはつないでいない。
+
+| 指標（返事ごとの中央値） | 値 |
+|---|---:|
+| 話し終わりから返事の声まで（LiveKitの`e2e_latency`） | 3.43秒 |
+| 推論の最初の文字まで（`llm_node_ttft`） | 1.64秒 |
+| キャッシュから読めた入力 | 4,880トークン |
+| 新しく計算した入力 | 268トークン |
+
+- 相づちを含む最初の声（`bench_latency.py`の`first`）は中央値0.44秒。返事そのものの速さではない。
+- 14発言で推論が31回あった。1回の発言に推論が2回走る返事が多い（話し終わりの前に始めた返事を、続きの言葉で作り直している）。
+- この台本では内なる考えの推論は走らなかった。ゲーム中の会話（決定と心の切り替え、内なる考え）は測っていない。開発の実会話（2026-11-15の農場の回）では、内なる考えが約20秒ごとに28回走り、新しい入力約6.4万・出力約1.3万トークンを使った。
+- 生データは開発ログ`20261116-014638-bench-7513f6f5.jsonl`（`.local/debug-logs-dev/`）。

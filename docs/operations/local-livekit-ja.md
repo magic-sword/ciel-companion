@@ -1,0 +1,47 @@
+# 家の中だけの LiveKit（試験用）
+
+> 責務：家の中だけのLiveKitと試験用の会話サーバー（試験・測定用）の構成と起動。
+
+クラウドの LiveKit は接続時間に上限があり、上限を超えると本番・開発とも会話に入れない（2026-11-16に429 `connection minutes limit exceeded`を受けた）。試験と測定は、家の中のネットワークだけで動く LiveKit で行える。普段の開発と本番は、これまでどおりクラウドの LiveKit につなぐ。
+
+## 構成
+
+| 部品 | 置き場所 | 役目 |
+|---|---|---|
+| `livekit-local` | `livekit/livekit-server:v1.8.4`、設定は`server/livekit-local/livekit.yaml` | 家の中のアドレスだけで開く LiveKit。信号7880、TCPの予備7881、音声のUDP 7882（1ポートにまとめる） |
+| `token-local` | `server/livekit-local/token_server.py` | アプリにトークンを出す窓口（7883の`POST /token`）。LiveKit の開発用トークンサーバーと同じ形（`server_url`・`participant_token`）で返し、部屋に試験用の会話サーバー`ciel-dev`を呼ぶ |
+| `agent-local` | 開発の会話サーバーと同じイメージと設定 | 家の中の LiveKit につなぐ試験用の会話サーバー（8092）。推論は共有GPU（8094）、記憶は開発のスコープ |
+
+サービスの定義は`server/compose.livekit-local.yaml`で、開発の`compose.dev.yaml`と一緒に読む。鍵・アドレスは開発の`server/.env.livekit-local`（Git・デプロイの外、権限0600）。家の中のアドレスは本番の`.env.minecraft`の`MC_BIND`を使う。
+
+## 起動と停止
+
+```bash
+scripts/server/livekit-local.sh start
+```
+
+```bash
+scripts/server/livekit-local.sh status
+```
+
+```bash
+scripts/server/livekit-local.sh stop
+```
+
+`start`は、今の開発の会話サーバー（`ciel-dev-agent-dev-1`）のイメージと設定（`/app/config`）で試験用の会話サーバーを起動する。開発の会話サーバーを配布し直したら、`start`をもう一度実行して版をそろえる。初回は鍵を作る。
+
+## Windows アプリからつなぐ
+
+設定の「そのほか」→「開発」で、トークンの取得先に`status`が表示するURL（例：`http://192.168.1.15:7883/token`）を入れ、「家の中の試験用サーバーにつなぐ」を入れる。切り替えると、つなぎ直す。家の中のネットワーク専用なので、外出先からはつながらない。
+
+2026-11-16に、この Windows からトークンの窓口（7883）と LiveKit（7880）へ届くことを確かめた。アプリから実際に話す確認と、UDP 7882 が通るか（通らなければTCP 7881を使う）は未確認。
+
+## 測定
+
+試験用の会話サーバーのコンテナの中で、往復を重ねる測定を流せる。クラウドの接続時間を使わない。
+
+```bash
+source scripts/server/ssh-target.sh "" && "${SSH[@]}" 'docker exec ciel-dev-agent-local-1 sh -c "cd /app && python bench_latency.py --agent ciel-dev --rounds 2"'
+```
+
+その部屋の開発ログ（`scripts/server/debug-log.sh pull --dev`）から、返事ごとの時間とキャッシュを`scripts/server/conversation_latency_report.py`で集計する。結果は[音声の実測](../testing/voice-results-ja.md#家の中のlivekitでの往復の速さ)。

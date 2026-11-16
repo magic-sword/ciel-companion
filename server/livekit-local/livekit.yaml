@@ -1,0 +1,10 @@
+# 家の中だけで使う LiveKit サーバー（試験用。docs/operations/local-livekit-ja.md）。
+# 鍵は書かない：起動のときに環境変数 LIVEKIT_KEYS（server/.env.livekit-local、Git・デプロイの外）で渡す。
+# 開くアドレスは起動の引数 --bind・--node-ip（家の中の IPv4。scripts/server/livekit-local.sh が MC_BIND から渡す）。
+port: 7880
+rtc:
+  tcp_port: 7881          # UDP が通らないときの予備
+  udp_port: 7882          # 音声は 1 つの UDP ポートにまとめる（開けるポートを少なくする）
+  use_external_ip: false  # 外のアドレスを調べない（家の中だけ）
+logging:
+  level: info

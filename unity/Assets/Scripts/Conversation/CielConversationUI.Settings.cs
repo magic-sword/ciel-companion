@@ -28,11 +28,11 @@ namespace Ciel.Conversation
         Dropdown _devices, _speakers;
         readonly List<string> _deviceGuids = new List<string>();
         readonly List<string> _speakerGuids = new List<string>();
-        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _streamSwitch, _streamKnob, _gameSwitch, _gameKnob;
+        Image _exprSwitch, _exprKnob, _devServerSwitch, _devServerKnob, _localServerSwitch, _localServerKnob, _streamSwitch, _streamKnob, _gameSwitch, _gameKnob;
         Text _gameNow, _youtubeNow, _gameTitle, _gameSwitchLabel;
         readonly List<(Image fill, Image edge, Text label)> _backdropSegs = new List<(Image, Image, Text)>();
         Image _youtubeSwitch, _youtubeKnob;
-        InputField _youtubeUrl;
+        InputField _youtubeUrl, _localServerUrl;
         Image _cardOutputSwitch, _cardOutputKnob, _planOutputSwitch, _planOutputKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
@@ -494,6 +494,11 @@ namespace Ciel.Conversation
             (_devServerSwitch, _devServerKnob) = SwitchRow(sec, "開発用のサーバーにつなぐ",
                 () => _conversation.SetDevServer(!_conversation.DevServer));
             Note(sec, "試験・分析用のシエルにつなぎます。会話は調べるために記録され、7 日で消えます。切り替えると、つなぎ直します");
+            (_localServerSwitch, _localServerKnob) = SwitchRow(sec, "家の中の試験用サーバーにつなぐ",
+                () => _conversation.SetLocalServer(!_conversation.LocalServer));
+            _localServerUrl = NameField(Row(sec, 40), _conversation.LocalServerUrl, 0, "トークンの取得先（例：http://192.168.1.15:7883/token）", 200);
+            _localServerUrl.onEndEdit.AddListener(url => _conversation.SetLocalServerUrl(url));
+            Note(sec, "自宅サーバーで家の中だけの LiveKit を動かしているときに使います（scripts/server/livekit-local.sh）。クラウドの LiveKit を使いません");
             (_exprSwitch, _exprKnob) = SwitchRow(sec, "表情の確認ボタンを出す", () =>
             {
                 PlayerPrefs.SetInt(ExpressionPrefKey, ExpressionButtonsOn ? 0 : 1);
@@ -568,6 +573,7 @@ namespace Ciel.Conversation
             if (_exprPanel != null) _exprPanel.SetActive(expr);
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
+            ShowSwitch(_localServerSwitch, _localServerKnob, c.LocalServer);
             ShowSwitch(_gameSwitch, _gameKnob, c.GameWanted);
             if (_micSideButtonSegs.Count > 0) ShowSelected(_micSideButtonSegs, (int)c.MicSideButtonChoice);
             _gameNow.text = GameNow(c);

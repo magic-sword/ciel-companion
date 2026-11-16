@@ -1,0 +1,43 @@
+# 家の中だけの LiveKit と、そこへつなぐ試験用の会話サーバー（試験のときだけ起動する。docs/operations/local-livekit-ja.md）。
+# 開発の compose.dev.yaml と一緒に読む。起動・停止は手元から scripts/server/livekit-local.sh（start・stop・status）。
+# - 普段の開発（agent-dev）と本番は、これまでどおりクラウドの LiveKit につなぐ。ここでは作り直さない。
+# - 鍵・アドレスは server/.env.livekit-local（Git・デプロイの外。livekit-local.sh が初回に作る）。
+# - 試験用の会話サーバーは開発と同じイメージ（CIEL_LOCAL_AGENT_IMAGE。livekit-local.sh が今の開発の版を渡す）。
+services:
+  livekit-local:
+    image: livekit/livekit-server:v1.8.4
+    network_mode: host
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_LOCAL_KEY:?}: ${LIVEKIT_LOCAL_SECRET:?}"   # LiveKit は「鍵: 秘密」（コロンの後ろに空白）で読む
+    command: ['--config', '/etc/livekit.yaml', '--bind', '${LIVEKIT_LOCAL_BIND:?}', '--node-ip', '${LIVEKIT_LOCAL_BIND:?}']
+    volumes:
+      - ./livekit-local/livekit.yaml:/etc/livekit.yaml:ro
+    restart: 'no'
+
+  token-local:
+    image: ${CIEL_LOCAL_AGENT_IMAGE:?}
+    network_mode: host
+    environment:
+      - LIVEKIT_LOCAL_KEY=${LIVEKIT_LOCAL_KEY:?}
+      - LIVEKIT_LOCAL_SECRET=${LIVEKIT_LOCAL_SECRET:?}
+      - LIVEKIT_LOCAL_URL=ws://${LIVEKIT_LOCAL_BIND:?}:7880
+      - LIVEKIT_LOCAL_BIND=${LIVEKIT_LOCAL_BIND:?}
+      - LIVEKIT_LOCAL_AGENT=ciel-dev
+    entrypoint: ['python', '/livekit-local/token_server.py']
+    volumes:
+      - ./livekit-local:/livekit-local:ro
+    restart: 'no'
+
+  agent-local:
+    extends:
+      file: compose.dev.yaml
+      service: agent-dev
+    image: ${CIEL_LOCAL_AGENT_IMAGE:?}
+    volumes:
+      - ${CIEL_LOCAL_AGENT_CONFIG:?}:/app/config:ro   # 開発の会話サーバーが今使っている設定（livekit-local.sh が渡す）
+    environment:
+      - LIVEKIT_URL=ws://${LIVEKIT_LOCAL_BIND:?}:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_LOCAL_KEY:?}
+      - LIVEKIT_API_SECRET=${LIVEKIT_LOCAL_SECRET:?}
+      - CIEL_AGENT_PORT=8092            # 開発の会話サーバー（8091）と並べて動かす
+    restart: 'no'

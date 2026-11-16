@@ -348,6 +348,7 @@ namespace Ciel.Conversation
             LoadGame();
             LoadYouTube();
             LoadMicSideButton();
+            LoadLocalServer();
             if (_connectOnStart) StartConversation();
         }
 
@@ -610,11 +611,15 @@ namespace Ciel.Conversation
             string url;
             var headers = new List<(string, string)>();
             if (config == null) { Debug.LogError("[CielConversation] 接続の設定（Token Config）がない"); yield break; }
-            switch (config.TokenSourceType)
+            // 家の中の試験用サーバー（CielConversation.LocalServer.cs）：クラウドの代わりに、家の中の窓口からトークンを受け取る
+            switch (LocalServer ? TokenSourceType.Endpoint : config.TokenSourceType)
             {
                 case TokenSourceType.DevelopmentTokenServer:
                     url = "https://cloud-api.livekit.io/api/v2/sandbox/connection-details";
                     headers.Add(("X-Sandbox-ID", config.TokenServerId));
+                    break;
+                case TokenSourceType.Endpoint when LocalServer:
+                    url = LocalServerUrl;
                     break;
                 case TokenSourceType.Endpoint:
                     url = config.EndpointUrl;
