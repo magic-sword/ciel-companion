@@ -88,6 +88,19 @@ class OnlyGivenTest(unittest.TestCase):
         out, _ = mind.only_given(chunk('start_minutes', content='はい'), self.given)
         self.assertEqual((out.delta.content, out.delta.tool_calls), ('はい', []))
 
+    def test_refused_tools_are_dropped_through_the_execution_entry_too(self):
+        # 多くの道具は execute_capability から呼ばれる。断る道具は、入口の先の名前で見る
+        from capabilities import CapabilityCatalog
+        target = CapabilityCatalog.target.__get__(mock.Mock(executor=mock.Mock(id='execute_capability')))
+        given = [mock.Mock(id='execute_capability'), mock.Mock(id='finish_minutes')]
+        call = llm.FunctionToolCall(name='execute_capability', call_id='c0',
+                                    arguments='{"tool_id": "start_minutes", "version": "v", "arguments": {}}')
+        c = llm.ChatChunk(id='x', delta=llm.ChoiceDelta(role='assistant', content=None, tool_calls=[call]))
+        self.assertEqual(mind.only_given(c, given, {'start_minutes'}, target=target), (None, ['start_minutes']))
+        self.assertIs(mind.only_given(c, given, {'finish_minutes'}, target=target)[0], c)
+        self.assertEqual(mind.only_given(chunk('finish_minutes'), given, {'finish_minutes'}, target=target),
+                         (None, ['finish_minutes']))
+
     def test_text_and_given_calls_pass_as_they_are(self):
         c = chunk('research_web')
         self.assertIs(mind.only_given(c, self.given)[0], c)

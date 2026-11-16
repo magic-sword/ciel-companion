@@ -331,8 +331,7 @@ class Ciel(Agent):
                     yield reply
                     return
                 # The decision chose not to act; the conversation model answers in words.
-                refused |= mind.GOAL_MOVING
-        allowed = [fn for fn in fns if getattr(fn, 'id', None) not in refused]
+                refused |= self.mind.one_call_tools()
         who = 'mind'
         if self.activity is not None:
             self.activity.thinking(who, self.mind.reply_origin)
@@ -354,7 +353,8 @@ class Ciel(Agent):
                     expired = True
                     break
                 # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
-                chunk, dropped = mind.only_given(chunk, allowed)
+                chunk, dropped = mind.only_given(chunk, fns, refused,
+                                                 target=self.capabilities.target if self.capabilities else None)
                 if dropped:
                     logger.warning('心：渡していない道具の呼び出しを止めた %s', dropped)
                     blocked += dropped

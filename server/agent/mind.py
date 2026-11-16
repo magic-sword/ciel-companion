@@ -340,7 +340,7 @@ class Mind:
         debug_log.record('mind_brief', brief=self.brief)
 
 
-def only_given(chunk, fns: list):
+def only_given(chunk, fns: list, refused=frozenset(), *, target=None):
     """返事の流れから、今回渡した道具（fns）の呼び出しだけを通す。LiveKit は、送らなかった道具でも Agent の道具なら
     呼んでしまう（voice/agent_activity.py の tool_ctx は Agent の道具全部）。渡していない道具（コメントから使えない道具・
     絞った議事録の道具）を呼ばせないために、ここで落とす。（通す chunk, 落とした道具の名前）を返し、全部落として
@@ -348,9 +348,13 @@ def only_given(chunk, fns: list):
     delta = None if isinstance(chunk, str) else getattr(chunk, 'delta', None)
     if delta is None or not delta.tool_calls:
         return chunk, []
+    # refused：一覧には載せているが、今回は実行しない道具。多くの道具は実行の入口（execute_capability）から呼ばれるので、
+    # target で入口の先の道具の名前に直して見る（capabilities.CapabilityCatalog.target）
     given = {getattr(t, 'id', None) for t in fns}
-    kept = [c for c in delta.tool_calls if c.name in given]
-    dropped = [c.name for c in delta.tool_calls if c.name not in given]
+    name = target or (lambda c: c.name)
+    ok = lambda c: c.name in given and name(c) not in refused   # noqa: E731
+    kept = [c for c in delta.tool_calls if ok(c)]
+    dropped = [name(c) for c in delta.tool_calls if not ok(c)]
     if not dropped:
         return chunk, []
     if not kept and not delta.content and getattr(chunk, 'usage', None) is None:
