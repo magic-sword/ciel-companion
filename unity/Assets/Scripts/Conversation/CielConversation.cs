@@ -636,6 +636,21 @@ namespace Ciel.Conversation
             // 開発用のサーバーにつなぐときは、その部屋に開発用の会話サーバーを呼ぶ（LiveKit の部屋の設定 room_config）
             var roomConfig = DevServer ? $",\"room_config\":{{\"agents\":[{{\"agent_name\":\"{DevAgentName}\"}}]}}" : "";
             var body = $"{{\"room_name\":\"{roomName}\"{roomConfig}}}";
+            if (LocalServer)
+            {
+                // 家の中の窓口は http（CielConversation.LocalServer.cs）。Unity の通信は http を許さない設定のままにし、
+                // この取得先だけを .NET の通信で受け取る
+                string text = null;
+                yield return FetchLocalToken(url, body, t => text = t);
+                var local = text == null ? null : JsonUtility.FromJson<ConnectionDetailsJson>(text);
+                if (local == null || string.IsNullOrEmpty(local.server_url) || !IsTokenForRoom(local.participant_token, roomName))
+                {
+                    Debug.LogError("[CielConversation] 家の中の試験用サーバーからトークンを取得できない");
+                    yield break;
+                }
+                done(local.server_url, local.participant_token);
+                yield break;
+            }
             using var req = new UnityEngine.Networking.UnityWebRequest(url, "POST");
             req.uploadHandler = new UnityEngine.Networking.UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
             req.downloadHandler = new UnityEngine.Networking.DownloadHandlerBuffer();
