@@ -39,6 +39,8 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 ## 本番・開発で共通の変数名
 
+`CIEL_SEARCH_CONTACT`は検索APIへUser-Agentで送信する公開連絡先（メールまたはURL）。資格情報ではないため`server/.env`または`server/.env.dev`へ置く。単独の`search-approved.py`は既定で手元PCの`server/.env`からこの項目だけを読み、開発用は`--env-file server/.env.dev`で明示する。優先順位は`--contact`、プロセス環境変数、指定ファイル。ほかの設定をプロセス環境へ読み込まない。
+
 両方の設定ファイルで次の名前を使う。
 
 ```dotenv

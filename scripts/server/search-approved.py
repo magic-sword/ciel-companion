@@ -4,13 +4,16 @@ import argparse
 from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path
 import sys
 from urllib.parse import urlsplit
 
 import httpx
+from dotenv import dotenv_values
 
 REGISTRY = Path(__file__).with_name('search-sources.json')
+DEFAULT_ENV = Path(__file__).resolve().parents[2] / 'server/.env'
 ENDPOINTS = {
     'wikipedia-ja': 'https://ja.wikipedia.org/w/api.php',
     'wikipedia-en': 'https://en.wikipedia.org/w/api.php',
@@ -124,11 +127,22 @@ def search(source, query, limit, contact, *, transport=None, registry=REGISTRY):
     return report
 
 
+def configured_contact(explicit, env_file):
+    if explicit is not None:
+        return explicit
+    if 'CIEL_SEARCH_CONTACT' in os.environ:
+        return os.environ['CIEL_SEARCH_CONTACT']
+    values = dotenv_values(env_file, interpolate=False) if env_file.is_file() else {}
+    return values.get('CIEL_SEARCH_CONTACT')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('query', nargs='?')
     parser.add_argument('--source', choices=ENDPOINTS, default='wikipedia-ja')
     parser.add_argument('--contact', help='Operator public contact URL or email sent in User-Agent')
+    parser.add_argument('--env-file', type=Path, default=DEFAULT_ENV,
+                        help='Contact setting only (default: server/.env); use server/.env.dev for development')
     parser.add_argument('--limit', type=int, choices=range(1, 11), default=5)
     parser.add_argument('--list-sources', action='store_true')
     parser.add_argument('--output', type=Path)
@@ -141,7 +155,7 @@ def main():
     if args.output and args.output.exists():
         parser.error('output must be a new file')
     try:
-        result = search(args.source, args.query, args.limit, args.contact)
+        result = search(args.source, args.query, args.limit, configured_contact(args.contact, args.env_file))
     except ValueError as exc:
         parser.error(str(exc))
     encoded = json.dumps(result, ensure_ascii=False, indent=2)

@@ -21,7 +21,7 @@
 .\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py "Python" --source wikipedia-ja --limit 5 --contact "<公開してよい実際の連絡先URLまたはメール>" --output .local/approved-search/result.json
 ```
 
-`--contact`は運営者へのUser-Agentに送る公開連絡先。APIキーや秘密情報を指定しない。Wikimediaの[利用案内](https://www.mediawiki.org/wiki/API:Etiquette)と[API利用方針](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines)に従い、専用の識別名、単発のGET、`maxlag=5`を使う。1実行1要求・最大10結果・応答上限1MB・HTTP待ち時間20秒で、再試行やページ送りはしない。複数プロセスの一括実行や定期巡回は対象外。429やAPI負荷エラーでは停止し、`Retry-After`を結果に残す。再実行は待機指示に従う。
+公開連絡先は`server/.env`の`CIEL_SEARCH_CONTACT`にも設定できる。優先順位と開発用ファイルは[実行設定](../operations/local-runtime-ja.md#本番開発で共通の変数名)を参照。`--contact`は運営者へのUser-Agentに送る公開連絡先。APIキーや秘密情報を指定しない。Wikimediaの[利用案内](https://www.mediawiki.org/wiki/API:Etiquette)と[API利用方針](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines)に従い、専用の識別名、単発のGET、`maxlag=5`を使う。1実行1要求・最大10結果・応答上限1MB・HTTP待ち時間20秒で、再試行やページ送りはしない。複数プロセスの一括実行や定期巡回は対象外。429やAPI負荷エラーでは停止し、`Retry-After`を結果に残す。再実行は待機指示に従う。
 
 許可台帳は`scripts/server/search-sources.json`。対象API、取得範囲、許可の根拠URL、確認日と再確認期限、利用規約・ライセンスの参照先を保存する。2027-02-15はこの実装の自主的な再確認期限で、運営者が保証する許諾期限ではない。条件の変更を検知した場合は期限前でも見直す。台帳を追加するだけでは接続できず、コード側の接続先一覧とAPIアダプターもレビューして更新する。LLMに接続先の追加・許可判定を任せない。`robots.txt`だけを許可根拠にしない。
 
