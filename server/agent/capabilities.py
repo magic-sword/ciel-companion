@@ -32,8 +32,7 @@ class CapabilityCatalog:
             ('4', 'research', 'Webで調査し、出典付きの結果を読む', ('research',)),
             ('5', 'minutes', '会議の議事録を作成し、状態や内容を確認する', ('minutes',)),
             ('6', 'conversation', '現在の会話の履歴を探す', ('conversation',)),
-            ('7', 'thoughts', 'シエルの内なる考えを読む・預ける', ('thoughts',)),
-            ('8', 'app', '接続しているアプリの表示・動きを操作する', ()),
+            ('7', 'app', '接続しているアプリの表示・動きを操作する', ()),
         )
         groups = {m.__name__.split('.')[-1]: m for m in modules}
         self.services = [Service(i, name, summary, frozenset(

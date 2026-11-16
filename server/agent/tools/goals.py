@@ -8,9 +8,6 @@ async def submit_game_task(context: RunContext, capability: str, arguments: dict
                            title: str, seconds: int = 90) -> str:
     """ゲームの公開する能力へ作業を依頼する。引数と制約は公開schemaに従う。受付は完了ではない。"""
     runner = context.userdata.goals
-    activity = getattr(context.userdata, 'activity', None)
-    if runner and getattr(activity, 'thinking_origin', '') == 'initiative' and runner.work and runner.work['state'] != 'succeeded':
-        return json.dumps({'status': 'busy', 'reason': 'awaiting_owner'})
     return json.dumps(await runner.start(capability, arguments, constraints=constraints, title=title, seconds=seconds)
                       if runner else {'status': 'unavailable'}, ensure_ascii=False)
 

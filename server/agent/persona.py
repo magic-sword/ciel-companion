@@ -25,11 +25,6 @@ class Persona:
     talk_quiet_instructions: str
     talk_quiet_turn_instructions: str
     talk_chatty_instructions: str
-    talk_chatty_nudge: str
-    inner_thoughts_instructions: str
-    talk_correction_nudge: str
-    talk_inner_state_instructions: str
-    inner_thoughts_voice_instructions: str
     presence_solo_instructions: str
     presence_close_instructions: str
     presence_public_instructions: str
@@ -51,8 +46,6 @@ class Persona:
     execution_instructions: str
     tool_discovery_instructions: str
     tasks_instructions: str
-    initiative_open_nudge: str
-    research_found_nudge: str
     game_instructions: str
     app_instructions: str
     image_voice_instructions: str
@@ -73,8 +66,6 @@ class Persona:
         content = json.dumps(
             [self.instructions, self.self_instructions, self.growth_instructions, self.emotion_instructions, self.greeting, self.greeting_owner, self.enroll_done, self.touch_instructions,
              self.talk_quiet_instructions, self.talk_quiet_turn_instructions, self.talk_chatty_instructions,
-             self.talk_chatty_nudge, self.inner_thoughts_instructions, self.talk_correction_nudge,
-             self.talk_inner_state_instructions, self.inner_thoughts_voice_instructions,
              self.presence_solo_instructions, self.presence_close_instructions,
              self.presence_public_instructions, self.speaker_instructions, self.notes_instructions,
              self.relationship_instructions, self.minutes_instructions, self.minutes_live_instructions,
@@ -82,7 +73,7 @@ class Persona:
              self.conversation_instructions, self.research_instructions, self.research_voice_instructions,
              self.singing_voice_instructions, self.singing_feedback, self.talker_instructions,
              self.mind_brief_instructions, self.listener_instructions, self.game_decide_instructions, self.tool_discovery_instructions, self.tasks_instructions,
-             self.initiative_open_nudge, self.research_found_nudge, self.game_instructions, self.app_instructions, self.execution_instructions,
+             self.game_instructions, self.app_instructions, self.execution_instructions,
              self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions, self.stream_note, self.voice_warmup, self.voice_first_sentence, self.stt_vocabulary, self.reply_frame,
              hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
             ensure_ascii=False,
@@ -104,15 +95,13 @@ def load_persona() -> Persona:
     values = {}
     for key in ('instructions', 'self_instructions', 'growth_instructions', 'emotion_instructions', 'greeting', 'greeting_owner', 'enroll_done', 'touch_instructions',
                 'talk_quiet_instructions', 'talk_quiet_turn_instructions', 'talk_chatty_instructions',
-                'talk_chatty_nudge', 'inner_thoughts_instructions', 'talk_correction_nudge',
-                'talk_inner_state_instructions', 'inner_thoughts_voice_instructions',
                 'presence_solo_instructions', 'presence_close_instructions',
                 'presence_public_instructions', 'speaker_instructions', 'notes_instructions', 'relationship_instructions',
                 'minutes_instructions', 'minutes_live_instructions', 'minutes_voice_instructions',
                 'conversation_instructions',
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
                 'talker_instructions', 'mind_brief_instructions', 'listener_instructions', 'game_decide_instructions', 'tool_discovery_instructions', 'tasks_instructions',
-                'initiative_open_nudge', 'research_found_nudge', 'game_instructions', 'app_instructions', 'execution_instructions',
+                'game_instructions', 'app_instructions', 'execution_instructions',
                 'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'stream_note', 'voice_warmup', 'voice_first_sentence', 'stt_vocabulary', 'reply_frame'):
         file_key = f'{key}_file'
         value = config.get(file_key)

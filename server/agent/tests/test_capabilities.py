@@ -33,7 +33,7 @@ class CatalogTests(unittest.TestCase):
                                      'finish_minutes', 'get_minutes_status', 'execute_capability',
                                      'register_participant_name', 'get_speaker_status'})
         summary = json.loads(self.catalog.summary())
-        self.assertEqual(len(summary['services']), 7)  # app is not connected
+        self.assertEqual(len(summary['services']), 6)  # app is not connected
         self.assertNotIn('remember_about_speaker', self.catalog.summary())
         self.assertNotIn('inputSchema', self.catalog.summary())
 
@@ -117,7 +117,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         self.bridge = SessionMCP(self.catalog)
         self.all = tools.TOOLS + [self.catalog.loader]
         self.catalog.select(self.all)
-        self.catalog.load(['3', '2', '7'])
+        self.catalog.load(['3', '2'])
         self.catalog.select(self.all)
 
     async def test_real_mcp_keeps_trusted_actor_out_of_model_arguments(self):
@@ -223,7 +223,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
             return 'ok'
         self.catalog.bind_external([body],'app')
         self.catalog.select(self.all+[body,self.catalog.executor])
-        self.catalog.load(['8'])
+        self.catalog.load(['7'])
         definition=self.catalog.definition(body.id)
         values={'tool_id':body.id,'version':definition['version'],'arguments':{}}
         self.catalog.moving={body.id}

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """シエルの口：シエルを話させる入り口は、ここ 1 つにする。
 
-それまでは、返事（turns.py）・自分から話しかける（initiative.py）・議事録の知らせ（agent.py）・歌（singing.py）・
+それまでは、返事（turns.py）・議事録の知らせ（agent.py）・歌（singing.py）・
 タッチ（touch.py）・声の登録（agent.py）・あいさつが、それぞれ session.generate_reply を呼び、今話してよいかも
 それぞれが決めていた（11 か所。2026-10-30）。ここに集め、なぜ話すか（why）を記録する。
 - say：今すぐ話させる（相手への返事・頼まれた一言）。
@@ -20,7 +20,7 @@ from reactions import Reactions
 
 log = logging.getLogger('ciel-agent.mouth')
 
-WHY = ('greeting', 'reply', 'initiative', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
+WHY = ('greeting', 'reply', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
        'game', 'image')   # comment：配信のコメントへの返事。game：ゲームの出来事・頼まれた技の結果（game_env.py）。
                           # image：見せてもらった画像を見る（eyes.py）
 FREE_POLL = 0.25

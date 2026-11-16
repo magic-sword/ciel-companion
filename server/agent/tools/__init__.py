@@ -23,7 +23,6 @@ class State:
     minutes: object | None = None   # minutes.Minutes（会議の議事録の係）
     history: object | None = None   # conversation.Conversation（接続中だけの共通履歴）
     researcher: object | None = None   # web_research.WebResearcher（Web検索）
-    initiative: object | None = None   # initiative.Initiative（シエルの内なる考え）
     song: object | None = None   # singing.SongListener（歌を聴く係）
     preamble: object | None = None   # emotion.PreambleCut（道具を呼んだ返事の前置きを止める）
     mouth: object | None = None   # mouth.Mouth（シエルを話させる入り口）
@@ -37,9 +36,9 @@ def cut_preamble(context) -> None:
         cut.request(getattr(context, 'speech_handle', None))
 
 
-from . import memory, minutes, people, conversation, research, thoughts, clock, singing, goals  # noqa: E402  State の後に読む
+from . import memory, minutes, people, conversation, research, clock, singing, goals  # noqa: E402  State の後に読む
 
-MODULES = (people, memory, minutes, conversation, research, thoughts, clock, singing, goals)
+MODULES = (people, memory, minutes, conversation, research, clock, singing, goals)
 TOOLS = [t for m in MODULES for t in m.TOOLS]
 # 道具の中のエラーは、エラーの係が受け止める（記録・アプリへの知らせ・心には tool_failed。errors.py）
 errors.ERRORS.wrap_tools(TOOLS)

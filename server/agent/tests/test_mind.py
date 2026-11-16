@@ -119,9 +119,9 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
         self.assertEqual(m.route(llm.ChatContext()), 'talker')
         # 話す番（自分から話す）も、心が話すか黙るかを決める
-        m.on_say('initiative')
+        m.on_say('research')
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
-        self.assertEqual(m.reply_origin, 'initiative')
+        self.assertEqual(m.reply_origin, 'research')
         m.route(self.ctx_with('こんにちは'), {})
         self.assertEqual(m.reply_origin, 'reply')
 

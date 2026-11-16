@@ -9,12 +9,10 @@ from mcp import ClientSession
 
 import app_env
 import board
-import curiosity
 import tools
 from capabilities import CapabilityCatalog
 from conversation import Conversation
 from image_analysis import ImageAnalysis
-from initiative import Thought
 from memory_jobs import run_memory_job
 from notes import NoteTaker
 from service_mcp import ServiceError, call_service
@@ -62,23 +60,6 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await run_memory_job('raw_sql', handler)
         self.assertEqual(handler.await_count, 1)
-
-    async def test_autonomous_research_uses_the_same_mcp_provider(self):
-        citation = Obj(type='url_citation', url='https://example.org/', title='Source', start_index=0, end_index=1)
-        response = Obj(status='completed', output=[Obj(type='web_search_call', status='completed'),
-            Obj(type='message', content=[Obj(type='output_text', text='answer', annotations=[citation])])])
-        client = Obj(responses=Obj(create=AsyncMock(return_value=response)), close=AsyncMock())
-        researcher = WebResearcher(Conversation(), 'instructions', client=client)
-        say = Mock()
-        worker = curiosity.Curiosity(researcher, board.Board(), say, 'FOUND', style=Obj(talk='normal'))
-        thought = Thought('気になる', 'research', 4.0, query='質問')
-        with patch('models.LOCAL_TEST', False), patch('service_mcp.debug_log.record') as trace:
-            self.assertTrue(worker.offer(thought))
-            await worker._task
-        self.assertEqual(researcher.history.research.records[0].status, 'completed')
-        self.assertTrue(any(c.kwargs.get('service') == 'research' and
-                            c.kwargs.get('operation') == 'search_web' for c in trace.call_args_list))
-        say.assert_called_once()
 
     async def test_cancelled_memory_generation_restores_save_and_forget_requests(self):
         started = asyncio.Event()
@@ -146,7 +127,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         wrapped = SessionMCP(catalog).wrap(app.tools[0])
         eligible = [wrapped, catalog.loader]
         catalog.select(eligible)
-        catalog.load(['8'])
+        catalog.load(['7'])
         catalog.select(eligible)
         result = await wrapped({'title': 'test'}, None)
         self.assertEqual(json.loads(result.output)['status'], 'ok')

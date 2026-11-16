@@ -39,7 +39,7 @@ DEEP_TURNS = 40            # 心に渡す最近の発言の数
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'initiative', 'research', 'comment', 'game', 'image')   # 心が返事を作る、口（mouth.py）の why
+DEEP_WHY = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image')   # 心が返事を作る、口（mouth.py）の why
 LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
 LONG_CHARS = 80
 # 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
@@ -65,14 +65,13 @@ BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まっ�
 
 
 class Mind:
-    def __init__(self, history, *, style=None, minutes=None, initiative=None, quiet_turn: str = '',
+    def __init__(self, history, *, style=None, minutes=None, quiet_turn: str = '',
                  brief_instructions: str = '', client=None, board=None, body=None, eyes=None,
                  self_image: str = '') -> None:
         self.history = history        # conversation.Conversation（唯一の記録）
         self.style = style            # mode.ConversationStyle
         self.minutes = minutes        # minutes.Minutes
         self.board = board            # board.Board（頼まれたこと・していることの付箋。今どうなっているかはここで読む）
-        self.initiative = initiative  # initiative.Initiative（心の状態。段階 3 で記録に移す）
         self.body = body              # game_env.GameEnv（ゲームの体。つなぐ先があるときだけ）
         self.goals = None             # goals.GoalRunner（長い目的の係。agent.py が置く）
         self.stream = None            # youtube_chat.YouTubeChat（配信中か。agent.py が置く）
@@ -95,7 +94,6 @@ class Mind:
         self.from_comment = False        # 今の返事（と、その道具の結果の続き）は配信のコメントへの返事
         self.waiting = None              # まだ言っていない知らせ（why → 指示）を返す（mouth.Mouth.waiting）
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
-        self._state: str | None = None   # 最後に受け取った心の状態（initiative）
         self._task: asyncio.Task | None = None
         # 遊んでいるあいだの振り分けの 2 段目（router.Router。道具ごとのきっかけとの意味の近さ）。agent.py が置く
         self.router = None
@@ -383,12 +381,6 @@ class Mind:
         lines = [clock.now_line()]
         if self.brief:
             lines.append(self.brief)
-        if self.initiative is not None:
-            note = self.initiative.state_note()
-            if note is not None:
-                self._state = note
-            if self._state and self.style is not None and self.style.talk == 'chatty':
-                lines.append(self._state)
         if self.board is not None:
             lines.append(self.board.context())   # 今どうなっているか（小脳も、していないことを言わないように読む）
         if self.eyes is not None:
@@ -447,7 +439,6 @@ class Mind:
             'talk': self.style.talk if self.style is not None else 'normal',
             **({'previous': self._brief_raw} if self._brief_raw else {}),
             'conversation': [{'speaker': t.name, 'text': t.text[:TURN_CHARS]} for t in rows],
-            **({'thoughts': self._state} if self._state else {}),
         }
         model = models.model('brief')
         try:

@@ -28,7 +28,6 @@ ROLES = {
     'listener': ('CIEL_LISTENER_MODEL', 'gpt-5.4-mini'),          # 聞く係が、話の途中の頼みを確かめる（listener.py）
     'brief': ('CIEL_BRIEF_MODEL', 'gpt-5.4-mini'),                # 心が「今のまとめ」を書く（mind.py）
     'stt': ('CIEL_STT_MODEL', 'gpt-live-transcribe'),             # 文字起こし（CIEL_MODEL=pipeline。話している途中から文字が出て、名前のヒントを渡せる）
-    'thought': ('CIEL_THOUGHT_MODEL', 'gpt-5.4-mini'),            # 内なる考え（initiative.py）
     'minutes_live': ('CIEL_MINUTES_LIVE_MODEL', 'gpt-5.4-mini'),  # 議事録のライブ（minutes.py）
     'minutes': ('CIEL_MINUTES_MODEL', 'gpt-5.4'),                 # 議事録の清書（minutes.py）
     'notes': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),                # メモ（notes.py）
@@ -61,7 +60,7 @@ _local_client = None
 CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt', 'research'}
 if OPENAI_ROLES - CHAT_ROLES:
     raise ValueError('CIEL_OPENAI_ROLES contains unsupported roles: ' + ', '.join(sorted(OPENAI_ROLES - CHAT_ROLES)))
-BACKGROUND_ROLES = {'thought', 'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
+BACKGROUND_ROLES = {'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}
 if LOCAL_TEST and not LOCAL_URL:
     raise ValueError('CIEL_LOCAL_LLM_URL is required for local backend')
 

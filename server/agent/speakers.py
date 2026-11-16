@@ -325,7 +325,7 @@ class SpeakerBook:
         self.owner_id: int | None = None   # 端末の持ち主（覚えている人の番号。アプリの hello で決まる）
         self.channel: str | None = None    # 声の経路（端末ごと。見本に印を付ける）
         self.device_known = asyncio.Event()   # アプリの hello を受け取った（あいさつの前に、持ち主が分かるのを少し待つ）
-        self.enrolling: Enrollment | None = None   # 声の登録の途中（その間は返事をしない。turns.py・initiative.py が見る）
+        self.enrolling: Enrollment | None = None   # 声の登録の途中（その間は返事をしない。turns.py が見る）
         self.on_enroll = None          # 登録の様子が変わったとき呼ぶ（引数は enroll_state()。agent.py がアプリへ送る）
         self.on_enrolled = None        # 登録できたとき呼ぶ（引数は名前。agent.py がシエルにひとこと言わせる）
 

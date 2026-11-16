@@ -424,14 +424,6 @@ class BodyLifecycleTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['status'], 'busy')
         stop.assert_not_awaited()
 
-    async def test_spontaneous_action_cannot_replace_current_body_command(self):
-        self.env.activity.thinking_origin = 'initiative'
-        self.env._body = {'current': {'id': 1}}
-        self.env._call = mock.AsyncMock()
-        result = await self.env.use('test_jump', {})
-        self.assertEqual(result['status'], 'goal_running')
-        self.env._call.assert_not_awaited()
-
 
 class MindGameTest(EnvCase):
     def setUp(self):

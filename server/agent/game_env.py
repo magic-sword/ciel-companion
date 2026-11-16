@@ -454,13 +454,7 @@ class GameEnv:
         if role == 'act' and not meta.get('ciel/stops') and not self._body_protocol_valid:
             return {'status': 'error', 'reason': 'body_protocol_mismatch'}
         busy = self.goals.body_step() if self.goals is not None and role == 'act' else None
-        planning = False
-        spontaneous = self.activity is not None and self.activity.thinking_origin == 'initiative'
-        if role == 'act' and spontaneous and (busy is not None or planning or self._body.get('current') or self._body.get('pending')):
-            return {'status': 'goal_running', 'why': '依頼された体の作業を進めている'}
         if role == 'act' and busy is not None:
-            if spontaneous:
-                return {'status': 'goal_running', 'why': '持ち主の目的を進めている'}
             if not meta.get('ciel/stops'):
                 return {'status': 'busy'}
             return await self.goals.stop()

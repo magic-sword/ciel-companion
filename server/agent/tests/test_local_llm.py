@@ -11,13 +11,13 @@ class RoutingTest(unittest.TestCase):
     def test_explicit_cloud_mind_preserves_local_background_and_options(self):
         with mock.patch.object(models, 'LOCAL_TEST', True), \
              mock.patch.object(models, 'LOCAL_URL', 'http://local.invalid/v1'), \
-             mock.patch.object(models, 'LOCAL_ROLES', {'mind', 'thought'}), \
+             mock.patch.object(models, 'LOCAL_ROLES', {'mind', 'brief'}), \
              mock.patch.object(models, 'OPENAI_ROLES', {'mind'}), \
              mock.patch.dict('os.environ', {'CIEL_MIND_MODEL': 'gpt-5.4-mini'}):
             self.assertFalse(models.is_local('mind'))
-            self.assertTrue(models.is_local('thought'))
+            self.assertTrue(models.is_local('brief'))
             self.assertEqual(models.model('mind'), 'gpt-5.4-mini')
-            self.assertEqual(models.model('thought'), models.LOCAL_MODEL)
+            self.assertEqual(models.model('brief'), models.LOCAL_MODEL)
             self.assertEqual(models.reply_options('none'), {'model': 'gpt-5.4-mini', 'reasoning_effort': 'none'})
             self.assertEqual(models.options('mind', model='gpt-5.4-mini', timeout=20),
                              {'model': 'gpt-5.4-mini', 'timeout': 20})
@@ -29,16 +29,16 @@ class RoutingTest(unittest.TestCase):
 
     def test_only_listed_roles_go_local(self):
         with mock.patch.object(models, 'LOCAL_URL', 'http://127.0.0.1:8094/v1'), \
-             mock.patch.object(models, 'LOCAL_ROLES', {'thought', 'brief'}), mock.patch.object(models, '_local_client', None):
-            self.assertTrue(models.is_local('thought'))
+             mock.patch.object(models, 'LOCAL_ROLES', {'brief', 'brief'}), mock.patch.object(models, '_local_client', None):
+            self.assertTrue(models.is_local('brief'))
             self.assertFalse(models.is_local('mind'))   # 返事は OpenAI のまま
-            self.assertEqual(models.model('thought'), 'local')
+            self.assertEqual(models.model('brief'), 'local')
             default = object()
             self.assertIs(models.client_for('mind', default), default)
-            local = models.client_for('thought', default)
+            local = models.client_for('brief', default)
             self.assertIsNot(local, default)
             self.assertEqual(str(local.base_url).rstrip('/'), 'http://127.0.0.1:8094/v1')
-            o = models.options('thought', model='gpt-5.4-mini', reasoning_effort='low', timeout=20.0, messages=[])
+            o = models.options('brief', model='gpt-5.4-mini', reasoning_effort='low', timeout=20.0, messages=[])
             self.assertEqual(o['model'], 'local')
             self.assertNotIn('reasoning_effort', o)
             self.assertEqual(o['timeout'], models.LOCAL_TIMEOUT)
@@ -47,9 +47,9 @@ class RoutingTest(unittest.TestCase):
             self.assertEqual(models.options('mind', model='x', reasoning_effort='low'), {'model': 'x', 'reasoning_effort': 'low'})
 
     def test_no_url_means_nothing_is_local(self):
-        with mock.patch.object(models, 'LOCAL_URL', ''), mock.patch.object(models, 'LOCAL_ROLES', {'thought'}):
-            self.assertFalse(models.is_local('thought'))
-            self.assertEqual(models.model('thought'), 'gpt-5.4-mini')
+        with mock.patch.object(models, 'LOCAL_URL', ''), mock.patch.object(models, 'LOCAL_ROLES', {'brief'}):
+            self.assertFalse(models.is_local('brief'))
+            self.assertEqual(models.model('brief'), 'gpt-5.4-mini')
 
 
 class SingingSwitchTest(unittest.IsolatedAsyncioTestCase):

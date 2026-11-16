@@ -8,7 +8,7 @@ Unity が LiveKit のデータのメッセージ（topic ciel.style）で知ら�
   [silent] の返事は会話の履歴には残るので、黙っていたあいだの話の流れもシエルは覚えている。
   黙る仕組みは文字から声を作る方式（CIEL_VOICE=irodori）でだけ働く。ほかの方式では normal にする。
 - normal（ふつう）：話しかけられるたびに答える。指示は足さない。
-- chatty（おしゃべり）：答えるうえに、しばらく静かだと自分からも話しかける（initiative.py）。talk_chatty.md を足す。
+- chatty（おしゃべり）：答えるときに話を広げる。talk_chatty.md を足す。
 
 その場にいる人（presence）：覚えている人のメモ（speakers.py）の出し方。
 - solo（ひとり）：本人のメモを渡し、シエルから話題にしてよい（presence_solo.md）。

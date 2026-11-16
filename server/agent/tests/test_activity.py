@@ -101,12 +101,12 @@ class DetailTest(unittest.TestCase):
     def test_repeated_thinking_resets_the_timer_and_is_published(self):
         clock, sent = Clock(), []
         a = activity.Activity(sent.append, clock=clock)
-        a.thinking('mind', 'initiative')
+        a.thinking('mind', 'research')
         clock.now += 5
         before = len(sent)
-        a.thinking('mind', 'initiative')
+        a.thinking('mind', 'research')
         self.assertEqual(a.state()['mind_for'], 0)
-        self.assertEqual(a.state()['thinking_origin'], 'initiative')
+        self.assertEqual(a.state()['thinking_origin'], 'research')
         self.assertGreater(len(sent), before)
         a.agent_state(types.SimpleNamespace(new_state='listening'))
         self.assertEqual(a.state()['thinking_origin'], '')

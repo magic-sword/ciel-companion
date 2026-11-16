@@ -21,8 +21,8 @@ class CostTest(unittest.TestCase):
         self.assertEqual(models.cost('unknown', 1000, 0, 1000), 0.0)
 
     def test_role_reads_environment(self):
-        with mock.patch.dict('os.environ', {'CIEL_THOUGHT_MODEL': 'gpt-5.4'}):
-            self.assertEqual(models.model('thought'), 'gpt-5.4')
+        with mock.patch.dict('os.environ', {'CIEL_BRIEF_MODEL': 'gpt-5.4'}):
+            self.assertEqual(models.model('brief'), 'gpt-5.4')
 
 
 class RecordTest(unittest.TestCase):
@@ -34,13 +34,13 @@ class RecordTest(unittest.TestCase):
                                      input_tokens_details=types.SimpleNamespace(cached_tokens=0),
                                      output_tokens_details=None)
         with mock.patch('debug_log.record') as rec:
-            models.record('thought', 'gpt-5.4-mini', chat)
+            models.record('brief', 'gpt-5.4-mini', chat)
             models.record('research', 'gpt-5.4-mini', resp)
             models.record('notes', 'gpt-5.4-mini', None)
         self.assertEqual(rec.call_count, 2)
         first = rec.call_args_list[0].kwargs
         self.assertEqual((first['role'], first['input_tokens'], first['cached_tokens'], first['reasoning_tokens']),
-                         ('thought', 100, 50, 5))
+                         ('brief', 100, 50, 5))
         self.assertEqual(rec.call_args_list[1].kwargs['input_tokens'], 200)
 
 

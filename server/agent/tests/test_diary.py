@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, Mock
 
 from conversation import Conversation
 import diary
-from initiative import Initiative
 from jst import JST
 import touch
 
@@ -79,21 +78,6 @@ class TouchDiaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([c.args for c in t.diary.add.call_args_list],
                          [('touch', '頭をなでてもらった'), ('touch', '頭をちょんとつつかれた')])
         await __import__('mouth').of(session).reactions.close()
-
-
-class ThinkerGetsEventsTests(unittest.IsolatedAsyncioTestCase):
-    async def test_events_go_to_the_thinker(self):
-        session = SimpleNamespace(generate_reply=Mock())
-        i = Initiative(session, SimpleNamespace(talk='chatty'), 'NUDGE', history=Conversation(), instructions='THINK')
-        i.diary = diary.Diary()
-        i.diary.add('research', '気になって調べた：サモエドの毛が白い理由', at=datetime.now(JST))
-        reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{}'))])
-        i._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(return_value=reply))))
-        await i._think(0.0)
-        request = json.loads(i._client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
-        self.assertEqual(request['ciel_events'], ['さっき：気になって調べた：サモエドの毛が白い理由'])
-        i.apply({'thoughts': [{'text': '白い毛の理由、話したい', 'kind': 'share', 'stimulus': '調べたこと', 'motivation': 4}]}, 1.0)
-        self.assertEqual(i.thoughts[0].kind, 'share')
 
 
 if __name__ == '__main__':

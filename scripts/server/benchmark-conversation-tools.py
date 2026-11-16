@@ -73,7 +73,7 @@ async def run(args):
                 history = Conversation()
                 agent.mind = Mind(history)
                 agent.style = Obj(talk='chatty', presence='close')
-                state = State(history=history, book=Obj(), minutes=Obj(), initiative=Obj())
+                state = State(history=history, book=Obj(), minutes=Obj())
                 speech = Obj(id='fixture', num_steps=1)
                 session = Obj(userdata=state, current_speech=speech, _global_run_state=None)
                 chat = llm.ChatContext()

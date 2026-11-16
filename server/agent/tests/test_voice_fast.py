@@ -73,10 +73,10 @@ class AdmissionTest(unittest.TestCase):
 
     def test_only_local_background_roles_receive_background_class(self):
         with patch('models.is_local', return_value=True), patch.dict('os.environ', {'CIEL_VOICE_FAST':'1'}):
-            self.assertEqual(models.options('thought')['extra_headers']['X-Ciel-Work-Class'], 'background')
+            self.assertEqual(models.options('brief')['extra_headers']['X-Ciel-Work-Class'], 'background')
             self.assertEqual(models.options('listener')['extra_headers']['X-Ciel-Work-Class'], 'foreground')
         with patch('models.is_local', return_value=False):
-            self.assertNotIn('extra_headers', models.options('thought'))
+            self.assertNotIn('extra_headers', models.options('brief'))
 
 
 class ClauseTest(unittest.TestCase):

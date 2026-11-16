@@ -40,14 +40,12 @@ import aizuchi
 import board
 import benchmark_contract
 import clock
-import curiosity
 import debug_log
 import diary
 import eyes as eyes_
 import emotion
 import growth
 import health
-import initiative
 import interruptions
 import irodori_tts
 import errors
@@ -225,7 +223,6 @@ class Ciel(Agent):
                 'minutes': persona.minutes_voice_instructions,
                 'conversation': persona.conversation_instructions,
                 'research': persona.research_voice_instructions,
-                'thoughts': persona.inner_thoughts_voice_instructions,
                 'karaoke': persona.singing_voice_instructions,
                 'app': persona.app_instructions,
                 'game': '\n\n'.join(p for p in (persona.game_instructions, getattr(game, 'instructions', '')) if p),
@@ -281,9 +278,6 @@ class Ciel(Agent):
         reaction = reactions.current() if reactions else None
         if reactions and not reactions.allowed(speech_id):
             return
-        if work is not None and work.body_step() and self.mind.reply_origin == 'initiative':
-            yield '[silent]'
-            return
         decision = getattr(self, 'game_decision', None)
         decided = False
         if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
@@ -320,7 +314,7 @@ class Ciel(Agent):
             self.capabilities.disabled = {name for name, ready in (
                 ('memory', state.book is not None), ('karaoke', state.song is not None),
                 ('research', state.researcher is not None and not models.LOCAL_TEST),
-                ('minutes', state.minutes is not None), ('thoughts', state.initiative is not None),
+                ('minutes', state.minutes is not None),
                 ('conversation', state.history is not None)) if not ready}
             fns = self.capabilities.select(fns)
             self.capabilities.moving = set(self.mind.one_call_tools())
@@ -461,8 +455,7 @@ class Ciel(Agent):
             parts.append(p.speaker_instructions)
         for service, prompt in [('minutes', p.minutes_voice_instructions),
                                 ('conversation', p.conversation_instructions),
-                                ('research', p.research_voice_instructions),
-                                ('thoughts', p.inner_thoughts_voice_instructions)]:
+                                ('research', p.research_voice_instructions)]:
             if loaded is None or service in loaded:
                 parts.append(prompt)
         if self.capabilities is not None:
@@ -539,7 +532,7 @@ async def entrypoint(ctx: JobContext) -> None:
     book = speakers.SpeakerBook(store) if SPEAKERS else None
     if book is not None:
         await book.load()
-    # シエル自身に本当にあった出来事（diary.py）。内なる考えが、自分から話したいことの材料にする
+    # シエル自身に本当にあった出来事（diary.py）。好みが育つ材料にする（growth.py）
     ciel_diary = diary.Diary(store)
     await ciel_diary.load()
     # 出来事から育った好み（growth.py）。芯の好みのあとに、会話モデルと内なる考えへ渡す
@@ -651,34 +644,12 @@ async def entrypoint(ctx: JobContext) -> None:
             json.dumps(packet, ensure_ascii=False), reliable=True, topic='ciel.research')
     researcher = WebResearcher(history, agent.persona.research_instructions, publish_research)
     session.userdata.researcher = researcher
-    # シエルの内なる考え：会話の裏で考えを作り、話したい気持ちが強い考えを、会話が途切れたときに話す（initiative.py）
-    talker = initiative.Initiative(session, style, agent.persona.talk_chatty_nudge, history=history,
-                                   instructions='\n\n'.join(part for part in (agent.persona.inner_thoughts_instructions,
-                                                                agent.persona.self_instructions, agent.grown) if part),
-                                   correction_nudge=agent.persona.talk_correction_nudge,
-                                   state_header=agent.persona.talk_inner_state_instructions,
-                                   memories=lambda: book.last.notes() if book is not None and book.last is not None
-                                   and book.last_sure and style.presence in ('solo', 'close') else [])
-    replies.initiative = talker   # 相手への返事に、話したかった考えを添える
-    talker.on_thinking = act.background
-    talker.diary = ciel_diary
     if PIPELINE:
         # 心：返事のたびに会話の記録から文脈を作る（mind.py）。話者は返事の前に turns.py が決める
         # 付箋の一覧：頼まれたこと・していることの今の状態を、心・小脳・アプリが同じ 1 つで見る（board.py）
         tasks = board.Board()
         tasks.on_change = notify
         minute_taker.board = tasks
-        # 気になっていることも付箋にし、話す番が来たら心が話すかを決める（沈黙の秒数では話さない。initiative.py）
-        talker.board, talker.open_nudge = tasks, agent.persona.initiative_open_nudge
-
-        # 調べてみたいことを、自分で調べて、分かったら話の切れ目に話す（curiosity.py）。分かったことは日記にも残す
-        def learned(question: str, summary: str) -> None:
-            talker.learn(question, summary)
-            ciel_diary.add('research', f'気になって調べた：{question} → {summary}')
-        talker.curious = curiosity.Curiosity(
-            researcher, tasks, lambda text: voice.say_latest('research', settle=curiosity.SETTLE, instructions=text),
-            agent.persona.research_found_nudge, style=style, paused=lambda: talker.paused is not None and talker.paused(),
-            learned=learned)
         # ゲームの体（game_env.py）。アプリの設定でオンにしたときだけ受け持つ。
         # 出来事は、話の切れ目に心が知らせる（why 'game'）
         body = game
@@ -704,14 +675,6 @@ async def entrypoint(ctx: JobContext) -> None:
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:
-            # 内なる考えに、マイクラの様子と今の目的を渡す（遊んでいるあいだだけ）。体でやりたいこと（act）を考え、
-            # 静かでも一定の間で考える（initiative.py の game・PLAY_THINK_SECONDS）
-            def game_now() -> str | None:
-                if not body.playing():
-                    return None
-                goal = goal_runner.context() if goal_runner is not None else None
-                return '\n'.join(p for p in (body.context(), goal) if p)
-            talker.game = game_now
             ctx.room.on('data_received', body.on_data)
             ctx.add_shutdown_callback(body.close)   # 会話が終わったら切る（体はその場で待つ）
         # 目（eyes.py）：アプリから送られた画像を受け取り、話の切れ目に心が見て話す（why 'image'）
@@ -720,7 +683,7 @@ async def entrypoint(ctx: JobContext) -> None:
         if body is not None:
             body.eyes = seeing   # ゲームの体の目で撮った景色も、同じ目の係が受ける
         ctx.room.register_byte_stream_handler(eyes_.TOPIC, seeing.on_stream)
-        agent.mind = mind.Mind(history, style=style, minutes=minute_taker, initiative=talker,
+        agent.mind = mind.Mind(history, style=style, minutes=minute_taker,
                                quiet_turn=agent.persona.talk_quiet_turn_instructions,
                                brief_instructions=agent.persona.mind_brief_instructions, board=tasks, body=body,
                                eyes=seeing, self_image=agent.persona.self_image)
@@ -753,7 +716,6 @@ async def entrypoint(ctx: JobContext) -> None:
         session.on('conversation_item_added', on_said)
         agent.replies, agent.style = replies, style
         replies.stall_watch = False   # 区切りは LiveKit が決めるので、Realtime の区切りが来ない見張りは使わない
-    session.userdata.initiative = talker   # 道具 read_inner_thoughts・keep_thought が、心の中を読む・預ける
     # 歌を聴く（singing.py）。聴いているあいだは会話モデルへ声を送らず、シエルから話しかけない
     song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
     session.userdata.song = song
@@ -769,16 +731,12 @@ async def entrypoint(ctx: JobContext) -> None:
                 voice.reactions.receive('song', envelope, why='song', expression=msg.get('expression') or None)
             notify(msg)
         song.publish = song_event
-        talker.paused = lambda: song.active
-        song.on_end = talker.interlude   # 歌の前の考えを、歌のあとで話さない
         song.preamble = agent.preamble   # 「どうぞ」を 2 文までにする
     if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
         import inference_activity
         session.on('user_state_changed', lambda ev: inference_activity.activity.update(user=ev.new_state == 'speaking'))
         session.on('agent_state_changed', lambda ev: inference_activity.activity.update(
             agent=ev.new_state in ('thinking', 'speaking', 'initializing')))
-    session.on('user_state_changed', talker.on_user_state)
-    session.on('agent_state_changed', talker.on_agent_state)
     if REALTIME:
         session.on('user_state_changed', replies.on_user_state)
         session.on('user_input_transcribed', replies.on_transcribed)   # 文字起こしの確定で返事を作らせる
@@ -823,7 +781,6 @@ async def entrypoint(ctx: JobContext) -> None:
             await voice.say_when_free('enrolled', wait=10.0, anyway=True, tool_choice='none',
                                       instructions=agent.persona.enroll_done.replace('{name}', name))
         book.on_enrolled = lambda name: asyncio.create_task(enrolled(name))
-        talker.paused = lambda: book.enrolling is not None or (song is not None and song.active)
     # 書き起こし・発言時刻・その区間の話者を共通履歴へ一度だけ記録する。
     recorder = ConversationRecorder(history, replies, note_taker)
     session.on('user_input_transcribed', recorder.on_transcribed)
@@ -948,7 +905,6 @@ async def entrypoint(ctx: JobContext) -> None:
     if not BENCHMARK:
         await voice.say('greeting', instructions=clock.now_line() + '\n\n' + await greeting(agent, book, style),
                                      tool_choice='none')
-    talker.start()
     if agent.mind is not None:
         agent.mind.start()   # 心が「今のまとめ」を書く見回り
     if AIZUCHI:
