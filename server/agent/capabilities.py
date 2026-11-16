@@ -177,6 +177,36 @@ class CapabilityCatalog:
         self.exposed = {t.id for t in visible}
         return visible
 
+    def retain_context(self, context):
+        """Keep only issued definitions still visible in this request's working context.
+
+        This only revokes availability; replaying a tool result cannot grant it.
+        Mind builds a fresh tail after each completed reply, so prior task details
+        and their execution leases expire together, without changing shared history.
+        """
+        visible = {}
+        for item in context.items:
+            if (getattr(item, 'type', None) != 'function_call_output'
+                    or getattr(item, 'name', None) != self.loader.id
+                    or getattr(item, 'is_error', False)):
+                continue
+            try:
+                packet = json.loads(item.output)
+                if not isinstance(packet, dict) or packet.get('status') != 'loaded':
+                    continue
+                for service in packet.get('definitions', []):
+                    for definition in service.get('tools', []):
+                        visible[definition['tool_id']] = definition['version']
+            except (ValueError, TypeError, KeyError, AttributeError):
+                continue
+        self.issued = {name: version for name, version in self.issued.items()
+                       if name in self.allowed and visible.get(name) == version
+                       and self.definition(name)['version'] == version}
+        retained = {self.service_for(name) for name in self.issued}
+        for service in list(self.loaded):
+            if service not in retained:
+                del self.loaded[service]
+
     def summary(self):
         return json.dumps({'services': [{'id': s.id, 'name': s.name, 'summary': s.summary}
                                        for s in self.services if s.name not in self.disabled

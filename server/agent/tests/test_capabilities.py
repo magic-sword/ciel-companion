@@ -53,6 +53,36 @@ class CatalogTests(unittest.TestCase):
             self.assertNotEqual(self.catalog.load(ids)['status'], 'loaded')
             self.assertFalse(self.catalog.loaded)
 
+    def test_definition_lease_follows_request_context_not_session(self):
+        self.ids()
+        packet = self.catalog.load(['5', '6'])
+        ctx = mind.llm.ChatContext()
+        ctx.items.append(mind.llm.FunctionCallOutput(call_id='load', name='load_capabilities',
+            output=json.dumps(packet), is_error=False))
+        self.catalog.retain_context(ctx)
+        self.assertTrue(self.catalog.can_execute('read_minutes'))
+        self.assertTrue(self.catalog.can_execute('search_conversation'))
+        original = ctx.items[0].output
+        self.catalog.retain_context(mind.llm.ChatContext())
+        self.assertFalse(self.catalog.loaded)
+        self.assertFalse(self.catalog.can_execute('read_minutes'))
+        self.assertTrue(self.catalog.can_execute('finish_minutes'))
+        self.catalog.retain_context(ctx)
+        self.assertFalse(self.catalog.loaded)
+        self.assertEqual(ctx.items[0].output, original)
+
+    def test_context_retention_revokes_changed_or_disallowed_definitions(self):
+        self.ids()
+        packet = self.catalog.load(['5', '6'])
+        ctx = mind.llm.ChatContext()
+        ctx.items.append(mind.llm.FunctionCallOutput(call_id='load', name='load_capabilities',
+            output=json.dumps(packet), is_error=False))
+        self.catalog.instructions['conversation'] = 'changed'
+        self.catalog.select(tools.for_comments(self.all))
+        self.catalog.retain_context(ctx)
+        self.assertFalse(self.catalog.can_execute('read_minutes'))
+        self.assertFalse(self.catalog.can_execute('search_conversation'))
+
     def test_lru_bound_and_session_isolation(self):
         self.ids()
         self.catalog.load(['3', '4', '5'])

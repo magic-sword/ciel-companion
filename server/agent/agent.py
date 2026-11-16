@@ -293,6 +293,7 @@ class Ciel(Agent):
                 ('minutes', state.minutes is not None),
                 ('conversation', state.history is not None)) if not ready}
             fns = self.capabilities.select(fns)
+            self.capabilities.retain_context(ctx)
             self.capabilities.moving = set(self.mind.one_call_tools())
             style = self.style
             index = next((i for i, item in enumerate(ctx.items) if getattr(item, 'role', None) == 'system'), None)
