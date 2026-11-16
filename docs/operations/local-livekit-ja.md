@@ -44,4 +44,4 @@ scripts/server/livekit-local.sh stop
 source scripts/server/ssh-target.sh "" && "${SSH[@]}" 'docker exec ciel-dev-agent-local-1 sh -c "cd /app && python bench_latency.py --agent ciel-dev --rounds 2"'
 ```
 
-その部屋の開発ログ（`scripts/server/debug-log.sh pull --dev`）から、返事ごとの時間とキャッシュを`scripts/server/conversation_latency_report.py`で集計する。結果は[音声の実測](../testing/voice-results-ja.md#家の中のlivekitでの往復の速さ)。
+返事の推論だけを比べるときは、発言を文字で送る`bench_text.py`を使う（音声の台本は、音声認識の区切り方で返事が作り直されて揺れる）。別の版と比べるときは`LIVEKIT_LOCAL_REVISION=<コミット> scripts/server/livekit-local.sh start`で、開発へ配布したことのある版を起動する。その部屋の開発ログ（`scripts/server/debug-log.sh pull --dev`）から、返事ごとの時間とキャッシュを`scripts/server/conversation_latency_report.py`で集計する。結果は[音声の実測](../testing/voice-results-ja.md#家の中のlivekitでの往復の速さ)。

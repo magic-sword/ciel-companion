@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # 家の中だけの LiveKit と試験用の会話サーバーを、自宅サーバーで起動・停止する（Git Bash、リポジトリのルートで）。
 #   scripts/server/livekit-local.sh start    今の開発の会話サーバーと同じ版で起動する（初回は鍵を作る）
+#   LIVEKIT_LOCAL_REVISION=<コミット> scripts/server/livekit-local.sh start
+#                                            開発へ配布したことのある別の版で起動する（変更の前後を比べるとき）
 #   scripts/server/livekit-local.sh stop     止める（普段の開発・本番には触らない）
 #   scripts/server/livekit-local.sh status   動いているか、アプリに入れるトークンの取得先
 # 置き場所は開発（~/work/ciel-companion-dev/server）。compose.livekit-local.yaml と livekit-local/ をそこへ送る。
@@ -16,7 +18,8 @@ if [ "$ACTION" = start ]; then
   tar -C "$ROOT/server" -cf - compose.livekit-local.yaml livekit-local | "${SSH[@]}" "cd $DEST && tar xf -"
 fi
 
-"${SSH[@]}" "ACTION=$ACTION bash -s" <<'REMOTE'
+REVISION=${LIVEKIT_LOCAL_REVISION:+$(git -C "$ROOT" rev-parse --verify "$LIVEKIT_LOCAL_REVISION^{commit}")}
+"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/work/ciel-companion-dev/server
 PROD=../../ciel-companion/server
@@ -34,8 +37,15 @@ print(f'LIVEKIT_LOCAL_SECRET={secrets.token_urlsafe(32)}')
 PY
 fi
 set -a; . "./$ENV"; set +a
-export CIEL_LOCAL_AGENT_IMAGE=$(docker inspect ciel-dev-agent-dev-1 --format '{{.Config.Image}}' 2>/dev/null || true)
-export CIEL_LOCAL_AGENT_CONFIG=$(docker inspect ciel-dev-agent-dev-1 --format '{{range .Mounts}}{{if eq .Destination "/app/config"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)
+if [ -n "$REVISION" ]; then
+  # deploy-agent.py が残した、その版のイメージと設定
+  REV=${REVISION:0:12}
+  export CIEL_LOCAL_AGENT_IMAGE=ciel-dev-agent:$REV
+  export CIEL_LOCAL_AGENT_CONFIG=$(ls -d "$PWD"/data/deployments/agent-$REV*/release/server/agent/config 2>/dev/null | tail -n 1)
+else
+  export CIEL_LOCAL_AGENT_IMAGE=$(docker inspect ciel-dev-agent-dev-1 --format '{{.Config.Image}}' 2>/dev/null || true)
+  export CIEL_LOCAL_AGENT_CONFIG=$(docker inspect ciel-dev-agent-dev-1 --format '{{range .Mounts}}{{if eq .Destination "/app/config"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)
+fi
 COMPOSE=(docker compose -p ciel-dev --env-file "$PROD/.env.shared" --env-file .env.dev --env-file "$ENV"
          -f compose.dev.yaml -f compose.livekit-local.yaml)
 case "$ACTION" in
