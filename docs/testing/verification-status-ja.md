@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+2026-11-17、Gemini 2.5 Flash-LiteのGoogle検索連携を試す単発スクリプトを準備した。ローカルおよび本番・開発の設定を値非表示で確認したが、Gemini用APIキーは未設定。検索根拠・モデル一致・無料プラン確認・上限停止とキー秘匿のオフライン4件、文書検査は成功。実APIのアクセス可否・無料枠・検索品質は未検証で、本番の検索プロバイダーは変更していない。[試験手順](../services/web-research-ja.md#geminiのgoogle検索連携の接続試験)を参照。
+
 2026-11-16、利用者の指定により通常の音声・文字会話へ`say`・`act`の実行ループを接続した。LiveKitの結果イベントから継続し、サービス通知との重複発話を抑止、人の発話開始と会話終了で古い判断を失効させる。通常回帰749件（`.local/regression/20261116T120306Z-5926f8/report.json`、DB非選択）、能力MCP・反応結合が成功。通常入口を差し替えない共有Qwenの検索・引用・雑談3場面も3/3成功。先の60ターン比較の要求操作18/33→30/33・無操作26/27→21/27という改善と退行は残課題として維持する。実マイク・TTS・実通知の体感は未確認。[条件・結果](capability-results-ja.md#say-actによる実行ループの比較)。この接続版eb4655f96b7889e254f95c301eede15f7db158a2を開発・本番へ配布済み。
 
 開発は185ファイル完全一致・health・worker登録・他コンテナ不変・再起動0（image `a6c2cc9056e355c81709ca63284bc80080e44eebcab2d40c4a976c4e8895f1e9`、根拠`~/work/ciel-companion-dev/server/data/deployments/agent-eb4655f96b78-1794830941448515746`）。本番はGit archiveの確定版から標準deploy-remoteで再構築し、185ファイル完全一致、通常pipeline設定、health・worker登録・再起動0・Traceback 0・他コンテナ不変を確認（image `464accbc75b50e2a836e3b56831ccb7ff26382bb19367ee3a94e65a7fa80356e`、根拠`~/work/ciel-companion/server/data/deployments/production-eb4655f96b78`）。DBを配布前に退避。先行配布114d555で発見した本番の旧ファイル18個も退避済みで、実行・設定領域に余分な旧ファイルはない。以下の自発判断・取得状態修正を含む。
