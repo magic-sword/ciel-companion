@@ -55,9 +55,10 @@ class MindTest(unittest.TestCase):
         ctx = ctx_with(None)
         self.assertEqual(self.mind.route(ctx), 'mind')
         # 目的の道具は、ゲームの体を受け持っていないので渡さない（mind.py の tools_for）
-        comment_tools = ({t.id for t in tools.for_comments(tools.TOOLS)} - set(GOAL_TOOLS)
-                         - set(mind.MINUTES_MOVES) - {'get_minutes_status'})
+        comment_tools = {t.id for t in tools.for_comments(tools.TOOLS)} - set(GOAL_TOOLS)
         self.assertEqual(self.ids(ctx), comment_tools)
+        # 議事録を動かす道具は一覧に載せたまま、頼みが無ければ呼んでも断る（mind.py の refused_now）
+        self.assertTrue(set(mind.MINUTES_MOVES) | {'get_minutes_status'} <= self.mind.refused_now(ctx))
         # 道具の結果を受けた続きも、コメントへの返事のまま
         ctx.items.append(llm.FunctionCall(call_id='c1', name='research_web', arguments='{}'))
         ctx.items.append(llm.FunctionCallOutput(call_id='c1', name='research_web', output='{}', is_error=False))

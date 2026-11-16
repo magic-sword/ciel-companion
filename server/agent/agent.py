@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 load_dotenv()  # models.py を含む各モジュールが環境変数を読む前に設定する
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, inference, llm
+from livekit.agents.llm._provider_format.openai import to_fnc_ctx
 from livekit.agents.voice.agent_session import SessionConnectOptions
 from livekit.plugins import openai
 from openai.types.realtime.audio_transcription import AudioTranscription
@@ -257,7 +258,8 @@ class Ciel(Agent):
         return self._pipeline_llm(chat_ctx, tools, model_settings)
 
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
-        """pipeline：誰が話したかを決め、心と小脳のどちらが返すかをコードで決めて（mind.py の route）、返事を流す"""
+        """pipeline：返事を作るかをコードで決め（mind.py の route）、心の返事を流す。ゲーム中の持ち主の発言は、
+        心と同じ固定の指示・道具の一覧・履歴で、先に話すこととすることを一つの決定にする（game_decision.py）"""
         readiness = getattr(self, 'voice_readiness', None)
         validated = await voice_preparation.validate(readiness)
         if validated is not readiness:
@@ -278,38 +280,11 @@ class Ciel(Agent):
         reaction = reactions.current() if reactions else None
         if reactions and not reactions.allowed(speech_id):
             return
-        decision = getattr(self, 'game_decision', None)
-        decided = False
-        if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
-                and self.mind.reply_origin == 'reply'):
-            tail = mind._tail(list(chat_ctx.items))
-            user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
-            if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
-                # One decision with the whole conversation: what to say and what to do (game_decision.py).
-                style = self.style
-                wire = mind.local_context(self.mind.build(chat_ctx, turn=turn), source=chat_ctx).to_provider_format('openai')[0] \
-                    if models.is_local('mind') else self.mind.build(chat_ctx, turn=turn).to_provider_format('openai')[0]
-                # The game's instructions travel with loaded capabilities, not in the fixed instructions;
-                # the decision needs them next to its actions (they say which capability does what).
-                system = '\n\n'.join(t for t in (self.instructions_for(
-                    style.talk if style else 'normal', style.presence if style else 'solo'), self._game_text()) if t)
-                reply = await decision.handle(user_item, system,
-                                              [m for m in wire if m is not wire[0] or m.get('role') != 'system'])
-                decided = True
-                if reply is not None:
-                    yield reply
-                    return
         if who == 'skip':
             return
-        # One conversation loop; load service schemas and instructions on demand.
-        who = 'mind'
-        if self.activity is not None:
-            self.activity.thinking(who, self.mind.reply_origin)
+        # One conversation: the same fixed instructions, tools and history for every reply and for the decision.
         ctx, fns = self.mind.build(chat_ctx, turn=turn), self.mind.tools_for(chat_ctx, tools)
-        if decided:
-            # The decision already chose not to act; the conversation model answers in words.
-            fns = [fn for fn in fns if getattr(fn, 'id', None) not in mind.GOAL_MOVING]
-        if who == 'mind' and self.capabilities is not None:
+        if self.capabilities is not None:
             state = self.session.userdata
             self.capabilities.disabled = {name for name, ready in (
                 ('memory', state.book is not None), ('karaoke', state.song is not None),
@@ -338,11 +313,32 @@ class Ciel(Agent):
             fixed = next((item.text_content for item in ctx.items if getattr(item, 'role', None) == 'system'), '')
             await voice_preparation.prepare_conversation_prefix(fixed, fns, self.persona.voice_warmup)
             self._conversation_prefix_prepared = True
+        if models.is_local('mind'):
+            ctx = mind.local_context(ctx, source=chat_ctx)
+        # Shown but not run this time (mind.refused_now); a call to them is dropped like an ungiven tool.
+        refused = self.mind.refused_now(chat_ctx)
+        decision = getattr(self, 'game_decision', None)
+        if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
+                and self.mind.reply_origin == 'reply'):
+            tail = mind._tail(list(chat_ctx.items))
+            user_item = next((i for i in reversed(tail) if getattr(i, 'role', None) == 'user'), None)
+            if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
+                # One decision: what to say and what to do (game_decision.py). It gets this reply's request as is;
+                # the game's instructions go with its actions after the conversation (they say which capability does what).
+                reply = await decision.handle(user_item, ctx.to_provider_format('openai')[0],
+                                              to_fnc_ctx(llm.ToolContext(fns), strict=True), note=self._game_text())
+                if reply is not None:
+                    yield reply
+                    return
+                # The decision chose not to act; the conversation model answers in words.
+                refused |= mind.GOAL_MOVING
+        allowed = [fn for fn in fns if getattr(fn, 'id', None) not in refused]
+        who = 'mind'
+        if self.activity is not None:
+            self.activity.thinking(who, self.mind.reply_origin)
         # デバッグ用の会話ログ：作った文と道具の呼び出しを、最後まで作れたか（done）と一緒に残す。返事が声にも記録にも
         # ならなかったとき（止められた直後の返事）や、話す番で心が黙ったか（[silent]）を、speech・item と見比べる
         speech = getattr(self.session.current_speech, 'id', None)
-        if models.is_local('mind'):
-            ctx = mind.local_context(ctx,source=chat_ctx)
         text, calls, blocked, done = [], [], [], False
         taken: list[str] = []   # この返事で通した道具（体を動かす道具は 1 つだけ。mind.one_body_call）
         request_id, generation_started = uuid.uuid4().hex, time.monotonic()
@@ -358,7 +354,7 @@ class Ciel(Agent):
                     expired = True
                     break
                 # 渡していない道具の呼び出しは通さない（コメントから使えない道具など。mind.py の only_given）
-                chunk, dropped = mind.only_given(chunk, fns)
+                chunk, dropped = mind.only_given(chunk, allowed)
                 if dropped:
                     logger.warning('心：渡していない道具の呼び出しを止めた %s', dropped)
                     blocked += dropped
@@ -397,22 +393,9 @@ class Ciel(Agent):
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
             try:
-                self.mind.after_reply(chat_ctx, who, ''.join(text), calls, done)   # 例文を育てる・約束の受け皿
+                self.mind.after_reply(done)
             except Exception:
-                logger.exception('心：返事のあとの振り分けの処理に失敗')
-
-    def talker_instructions_for(self, talk: str, presence: str) -> str:
-        """小脳（pipeline のすぐの返事）の短い指示：人物像・感情の印・タッチ・すぐの返事の決まり・その場にいる人・おしゃべり度。
-        話者の識別・議事録・道具の使い方は心が受け持つので入れない"""
-        p = self.persona
-        parts = [p.instructions + p.emotion_instructions, p.self_instructions, self.grown, p.touch_instructions,
-                 p.talker_instructions,
-                 p.tasks_instructions, self._presence_text(presence), self._talk_text(talk),
-                 self._game_text(),
-                 p.image_voice_instructions if PIPELINE else '']
-        if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
-            parts.append(p.voice_first_sentence)
-        return '\n\n'.join(part.strip('\n') for part in parts if part)
+                logger.exception('心：返事のあとの処理に失敗')
 
     def _game_text(self) -> str:
         """ゲームで遊ぶときの指示：どのゲームでも同じシエルの振る舞い（game.md）と、ゲームの遊び方（MCP の prompt play）"""

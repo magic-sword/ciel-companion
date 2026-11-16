@@ -18,10 +18,11 @@ talker cannot warm this prefix. Never record or execute the generated output.
 """
     if not models.is_local('mind'):
         return
-    from livekit.agents.llm import utils
-    schemas = [getattr(fn.info, 'raw_schema', None) or utils.build_legacy_openai_schema(fn)['function']
-               for fn in functions]
-    kwargs = {'tools': [{'type': 'function', 'function': s} for s in schemas]} if schemas else {}
+    from livekit.agents import llm
+    from livekit.agents.llm._provider_format.openai import to_fnc_ctx
+    # The same schemas the reply sends (the openai plugin builds strict ones), or the prefix differs from the start.
+    schemas = to_fnc_ctx(llm.ToolContext(list(functions)), strict=True)
+    kwargs = {'tools': schemas} if schemas else {}
     client = models.create_client('mind')
     started = time.monotonic()
     try:
@@ -71,7 +72,7 @@ async def prepare(agent, replies, encoder_task=None):
     text = agent.persona.voice_warmup.strip()
     if not text:
         raise ValueError('voice_warmup must contain speech text')
-    instructions = agent.talker_instructions_for('normal', 'solo')
+    instructions = agent.instructions_for('normal', 'solo')
     async def llm():
         client = models.create_client('mind')
         try:

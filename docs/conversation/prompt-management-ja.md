@@ -15,7 +15,7 @@
 | `server/agent/config/persona.toml` | 本文ファイルの選択 |
 | `server/agent/config/prompts/stt_vocabulary.md` | CPU Whisperへ渡す固有名詞の語彙ヒント。会話本文や認識後の置換規則ではない |
 | `server/agent/config/prompts/character.md` | 人物像・話し方・会話上のルール |
-| `server/agent/config/prompts/ciel_self.md` | シエル自身の好み・苦手・こだわり（企画の設定資料から、好みと癖だけを選んだもの。物語の人や場所は入れない）。会話モデル（心・小脳）に渡す |
+| `server/agent/config/prompts/ciel_self.md` | シエル自身の好み・苦手・こだわり（企画の設定資料から、好みと癖だけを選んだもの。物語の人や場所は入れない）。会話モデルに渡す |
 | `server/agent/config/prompts/ciel_growth.md` | 会話の終わりに、本当にあった出来事からシエルの好みが育つかを決める係への指示。処理は `growth.py`。[好みの育ち方](../services/shared-memory-ja.md) |
 | `server/agent/config/prompts/greeting.md` | 初回あいさつを生成するための指示（前に「[今：…]」の 1 行が付く。[今の日時](conversation-pipeline-ja.md)） |
 | `server/agent/config/prompts/greeting_owner.md` | 端末の持ち主が分かっているとき（ひとり・身近な人）の初回あいさつ。`{name}` を持ち主の名前に置き換える（`agent.py` の `greeting`）。[話者の識別](../services/shared-memory-ja.md) |

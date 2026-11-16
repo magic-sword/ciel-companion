@@ -95,20 +95,25 @@ class PreparationTest(unittest.IsolatedAsyncioTestCase):
     async def test_greeting_prefix_uses_real_tool_schema_without_executing_output(self):
         client = Obj(chat=Obj(completions=Obj(create=AsyncMock(return_value=Obj(tool_calls=['not executed'])))), close=AsyncMock())
         schema = {'name':'fixture_tool','description':'fixture','parameters':{'type':'object','properties':{}}}
-        fn = MagicMock(info=Obj(raw_schema=schema))
+        called = MagicMock()
+
+        async def handler(raw_arguments):
+            called()
+        from livekit.agents import llm
+        fn = llm.function_tool(handler, raw_schema=schema)
         with patch('voice_preparation.models.is_local', return_value=True), \
              patch('voice_preparation.models.create_client', return_value=client):
             await voice_preparation.prepare_conversation_prefix('fixed instructions', [fn], 'warmup')
         request = client.chat.completions.create.call_args.kwargs
         self.assertEqual(request['tools'], [{'type':'function','function':schema}])
         self.assertEqual(request['max_tokens'], 1)
-        fn.assert_not_called()
+        called.assert_not_called()
         client.close.assert_awaited_once()
 
     async def test_preparation_never_records_a_user_turn_or_plays_audio(self):
         client = Obj(chat=Obj(completions=Obj(create=AsyncMock())), close=AsyncMock())
         agent = Obj(persona=Obj(voice_warmup='fixture speech', fingerprint='fixture'),
-                    talker_instructions_for=lambda *args: 'fixture system')
+                    instructions_for=lambda *args: 'fixture system')
         with patch('voice_preparation.models.is_local', return_value=True), \
              patch('voice_preparation.models.create_client', return_value=client), \
              patch('voice_preparation.mode_snapshot', AsyncMock(return_value={'model':'fixture','mode':'gpu','generation':'1'})), \
@@ -124,7 +129,7 @@ class PreparationTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_cloud_mind_skips_local_llm_warmup_but_prepares_stt_and_tts(self):
         agent = Obj(persona=Obj(voice_warmup='fixture speech', fingerprint='fixture'),
-                    talker_instructions_for=lambda *args: 'fixture system')
+                    instructions_for=lambda *args: 'fixture system')
         with patch('voice_preparation.models.is_local', return_value=False), \
              patch('voice_preparation.models.create_client') as create, \
              patch('voice_preparation.mode_snapshot', AsyncMock(return_value={'generation':'1'})), \

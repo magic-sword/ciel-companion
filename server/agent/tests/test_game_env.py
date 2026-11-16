@@ -86,8 +86,6 @@ class PrepareTest(EnvCase):
         # 心に渡すのは act・look・know だけ。名前の頭がゲームの名前でない道具は使わない
         self.assertEqual({t.id for t in env.tools}, {'test_jump', 'test_stop', 'test_look', 'test_facts'})
         self.assertEqual(env.tool_ids('act'), {'test_jump', 'test_stop'})
-        self.assertIn(('ちょっと跳んでみて', 'test_jump'), env.seeds())
-        self.assertIn(('えらいね', None), env.seeds())
         self.assertEqual(env.from_comments(), {'test_jump': False, 'test_stop': False, 'test_look': False, 'test_facts': True})
 
     async def test_unreachable_game_is_not_ready(self):
@@ -431,14 +429,6 @@ class MindGameTest(EnvCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    async def test_game_words_go_to_the_mind_only_while_linked(self):
-        m = mind.Mind(Conversation(), body=self.env)
-        self.assertEqual(m.route(ctx_with('跳んでみて'), {'seconds': 1.0}), 'talker')
-        await self.link()
-        self.assertEqual(m.route(ctx_with('跳んでみて'), {'seconds': 1.0}), 'mind')
-        self.assertEqual(m.route(ctx_with('うまくできてる'), {'seconds': 1.0}), 'talker')
-        self.assertEqual(mind.Mind(Conversation()).route(ctx_with('跳んでみて'), {'seconds': 1.0}), 'talker')
-
     async def test_game_tools_only_while_linked_and_one_moving_call(self):
         m = mind.Mind(Conversation(), body=self.env)
         all_tools = tools.TOOLS + self.env.tools
@@ -446,17 +436,15 @@ class MindGameTest(EnvCase):
         self.assertFalse({'test_jump', 'test_facts', 'submit_game_task'} & ids())
         await self.link()
         self.assertTrue({'test_jump', 'test_look', 'test_facts', 'submit_game_task'} <= ids())
-        self.assertIn('test_jump', m.moving_calls())
-        self.assertNotIn('test_look', m.moving_calls())
-        self.assertIn('test_facts', m.game_calls())
+        self.assertIn('test_jump', m.one_call_tools())
+        self.assertNotIn('test_look', m.one_call_tools())
         self.assertIn('answer_game_task', m.one_call_tools())
 
-    async def test_the_state_goes_to_the_talker_and_the_mind(self):
+    async def test_the_state_goes_to_the_reply(self):
         await self.link()
         m = mind.Mind(Conversation(), body=self.env)
-        ctx = ctx_with('今どんな感じ？')
-        for built in (m.build(ctx, turn={}), m.build(ctx, talker_instructions='短い指示', turn={})):
-            self.assertTrue(any('[テストの様子]' in (i.text_content or '') for i in built.items))
+        built = m.build(ctx_with('今どんな感じ？'), turn={})
+        self.assertTrue(any('[テストの様子]' in (i.text_content or '') for i in built.items))
 
     async def test_moving_the_body_is_not_for_comments(self):
         with mock.patch.dict(tools.ENV_FROM_COMMENTS, self.env.from_comments()):

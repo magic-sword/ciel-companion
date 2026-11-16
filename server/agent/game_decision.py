@@ -30,6 +30,7 @@ import debug_log
 import jsonschema
 import emotion
 import models
+from mind import NOTE_PREFIX
 
 STRING = {'type': 'string', 'minLength': 1, 'maxLength': 2000}
 ACTIVE = ('accepted', 'running', 'needs_decision', 'cancelling')
@@ -265,19 +266,22 @@ class GameDecision:
             await self._client.close()
 
     # ---- the decision ----
-    async def handle(self, item, system: str, messages) -> str | None:
-        """system: the fixed instructions; messages: the rest of the conversation as sent to the model.
+    async def handle(self, item, messages, tools=(), note: str = '') -> str | None:
+        """messages: the conversation exactly as the conversation model gets it (its fixed instructions first);
+        tools: the same tool schemas it gets. Both are sent unchanged, so the decision and the reply share one
+        cached prefix (Qwen's template puts the tools before the fixed instructions). How to write the decision,
+        what can be done now and the game's instructions (note) go after the conversation.
         Returns what to say, or None to let the conversation model answer as usual.
         One user item is decided once; a second call for it returns the same words."""
         if item.id in self._items:
             return self._items[item.id]
-        reply = await self._handle(item, system, messages)
+        reply = await self._handle(item, (list(messages), list(tools), note))
         self._items[item.id] = reply
         while len(self._items) > 128:
             del self._items[next(iter(self._items))]
         return reply
 
-    async def _handle(self, item, system, messages):
+    async def _handle(self, item, prefix):
         text = item.text_content or ''
         if not self.authorized():
             return None
@@ -287,23 +291,23 @@ class GameDecision:
             fast, self._fast_stop = self._fast_stop, None
             r = await fast if fast is not None else await self._stop()
             fact = r.get('message') or '停止を確認できませんでした。'
-            return await self._speak(system, messages, f'相手の言葉を受けて、体を止めました。結果：{fact}') or fact
+            return await self._speak(prefix, f'相手の言葉を受けて、体を止めました。結果：{fact}') or fact
         if not env.playing():
             return None
         work = self.runner.work
         references = await self._references(item)
         targets = bind_targets(env, text, references, item.id)
         alternatives = acts(env, work, targets)
-        out = await self._decide(system, messages, alternatives, work)
+        out = await self._decide(prefix, alternatives, work)
         if out is None:
             return None   # The conversation model answers as before; nothing was started.
         act, say = out.get('act') or {}, spoken(out.get('say'))
         if generation != self._generation or not self.authorized():
-            return await self._speak(system, messages, '確かめている間に止める指示があったので、何も始めませんでした。') \
+            return await self._speak(prefix, '確かめている間に止める指示があったので、何も始めませんでした。') \
                 or '止める指示があったので、何も始めませんでした。'
         failure = await self._carry_out(operations(act, work, env), text, targets, references)
         if failure:
-            return await self._speak(system, messages, f'選んだ行動は、できませんでした。理由：{failure}') or failure
+            return await self._speak(prefix, f'選んだ行動は、できませんでした。理由：{failure}') or failure
         return say or None
 
     async def _references(self, item):
@@ -322,12 +326,14 @@ class GameDecision:
             debug_log.record('game_decision_error', error='references_unavailable')
             return None
 
-    async def _decide(self, system, messages, alternatives, work, note=''):
-        wire = [{'role': 'system', 'content': system + '\n\n' + instructions(self.template, alternatives)
-                 + (('\n\n' + note) if note else '')}, *messages]
+    async def _decide(self, prefix, alternatives, work, note=''):
+        messages, tools, game = prefix
+        local = models.is_local('mind')
+        after = '\n\n'.join(t for t in (game, instructions(self.template, alternatives), note) if t)
+        # After the conversation, as the conversation model's own turn notes are (mind.local_context).
+        wire = [*messages, {'role': 'user', 'content': NOTE_PREFIX + after} if local else {'role': 'system', 'content': after}]
         if self._client is None:
             self._client = models.create_client('mind')
-        local = models.is_local('mind')
         decision_schema = schema(alternatives)
         request, began = uuid.uuid4().hex, time.monotonic()
         debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide' if not note else 'decide_speak',
@@ -336,6 +342,7 @@ class GameDecision:
             # A cloud schema is not strict (the game's own argument schemas may leave fields optional);
             # its answer is checked against the same schema below.
             options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20, messages=wire,
+                                     **({'tools': tools, 'tool_choice': 'none'} if tools else {}),
                                      response_format={'type': 'json_schema', 'json_schema': {
                                          'name': 'decision', 'schema': decision_schema, **({} if local else {'strict': False})}},
                                      **({'temperature': self.TEMPERATURE} if local else {'reasoning_effort': REASONING}))
@@ -351,9 +358,9 @@ class GameDecision:
         debug_log.record('work_decision', stage='decide', operation=(out.get('act') or {}).get('kind'))
         return out
 
-    async def _speak(self, system, messages, note):
+    async def _speak(self, prefix, note):
         """Ciel's own words about what happened, from a decision that can only speak."""
-        out = await self._decide(system, messages, [(NONE, 'none：話すだけ')], self.runner.work, note)
+        out = await self._decide(prefix, [(NONE, 'none：話すだけ')], self.runner.work, note)
         return spoken((out or {}).get('say')) or None
 
     def _why(self, r):

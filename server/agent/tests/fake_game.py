@@ -18,17 +18,15 @@ PROFILE = {
     'work': {'version': 1, 'submit': 'test_work_submit', 'status': 'test_work_status',
              'cancel': 'test_work_cancel', 'answer': 'test_work_answer',
              'capabilities': [{'name': 'test.solve_puzzle'}]},
-    'talker_examples': ['えらいね'],
     'reasons': {'stopped': '止められた', 'no_key': '鍵が無い', 'error': 'うまくいかなかった'},
     'quiet_reasons': ['stopped'],
 }
 EMPTY = {'type': 'object', 'properties': {}}
 TOOLS = [
     types.Tool(name='test_jump', description='跳ぶ', inputSchema={'type': 'object', 'properties': {'height': {'type': 'integer'}}},
-               _meta={'ciel/role': 'act', 'ciel/long_running': True, 'ciel/from_comments': False,
-                      'ciel/triggers': ['ちょっと跳んでみて']}),
+               _meta={'ciel/role': 'act', 'ciel/long_running': True, 'ciel/from_comments': False}),
     types.Tool(name='test_stop', description='止まる', inputSchema=EMPTY, _meta={'ciel/role': 'act', 'ciel/stops': True}),
-    types.Tool(name='test_look', description='見る', inputSchema=EMPTY, _meta={'ciel/role': 'look', 'ciel/triggers': ['何が見える？']}),
+    types.Tool(name='test_look', description='見る', inputSchema=EMPTY, _meta={'ciel/role': 'look'}),
     types.Tool(name='test_facts', description='調べる', inputSchema=EMPTY,
                _meta={'ciel/role': 'know', 'ciel/from_comments': True}),
     types.Tool(name='test_link', description='受け持つ', inputSchema={'type': 'object', 'properties': {'on': {'type': 'boolean'}}},

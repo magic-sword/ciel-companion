@@ -2,7 +2,8 @@
 """Task-vs-chat routing on the shared home GPU API: a committed baseline against the working tree.
 
 Reads the body's MCP catalog without linking a bot, opens a tunnel to the shared model API, and
-runs server/benchmark/intent_routing.py for both sources. Nothing is executed in a world.
+runs server/benchmark/intent_routing.py for both sources, each with its own evaluator (how the request is laid
+out is part of what changes). Nothing is executed in a world.
 """
 import argparse
 import importlib.util
@@ -11,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -64,8 +66,14 @@ def main():
     output.mkdir(parents=True)
     revision = subprocess.check_output(['git', 'rev-parse', '--verify', '--end-of-options', args.baseline_ref+'^{commit}'],
                                        cwd=ROOT, text=True).strip()
-    with tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['git', 'archive', revision, 'server/agent'], cwd=ROOT))) as archive:
+    with tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['git', 'archive', revision, 'server/agent', 'server/benchmark'], cwd=ROOT))) as archive:
         archive.extractall(output/'baseline', filter='data')
+    # The real utterances stay out of Git; the baseline's evaluator reads them next to its own copy.
+    cases = output/'baseline/.local/intent-routing'
+    cases.mkdir(parents=True)
+    for name in ('real_cases.json', 'work_cases.json'):
+        if (ROOT/'.local/intent-routing'/name).exists():
+            shutil.copy2(ROOT/'.local/intent-routing'/name, cases/name)
     remote = "docker exec -i -w /app ciel-minecraft-body-1 sh -c 'cat > /tmp/ciel-catalog.mjs && node /tmp/ciel-catalog.mjs; rm -f /tmp/ciel-catalog.mjs'"
     catalog = subprocess.run(home.ssh_args()+[remote], input=CATALOG_JS.encode(), capture_output=True, check=True).stdout
     json.loads(catalog)
@@ -97,7 +105,7 @@ def main():
                        '--output', str(output/f'{name}.json')]
             for split in args.split or ['dev']:
                 command += ['--split', split]
-            subprocess.run(command, cwd=ROOT/'server', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}, check=True)
+            subprocess.run(command, cwd=source.parent, env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}, check=True)
         (output/'manifest.json').write_text(json.dumps({'baseline_commit': revision, 'runs': runs and [
             {'name': n, 'source': str(s), 'system': y} for n, s, y in runs]}, ensure_ascii=False, indent=1), encoding='utf-8')
     finally:

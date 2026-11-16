@@ -207,23 +207,6 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
             self.assertGreaterEqual(call.kwargs['timeout'], models.LOCAL_TIMEOUT)
         cloud.chat.completions.create.assert_not_called()
 
-    async def test_game_routing_and_learning_never_embed(self):
-        import mind
-        import router
-        from conversation import Conversation
-        client = mock.AsyncMock()
-        route = router.Router('minecraft', client=client)
-        route.start()
-        self.assertIsNone(await route.wants_mind('石のピッケルが欲しいな'))
-        self.assertEqual(await route.learn('石のピッケルが欲しいな', 'minecraft_act', 'tool'), 'skip')
-        client.embeddings.create.assert_not_called()
-        body = mock.Mock()
-        body.playing.return_value = True
-        m = mind.Mind(Conversation(), body=body)
-        ctx = llm.ChatContext()
-        ctx.add_message(role='user', content='石のピッケルが欲しいな')
-        self.assertEqual(await m.second_look(ctx), 'mind')
-
     async def test_unsupported_services_do_not_call_openai(self):
         from conversation import Conversation
         from eyes import Eyes

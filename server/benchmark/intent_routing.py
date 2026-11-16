@@ -164,13 +164,20 @@ class Harness:
         c.add_message(role='user', content=case['text'])
         return c
 
+    def _system(self, fake, catalog):
+        # The fixed instructions the conversation server sends for every reply and for the decision (agent.py)
+        return '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), catalog.summary(),
+                             self.persona.reply_frame))
+
+    def _eligible(self, world, catalog):
+        return list(self.tools_mod.goals.TOOLS) + list(self.tools_mod.clock.TOOLS) + list(world.tools) \
+            + [catalog.loader, catalog.executor]
+
     async def mind(self, case, world):
         fake, catalog = self._agent(world)
-        eligible = list(self.tools_mod.goals.TOOLS) + list(self.tools_mod.clock.TOOLS) + list(world.tools) \
-            + [catalog.loader, catalog.executor]
+        eligible = self._eligible(world, catalog)
         visible = catalog.select(eligible)
-        system = self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo') + '\n\n' + catalog.summary()
-        wire = self.mind_mod.local_context(self._context(case, system)).to_provider_format('openai')[0]
+        wire = self.mind_mod.local_context(self._context(case, self._system(fake, catalog))).to_provider_format('openai')[0]
         actions, text, rounds = [], '', 0
         while rounds < 3:
             rounds += 1
@@ -220,18 +227,19 @@ class Harness:
 
     async def decide(self, case, world):
         import game_decision
-        fake, _ = self._agent(world)
+        fake, catalog = self._agent(world)
         work = work_of(case)
         # Nothing is pointed at in these cases; coordinates in the words still bind a target.
         alternatives = self._acts(world, work, targets=game_decision.bind_targets(world, case['text'], None, case['id']))
         template = self.persona.game_decide_instructions
-        # The same system the conversation server sends (agent.py): the conversation's instructions, the game's
-        # (with a capability catalog they are not in the fixed instructions), then the decision's.
-        system = '\n\n'.join((self.agent_mod.Ciel.instructions_for(fake, 'normal', 'solo'), fake._game_text(),
-                              game_decision.instructions(template, alternatives)))
-        wire = self.mind_mod.local_context(self._context(case, system)).to_provider_format('openai')[0]
+        # As the conversation server sends it (agent.py, game_decision.py): the reply's fixed instructions, tools and
+        # conversation unchanged; the game's instructions and how to decide after the conversation.
+        wire = self.mind_mod.local_context(self._context(case, self._system(fake, catalog))).to_provider_format('openai')[0]
+        note = '\n\n'.join(t for t in (fake._game_text(), game_decision.instructions(template, alternatives)) if t)
+        wire.append({'role': 'user', 'content': self.mind_mod.NOTE_PREFIX + note})
+        tools = [self._schema(fn) for fn in catalog.select(self._eligible(world, catalog))]
         schema = game_decision.schema(alternatives)
-        body = {'model': 'local', 'messages': wire, 'max_tokens': 800,
+        body = {'model': 'local', 'messages': wire, 'max_tokens': 800, 'tools': tools, 'tool_choice': 'none',
                 'response_format': {'type': 'json_schema', 'json_schema': {'name': 'decision', 'schema': schema}},
                 'chat_template_kwargs': {'enable_thinking': False}, 'temperature': DECIDE_TEMPERATURE}
         message = self._post(body)['choices'][0]['message']

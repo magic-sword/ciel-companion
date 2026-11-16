@@ -92,44 +92,41 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         ctx.add_message(role='user', content=text)
         return ctx
 
-    async def test_talker_gets_short_instructions_and_the_brief(self):
+    async def test_the_reply_gets_the_fixed_instructions_and_the_brief(self):
         m = mind.Mind(history_with(), style=Style())
         m.apply_brief({'topic': '展示', 'decided': 'A2 で印刷'}, through=3)
-        ctx = llm.ChatContext()
-        ctx.add_message(role='system', content='全部の指示')
-        ctx.add_message(role='user', content='どう思う？')
-        out = m.build(ctx, talker_instructions='短い指示')
+        out = m.build(self.ctx_with('どう思う？'))
         texts = [i.text_content for i in out.items]
-        self.assertEqual(texts[0], '短い指示')
-        self.assertNotIn('全部の指示', texts)
+        self.assertEqual(texts[0], '全部の指示')
         self.assertIn('[今のまとめ]\n話題：展示\n決まったこと：A2 で印刷', texts[-2])
+
+    async def test_the_history_window_moves_only_in_steps(self):
+        # 先頭が毎回ずれると履歴のキャッシュが外れるので、超えたときだけまとめて進める
+        h = history_with(*[('user', f'発言{i}', 'ゆうき') for i in range(mind.WINDOW_MAX)])
+        m = mind.Mind(h, style=Style())
+        first = m._window()[0]
+        self.assertEqual(len(m._window()), mind.WINDOW_KEEP)
+
+        def say(text):
+            t = h.reserve(role='user')
+            h.complete(t, text, Speaker('ゆうき'), 'ゆうき', sure=True)
+        for n in range(mind.WINDOW_MAX - mind.WINDOW_KEEP):
+            say(f'続き{n}')
+        self.assertIs(m._window()[0], first)                   # 超えるまでは同じ先頭のまま
+        self.assertEqual(len(m._window()), mind.WINDOW_MAX)
+        say('次の発言')
+        self.assertEqual(len(m._window()), mind.WINDOW_KEEP)   # 超えたら KEEP 件まで進める
+        self.assertIsNot(m._window()[0], first)
 
     async def test_code_routes_turns(self):
         m = mind.Mind(history_with(), style=Style())
-        self.assertEqual(m.route(self.ctx_with('シエルは何色が好き？'), {'seconds': 2.0}), 'talker')
-        self.assertEqual(m.route(self.ctx_with('あ、議事録開始して'), {'seconds': 2.0}), 'mind')       # 頼みごと
-        self.assertEqual(m.route(self.ctx_with('今日はね'), {'seconds': 12.0}), 'mind')                # 長い話
-        self.assertEqual(m.route(self.ctx_with('あ' * 90), {}), 'mind')
-        # ひかえめ（会議）では、どの発言も心が受け、黙るか答えるかを見極める
-        quiet = mind.Mind(history_with(), style=Style('quiet'))
-        self.assertEqual(quiet.route(self.ctx_with('シェル、今の話どう思う？'), {'seconds': 3.0}), 'mind')
-        self.assertEqual(quiet.route(self.ctx_with('ポスターは水曜までに作りましょう'), {'seconds': 3.0}), 'mind')
-        # 議事録・歌の知らせは、次の 1 回だけ心が返す
-        m.on_say('minutes')
-        self.assertEqual(m.route(llm.ChatContext()), 'mind')
-        self.assertEqual(m.route(llm.ChatContext()), 'talker')
-        # 話す番（自分から話す）も、心が話すか黙るかを決める
+        self.assertEqual(m.route(self.ctx_with('シエルは何色が好き？'), {'seconds': 2.0}), 'mind')
+        # 議事録・歌の知らせ、話す番（自分から話す）は、どこから来た返事かを残す
         m.on_say('research')
         self.assertEqual(m.route(llm.ChatContext()), 'mind')
         self.assertEqual(m.reply_origin, 'research')
         m.route(self.ctx_with('こんにちは'), {})
         self.assertEqual(m.reply_origin, 'reply')
-
-    async def test_several_people_since_ciel_go_to_the_mind(self):
-        h = history_with(('assistant', 'こんにちは', None), ('user', 'テーマは星空', 'A'), ('user', 'いいですね', 'B'))
-        self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('いいですね'), {}), 'mind')
-        # 「議事録」が「二次録」と書き起こされても、頼みごととして心に回す
-        self.assertEqual(mind.Mind(h, style=Style()).route(self.ctx_with('二次録開始して'), {}), 'mind')
 
     def board_with_minutes(self, said):
         tasks = board.Board()
@@ -139,8 +136,8 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
     async def test_requests_on_the_board_are_not_requests_again(self):
         m = mind.Mind(history_with(), style=Style(), board=self.board_with_minutes('あ、そうだ、議事録開始して。'))
         ctx = self.ctx_with('商店街にも声をかけて。あ、そうだ、議事録開始して。それで屋台を増やしたい')
-        self.assertEqual(m.route(ctx, {'seconds': 4.0}), 'talker')
-        # 長い話で心に回っても、付箋になった頼みは付箋の印で渡す（終了の頼みと取り違えないように）
+        self.assertEqual(m.route(ctx, {'seconds': 4.0}), 'mind')
+        # 付箋になった頼みは付箋の印で渡す（終了の頼みと取り違えないように）
         items = m.build(ctx, turn={}).items
         self.assertNotIn('議事録開始して', items[-1].text_content)
         self.assertIn('（→ #1 会議の議事録をとる：実行中）', items[-1].text_content)
@@ -156,18 +153,20 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(m.route(ctx, {'seconds': 2.0}), 'skip')
 
     async def test_minutes_tools_only_when_this_turn_asks(self):
+        # 道具の一覧は変えず（キャッシュのため）、頼みの無い発言では、始める・終える道具を呼んでも断る
         tools = [types.SimpleNamespace(id=n) for n in ('start_minutes', 'finish_minutes', 'read_minutes')]
         m = mind.Mind(history_with(), style=Style(), board=self.board_with_minutes('議事録開始して。'))
-        ids = lambda text: [t.id for t in m.tools_for(self.ctx_with(text), tools)]
-        self.assertEqual(ids('予算は去年と同じくらい'), ['read_minutes'])
-        self.assertEqual(ids('それで、議事録開始して。屋台を増やしたい'), ['read_minutes'])   # 付箋になった頼みは除く
-        self.assertEqual(ids('議事録まとめて'), ['start_minutes', 'finish_minutes', 'read_minutes'])
-        self.assertEqual(ids('記録ストップ'), ['start_minutes', 'finish_minutes', 'read_minutes'])
-        # ほかの道具の結果を受けた続きでも、頼みが無ければ渡さない
+        moves = {'start_minutes', 'finish_minutes'}
+        self.assertEqual(m.tools_for(self.ctx_with('予算は去年と同じくらい'), tools), tools)
+        self.assertTrue(moves <= m.refused_now(self.ctx_with('予算は去年と同じくらい')))
+        self.assertTrue(moves <= m.refused_now(self.ctx_with('それで、議事録開始して。屋台を増やしたい')))   # 付箋になった頼みは除く
+        self.assertFalse(moves & m.refused_now(self.ctx_with('議事録まとめて')))
+        self.assertFalse(moves & m.refused_now(self.ctx_with('記録ストップ')))
+        # ほかの道具の結果を受けた続きでも、頼みが無ければ通さない
         ctx = self.ctx_with('予算は去年と同じくらい')
         ctx.items.append(llm.FunctionCall(call_id='c1', name='search_conversation', arguments='{}'))
         ctx.items.append(llm.FunctionCallOutput(call_id='c1', name='search_conversation', output='{}', is_error=False))
-        self.assertEqual([t.id for t in m.tools_for(ctx, tools)], ['read_minutes'])
+        self.assertTrue(moves <= m.refused_now(ctx))
 
     async def test_a_waiting_notice_goes_into_the_reply(self):
         m = mind.Mind(history_with(), style=Style())
@@ -178,13 +177,11 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         items = m.build(ctx, turn={}).items
         self.assertIn('[まだ伝えていない知らせ]\n[議事録：とり始めた]', items[-2].text_content)
         self.assertEqual(m.handed, 'minutes')
-        # 知らせそのものの返事（相手の発言が無い）には添えない。待っている知らせが無ければ小脳
+        # 知らせそのものの返事（相手の発言が無い）には添えない
         ctx = llm.ChatContext()
         ctx.add_message(role='system', content='全部の指示')
         m.build(ctx)
         self.assertIsNone(m.handed)
-        waiting.clear()
-        self.assertEqual(m.route(self.ctx_with('ここまでで何か気になることある？'), {'seconds': 2.0}), 'talker')
 
     async def test_requests_on_the_board_stay_marked_in_later_turns(self):
         h = history_with(('user', '商店街にも声をかけて。あ、そうだ、議事録開始して。', 'ゆうき'))
@@ -192,9 +189,8 @@ class TalkerTest(unittest.IsolatedAsyncioTestCase):
         texts = [i.text_content for i in m.build(self.ctx_with('予算は去年と同じくらい'), turn={}).items]
         self.assertFalse(any('議事録開始して' in t for t in texts))
         self.assertIn('ゆうき：商店街にも声をかけて。あ、そうだ、（→ #1 会議の議事録をとる：実行中）', texts)
-        # 小脳にも、今どうなっているかを渡す（していないことを言わないように）
-        talker = m.build(self.ctx_with('うん'), talker_instructions='短い指示', turn={}).items
-        self.assertTrue(any('[今のタスク]' in i.text_content for i in talker))
+        # 今どうなっているかも渡す（していないことを言わないように）
+        self.assertTrue(any('[今のタスク]' in t for t in texts))
 
     async def test_tool_results_go_to_the_mind(self):
         ctx = llm.ChatContext()

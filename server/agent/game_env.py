@@ -491,12 +491,6 @@ class GameEnv:
     def tool_ids(self, *roles: str) -> frozenset[str]:
         return frozenset(n for n, m in self.meta.items() if m.get('ciel/role') in roles)
 
-    def seeds(self) -> list[tuple[str, str | None]]:
-        """振り分けの最初の例文：(文, 道具の名前)。小脳でよい発言は道具の名前が None"""
-        out = [(t, n) for n, m in self.meta.items() if m.get('ciel/role') in SHOWN_ROLES for t in m.get('ciel/triggers') or []]
-        out += [(t, n) for n, texts in (self.profile.get('goal_triggers') or {}).items() for t in texts]
-        return out + [(t, None) for t in self.profile.get('talker_examples') or []]
-
     def from_comments(self) -> dict[str, bool]:
         """配信のコメントへの返事で使ってよいか（_meta の ciel/from_comments。無ければ読むだけの道具か）"""
         return {n: bool(m.get('ciel/from_comments', False)) for n, m in self.meta.items() if m.get('ciel/role') in SHOWN_ROLES}

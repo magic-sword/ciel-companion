@@ -1,18 +1,16 @@
 # -*- coding: utf-8 -*-
-"""シエルの小脳と心（CIEL_MODEL=pipeline のとき）。返事を作るたびに、会話の記録（conversation.Conversation）から文脈を組み立てる。
+"""シエルの心（CIEL_MODEL=pipeline のとき）。返事を作るたびに、会話の記録（conversation.Conversation）から文脈を組み立てる。
 
 Realtime の組み立てでは、会話モデルが自分の会話をもう 1 つ持ち、そこへ話者の行・時刻・議事録の状態・心の状態を
 system の項目として差し込んで合わせていた（記録が 2 つ。docs/conversation/conversation-pipeline-ja.md の 2 章）。
 ここでは、LiveKit が持つ会話からは今回の分（今回の発言・今回だけの指示・道具の呼び出し）だけを使い、ほかは記録から作る。
 
-返事は 2 つの係で作る（研究 Talker-Reasoner の形。速く話す係と、裏で考える係を分ける）。
-- 小脳（すぐの返事）：ふつうの発言に返す。短い指示（人物像・話し方・config/prompts/talker.md）と、心が書いた「今のまとめ」と、
-  最近の発言だけを読み、道具は持たない。黙るときは [silent]。
-- 心（考える番）：全部の指示と道具で返す。どちらで返すかはコードが決める（route）：頼みごとの言葉がある・長く話した・何人も話した・
-  ひかえめで名前を呼ばれた・議事録や歌の知らせ・道具の結果を受けた続き。小脳に「考えるべきか」を [think] で言わせる作りは、
-  2 回の試験で一度も [think] を出さず、議事録を頼まれて道具なしで「準備しますね」と答えたのでやめた（2026-10-30）。
-- 今のまとめ：心が、発言が増えたら（summaries/live.py と同じ決め方）会話を読み直して書く（config/prompts/mind_brief.md）。
-  小脳は最近の発言しか読まないので、会話全体の流れはここで伝える。
+返事はいつも心が作る。固定の指示（人物像・話し方・道具の使い方）と道具の一覧は会話の間変えず、最近の発言（_window）、
+今回の補足（_notes：時刻・今のまとめ・付箋・体や目的の様子）、今回の発言の順に並べる。前の返事と先頭が同じなので、
+推論のキャッシュが履歴の終わりまで効く。ゲーム中の持ち主の発言には、同じ並びの後ろに決定の書き方を足して、
+話すこととすることを一つの決定にする（game_decision.py）。
+- 今のまとめ：発言が増えたら（summaries/live.py と同じ決め方）会話を読み直して書く（config/prompts/mind_brief.md）。
+  最近の発言より前の流れはここで伝える。
 """
 import asyncio
 import json
@@ -34,19 +32,13 @@ from summaries import live
 
 log = logging.getLogger('ciel-agent.mind')
 
-TALKER_TURNS = 16          # 小脳に渡す最近の発言の数
-DEEP_TURNS = 40            # 心に渡す最近の発言の数
+DEEP_TURNS = 40            # 心の外（議事録の係など）に渡す最近の発言の数
+WINDOW_KEEP = 40           # 心に渡す最近の発言：区切り直すときに残す数
+WINDOW_MAX = 60            # 心に渡す最近の発言：これを超えたら区切り直す（それまでは履歴の先頭を変えない）
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
 DEEP_WHY = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image')   # 心が返事を作る、口（mouth.py）の why
-LONG_SECONDS = 10.0        # これだけ長く話したら、心が考えて返す
-LONG_CHARS = 80
-# 「シエル」。文字起こしの聞き間違いも含める（gpt-realtime-whisper は名前のヒントを渡せず「シェル」「シェアル」になった。2026-10-30）
-NAME = re.compile(r'シエル|しえる|シェル|シェアル|チエル|ciel|\bCL\b', re.IGNORECASE)
-# 道具が要る頼みごとの言葉（議事録・調べもの・時刻・名前・覚えていること・歌）。あれば心が返す
-REQUEST = re.compile(r'録|まとめ|調べ|検索|何時|時間を|名前|覚えて|忘れて|歌')
-# 議事録を始める・終える頼みの言葉。今回の発言（付箋になった分を除く）に無ければ、議事録を動かす道具を心に渡さない
 MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
 MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
 # 目的の道具のうち、相手の発言で呼ぶもの（育つ例文の印）・体を動かすもの。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を
@@ -57,8 +49,6 @@ GOAL_MOVING = GOAL_ASKED - {'game_task_status'}
 GOAL_ONE = GOAL_MOVING
 # 小脳が体の動きを約束した言い方（シエル自身の口ぐせなので、相手の言い方よりそろっている）。約束しても小脳は道具を持たないので、
 # 話し終えたら心が続きをする（「すぐに渡しますね」と言うだけで渡さなかった。2026-11-07）
-PROMISE = re.compile(r'(渡し|作り|作って|集め|集めて|取って|取り|掘り|掘って|探し|探して|持って|置き|置いて|拾い|拾って|降り|向かい|ついていき|ついて行き|そっちに行き|行き|あげ|止まり|待ち)(ます|ますね|ますよ|ましょう|きます|おきます|いきます|るのです|ますのです)')
-STALL_GAP = 30.0   # 言葉だけで止まったと心に知らせるのは、この秒数に 1 回まで
 FILLER = re.compile(r'[\s、。，．,.!?！？…ー〜あえうっんそだは]+')
 BRIEF_LABELS = (('topic', '話題'), ('flow', '流れ'), ('decided', '決まったこと'), ('open', 'まだ決まっていないこと'),
                 ('people', '人'), ('say', 'シエルが言いたいこと'))
@@ -95,16 +85,8 @@ class Mind:
         self.waiting = None              # まだ言っていない知らせ（why → 指示）を返す（mouth.Mouth.waiting）
         self.handed: str | None = None   # 今の返事に添えた知らせの why（言い終えたら agent.py が口から外す）
         self._task: asyncio.Task | None = None
-        # 遊んでいるあいだの振り分けの 2 段目（router.Router。道具ごとのきっかけとの意味の近さ）。agent.py が置く
-        self.router = None
-        self.is_owner = lambda: True      # 今の発言が持ち主のものか（育つ例文は持ち主の発言だけ。agent.py が置く）
-        self.last_why: str | None = None  # 最後に心へ回した理由（semantic なら、道具を使わなければ小脳の例文にする）
-        self.semantic_tool: str | None = None   # 意味で心へ回したときの、いちばん近いきっかけの道具
-        self._promised: str | None = None # 小脳が体の動きを約束だけした発言（心が道具でやったら、その道具の例文にする）
-        self.on_promise = None            # 呼ぶと、心に約束の続きをさせる（agent.py が置く。口の why 'game'）
-        self.on_stalled = None            # 呼ぶと、断られた体の道具の次の手を心にさせる（agent.py が置く。口の why 'game'）
-        self._nudged: set[str] = set()    # 言葉だけで止まったと心に知らせた道具の呼び出し（同じものは 1 度だけ）
-        self._nudged_at = -STALL_GAP      # 最後に知らせた時刻（知らせた返事でまた止まっても、続けて知らせない）
+        self.is_owner = lambda: True      # 今の発言が持ち主のものか（agent.py が置く）
+        self._window_first = None       # 心に渡している最近の発言の、最初の発言（_window）
 
     @property
     def client(self):
@@ -122,9 +104,8 @@ class Mind:
             self._deep = True
 
     def route(self, chat_ctx: llm.ChatContext, turn: dict | None = None) -> str:
-        """この返事を心（'mind'）と小脳（'talker'）のどちらが作るか（コードで決める）。turn は turns.py の pipeline_turn"""
+        """この返事を作るか（'mind'）、黙るか（'skip'）。返事はいつも心が作る。turn は turns.py の pipeline_turn"""
         tail = _tail(list(chat_ctx.items))
-        self.last_why = self.semantic_tool = None
         if any(getattr(i, 'type', None) == 'function_call_output' for i in tail):
             self.reply_origin = 'tool_result'
             return 'mind'   # 道具の結果を受けた続き
@@ -134,39 +115,14 @@ class Mind:
             self._deep = False
             return 'mind'
         self.from_comment = False   # 声の発言への返事（口を通さない）
-        text = _user_text(tail)
-        if not text:
-            return 'talker'   # 自分から話しかける・タッチなど、相手の発言の無い返事
-        # 付箋になった頼みは、頼みごととして数えない。同じ発言に残った「議事録開始して」で心に回し続け、
-        # 議事録をとっている心が終了の頼みと取り違えて終わらせた（2026-10-30）
-        rest = self._strip(text)
-        # 頼みだけの発言かは、最後の発言で見る。黙って聞いた前の発言も今回の分に残るので、全部で見ると
-        # 「賛成です。…（→ 付箋）」が頼みだけにならず、心が前の発言に返した（2026-10-31）
+        # 頼みだけの発言かは、最後の発言で見る（付箋になった頼みは、頼みごととして数えない）
         latest = next((_text(i) for i in reversed(tail) if _is_user(i) and _text(i)), '')
         latest_rest = self._strip(latest)
-        if latest_rest != latest and not FILLER.sub('', latest_rest):
+        if latest and latest_rest != latest and not FILLER.sub('', latest_rest):
             # 頼みだけの発言で、付箋になった（「あ、議事録開始して」）。返事はせず、議事録係の知らせだけを言う。
             # 心が「議事録、とりながら進めていますよ」と返し、そのあと知らせも言って 2 回になった（2026-10-30）
             debug_log.record('mind_route', why='on_board')
             return 'skip'
-        # ひかえめ（会議）では、どの発言も心が受ける。黙るか答えるかの見極めは、短い指示の小脳では人どうしの話に
-        # 1 回に 3 度口をはさみ、全部の指示と会話の流れを読む心では口をはさまなかった（2026-10-30、bench_compare.py）。
-        # 黙る返事は声にならないので、心で受けても遅れは気にならない
-        quiet = self.style is not None and self.style.talk == 'quiet'
-        why = ('image' if self.eyes is not None and self.eyes.wants(rest)
-               else 'notice' if self._waiting()
-               else 'request' if REQUEST.search(rest)
-               else 'game' if self._game_ask(rest)
-               else 'long' if (turn or {}).get('seconds', 0.0) >= LONG_SECONDS or len(text) >= LONG_CHARS
-               else 'people' if not quiet and self._speakers_since_ciel() >= 2
-               else 'named' if quiet and NAME.search(text)
-               else 'quiet' if quiet
-               else None)
-        self.last_why = why
-        if why is None:
-            return 'talker'
-        log.info('心：考えて返す（%s）', why)
-        debug_log.record('mind_route', why=why)
         return 'mind'
 
     def playing(self) -> bool:
@@ -180,131 +136,41 @@ class Mind:
     def _ids(self, *roles: str) -> frozenset:
         return self.body.tool_ids(*roles) if self.body is not None else frozenset()
 
-    def game_calls(self) -> frozenset:
-        """相手の発言で呼ぶゲームの道具（育つ例文の印）"""
-        return self._ids('act', 'look', 'know') | GOAL_ASKED
-
-    def moving_calls(self) -> frozenset:
-        """体を動かす頼みの道具（意味で心へ回したのに使わなければ、回しすぎ）"""
-        return self._ids('act') | GOAL_MOVING
-
     def one_call_tools(self) -> frozenset:
         """1 つの返事で 1 つだけ通す道具（one_body_call）"""
         return self._ids('act') | GOAL_ONE
 
-    async def second_look(self, chat_ctx: llm.ChatContext) -> str:
-        """1 段目で小脳に決まった発言を、遊んでいるあいだだけ、道具ごとのきっかけとの意味の近さで見直す（router.py）。
-        決まった言葉に「欲しい」「ピッケル」が無く、「石のピッケルが欲しいな」が道具の無い小脳へ回り、
-        「渡しますね」と言うだけだった（2026-11-07）"""
-        if models.LOCAL_TEST and self.playing() and latest_user_text(chat_ctx):
-            self.last_why = 'local_game'
-            return 'mind'  # 埋め込み API を使わず、ゲームの頼みを道具のある心へ渡す
-        if self.router is None or not self.playing():
-            return 'talker'
-        text = latest_user_text(chat_ctx)
-        tool = await self.router.wants_mind(self._strip(text)) if text else None
-        if tool is None:
-            return 'talker'
-        self.last_why, self.semantic_tool = 'semantic', tool
-        log.info('心：考えて返す（semantic・%s）', tool)
-        debug_log.record('mind_route', why='semantic', tool=tool)
-        return 'mind'
-
-    def after_reply(self, chat_ctx: llm.ChatContext, who: str, text: str, calls: list[str], done: bool) -> None:
-        """返事のあと：振り分けの例文を育て、小脳が体の動きを約束だけしたら心に続きをさせる"""
+    def after_reply(self, done: bool) -> None:
+        """返事を言い終えたあと：見せてもらった画像の話を終える"""
         if done and self.eyes is not None:
             self.eyes.reply_finished()
-        if self.router is None or not self.playing() or not done:
-            return
-        if who == 'mind' and not calls and self.on_stalled is not None and time.monotonic() - self._nudged_at >= STALL_GAP:
-            stalled = self._stalled(chat_ctx)
-            if stalled is not None:
-                # 体の道具が始めずに断られ（次の手つき）、心が道具を呼ばずに言葉だけで返した。「丸石を集めてから作るのです」と
-                # 言って何も始めず、「始めてる？」に「まだ始めていない」と答えた（2026-11-07）。指示文だけでは止まらないので、
-                # コードで 1 度だけ心に続きをさせる
-                name, result = stalled
-                self._nudged_at = time.monotonic()
-                debug_log.record('mind_route', why='stalled', tool=name, reason=result.get('reason'))
-                self.on_stalled(name, result)
-        said = latest_user_text(chat_ctx)
-        asked = self.game_calls()
-        game = [c for c in calls if c in asked]
-        if who == 'mind' and game:
-            if self._promised:   # 小脳が約束だけした発言を、心が道具でやった：取りこぼしの例文
-                self._learn(self._promised, game[0], 'promise')
-                self._promised = None
-            elif said and self.is_owner():
-                self._learn(said, game[0], 'tool')
-        elif (who == 'mind' and self.last_why == 'semantic' and self.semantic_tool in self.moving_calls() and said
-              and self.is_owner() and '[silent]' not in text):
-            # 体を動かす頼みに近いとして心へ回したのに、道具を使わなかった：回しすぎ。見る・進み具合・知識の頼みは、
-            # 心が様子から道具なしで答えることもあるので、小脳の例文にしない
-            self._learn(said, None, 'no_tool')
-        elif who == 'talker' and said and PROMISE.search(text):
-            # 小脳が「渡しますね」と約束だけした：話し終えたら、心が道具で続きをする（取りこぼしの受け皿）
-            self._promised = said if self.is_owner() else None
-            debug_log.record('mind_route', why='promise', said=said[:60], text=text[:80])
-            if self.on_promise is not None:
-                self.on_promise(said, text)
-
-    def _stalled(self, chat_ctx: llm.ChatContext) -> tuple[str, dict] | None:
-        """この返事の直前の道具の結果のうち、体を動かす道具が始めずに断られ、次の手（next）があるもの。まだ知らせていなければ"""
-        acts = self._ids('act')
-        for item in reversed(list(chat_ctx.items)):
-            if isinstance(item, llm.FunctionCall):
-                continue
-            if not isinstance(item, llm.FunctionCallOutput):
-                return None   # この返事の道具の結果は、ここまで
-            if item.name not in acts or item.call_id in self._nudged:
-                continue
-            try:
-                result = json.loads(item.output)
-            except (TypeError, ValueError):
-                continue
-            if isinstance(result, dict) and result.get('status') == 'error' and result.get('next'):
-                self._nudged.add(item.call_id)
-                return item.name, result
-        return None
-
-    def _learn(self, text: str, tool: str | None, source: str) -> None:
-        task = asyncio.create_task(self.router.learn(self._strip(text), tool, source))
-        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
     def tools_for(self, chat_ctx: llm.ChatContext, tools: list) -> list:
-        """心に渡す道具。議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ渡す（付箋になった頼みは除く）。
-        付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
-        道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
-        text = _user_text(_tail(list(chat_ctx.items)))
-        if not text or not MINUTES_ASK.search(self._strip(text)):
-            tools = [t for t in tools if getattr(t, 'id', None) not in MINUTES_MOVES]
-            if not getattr(self.minutes, 'recording', False):
-                tools = [t for t in tools if getattr(t, 'id', None) != 'get_minutes_status']
-        # ゲームの体を受け持っていなければ、ゲームの道具（体・見る・知識）と目的の道具は渡さない
+        """心に見せる道具。会話の間は同じ一覧にする：Qwen の書式では道具の一覧が固定の指示より前に入るので、
+        発言ごとに出し入れすると先頭からキャッシュが外れる。ゲームの体を受け持っていない間はゲームの道具を、
+        配信のコメントへの返事ではコメントから使えない道具を見せない（どちらも会話の途中ではめったに変わらない）"""
         if not self._body_linked():
             hidden = set(self._ids('act', 'look', 'know')) | set(GOAL_TOOLS)
             tools = [t for t in tools if getattr(t, 'id', None) not in hidden]
-        # 配信のコメントへの返事では、コメントから使ってよい道具だけ（tools/ の FROM_COMMENTS）
         return toolbox.for_comments(tools) if self.from_comment else tools
+
+    def refused_now(self, chat_ctx: llm.ChatContext) -> frozenset:
+        """見せてはいるが、今回の返事では呼んでも実行しない道具（呼ばれたら断る。mind.only_given）。
+        議事録を始める・終える道具は、今回の発言に頼みの言葉があるときだけ通す（付箋になった頼みは除く）。
+        付箋で状態を渡しても、長い話のあとの「予算は去年と同じくらい」に、心が議事録を終える道具を 2 回とも呼んだ（2026-10-30）。
+        道具の結果を受けた続きも同じに見る（会話を探す道具の続きで、また終える道具を呼んだ。2026-10-31）"""
+        text = _user_text(_tail(list(chat_ctx.items)))
+        if text and MINUTES_ASK.search(self._strip(text)):
+            return frozenset()
+        return frozenset(MINUTES_MOVES) | (frozenset() if getattr(self.minutes, 'recording', False) else {'get_minutes_status'})
 
     def _body_linked(self) -> bool:
         return self.body is not None and self.body.linked
 
-    def _speakers_since_ciel(self) -> int:
-        """シエルが最後に話してから話した人の数（話者が分からない発言は数えない）"""
-        names = set()
-        for t in reversed(self.history.turns if self.history is not None else []):
-            if t.role == 'assistant' and t.text:
-                break
-            if t.role == 'user' and t.text and t.speaker is not None:
-                names.add(id(t.speaker))
-        return len(names)
-
     # ---- 文脈 ----
 
-    def build(self, chat_ctx: llm.ChatContext, *, talker_instructions: str | None = None,
-              turn: dict | None = None) -> llm.ChatContext:
+    def build(self, chat_ctx: llm.ChatContext, *, turn: dict | None = None) -> llm.ChatContext:
         """LiveKit が渡した会話（会話の指示＋LiveKit が持つ発言＋今回の分）から、送る会話を作る。
-        talker_instructions があれば小脳（会話の指示をこれに替え、最近の発言を少なく）、無ければ心（全部の指示）。
         turn（turns.py の pipeline_turn）の話者の 1 行・タッチは、今回の発言の前に置く（LiveKit の会話は書き換えない）"""
         items = list(chat_ctx.items)
         instructions = next((i for i in items if getattr(i, 'role', None) == 'system'), None)
@@ -312,24 +178,22 @@ class Mind:
         tail_users = {_text(i) for i in tail if _is_user(i)}
         turn = turn or {}
         out = llm.ChatContext()
-        if talker_instructions is not None:
-            out.add_message(role='system', content=talker_instructions)
-        elif instructions is not None:
+        if instructions is not None:
             out.items.append(instructions)
         if self.self_image and not models.LOCAL_TEST:
             out.items.append(llm.ChatMessage(role='user', content=[
                 '[わたしの姿]（わたし、シエルの見た目の絵。いつも知っている自分の姿）',
                 llm.ImageContent(image=self.self_image, inference_detail='low')]))
-        for t in self._recent(TALKER_TURNS if talker_instructions is not None else DEEP_TURNS):
+        for t in self._window():
             text = t.text[:TURN_CHARS]
             if t.role == 'user':
                 if any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 text = self._marked(text)
             out.add_message(**turn_message(t, text))
-        notes = self._notes(deep=talker_instructions is None, memory=turn.get('memory'))
+        notes = self._notes(deep=True, memory=turn.get('memory'))
         self.handed = None
-        if talker_instructions is None and tail_users:
+        if tail_users:
             # 切れ目を待っている知らせは、相手への返事の中で伝える。長い話の途中で聞く係が議事録を始めると、
             # 「とり始めた」は話し終わりまで待って約 26 秒後になり、最後の質問への答えになって議事録にふれなかった（2026-10-31）
             waiting = self._waiting()
@@ -339,8 +203,8 @@ class Mind:
                     notes = '\n\n'.join(x for x in (notes, f'[まだ伝えていない知らせ]\n{text}') if x)
         if notes:
             out.add_message(role='system', content=notes)
-        if talker_instructions is None and self.eyes is not None:
-            # 見ていない画像・画像を指した話のときだけ、この返事に画像を添える（小脳には添えない）
+        if self.eyes is not None:
+            # 見ていない画像・画像を指した話のときだけ、この返事に画像を添える
             picture = self.eyes.message_for_reply(_user_text(tail))
             if picture is not None:
                 out.items.append(picture)
@@ -370,11 +234,23 @@ class Mind:
         """付箋になった頼みを除いた発言（頼みごととして数え直さない）"""
         return self.board.strip(text) if self.board is not None else text
 
-    def _recent(self, n: int):
+    def _rows(self):
         if self.history is None:
             return []
-        rows = [t for t in self.history.turns if t.ready.is_set() and t.text and t.role in ('user', 'assistant', 'event')]
-        return rows[-n:]
+        return [t for t in self.history.turns if t.ready.is_set() and t.text and t.role in ('user', 'assistant', 'event')]
+
+    def _recent(self, n: int):
+        return self._rows()[-n:]
+
+    def _window(self):
+        """心に渡す最近の発言。始まりは WINDOW_MAX を超えたときだけ、まとめて WINDOW_KEEP 件まで進める：
+        1 発言ごとにずらすと、履歴の先頭が毎回変わって、そこから後ろのキャッシュが全部外れる"""
+        rows = self._rows()
+        start = next((i for i, t in enumerate(rows) if t is self._window_first), None)
+        if start is None or len(rows) - start > WINDOW_MAX:
+            start = max(0, len(rows) - WINDOW_KEEP)
+        self._window_first = rows[start] if rows else None
+        return rows[start:]
 
     def _notes(self, deep: bool, memory: str | None = None) -> str:
         """今回の返事のための補足（会話の後ろ、今回の発言の前に置く）"""

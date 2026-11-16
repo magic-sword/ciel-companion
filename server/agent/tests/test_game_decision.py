@@ -49,7 +49,9 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
             'kind': 'axes', 'point': True, 'fields': {'x': ['x', 0], 'z': ['z', 0]}}}
 
     async def say(self, text):
-        return await self.decision.handle(llm.ChatMessage(role='user', content=[text]), 'system', [{'role': 'user', 'content': text}])
+        return await self.decision.handle(llm.ChatMessage(role='user', content=[text]),
+                                          [{'role': 'system', 'content': 'system'}, {'role': 'user', 'content': text}],
+                                          [{'type': 'function', 'function': {'name': 'say_hi', 'parameters': {}}}], note='game')
 
     async def test_speaking_only_returns_the_words_and_starts_nothing(self):
         self.respond({'say': 'えへへ', 'act': {'kind': 'none'}})
@@ -57,7 +59,10 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.runner.start.assert_not_awaited()
         self.env.use.assert_not_awaited()
         sent = self.create.await_args.kwargs
-        self.assertTrue(sent['messages'][0]['content'].startswith('system\n\ndecide\n- none'))
+        # The conversation model's request as is, then how to decide, after the conversation
+        self.assertEqual(sent['messages'][:2], [{'role': 'system', 'content': 'system'}, {'role': 'user', 'content': 'えらいね'}])
+        self.assertTrue(sent['messages'][-1]['content'].startswith('game\n\ndecide\n- none'))
+        self.assertEqual((sent['tools'][0]['function']['name'], sent['tool_choice']), ('say_hi', 'none'))
         self.assertEqual(list(sent['response_format']['json_schema']['schema']['properties']), ['say', 'act'])
 
     async def test_a_work_is_started_with_the_decided_request(self):
@@ -75,7 +80,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
                       {'say': 'ごめんなさい、今は動けないのです', 'act': {'kind': 'none'}})
         self.assertEqual(await self.say('来て'), '[happy]ごめんなさい、今は動けないのです')
         told = self.create.await_args.kwargs
-        self.assertIn('できませんでした。理由：busy', told['messages'][0]['content'])
+        self.assertIn('できませんでした。理由：busy', told['messages'][-1]['content'])
         self.assertEqual(told['response_format']['json_schema']['schema']['properties']['act']['anyOf'], [game_decision.NONE])
 
     async def test_kinds_follow_the_work_state(self):
@@ -116,7 +121,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
             self.respond({'say': '止まりました！', 'act': {'kind': 'none'}})
             self.assertEqual(await self.say('止まって'), '[happy]止まりました！')
             stop.assert_awaited_once()
-            self.assertIn('結果：停止しました。', self.create.await_args.kwargs['messages'][0]['content'])
+            self.assertIn('結果：停止しました。', self.create.await_args.kwargs['messages'][-1]['content'])
             self.create.side_effect = TimeoutError()
             self.assertEqual(await self.say('止まって'), '停止しました。')   # without the model, the fact itself
 
