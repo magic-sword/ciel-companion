@@ -147,7 +147,7 @@ async def run(args):
                     controller = ToolDecision() if args.decision_loop else None
                     row['decisions'] = []
 
-                    async def infer(owner, ctx, functions, settings):
+                    async def infer(owner, ctx, functions, settings, **kwargs):
                         visible.clear()
                         visible.update((fn.id, fn) for fn in functions)
                         schemas = [getattr(fn.info, 'raw_schema', None) or utils.build_legacy_openai_schema(fn)['function'] for fn in functions]
@@ -190,7 +190,7 @@ async def run(args):
 
                     started = time.monotonic()
                     try:
-                        with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), patch.object(Agent.default, 'llm_node', infer):
+                        with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), patch.object(Ciel, '_conversation_node', infer):
                             for step in range(8):
                                 speech.num_steps = step + 1
                                 pending.clear()

@@ -106,7 +106,7 @@ async def run(args):
                 calls, replies, usage, requests, argument_errors = [], [], [], [], []
                 started = time.monotonic()
 
-                async def infer(owner, ctx, functions, settings):
+                async def infer(owner, ctx, functions, settings, **kwargs):
                     messages = []
                     for item in ctx.items:
                         if isinstance(item, llm.ChatMessage):
@@ -195,7 +195,7 @@ async def run(args):
 
                 error = None
                 try:
-                    with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), patch.object(Agent.default, 'llm_node', infer):
+                    with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), patch.object(Ciel, '_conversation_node', infer):
                         for step in range(3):
                             before = len(calls)
                             _ = [chunk async for chunk in agent._pipeline_llm(chat, agent.tools, {})]

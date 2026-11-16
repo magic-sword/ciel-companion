@@ -41,7 +41,7 @@ async def main():
     original = chat.items[0].text_content
     captured = []
 
-    async def model_stub(agent, ctx, functions, settings):
+    async def model_stub(agent, ctx, functions, settings, **kwargs):
         captured.append((ctx, functions))
         if len(captured) == 1:
             name, arguments = 'load_capabilities', '{"service_ids":["4"]}'
@@ -53,7 +53,7 @@ async def main():
             llm.FunctionToolCall(name=name, arguments=arguments, call_id=f'fixture-{len(captured)}')]))
 
     with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), \
-            patch.object(Agent.default, 'llm_node', model_stub), \
+            patch.object(Ciel, '_conversation_node', model_stub), \
             patch('models.is_local', return_value=False), patch('models.LOCAL_TEST', False):
         outputs = [chunk async for chunk in agent._pipeline_llm(chat, agent.tools, {})]
         assert outputs[0].delta.tool_calls[0].name == 'load_capabilities'

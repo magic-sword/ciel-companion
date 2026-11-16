@@ -70,11 +70,13 @@ def is_local(role: str) -> bool:
     return role not in OPENAI_ROLES and bool(LOCAL_URL) and (role in LOCAL_ROLES or (LOCAL_TEST and role in CHAT_ROLES))
 
 
-def create_client(role: str):
+def create_client(role: str, *, traced=False):
     """役目ごとの所有クライアント。ローカルなら OpenAI のキーも不要。"""
     import openai
     if is_local(role):
-        return openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0)
+        import inference_trace
+        return openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0,
+                                 **(inference_trace.client_options() if traced else {}))
     return openai.AsyncOpenAI()
 
 

@@ -55,6 +55,7 @@ import app_env
 import game_env
 import goals
 import game_decision
+from tool_decision import ConversationDecision, ToolDecision
 from initiative import Initiative
 from capabilities import CapabilityCatalog
 from session_mcp import SessionMCP
@@ -258,6 +259,12 @@ class Ciel(Agent):
             return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
         return self._pipeline_llm(chat_ctx, tools, model_settings)
 
+    async def _conversation_node(self, ctx, functions, settings, *, source=None):
+        if not hasattr(self, 'conversation_decision'):
+            self.conversation_decision = ConversationDecision()
+        async for chunk in self.conversation_decision.node(self, ctx, functions, settings, source=source):
+            yield chunk
+
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
         """pipeline：返事を作るかをコードで決め（mind.py の route）、心の返事を流す。ゲーム中の持ち主の発言は、
         心と同じ固定の指示・道具の一覧・履歴で、先に話すこととすることを一つの決定にする（game_decision.py）"""
@@ -358,7 +365,7 @@ class Ciel(Agent):
         debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'),
                          reaction_id=reaction.key[-1] if reaction else None, speech_id=speech)
         try:
-            async for chunk in Agent.default.llm_node(self, ctx, fns, model_settings):
+            async for chunk in self._conversation_node(ctx, fns, model_settings, source=chat_ctx):
                 if reactions and not reactions.allowed(speech_id):
                     expired = True
                     break
@@ -547,7 +554,7 @@ async def entrypoint(ctx: JobContext) -> None:
                            # 読み上げる前の文字の変換は、絵文字を外すだけにする。既定の filter_markdown は、返事の頭の
                            # 感情の印「[happy]」をリンクの書きかけとみなし、返事を最後まで書き終えるまで読み上げに渡さなかった
                            # （2026-10-22、bench_latency.py。印は emotion.py が読み取って外す）
-                           tts_text_transforms=['filter_emoji'],
+                           tts_text_transforms=['filter_emoji'], max_tool_steps=ToolDecision.MAX_STEPS,
                            userdata=tools.State(book=book))   # 道具（tools/）から使う会話の状態
     # ゲームの環境（game_env.py。MCP）。会話の始めにつなぎ、道具と遊び方の指示を読む（指示は会話の中で変えない）。
     # 体を受け持つのは、アプリの設定でオンにしてから。つなげなければ、ゲームの道具は無しで続ける
@@ -605,6 +612,10 @@ async def entrypoint(ctx: JobContext) -> None:
     act = agent.activity = activity_.Activity(notify)
     session.on('agent_state_changed', act.agent_state)
     session.on('function_tools_executed', act.tools_executed)
+    agent.conversation_decision = ConversationDecision()
+    session.on('function_tools_executed', agent.conversation_decision.feedback)
+    session.on('user_state_changed', agent.conversation_decision.on_user_state)
+    ctx.add_shutdown_callback(agent.conversation_decision.close)
     # エラーの係（errors.py）：道具・裏の処理・体のエラーを記録し、アプリの接続の表示に知らせる
     errors.ERRORS.notify = notify
     errors.ERRORS.install(asyncio.get_running_loop())

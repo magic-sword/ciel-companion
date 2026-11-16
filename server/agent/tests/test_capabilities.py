@@ -216,11 +216,11 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         state=State(history=history)
         session=Obj(userdata=state,current_speech=Obj(id='test',num_steps=1),_global_run_state=None)
         seen=[]
-        async def capture(owner,ctx,functions,settings):
+        async def capture(owner,ctx,functions,settings,**kwargs):
             seen.append(ctx)
             yield llm.ChatChunk(id='test',delta=llm.ChoiceDelta(role='assistant',content='ok'))
         with patch.object(agent,'_get_activity_or_raise',return_value=Obj(session=session)), \
-                patch.object(Agent.default,'llm_node',capture),patch('agent.models.is_local',return_value=True):
+                patch.object(Ciel,'_conversation_node',capture),patch('agent.models.is_local',return_value=True):
             for suffix in ('state-A','state-B'):
                 chat=llm.ChatContext()
                 chat.add_message(role='system',content=agent.instructions)

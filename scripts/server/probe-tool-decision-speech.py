@@ -48,7 +48,7 @@ async def prepare():
     chat.add_message(role='user', content='今日は紅茶を飲んで休憩しようかな。')
     captured = {}
 
-    async def capture(owner, ctx, functions, settings):
+    async def capture(owner, ctx, functions, settings, **kwargs):
         schemas = [getattr(f.info, 'raw_schema', None) or bench.utils.build_legacy_openai_schema(f)['function'] for f in functions]
         captured.update(messages=bench.messages_for(ctx), tools=[dict(type='function', function=s) for s in schemas])
         controller = bench.ToolDecision()
@@ -58,7 +58,7 @@ async def prepare():
         yield bench.llm.ChatChunk(id='capture', delta=bench.llm.ChoiceDelta(role='assistant', content=''))
 
     with bench.patch.object(agent, '_get_activity_or_raise', return_value=bench.Obj(session=session)), \
-         bench.patch.object(bench.Agent.default, 'llm_node', capture):
+         bench.patch.object(bench.Ciel, '_conversation_node', capture):
         _ = [chunk async for chunk in agent._pipeline_llm(chat, agent.tools, {})]
     return captured
 

@@ -1,13 +1,20 @@
 import json
+import asyncio
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace as Obj
 
 import jsonschema
 from capabilities import CapabilityCatalog
 from persona import load_persona
 from tool_decision import ToolDecision
 import tools
+from livekit.agents import RunContext, ToolResult, llm
+from livekit.agents.llm import utils
+from livekit.agents.voice.events import FunctionToolsExecutedEvent
+from tool_decision import ConversationDecision
 
 
 class ToolDecisionTests(unittest.TestCase):
@@ -92,3 +99,101 @@ class ToolDecisionTests(unittest.TestCase):
         persona = load_persona()
         self.assertIn('{state}', persona.tool_decide_instructions)
         self.assertNotEqual(persona.fingerprint, replace(persona, tool_decide_instructions='changed').fingerprint)
+
+
+class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from agent import Ciel
+        from conversation import Conversation
+        from mind import Mind
+        with patch('agent.PIPELINE', True):
+            self.agent = Ciel()
+        history = Conversation()
+        history.complete(history.reserve(), 'fixture project', label='owner', sure=True)
+        self.agent.mind = Mind(history)
+        self.agent.style = Obj(talk='normal', presence='solo')
+        self.speech = Obj(id='turn-1', num_steps=1, interrupted=False)
+        self.session = Obj(userdata=tools.State(history=history), current_speech=self.speech, _global_run_state=None)
+        self.chat = llm.ChatContext()
+        self.chat.add_message(role='system', content=self.agent.instructions)
+        self.chat.add_message(role='user', content='Search fixture in this conversation')
+        self.create = AsyncMock()
+        self.client = MagicMock()
+        self.client.__aenter__ = AsyncMock(return_value=Obj(chat=Obj(completions=Obj(create=self.create))))
+        self.client.__aexit__ = AsyncMock(return_value=False)
+
+    def answer(self, act, text=''):
+        return Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps(dict(
+            say=[dict(feeling='neutral', text=text)] if text else [], act=act))))])
+
+    async def node(self):
+        with patch.object(self.agent, '_get_activity_or_raise', return_value=Obj(session=self.session)), \
+                patch('models.is_local', return_value=False), patch('models.create_client', return_value=self.client):
+            return [c async for c in self.agent._pipeline_llm(self.chat, self.agent.tools, {})]
+
+    async def dispatch(self, call):
+        fn = next(f for f in self.agent.capabilities.select(self.agent.tools) if f.id == call.name)
+        call = llm.FunctionCall(call_id=call.call_id, name=call.name, arguments=call.arguments)
+        context = RunContext(session=self.session, speech_handle=self.speech, function_call=call)
+        args, kwargs = utils.prepare_function_arguments(fnc=fn, json_arguments=call.arguments, call_ctx=context)
+        result = await fn(*args, **kwargs)
+        required = True
+        if isinstance(result, ToolResult):
+            required, result = result.reply_required, result.output
+        out = llm.FunctionCallOutput(call_id=call.call_id, name=call.name,
+            output=result if isinstance(result, str) else json.dumps(result), is_error=False, reply_required=required)
+        self.agent.conversation_decision.feedback(FunctionToolsExecutedEvent(function_calls=[call], function_call_outputs=[out]))
+        self.chat.items.extend([call, out])
+        return out
+
+    async def test_normal_pipeline_loads_executes_real_mcp_and_answers_from_result(self):
+        self.create.side_effect = [self.answer(dict(kind='load', service_ids=['6'])),
+            self.answer(dict(kind='call', tool_id='search_conversation', arguments={'query': 'fixture'})),
+            self.answer(dict(kind='complete', evidence=['r2']), 'Found fixture project')]
+        chunks = await self.node()
+        self.assertEqual(chunks[0].delta.tool_calls[0].name, 'load_capabilities')
+        await self.dispatch(chunks[0].delta.tool_calls[0])
+        chunks = await self.node()
+        self.assertEqual(chunks[0].delta.tool_calls[0].name, 'execute_capability')
+        output = await self.dispatch(chunks[0].delta.tool_calls[0])
+        self.assertIn('fixture project', output.output)
+        chunks = await self.node()
+        self.assertIn('Found fixture project', chunks[0].delta.content)
+        self.assertEqual(self.agent.conversation_decision.loop.steps, 3)
+        self.assertEqual(self.create.await_count, 3)
+
+    async def test_late_model_result_cannot_dispatch_after_user_interrupts(self):
+        async def interrupted(**kwargs):
+            self.agent.conversation_decision.on_user_state(Obj(new_state='speaking'))
+            return self.answer(dict(kind='load', service_ids=['6']))
+        self.create.side_effect = interrupted
+        self.assertEqual(await self.node(), [])
+        self.assertTrue(self.agent.conversation_decision.loop.cancelled)
+
+    async def test_service_owned_notice_gets_feedback_without_duplicate_speech(self):
+        self.create.return_value = self.answer(dict(kind='load', service_ids=['6']))
+        chunks = await self.node()
+        await self.dispatch(chunks[0].delta.tool_calls[0])
+        loop = self.agent.conversation_decision.loop
+        loop.issued['notice'] = 'search_conversation'
+        output = llm.FunctionCallOutput(call_id='notice', name='execute_capability', output='{"status":"ok"}',
+            is_error=False, reply_required=False)
+        event = FunctionToolsExecutedEvent(function_calls=[llm.FunctionCall(call_id='notice', name='execute_capability', arguments='{}')], function_call_outputs=[output])
+        self.agent.conversation_decision.feedback(event)
+        self.agent.conversation_decision.feedback(event)
+        self.assertTrue(event.has_tool_reply)
+        self.assertEqual(len(loop.results), 2)
+        self.create.return_value = self.answer(dict(kind='complete', evidence=['r2']), 'Already announced')
+        chunks = await self.node()
+        self.assertFalse(chunks[0].delta.content)
+
+    async def test_new_speech_does_not_inherit_pending_actions(self):
+        self.create.return_value = self.answer(dict(kind='load', service_ids=['6']))
+        await self.node()
+        old = self.agent.conversation_decision.loop
+        self.speech.id = 'turn-2'
+        self.create.return_value = self.answer(dict(kind='none'), 'Hello')
+        chunks = await self.node()
+        self.assertTrue(old.cancelled)
+        self.assertEqual(self.agent.conversation_decision.loop.outcome, 'none')
+        self.assertIn('Hello', chunks[0].delta.content)

@@ -13,7 +13,7 @@
 | ファイル | 責務 |
 |---|---|
 | `server/agent/config/persona.toml` | 本文ファイルの選択 |
-| `server/agent/config/prompts/tool_decide.md` | 評価用の通常会話の構造化判断。発話・感情と操作、結果からの継続・終了を決める。通常音声へは未適用 |
+| `server/agent/config/prompts/tool_decide.md` | 通常の音声・文字会話の構造化判断。発話・感情と操作、結果からの継続・終了を決める |
 | `server/agent/config/prompts/stt_vocabulary.md` | CPU Whisperへ渡す固有名詞の語彙ヒント。会話本文や認識後の置換規則ではない |
 | `server/agent/config/prompts/character.md` | 人物像・話し方・会話上のルール |
 | `server/agent/config/prompts/ciel_self.md` | シエル自身の好み・苦手・こだわり（企画の設定資料から、好みと癖だけを選んだもの。物語の人や場所は入れない）。会話モデルに渡す |

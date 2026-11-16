@@ -46,7 +46,7 @@ async def main():
     output, tasks = [], []
     delay = 0.
 
-    async def model_stub(agent, context, functions, settings):
+    async def model_stub(agent, context, functions, settings, **kwargs):
         if not delay:
             assert any('observed damage' in (i.text_content or '') for i in context.items)
         await asyncio.sleep(delay)
@@ -75,7 +75,7 @@ async def main():
 
     session.generate_reply = generate_reply
     with patch.object(agent, '_get_activity_or_raise', return_value=Obj(session=session)), \
-            patch.object(Agent.default, 'llm_node', model_stub), patch('models.is_local', return_value=False):
+            patch.object(Ciel, '_conversation_node', model_stub), patch('models.is_local', return_value=False):
         event = voice.react_latest('game', instructions='observed damage', reaction_kind='hurt')
         await asyncio.sleep(.1)
         assert output == ['pain reaction'], output

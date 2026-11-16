@@ -1,8 +1,5 @@
-"""Experimental say/act controller. The host owns dispatch and observed results.
-
-Used by the lifecycle evaluation, not enabled in the deployed voice pipeline.
-No side effects occur here: calls still go through the existing catalog/MCP guards.
-"""
+"""Say/act controller and LiveKit adapter; dispatch stays in the catalog/MCP guards."""
+import asyncio
 import copy
 import json
 import time
@@ -10,7 +7,10 @@ import uuid
 
 import jsonschema
 from livekit.agents import llm
-from game_decision import SAY, spoken
+from livekit.agents.llm._provider_format.openai import to_fnc_ctx
+from game_decision import REASONING, SAY, spoken
+import models
+import debug_log
 
 
 def object_schema(properties):
@@ -33,6 +33,9 @@ class ToolDecision:
         self.attempted = set()
         self.outcome = None
         self.cancelled = False
+        self.issued = {}
+        self.observed = set()
+        self.notification_owned = False
 
     def check(self):
         if self.cancelled:
@@ -116,6 +119,7 @@ class ToolDecision:
         if name not in visible:
             raise ValueError('entrypoint_no_longer_allowed')
         call = llm.FunctionToolCall(name=name, arguments=json.dumps(arguments, ensure_ascii=False), call_id=uuid.uuid4().hex)
+        self.issued[call.call_id] = catalog.target(call)
         # A proposal is not an observed success. Intermediate speech is held until
         # feedback, so an unexecuted promise is never the terminal spoken answer.
         return '', call
@@ -131,3 +135,78 @@ class ToolDecision:
         except (TypeError, ValueError):
             pass
         self.results.append(dict(id=f'r{len(self.results)+1}', tool=name, status=status, error=error))
+
+    def feedback(self, event):
+        """Keep LiveKit's result loop running, including services owning their spoken notice."""
+        for output in event.function_call_outputs:
+            if output.call_id not in self.issued or output.call_id in self.observed:
+                continue
+            self.observed.add(output.call_id)
+            self.notification_owned = not output.reply_required and not output.is_error
+            self.observe(self.issued[output.call_id], output.output, error=output.is_error)
+            if not self.cancelled:
+                output.reply_required = True
+
+
+class ConversationDecision:
+    """One bounded decision chain per SpeechHandle, using LiveKit's actual tool results."""
+    def __init__(self):
+        self.speech_id = None
+        self.loop = None
+
+    def cancel(self):
+        if self.loop is not None:
+            self.loop.cancelled = True
+
+    async def close(self):
+        self.cancel()
+
+    def on_user_state(self, event):
+        if event.new_state == 'speaking':
+            self.cancel()
+
+    def feedback(self, event):
+        if self.loop is not None:
+            self.loop.feedback(event)
+
+    async def node(self, owner, ctx, functions, settings, *, source=None):
+        speech = owner.session.current_speech
+        if self.loop is None or self.speech_id != speech.id:
+            self.cancel()
+            self.speech_id, self.loop = speech.id, ToolDecision()
+        loop = self.loop
+        if loop.cancelled or getattr(speech, 'interrupted', False):
+            return
+        visible = {fn.id: fn for fn in functions}
+        source = source if source is not None else ctx
+        refused = owner.mind.refused_now(source)
+        schema = loop.schema(owner.capabilities, visible, refused)
+        instruction = owner.persona.tool_decide_instructions.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
+        local = models.is_local('mind')
+        messages = ctx.to_provider_format('openai')[0]
+        messages.append({'role': 'user' if local else 'system', 'content': ('SYSTEM: ' if local else '') + instruction})
+        options = models.options('mind', model=models.model('mind'), messages=messages,
+            tools=to_fnc_ctx(llm.ToolContext(functions), strict=True), tool_choice='none',
+            response_format={'type': 'json_schema', 'json_schema': {'name': 'tool_decision', 'schema': schema,
+                **({} if local else {'strict': False})}},
+            max_completion_tokens=600, timeout=90,
+            **({'temperature': 0, 'seed': 1729} if local else {'reasoning_effort': REASONING}))
+        try:
+            async with models.create_client('mind', traced=True) as client:
+                response = await client.chat.completions.create(**options)
+            models.record('mind', models.model('mind'), response.usage)
+            if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
+                return
+            decision = json.loads(response.choices[0].message.content or '')
+            text, call = loop.resolve(decision, schema, owner.capabilities, visible, owner.mind.refused_now(source))
+            debug_log.record('conversation_decision', speech_id=speech.id, step=loop.steps,
+                             outcome=decision['act']['kind'], notification_owned=loop.notification_owned)
+            # A service that owns its notice still receives feedback, but its
+            # queued announcement remains the only spoken acknowledgement.
+            if call is None and loop.notification_owned and loop.outcome in ('complete', 'accepted'):
+                text = ''
+            yield llm.ChatChunk(id=uuid.uuid4().hex, delta=llm.ChoiceDelta(role='assistant',
+                content=text or None, tool_calls=[call] if call is not None else []))
+        except asyncio.CancelledError:
+            loop.cancelled = True
+            raise
