@@ -36,17 +36,17 @@ class GeminiSearchProbeTests(unittest.TestCase):
         data['modelVersion'] = 'another-model'
         self.assertFalse(probe.inspect_grounding(data)['grounding_present'])
 
-    def test_requires_free_tier_confirmation_before_network(self):
+    def test_requires_paid_usage_confirmation_before_network(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(probe.httpx, 'Client') as client:
-            args = Obj(env_file=Path(folder) / 'missing', check_config=False, free_tier_confirmed=False)
-            with self.assertRaisesRegex(ValueError, 'Free Tier'):
+            args = Obj(env_file=Path(folder) / 'missing', check_config=False, paid_usage_confirmed=False)
+            with self.assertRaisesRegex(ValueError, 'paid API usage'):
                 probe.run(args)
             client.assert_not_called()
 
     def test_quota_failure_stops_and_redacts_key(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(probe.httpx, 'Client') as factory, \
                 patch.dict(probe.os.environ, {'GEMINI_API_KEY': 'fixture-secret'}), patch('builtins.print'):
-            args = Obj(env_file=Path(folder) / 'missing', check_config=False, free_tier_confirmed=True,
+            args = Obj(env_file=Path(folder) / 'missing', check_config=False, paid_usage_confirmed=True,
                        output=Path(folder) / 'report.json', limit=3)
             client = factory.return_value.__enter__.return_value
             client.post.return_value = Obj(status_code=429, json=lambda: {'error': {

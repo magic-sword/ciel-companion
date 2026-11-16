@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded Gemini 2.5 Flash-Lite Google Search trial; no deployment or fallback.
+"""Bounded Gemini 3.5 Flash-Lite Google Search trial; no deployment or fallback.
 
 --check-config makes no network requests. --run requires the operator to confirm
-the project's Free Tier; an API key does not reveal or enforce its billing tier.
+paid API usage; an API key does not reveal or enforce its billing tier.
 """
 import argparse
 from datetime import datetime, timezone, timedelta
@@ -18,12 +18,12 @@ import httpx
 from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parents[2]
-MODEL = 'gemini-2.5-flash-lite'
+MODEL = 'gemini-3.5-flash-lite'
 ENDPOINT = f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent'
 QUESTIONS = [
     'Python公式サイトをGoogle検索し、現在の最新安定版のバージョンとリリース日を、公式の出典付きで確認してください。',
     'Google公式資料を検索し、Custom Search JSON APIの新規利用可否と提供終了予定日を確認してください。',
-    'Gemini公式資料を検索し、gemini-2.5-flash-liteのGoogle検索連携の無料枠を、利用条件とともに確認してください。',
+    'Gemini公式資料を検索し、gemini-3.5-flash-liteのGoogle検索連携の料金と無料枠を、利用条件とともに確認してください。',
 ]
 
 
@@ -64,8 +64,8 @@ def run(args):
     if args.check_config:
         print(json.dumps(dict(model=MODEL, key_present=bool(key), billing_tier='not_determined', requests=0)))
         return 0
-    if not args.free_tier_confirmed:
-        raise ValueError('Confirm the project is on Free Tier before using --free-tier-confirmed; no request sent')
+    if not args.paid_usage_confirmed:
+        raise ValueError('Confirm paid API usage before using --paid-usage-confirmed; no request sent')
     if not key:
         raise ValueError('Set GEMINI_API_KEY in the environment or --env-file; no request sent')
     if args.output is None:
@@ -75,7 +75,7 @@ def run(args):
     instructions_path = ROOT / 'server/agent/config/prompts/research.md'
     instructions = instructions_path.read_text(encoding='utf8')
     now = datetime.now(timezone(timedelta(hours=9))).isoformat()
-    report = dict(model=MODEL, endpoint=ENDPOINT, requested_at=now, free_tier_operator_confirmed=True,
+    report = dict(model=MODEL, endpoint=ENDPOINT, requested_at=now, paid_usage_operator_confirmed=True,
                   billing_verified_by_api=False, max_requests=args.limit, max_output_tokens=1600,
                   instructions_sha256=hashlib.sha256(instructions_path.read_bytes()).hexdigest(),
                   script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), trials=[])
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     mode.add_argument('--run', action='store_true')
     parser.add_argument('--env-file', type=Path, default=ROOT / 'server/.env.shared',
                         help='API credentials (default: server/.env.shared); process environment takes precedence')
-    parser.add_argument('--free-tier-confirmed', action='store_true')
+    parser.add_argument('--paid-usage-confirmed', action='store_true')
     parser.add_argument('--limit', type=int, choices=(1, 2, 3), default=1)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
