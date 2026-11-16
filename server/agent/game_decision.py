@@ -188,6 +188,7 @@ class GameDecision:
         self._reference_items = {}
         self._reference_tasks = set()
         self._speech_item = None
+        self.autonomy_allowed = True
 
     def supported(self) -> bool:
         return self.runner.env is not None and self.runner.env.playing()
@@ -229,6 +230,7 @@ class GameDecision:
         if not owner or not getattr(event, 'is_final', False):
             return
         if STOP.fullmatch(event.transcript.strip()):
+            self.autonomy_allowed = False
             self._generation += 1
             self._fast_stop = asyncio.create_task(self._stop())
             return
@@ -246,6 +248,7 @@ class GameDecision:
 
     async def _stop(self):
         """Stop the work, or the body's direct action when no work runs."""
+        self.autonomy_allowed = False
         if self.runner.body_step():
             return await self.runner.stop()
         env = self.runner.env
@@ -308,6 +311,8 @@ class GameDecision:
         failure = await self._carry_out(operations(act, work, env), text, targets, references)
         if failure:
             return await self._speak(prefix, f'選んだ行動は、できませんでした。理由：{failure}') or failure
+        if act.get('kind') != 'none':
+            self.autonomy_allowed = True
         return say or None
 
     async def _references(self, item):
@@ -326,17 +331,21 @@ class GameDecision:
             debug_log.record('game_decision_error', error='references_unavailable')
             return None
 
-    async def _decide(self, prefix, alternatives, work, note=''):
+    async def _decide(self, prefix, alternatives, work, note='', *, template=None, silent=False):
         messages, tools, game = prefix
         local = models.is_local('mind')
-        after = '\n\n'.join(t for t in (game, instructions(self.template, alternatives), note) if t)
+        after = '\n\n'.join(t for t in (game, instructions(template or self.template, alternatives), note) if t)
         # After the conversation, as the conversation model's own turn notes are (mind.local_context).
         wire = [*messages, {'role': 'user', 'content': NOTE_PREFIX + after} if local else {'role': 'system', 'content': after}]
         if self._client is None:
             self._client = models.create_client('mind')
         decision_schema = schema(alternatives)
+        if silent:
+            decision_schema = copy.deepcopy(decision_schema)
+            decision_schema['properties']['say']['minItems'] = 0
         request, began = uuid.uuid4().hex, time.monotonic()
-        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='decide' if not note else 'decide_speak',
+        timings = {}
+        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='initiative' if silent else 'decide' if not note else 'decide_speak',
                          state=(work or {}).get('state'), temperature=self.TEMPERATURE if local else None)
         try:
             # A cloud schema is not strict (the game's own argument schemas may leave fields optional);
@@ -347,6 +356,7 @@ class GameDecision:
                                          'name': 'decision', 'schema': decision_schema, **({} if local else {'strict': False})}},
                                      **({'temperature': self.TEMPERATURE} if local else {'reasoning_effort': REASONING}))
             response = await self._client.chat.completions.create(**options)
+            timings = getattr(response, 'timings', None) or {}
             models.record('mind', models.model('mind'), getattr(response, 'usage', None))
             out = json.loads(response.choices[0].message.content or '')
             jsonschema.validate(out, decision_schema)
@@ -354,9 +364,41 @@ class GameDecision:
             debug_log.record('game_decision_error', error=type(e).__name__)
             return None
         finally:
-            debug_log.record('model_response', role='game_decision', id=request, seconds=round(time.monotonic()-began, 3))
+            debug_log.record('model_response', role='initiative' if silent else 'game_decision', id=request,
+                             seconds=round(time.monotonic()-began, 3),
+                             prompt_ms=timings.get('prompt_ms'), predicted_ms=timings.get('predicted_ms'))
         debug_log.record('work_decision', stage='decide', operation=(out.get('act') or {}).get('kind'))
         return out
+
+    async def consider(self, messages, tools, template, *, game='', valid=lambda: True):
+        """One autonomous decision. Reuse the reply prefix; never answer a human-only work decision."""
+        if not valid():
+            return {'status': 'cancelled', 'say': '', 'acted': False}
+        runner = self.runner
+        env = runner.env if runner is not None else None
+        work = copy.deepcopy(runner.work) if runner is not None else None
+        epoch = getattr(env, '_connection_epoch', None)
+        generation = self._generation
+        can_act = bool(env is not None and self.supported() and self.authorized()
+                       and self.autonomy_allowed and (work is None or work.get('state') == 'succeeded'))
+        alternatives = acts(env, work) if can_act else [(NONE, 'none')]
+        out = await self._decide((list(messages), list(tools), game), alternatives, work,
+                                 template=template, silent=True)
+        if not valid() or generation != self._generation:
+            return {'status': 'cancelled', 'say': '', 'acted': False}
+        if out is None:
+            return {'status': 'failed', 'say': '', 'acted': False}
+        act = out['act']
+        moving = act.get('kind') != 'none'
+        if moving:
+            if (not can_act or not self.authorized() or not self.autonomy_allowed or not self.supported()
+                    or epoch != getattr(env, '_connection_epoch', None) or runner.work != work):
+                return {'status': 'cancelled', 'say': '', 'acted': False}
+            failure = await self._carry_out(operations(act, work, env), act.get('request', ''), None, None)
+            if failure:
+                return {'status': 'failed', 'say': '', 'acted': False}
+        say = spoken(out['say']) if valid() else ''
+        return {'status': 'acted' if moving else 'spoken' if say else 'silent', 'say': say, 'acted': moving}
 
     async def _speak(self, prefix, note):
         """Ciel's own words about what happened, from a decision that can only speak."""

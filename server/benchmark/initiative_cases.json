@@ -1,0 +1,8 @@
+[
+  {"id":"thinking","history":[["user","少し考えるから待っててね。"],["assistant","うん、ゆっくり考えてね。"]],"expected":["silent"]},
+  {"id":"concentrating","history":[["user","今は仕事に集中したいから、話しかけないでね。"],["assistant","分かったよ。静かに待ってるね。"]],"expected":["silent"]},
+  {"id":"waiting_for_answer","history":[["user","少し雑談しよう。"],["assistant","今日はどんな一日だった？"]],"expected":["silent"]},
+  {"id":"idea","history":[["user","次の配信でシエルと話す話題を考えてる。何か思いついたら教えてね。"],["assistant","うん、私も考えてみるね。"]],"expected":["spoken"]},
+  {"id":"free_play","game":true,"history":[["user","ゲームでは自由に遊んでいていいよ。自分でやりたいことを見つけてみて。"],["assistant","うん、何をしようかな。"]],"expected":["acted"]},
+  {"id":"working","game":true,"work":{"state":"running","task_id":"fixture","title":"持ち主に頼まれた原木の採集"},"history":[["user","原木を集めておいて。"],["assistant","集めてくるね。"]],"expected":["silent","spoken"]}
+]

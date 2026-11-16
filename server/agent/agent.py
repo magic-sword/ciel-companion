@@ -55,6 +55,7 @@ import app_env
 import game_env
 import goals
 import game_decision
+from initiative import Initiative
 from capabilities import CapabilityCatalog
 from session_mcp import SessionMCP
 import mind
@@ -317,6 +318,14 @@ class Ciel(Agent):
             ctx = mind.local_context(ctx, source=chat_ctx)
         # Shown but not run this time (mind.refused_now); a call to them is dropped like an ungiven tool.
         refused = self.mind.refused_now(chat_ctx)
+        if self.mind.reply_origin == 'initiative':
+            initiative = getattr(self, 'initiative', None)
+            if initiative is not None:
+                reply = await initiative.reply(ctx.to_provider_format('openai')[0],
+                    to_fnc_ctx(llm.ToolContext(fns), strict=True), self._game_text())
+                if reply:
+                    yield reply
+            return
         decision = getattr(self, 'game_decision', None)
         if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
                 and self.mind.reply_origin == 'reply'):
@@ -431,7 +440,7 @@ class Ciel(Agent):
         # Domain instructions travel in discovery results, never rewrite the fixed prefix.
         loaded = set() if self.capabilities is not None else None
         if PIPELINE:
-            parts.append(p.talker_instructions)
+            parts.append(p.mind_instructions)
             if models.LOCAL_TEST and os.environ.get('CIEL_VOICE_FAST', '1') == '1':
                 parts.append(p.voice_first_sentence)
         if SPEAKERS and (loaded is None or 'memory' in loaded):
@@ -702,6 +711,18 @@ async def entrypoint(ctx: JobContext) -> None:
     # 歌を聴く（singing.py）。聴いているあいだは会話モデルへ声を送らず、シエルから話しかけない
     song = singing.SongListener(session, tap, agent.persona.singing_feedback) if VOICE == 'irodori' else None
     session.userdata.song = song
+    if PIPELINE and os.environ.get('CIEL_INITIATIVE', '1') == '1':
+        decider = getattr(agent, 'game_decision', None)
+        if decider is None:
+            decider = game_decision.GameDecision(None, agent.persona.initiative_instructions)
+            ctx.add_shutdown_callback(decider.close)
+        agent.initiative = Initiative(history, voice, decider, agent.persona.initiative_instructions,
+            agent.persona.initiative_trigger,
+            allowed=lambda: style.talk != 'quiet' and style.presence in ('solo', 'close')
+                and not (song is not None and song.active)
+                and not (book is not None and book.enrolling is not None))
+        session.on('user_state_changed', agent.initiative.on_user_state)
+        ctx.add_shutdown_callback(agent.initiative.close)
     if song is not None:
         song.diary = ciel_diary
         voice.reactions.singing = lambda: song.active
@@ -890,6 +911,8 @@ async def entrypoint(ctx: JobContext) -> None:
                                      tool_choice='none')
     if agent.mind is not None:
         agent.mind.start()   # 心が「今のまとめ」を書く見回り
+    if getattr(agent, 'initiative', None) is not None:
+        agent.initiative.start()
     if AIZUCHI:
         await agent.aizuchi.prepare(ctx.room)   # あいさつのあとに、相づちの声を読み上げておく
     if BENCHMARK:

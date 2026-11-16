@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from dataclasses import replace
 from types import SimpleNamespace as Obj
 from unittest.mock import patch
 import jsonschema
@@ -59,7 +60,11 @@ async def run(args):
               'runner_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'source':json.loads(provenance.read_text()) if provenance.exists() else None,
               'variant': args.variant, 'catalog_position':getattr(args,'catalog_position','fixed'),
+              'direct_tools': getattr(args, 'direct_tools', False),
               'fresh_loaded_prefix':args.fresh_loaded_prefix, 'trials':[]}
+    result['source_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted((ROOT/'server/agent').rglob('*'))
+        if p.is_file() and p.suffix in ('.py', '.md', '.toml') and '__pycache__' not in p.parts}
     selector = ROOT/'server/benchmark/voice/capability-selector.md'
     if 'specialist' in args.variant:
         result['selector_sha256'] = hashlib.sha256(selector.read_bytes()).hexdigest()
@@ -70,6 +75,25 @@ async def run(args):
                 if args.cases and case not in args.cases:
                     continue
                 agent = Ciel()
+                if getattr(args, 'direct_tools', False):
+                    candidate = ROOT/'server/benchmark/voice/conversation-direct.md'
+                    result['direct_prompt_sha256'] = hashlib.sha256(candidate.read_bytes()).hexdigest()
+                    discovery = ROOT/'server/benchmark/voice/conversation-direct-discovery.md'
+                    result['direct_discovery_sha256'] = hashlib.sha256(discovery.read_bytes()).hexdigest()
+                    agent.persona = replace(agent.persona, mind_instructions=candidate.read_text(encoding='utf8'),
+                                            tool_discovery_instructions=discovery.read_text(encoding='utf8'))
+                    catalog = agent.capabilities
+                    original_select = catalog.select
+                    def direct_select(eligible):
+                        original_select(eligible)
+                        visible = [fn for fn in eligible if fn.id in catalog.allowed]
+                        catalog.exposed = {fn.id for fn in visible}
+                        return visible
+                    catalog.select = direct_select
+                    original_summary = catalog.summary
+                    catalog.summary = lambda: original_summary() + '\n\n' + '\n\n'.join(
+                        catalog.instructions[s.name] for s in catalog.available()
+                        if s.name in catalog.instructions)
                 history = Conversation()
                 agent.mind = Mind(history)
                 agent.style = Obj(talk='chatty', presence='close')
@@ -136,6 +160,7 @@ async def run(args):
                         temperature=0, seed=1729, max_tokens=180, timeout=60,
                         extra_body={'chat_template_kwargs':{'enable_thinking':False}}, **kwargs)
                     requests.append({'seconds':time.monotonic()-began, 'preparation':preparation,
+                        'model': getattr(response, 'model', None), 'timings': getattr(response, 'timings', None),
                         'schema_chars':len(json.dumps(schemas,ensure_ascii=False)),
                         'schema_sha256':hashlib.sha256(json.dumps(schemas,sort_keys=True).encode()).hexdigest(),
                         'usage':response.usage.model_dump(), 'loaded':list(agent.capabilities.loaded)})
@@ -202,6 +227,8 @@ if __name__ == '__main__':
     parser.add_argument('--cases', nargs='+', choices=[c[0] for c in CASES])
     parser.add_argument('--fresh-loaded-prefix', action='store_true')
     parser.add_argument('--capture-requests', action='store_true', help='Save synthetic fixture requests for cache-bank replay')
+    parser.add_argument('--direct-tools', action='store_true',
+                        help='Experiment: expose all currently permitted schemas with fixed domain instructions')
     parser.add_argument('--catalog-position', choices=['fixed','trailing'], default='fixed',
                         help='Compare current fixed catalog with its previous position after changing notes')
     parser.add_argument('--variant', choices=['baseline','compact','prepared','compact-prepared',

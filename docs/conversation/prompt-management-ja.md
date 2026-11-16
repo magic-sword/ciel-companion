@@ -33,9 +33,10 @@
 | `server/agent/config/prompts/minutes.md`・`minutes_live.md`・`minutes_voice.md` | 会話のまとめ（議事録など）の清書・ライブの差分・声での頼まれ方。処理は `minutes.py`・`summaries/`。[議事録の決定記録](../services/meeting-minutes-ja.md) |
 | `server/agent/config/summaries/*.toml`・`*.md` | まとめのテンプレート。TOML は見出しと種類（モデルへの本文ではない）、Markdown は書き方の指示（モデルへそのまま渡す） |
 | `server/agent/config/prompts/reply_frame.md` | 返事の前提（書いたとおりに読み上げられて相手に届く）。`agent.py`が能力一覧のあと、固定systemの最後に付ける。前へ移すと注釈を減らす効果が消えた |
-| `server/agent/config/prompts/talker.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline`の共通会話指示（会話と必要な道具の選択）、背景の短いまとめ、付箋と依頼の印の読み方。`listener.md`は独立モジュール用に残すが、通常pipelineの途中文字起こしには接続しない。処理は`mind.py`・`board.py`。[会話の処理構造](conversation-pipeline-ja.md) |
+| `server/agent/config/prompts/mind.md`・`mind_brief.md`・`listener.md`・`tasks.md` | `CIEL_MODEL=pipeline`の共通会話指示（会話と必要な道具の選択）、背景の短いまとめ、付箋と依頼の印の読み方。`listener.md`は独立モジュール用に残すが、通常pipelineの途中文字起こしには接続しない。処理は`mind.py`・`board.py`。[会話の処理構造](conversation-pipeline-ja.md) |
 | `server/agent/persona.py` | 設定の検証、ファイルの読み込み、本文一式のハッシュ計算 |
 | `server/agent/config/prompts/game_decide.md` | ゲーム中の発言の決定（話す言葉と行動）の書き方。`{actions}`に、その作業の状態で選べる行動が入る |
+| `server/agent/config/prompts/initiative.md`・`initiative_trigger.md` | 自発判断の末尾指示と、静かな時間が続いた事実の補足。通常会話の固定指示は共用する。`{actions}`へ今選べる行動を入れ、発話なしも選べる |
 | `server/agent/agent.py` | 声の方式に応じた指示の組み合わせと会話への適用 |
 
 Markdown は HTML に変換せず、そのソースをモデルへ渡す。見出し・箇条書きは利用できる。コメントや front matter を取り除く処理、テンプレート処理はない。変数展開は `greeting_owner.md`・`enroll_done.md` の `{name}` だけ（名前を別の行のデータとして渡すだけでは、名前を呼ばないことがあったため）。編集者向けの説明・出典は README やこの文書に置く。

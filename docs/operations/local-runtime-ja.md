@@ -18,6 +18,8 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 ## 設定ファイルの責務
 
+`CIEL_INITIATIVE`はpipelineの自発判断を有効にする（既定`1`、`0`で停止）。新しい会話・出来事のあとだけ考え、同じ状況での定期推論は行わない。`initiative.py`、`game_decision.py`、persona.tomlと指示本文を同じコミットで配置する。初版の判断品質と未確認範囲は[能力とキャッシュの実測](../testing/capability-results-ja.md#自発判断の初版)、通常サービスへの反映は[確認状況](../testing/verification-status-ja.md)を参照する。
+
 ローカル音声の`CIEL_VOICE_FAST`は既定`1`。ジョブのモデル準備、背景推論の分類、短い最初の文を有効にする。`0`は同じソースで旧動作と比較するための設定。新しい`voice_warmup_file`・`voice_first_sentence_file`を持つpersona.tomlとコードを一緒に配置する。準備済み状態には世代を返す新しい制御先が必要で、ソースの更新だけで既存の共有APIへ適用されたとは扱わない。
 
 | ファイル | 内容 | 読む環境 |

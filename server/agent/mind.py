@@ -38,7 +38,7 @@ WINDOW_MAX = 60            # 心に渡す最近の発言：これを超えたら
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-DEEP_WHY = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image')   # 心が返事を作る、口（mouth.py）の why
+EVENT_REPLIES = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image', 'initiative')
 MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
 MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
 # 目的の道具のうち、相手の発言で呼ぶもの（育つ例文の印）・体を動かすもの。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を
@@ -78,7 +78,6 @@ class Mind:
         self._brief_through = 0          # 今のまとめに使った最後の発言 ID
         self._brief_at = time.monotonic()
         self._briefing: asyncio.Task | None = None
-        self._deep = False               # 次の返事は心が作る
         self.reply_origin = ''
         self._next_origin = ''
         self.from_comment = False        # 今の返事（と、その道具の結果の続き）は配信のコメントへの返事
@@ -94,14 +93,12 @@ class Mind:
             self._client = models.create_client('brief')
         return self._client
 
-    # ---- 小脳と心の振り分け ----
+    # ---- 返事を作る契機 ----
 
     def on_say(self, why: str) -> None:
         """口が返事を頼む直前（mouth.Mouth.before_say）。議事録・歌の知らせ・声の登録の一言は、心が作る"""
         self.from_comment = why == 'comment'
         self._next_origin = why
-        if why in DEEP_WHY:
-            self._deep = True
 
     def route(self, chat_ctx: llm.ChatContext, turn: dict | None = None) -> str:
         """この返事を作るか（'mind'）、黙るか（'skip'）。返事はいつも心が作る。turn は turns.py の pipeline_turn"""
@@ -111,8 +108,8 @@ class Mind:
             return 'mind'   # 道具の結果を受けた続き
         self.reply_origin = self._next_origin or 'reply'
         self._next_origin = ''
-        if self._deep:
-            self._deep = False
+        if self.reply_origin in EVENT_REPLIES:
+            # Preserve a comment's origin and avoid treating a notification as a repeated user request.
             return 'mind'
         self.from_comment = False   # 声の発言への返事（口を通さない）
         # 頼みだけの発言かは、最後の発言で見る（付箋になった頼みは、頼みごととして数えない）
@@ -215,7 +212,7 @@ class Mind:
         return out
 
     def _waiting(self) -> dict[str, str]:
-        return {w: t for w, t in (self.waiting() if self.waiting is not None else {}).items() if w in DEEP_WHY}
+        return {w: t for w, t in (self.waiting() if self.waiting is not None else {}).items() if w in EVENT_REPLIES}
 
     def _mark_item(self, item):
         """今回の発言の、付箋になった頼みを付箋の印に置き換えた写し（送る会話だけ。LiveKit の会話は変えない）"""

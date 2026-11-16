@@ -50,4 +50,11 @@ what = "心（全部の指示と道具）と小脳（短い指示・道具なし
 cost = "既定（各 10 回）で約 0.02〜0.03 ドル"
 cost_max_usd = 0.05
 command = "docker exec ciel-dev-agent-dev-1 python bench_ttft.py [--rounds 10]"
-covers = ["mind.py", "config/prompts/talker.md"]
+covers = ["mind.py", "config/prompts/mind.md"]
+
+[initiative]
+what = "自発判断の沈黙・発話・行動の選択。実pipelineとローカルモデルを使い、ゲーム操作は模擬する"
+cost = "ローカル専用、外部API料金なし。共有GPUを6場面×3回使用。CIEL_LOCAL_LLM_URLに共有APIを指定する"
+cost_max_usd = 0.0
+command = "python scripts/server/benchmark-initiative.py --output .local/initiative/result.json --rounds 3"
+covers = ["initiative.py", "game_decision.py", "mind.py", "config/prompts/initiative", "config/prompts/mind.md"]

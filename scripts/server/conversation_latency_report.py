@@ -17,11 +17,23 @@ from pathlib import Path
 def report(path):
     rows = [json.loads(line) for line in Path(path).read_text(encoding='utf-8').splitlines() if line.strip()]
     replies, background, pending = [], {}, []
+    initiative = {'counts': {}, 'request_seconds': 0., 'model_compute_ms': 0., 'overlaps': 0, 'reply_items': 0}
     route = None
     for r in rows:
         kind = r.get('kind')
         if kind == 'mind_route':
             route = r.get('why')
+        elif kind == 'speak':
+            route = r.get('why')
+        elif kind == 'model_response' and r.get('role') == 'initiative':
+            initiative['request_seconds'] += r.get('seconds') or 0
+            initiative['model_compute_ms'] += (r.get('prompt_ms') or 0) + (r.get('predicted_ms') or 0)
+        elif kind == 'initiative':
+            status = r.get('status', 'unknown')
+            initiative['counts'][status] = initiative['counts'].get(status, 0) + 1
+            initiative['overlaps'] += int(bool(r.get('overlap')))
+            if r.get('speaks') is False:
+                pending, route = [], None
         elif kind == 'usage' and r.get('input_tokens') is not None:
             # The reply's streaming inference (LiveKit's usage of the conversation model).
             pending.append({'input_tokens': r['input_tokens'], 'cached_tokens': r.get('input_cached_tokens') or 0})
@@ -34,6 +46,7 @@ def report(path):
                 b['new_input'] += r['input_tokens'] - r['cached_tokens']
                 b['output'] += r['output_tokens']
         elif kind == 'item' and r.get('role') == 'assistant':
+            initiative['reply_items'] += int(route == 'initiative')
             m = r.get('metrics') or {}
             use = pending[-1] if pending else {}
             replies.append({'text': (r.get('text') or '')[:40], 'route': route,
@@ -48,7 +61,8 @@ def report(path):
         return round(statistics.median(values), 3) if values else None
     summary = {'replies': len(replies), 'median_e2e': median('e2e'), 'median_ttft': median('ttft'),
                'median_new_tokens': median('new'), 'median_cached_tokens': median('cached'),
-               'no_cache': sum(1 for x in replies if x.get('cached') == 0), 'background': background}
+               'no_cache': sum(1 for x in replies if x.get('cached') == 0), 'background': background,
+               'initiative': initiative}
     return {'summary': summary, 'replies': replies}
 
 
