@@ -10,15 +10,19 @@ namespace Ciel.Conversation
     {
         const string LocalServerPrefKey = "ciel.localServer";
         const string LocalServerUrlPrefKey = "ciel.localServerUrl";
+        public const string DefaultLocalServerUrl = "http://192.168.1.15:7883/token";
 
         /// 家の中の試験用サーバーにつなぐか（設定画面の開発の欄）
         public bool LocalServer { get; private set; }
         /// 家の中の試験用サーバーのトークンの取得先
-        public string LocalServerUrl { get; private set; } = "";
+        public string LocalServerUrl { get; private set; } = DefaultLocalServerUrl;
+
+        static string LocalTokenEndpoint(string url) => string.IsNullOrWhiteSpace(url)
+            ? DefaultLocalServerUrl : url.Trim();
 
         void LoadLocalServer()
         {
-            LocalServerUrl = PlayerPrefs.GetString(LocalServerUrlPrefKey, "");
+            LocalServerUrl = LocalTokenEndpoint(PlayerPrefs.GetString(LocalServerUrlPrefKey, ""));
             LocalServer = PlayerPrefs.GetInt(LocalServerPrefKey, 0) == 1 && LocalServerUrl != "";
         }
 
@@ -35,13 +39,12 @@ namespace Ciel.Conversation
 
         public void SetLocalServerUrl(string url)
         {
-            url = (url ?? "").Trim();
+            url = LocalTokenEndpoint(url);
             if (url == LocalServerUrl) return;
             LocalServerUrl = url;
             PlayerPrefs.SetString(LocalServerUrlPrefKey, url);
             PlayerPrefs.Save();
-            if (url == "" && LocalServer) SetLocalServer(false);
-            else if (LocalServer) ReconnectForServer();
+            if (LocalServer) ReconnectForServer();
             Changed?.Invoke();
         }
 

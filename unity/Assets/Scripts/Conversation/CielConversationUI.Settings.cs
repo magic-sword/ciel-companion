@@ -511,8 +511,11 @@ namespace Ciel.Conversation
             (_localServerSwitch, _localServerKnob) = SwitchRow(sec, "家の中の試験用サーバーにつなぐ",
                 () => _conversation.SetLocalServer(!_conversation.LocalServer));
             _localServerUrl = NameField(Row(sec, 40), _conversation.LocalServerUrl, 0, "トークンの取得先（例：http://192.168.1.15:7883/token）", 200);
-            _localServerUrl.onEndEdit.AddListener(url => _conversation.SetLocalServerUrl(url));
-            Note(sec, "自宅サーバーで家の中だけの LiveKit を動かしているときに使います（scripts/server/livekit-local.sh）。クラウドの LiveKit を使いません");
+            _localServerUrl.onEndEdit.AddListener(url => {
+                _conversation.SetLocalServerUrl(url);
+                _localServerUrl.SetTextWithoutNotify(_conversation.LocalServerUrl);
+            });
+            Note(sec, "取得先は入力を確定すると保存されます。空欄で確定すると初期値に戻ります。通常版・配信版で個別に保存します。家の中の試験用サーバーが動いているときに使えます");
             (_exprSwitch, _exprKnob) = SwitchRow(sec, "表情の確認ボタンを出す", () =>
             {
                 PlayerPrefs.SetInt(ExpressionPrefKey, ExpressionButtonsOn ? 0 : 1);
@@ -588,6 +591,8 @@ namespace Ciel.Conversation
             ShowSwitch(_exprSwitch, _exprKnob, expr);
             ShowSwitch(_devServerSwitch, _devServerKnob, c.DevServer);
             ShowSwitch(_localServerSwitch, _localServerKnob, c.LocalServer);
+            if (_localServerUrl != null && !_localServerUrl.isFocused && _localServerUrl.text != c.LocalServerUrl)
+                _localServerUrl.SetTextWithoutNotify(c.LocalServerUrl);
             ShowSwitch(_gameSwitch, _gameKnob, c.GameWanted);
             if (_micSideButtonSegs.Count > 0) ShowSelected(_micSideButtonSegs, (int)c.MicSideButtonChoice);
             _gameNow.text = GameNow(c);

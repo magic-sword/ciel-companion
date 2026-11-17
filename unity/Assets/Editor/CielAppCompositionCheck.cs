@@ -63,6 +63,14 @@ namespace Ciel.EditorTools
             Check(ui != null, "shared UI shell exists");
             Check((ui.GetComponent<CielAudienceCard>() != null) == broadcast, "audience output belongs only to broadcast app");
             Invoke(ui, "Awake");
+            var endpoint = (InputField)typeof(CielConversationUI).GetField("_localServerUrl", Private).GetValue(ui);
+            endpoint.SetTextWithoutNotify(""); // UI built before conversation.Start loads preferences.
+            int endpointChanges = 0;
+            endpoint.onEndEdit.AddListener(_ => endpointChanges++);
+            Invoke(c, "LoadLocalServer");
+            Invoke(ui, "RefreshSettings");
+            Check(endpoint.text == c.LocalServerUrl && endpoint.text != "", "token endpoint refreshes after preferences load");
+            Check(endpointChanges == 0, "restoring displayed endpoint does not commit an edit or reconnect");
             var canvas = ui.transform.Find("ConversationCanvas");
             // 配信ページの存在は、階層名で確認（非表示の設定ページも含む）。
             bool hasBroadcastPage = false;
