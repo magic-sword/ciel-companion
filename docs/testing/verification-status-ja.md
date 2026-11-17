@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+2026-11-18、LiveKitと推論設定の分離変更`f95d67fb04db`の4ファイルを開発・本番の配置先へ配布し、コミットのSHA-256との一致を確認した。開発のローカル接続では稼働設定もOpenAI mind・ローカルLiveKitで一致。本番の通常agentは引き続きクラウドLiveKitであり、今回の本番配布はファイル配置のみで、ローカル接続への切替は未実施。配布証拠は各serverの`data/deployments/livekit-inference-f95d67fb04db-1794928070594730638/`（開発）と`livekit-inference-f95d67fb04db-1794928070595809914/`（本番）。
+
 2026-11-18、ローカルLiveKitと推論先を独立して設定できるよう、`agent-local`のenv_file末尾に`.env.livekit-local`を追加した。Compose検査15ケースでローカルLiveKit＋OpenAI mind、ローカルLiveKit＋ローカルmindを含む設定の分離を確認。稼働中の`ciel-dev-agent-local-1`だけを再作成し、LiveKitは192.168.1.15、mindはOpenAIのgpt-5.4-mini・reasoning noneを確認した。他コンテナのID・起動時刻は不変。短文1要求（最大出力16トークン）の実API疎通は成功し、応答モデルgpt-5.4-mini-2026-03-17、入力10・出力4トークン、2.087秒。request IDは`req_d3b1acaf1b4045a8b76d44aeba05bd61`。証拠と設定退避は開発`server/data/deployments/local-livekit-openai-1794927815759067228/`。実音声の応答遅延は未測定。ローカル接続の記憶スコープ・プロンプトは引き続き開発側で、本番と同じ設定一式に変更したものではない。
 
 2026-11-17、自己紹介で年齢設定を読み上げるとの報告を受け、人物像・自己認識・関係性判断のプロンプト3ファイルから年齢指定を削除した。コミット`ff6b454bc37e`の対象ファイルを本番のconfigマウント元へ配布し、コンテナ内のSHA-256一致と`load_persona`の成功を確認。読み込み指紋は`56be8d4f35360962e2d98d2dc8aae63d27a4e406839c656c66e5db1dbb0b3ed6`。既存ファイルは退避済みで、証拠は本番`server/data/deployments/persona-age-ff6b454bc37e/verification.json`。コンテナは再起動せず稼働を維持した。次に開始する会話から適用され、進行中の会話は開始時の内容を使う。実際の自己紹介生成・発話の変更前後比較は未実施。
