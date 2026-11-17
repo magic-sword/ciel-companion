@@ -8,6 +8,8 @@
 
 中核APIの準備では出力上限1がOpenAIの400エラーになることも再現し、OpenAI準備の上限256で成功した。準備失敗はキャッシュ最適化の失敗で、会話モデルの操作拒否とは区別する。診断は別プロセス内の修正版を使い、MCP profileを読むだけで操作権取得・実採集・移動は行っていない。接続スモークだけでは今回の誤判断を検出できない。再実行入口は`scripts/server/check-game-decision-cloud.py`、生データは本番`server/data/deployments/game-decision-cloud-check/comparison.stdout`と`comparison.stderr`。実ワールドでの採集達成・音声認識精度は未検証。
 
+`2ef11db829b9`配布後、本番コンテナの実コードで同じ3課題を各3回再確認し、採集work・挨拶none・否定停止で9/9、準備APIも成功。`server/data/deployments/game-decision-2ef11db829b9/deployed-check.stdout`に保存した。これも操作を実行しない判断検査であり、実ワールドの成果とは区別する。
+
 [評価の見取り図](benchmark-guide-ja.md#minecraftの行動)と[採点・再実行の方法](../games/minecraft/minecraft-benchmark-ja.md)から読む。以下は異なる課題集合と時点の実測記録であり、合格数を合算しない。
 
 ## 現在の判断
