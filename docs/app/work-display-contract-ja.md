@@ -6,7 +6,7 @@
 
 ## 表示する事実
 
-継続中は発話だけでなく無言の判断も含むため、会話グラフと配信カードは「続きの判断中」と表示する。活動通知はactivity.state v3のままで、思考内容やmemoは表示しない。実験ブランチでの変更・確認状況と配布済み版は[確認状況](../testing/verification-status-ja.md)で区別する。
+継続中は発話だけでなく無言の判断も含むため、会話グラフと配信カードは「続きの判断中」と表示する。活動通知はactivity.state v3のままで、思考内容やmemoは表示しない。確認範囲と配布済み版は[確認状況](../testing/verification-status-ja.md)で区別する。
 
 Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのmessageに判断中・実行中を反映する。上流Agentの応答終了は目的達成を保証しないため、succeededの見出しは「処理終了」とし、本文へ「成果は未検証」とMindcraftの応答を表示する。evidenceのnative_finished=true・objective_verified=falseを、所持数や帰還の検証成功へ読み替えない。Unity側の文言変更も必要であり、旧アプリの「できた！」表示で検証済みと判断しない。
 
