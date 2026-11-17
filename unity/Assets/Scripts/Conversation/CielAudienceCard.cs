@@ -9,7 +9,7 @@ namespace Ciel.Conversation
         public const int Layer = 29;
         public CielStreamWindow Output { get; private set; }
         CielConversation _conversation;
-        Canvas _canvas;
+        CielDisplaySurface _surface;
         GameObject _panel;
         Text _heading, _title, _current, _progress, _elapsed, _conversationLine;
         Image _bar, _accent;
@@ -17,35 +17,15 @@ namespace Ciel.Conversation
         void Awake()
         {
             _conversation = FindAnyObjectByType<CielConversation>();
-            if (Camera.main != null) Camera.main.cullingMask &= ~(1 << Layer);
-            var source = new GameObject("Card Source Camera", typeof(Camera));
-            source.transform.SetParent(transform, false);
-            var camera = source.GetComponent<Camera>();
-            camera.enabled = false;
-            camera.orthographic = true;
-            camera.cullingMask = 1 << Layer;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = Color.green;
-            camera.depth = -20;
-            var output = new GameObject("Audience Card Output", typeof(CielStreamWindow));
-            output.transform.SetParent(source.transform, false);
-            Output = output.GetComponent<CielStreamWindow>();
-            Output.ConfigureCard(camera);
-            Build(camera);
+            _surface = new CielDisplaySurface(transform, "Card Source Camera", "Audience Card Output", "AudienceCardCanvas",
+                Layer, -20, Color.green, CielStreamWindow.CardTitle, "CielStatusCardWindow", "ciel.statusCard", new Vector2Int(900, 500));
+            Output = _surface.Output;
+            Build();
         }
 
-        void Build(Camera camera)
+        void Build()
         {
-            var go = new GameObject("AudienceCardCanvas", typeof(Canvas), typeof(CanvasScaler));
-            go.transform.SetParent(transform, false);
-            _canvas = go.GetComponent<Canvas>();
-            _canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            _canvas.worldCamera = camera;
-            _canvas.planeDistance = 1;
-            var scaler = go.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(900, 500);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            var go = _surface.Canvas.gameObject;
             var panel = Box("Card", go.transform, new Vector2(0, 0), new Vector2(1, 1), Vector2.zero, Vector2.zero);
             _panel = panel.gameObject;
             panel.gameObject.AddComponent<Image>().color = new Color(0.027f, 0.11f, 0.15f, 1);
@@ -80,20 +60,13 @@ namespace Ciel.Conversation
             track.gameObject.AddComponent<Image>().color = new Color(0.14f, 0.25f, 0.3f);
             _bar = Box("ProgressFill", track, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
             _bar.color = new Color(0.5f, 0.91f, 1);
-            SetLayer(go);
+            _surface.SetLayer(go);
             Show(new CielAudienceCardState { heading = "シエル｜状態の確認中", title = "状態の通知を待っています", current = "" });
         }
 
         // offsetMin/Maxを明示し、カメラの比率が変わっても画面の内側へ収める。
         static RectTransform Box(string name, Transform parent, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var r = (RectTransform)go.transform;
-            r.anchorMin = min; r.anchorMax = max;
-            r.offsetMin = offsetMin; r.offsetMax = offsetMax;
-            return r;
-        }
+            => CielDisplaySurface.Box(name, parent, min, max, offsetMin, offsetMax);
 
         static Text Label(string name, RectTransform panel, Font font, int size, float left, float top, float height)
         {
@@ -108,11 +81,7 @@ namespace Ciel.Conversation
             return text;
         }
 
-        static void SetLayer(GameObject go)
-        {
-            go.layer = Layer;
-            foreach (Transform child in go.transform) SetLayer(child.gameObject);
-        }
+
 
         public void Show(CielAudienceCardState state)
         {
@@ -138,7 +107,7 @@ namespace Ciel.Conversation
                 _conversation.Status == CielConversation.State.Connected, recent,
                 _conversation.Activity == null ? 0 : Time.unscaledTime - _conversation.ActivityAt,
                 _conversation.MicEnabled && _conversation.UserSpeaking));
-            if (Output.StreamCamera != null) _canvas.worldCamera = Output.StreamCamera;
+            _surface.BindCamera();
         }
     }
 }

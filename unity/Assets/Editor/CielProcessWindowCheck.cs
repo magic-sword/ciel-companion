@@ -37,6 +37,7 @@ namespace Ciel.EditorTools
             if(!disconnected)throw new Exception("Disconnected graph");
             CielPlanWindowCheck.Run();
             CielAudienceCardCheck.Run();
+            CielBroadcastNoticeCheck.Run();
             Debug.Log("CIEL_PROCESS_WINDOW_CHECK_OK 11 states/isolation plus plan and audience checks");
         }
         static void Render(Camera camera,string name)

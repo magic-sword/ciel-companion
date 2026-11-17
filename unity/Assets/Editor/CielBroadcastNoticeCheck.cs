@@ -20,6 +20,22 @@ namespace Ciel.EditorTools
             _checks = 0;
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var c = new GameObject("Notice Check", typeof(CielConversation)).GetComponent<CielConversation>();
+            void Event(string json)
+            {
+                var method = typeof(CielConversation).GetMethod("OnDataReceived", Private);
+                method.Invoke(c, new object[] { System.Text.Encoding.UTF8.GetBytes(json), null,
+                    Activator.CreateInstance(method.GetParameters()[2].ParameterType), "ciel.event" });
+            }
+            Event("{\"v\":1,\"type\":\"game.state\",\"linked\":true,\"in_world\":true}");
+            Check(!c.GameKnown, "legacy game state cannot claim a connection");
+            Event("{\"v\":2,\"type\":\"env.list\",\"games\":[{\"game\":\"protocol_check\"}]}");
+            Check(!c.GameListed, "unknown environment list version rejected");
+            Event("{\"v\":1,\"type\":\"env.list\",\"games\":[{\"game\":\"protocol_check\"}]}");
+            Event("{\"v\":2,\"type\":\"env.state\",\"game\":\"protocol_check\",\"linked\":true}");
+            Check(c.GameListed && !c.GameKnown, "unknown environment state version rejected");
+            Event("{\"v\":1,\"type\":\"env.state\",\"game\":\"protocol_check\",\"linked\":true,\"playing\":true}");
+            Check(c.GameKnown && c.GameLinked && c.GameInWorld, "current environment state reaches the UI");
+            Invoke(c, "ResetGame");
             Set(c, "Status", CielConversation.State.Connected);
             Set(c, "GameLabel", "マイクラ"); Set(c, "GameName", "minecraft"); Set(c, "GameListed", true);
             Check(!CielBroadcastNotice.From(c).Visible, "disabled game is not an error");

@@ -11,7 +11,7 @@ namespace Ciel.Conversation
         public const string Title = "CIEL Broadcast 会話グラフ";
         public CielStreamWindow Output { get; private set; }
         CielConversation _conversation;
-        Canvas _canvas;
+        CielDisplaySurface _surface;
         Font _font;
         Text _status, _initiative, _outcome;
         readonly Dictionary<string, Image> _nodes = new();
@@ -20,22 +20,10 @@ namespace Ciel.Conversation
         void Awake()
         {
             _conversation = FindAnyObjectByType<CielConversation>();
-            if (Camera.main != null) Camera.main.cullingMask &= ~(1 << Layer);
-            var source = new GameObject("Process Source Camera", typeof(Camera));
-            source.transform.SetParent(transform, false);
-            var camera = source.GetComponent<Camera>();
-            camera.enabled = false; camera.orthographic = true; camera.cullingMask = 1 << Layer;
-            camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = Back; camera.depth = -22;
-            var output = new GameObject("Process Graph Output", typeof(CielStreamWindow));
-            output.transform.SetParent(source.transform, false);
-            Output = output.GetComponent<CielStreamWindow>();
-            Output.ConfigureCard(camera, Title, "CielProcessGraphWindow", "ciel.processGraph", new Vector2Int(1552, 873));
-            var go = new GameObject("ProcessGraphCanvas", typeof(Canvas), typeof(CanvasScaler));
-            go.transform.SetParent(transform, false);
-            _canvas = go.GetComponent<Canvas>(); _canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            _canvas.worldCamera = camera; _canvas.planeDistance = 1;
-            var scaler = go.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1552, 873); scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            _surface = new CielDisplaySurface(transform, "Process Source Camera", "Process Graph Output", "ProcessGraphCanvas",
+                Layer, -22, Back, Title, "CielProcessGraphWindow", "ciel.processGraph", new Vector2Int(1552, 873));
+            Output = _surface.Output;
+            var go = _surface.Canvas.gameObject;
             var root = (RectTransform)go.transform;
             _font = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP" }, 64);
             Label(root, "シエルの会話・実行ループ", 40, 30, 960, 50, 34);
@@ -55,7 +43,7 @@ namespace Ciel.Conversation
             Node(root,"reviewing","結果確認","次の判断へ戻す",408,624,330);
             _initiative = Label(root,"",48,774,950,44,25);
             _outcome = Label(root,"",48,820,950,38,23);
-            SetLayer(go); Show(null, false, 0);
+            _surface.SetLayer(go); Show(null, false, 0);
         }
 
         static RectTransform Box(Transform parent,string name,float x,float y,float w,float h)
@@ -87,7 +75,6 @@ namespace Ciel.Conversation
         }
         static void Path(Transform root,params Vector2[] points)
         { for(int i=1;i<points.Length;i++)Edge(root,points[i-1],points[i],i==points.Length-1); }
-        static void SetLayer(GameObject go){go.layer=Layer;foreach(Transform t in go.transform)SetLayer(t.gameObject);}
         public void Show(CielConversation.ActivityState state,bool connected,float age)
         {
             bool fresh=connected&&CielActivityPresentation.Fresh(state,age);
@@ -103,7 +90,7 @@ namespace Ciel.Conversation
         void Update()
         {
             if(_conversation!=null)Show(_conversation.Activity,_conversation.Status==CielConversation.State.Connected,Time.unscaledTime-_conversation.ActivityAt);
-            if(Output.StreamCamera!=null)_canvas.worldCamera=Output.StreamCamera;
+            _surface.BindCamera();
         }
     }
 }

@@ -38,10 +38,10 @@ namespace Ciel.Conversation
         string OpenKey => CardOutput ? _cardPrefs + ".open" : PrefKey;
         string OutputWidthKey => CardOutput ? _cardPrefs + ".width" : WidthKey;
         string OutputHeightKey => CardOutput ? _cardPrefs + ".height" : HeightKey;
-        public void ConfigureCard(Camera source) { _cardSource = source; _isCard = true; }
         public void ConfigureCard(Camera source, string title, string windowClass, string prefs, Vector2Int size)
         {
-            ConfigureCard(source);
+            _cardSource = source;
+            _isCard = true;
             _cardTitle = title; _cardClass = windowClass; _cardPrefs = prefs; _cardSize = size;
         }
 

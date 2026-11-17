@@ -345,7 +345,6 @@ namespace Ciel.Conversation
             SpeakerphoneOn = PlayerPrefs.GetInt(SpeakerphonePrefKey, 1) == 1;
             VoiceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
             DevServer = PlayerPrefs.GetInt(DevServerPrefKey, 0) == 1;
-            LoadGame();
             LoadYouTube();
             LoadMicSideButton();
             LoadLocalServer();
@@ -1079,7 +1078,7 @@ namespace Ciel.Conversation
             public bool heart;
             public int hearts;
             public string comment;
-            public bool linked, in_world;   // game.state（以前の会話サーバー）
+            public bool linked;
             public string game, label;   // env.state（linked・reason も）
             public bool playing;
             public int id;   // image.state
@@ -1185,7 +1184,6 @@ namespace Ciel.Conversation
             else if (e.type == "activity.state") OnActivity(data);   // いまのシエル（CielConversation.Activity.cs）
             else if (e.type == "env.list") OnEnvList(data);   // つなげるゲームの一覧（CielConversation.Game.cs）
             else if (e.type == "env.state") OnEnvState(e);   // ゲームの体を受け持ったか（CielConversation.Game.cs）
-            else if (e.type == "game.state") OnGameState(e);   // 以前の会話サーバーの形
             else if (e.type == "image.state") OnImageState(e);   // 見せた画像を受け取ったか（CielConversation.Image.cs）
             else if (e.type == "youtube.state") OnYouTubeState(e);   // 配信のコメントの様子（CielConversation.YouTube.cs）
             else if (e.type == "device.hello_request")

@@ -8,6 +8,8 @@
 
 `game_env.GameEnv`が`CIEL_GAMES`で指定した環境へStreamable HTTPのMCPで接続する。Minecraftの会話用入口はループバック8771の`/mcp`。接続しただけでは体を動かさず、アプリで有効にした会話だけがlinkツールで所有権を取得する。体を動かせる会話は一つ。
 
+アプリとの接続通知はv1の`env.list`・`env.link`・`env.state`に統一する。アプリは一覧を受け取ってからゲームID付きの`env.link`を送り、サーバーはゲームIDとbooleanの`on`を検証する。旧`game.link`の受付、`game.state`の二重送信と受信、旧共通設定`ciel.minecraft`へのフォールバックは撤去した。設定は既存のゲーム別`ciel.game.<game>`を使用し、未設定のゲームは無効とする。未対応の通知版を接続済みへ読み替えない。
+
 | MCPの面 | 内容 |
 |---|---|
 | `game://profile` | profile 2。ゲームID・表示名・リンク／停止ツール、振り分け用情報、work 1の能力とツール名 |

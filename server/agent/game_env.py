@@ -6,7 +6,7 @@
   目的の係・アプリへ渡すだけ。ゲームの名前・技の名前・物の名前・失敗の理由の文は、ゲームの側が持つ。
 - 会話の始めにつなぐ（prepare）：決まり（game://profile）・道具の一覧・遊び方の指示（prompt play）を読む。設定は会話の始めに
   読んで会話の中では変えないので、指示と道具はここで決まる。ゲームのサーバーが止まっていても、会話は続ける（道具が無いだけ）。
-- つないだだけでは体を動かさない。アプリの設定「マイクラで一緒に遊ぶ」（topic ciel.game の game.link）がオンになったら、
+- つないだだけでは体を動かさない。アプリの設定「マイクラで一緒に遊ぶ」（topic ciel.game の env.link）がオンになったら、
   決まりの link_tool で体を受け持つ。体を動かせる会話は 1 つだけで、ほかの会話が使っていれば busy。
 - 様子は resource game://state。変わったという知らせ（notifications/resources/updated）で読み直す。
 - 出来事は MCP の知らせ notifications/message（logger 'ciel.event'）。急ぎの度合い（urgency）で口へ渡す切れ目を決め、
@@ -88,7 +88,7 @@ def _json(text: str) -> dict:
 
 
 def _link_wanted(packet) -> tuple[str | None, bool] | None:
-    """アプリのスイッチ：(ゲーム, オンか)。env.link {game, on}。以前のアプリの game.link {on} は、ゲームを言わない（None）"""
+    """Read the current environment-specific application switch."""
     if getattr(packet, 'topic', None) != TOPIC:
         return None
     try:
@@ -97,9 +97,10 @@ def _link_wanted(packet) -> tuple[str | None, bool] | None:
         return None
     if not isinstance(m, dict):
         return None
-    if m.get('type') == 'env.link' and isinstance(m.get('game'), str):
-        return m['game'], bool(m.get('on'))
-    return (None, bool(m.get('on'))) if m.get('type') == 'game.link' else None
+    if (m.get('v') == VERSION and m.get('type') == 'env.link'
+            and isinstance(m.get('game'), str) and m['game'] and type(m.get('on')) is bool):
+        return m['game'], m['on']
+    return None
 
 
 def listing(env: 'GameEnv | None') -> dict:
@@ -113,10 +114,8 @@ def refuse(notify: Callable[[dict], None]) -> Callable:
     def on_data(packet) -> None:
         wanted = _link_wanted(packet)
         if wanted and wanted[1]:
-            if wanted[0] is not None:
-                notify({'v': VERSION, 'type': 'env.state', 'game': wanted[0], 'label': '', 'linked': False, 'playing': False,
-                        'reason': 'unavailable'})
-            notify({'v': VERSION, 'type': 'game.state', 'linked': False, 'in_world': False, 'reason': 'unavailable'})
+            notify({'v': VERSION, 'type': 'env.state', 'game': wanted[0], 'label': '', 'linked': False, 'playing': False,
+                    'reason': 'unavailable'})
     return on_data
 
 
@@ -128,7 +127,7 @@ class GameEnv:
         self.say: Callable[..., None] | None = None     # mouth.Mouth.say_latest（why, settle=, instructions=, merge=）
         self.diary = None            # diary.Diary（倒した・倒れたなど、本当にあったことを残す）
         self.board = None            # board.Board（頼まれた技を付箋にする）
-        self.notify: Callable[[dict], None] | None = None   # アプリへの知らせ（game.state）
+        self.notify: Callable[[dict], None] | None = None   # アプリへの知らせ（env.state）
         self.eyes = None             # eyes.Eyes（撮った景色を渡す先）
         self.goals = None            # goals.GoalRunner（係が体を使っているあいだは、心の体の道具を断る）
         self.profile: dict = {}
@@ -308,10 +307,10 @@ class GameEnv:
         log.info('ゲーム（%s）の道具 %d 個', self.game, len(self.tools))
 
     def on_data(self, packet) -> None:
-        """アプリの設定「（ゲーム）で一緒に遊ぶ」（env.link、以前のアプリは game.link）。オンで体を受け持ち、オフで離す
+        """アプリの設定「（ゲーム）で一緒に遊ぶ」（env.link）。オンで体を受け持ち、オフで離す
         （体はその場で待つ）"""
         wanted = _link_wanted(packet)
-        if wanted is None or wanted[0] not in (None, self.game):
+        if wanted is None or wanted[0] != self.game:
             return
         on = wanted[1]
         self.wanted = on
@@ -398,8 +397,6 @@ class GameEnv:
         self._shown = shown
         self.notify({'v': VERSION, 'type': 'env.state', 'game': self.game, 'label': self.label, 'linked': shown[0],
                      'playing': shown[1], 'reason': shown[2]})
-        # 以前のアプリ（env.state を読まない）のため。E6 で消す
-        self.notify({'v': VERSION, 'type': 'game.state', 'linked': shown[0], 'in_world': shown[1], 'reason': shown[2]})
 
     # ---- 道具 ----
 

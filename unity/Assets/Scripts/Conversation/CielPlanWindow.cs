@@ -13,7 +13,7 @@ namespace Ciel.Conversation
             set { PlayerPrefs.SetInt("ciel.planGraph.focus", value ? 1 : 0); PlayerPrefs.Save(); } }
         public CielStreamWindow Output { get; private set; }
         CielConversation _conversation;
-        Canvas _canvas;
+        CielDisplaySurface _surface;
         RectTransform _board, _edges;
         Text _title, _note, _empty;
         Font _font;
@@ -24,7 +24,7 @@ namespace Ciel.Conversation
         static readonly Color Ink = new Color(0.94f, 0.98f, 1);
         static readonly Color Dim = new Color(0.62f, 0.72f, 0.78f);
         const float ColumnWidth = 440, ColumnGap = 70, BoxGap = 18, LineHeight = 34;
-        // The board in the canvas' reference units (1280 x 720 less the title and margins), so the
+        // The board in the canvas' reference units (1552 x 873 less the title, margins and OBS overlay area), so the
         // fit does not depend on when Unity lays the canvas out.
         static readonly Vector2 BoardSize = new Vector2(960, 710);
 
@@ -39,35 +39,15 @@ namespace Ciel.Conversation
         void Awake()
         {
             _conversation = FindAnyObjectByType<CielConversation>();
-            if (Camera.main != null) Camera.main.cullingMask &= ~(1 << Layer);
-            var source = new GameObject("Plan Source Camera", typeof(Camera));
-            source.transform.SetParent(transform, false);
-            var camera = source.GetComponent<Camera>();
-            camera.enabled = false;
-            camera.orthographic = true;
-            camera.cullingMask = 1 << Layer;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = Back;
-            camera.depth = -21;
-            var output = new GameObject("Plan Graph Output", typeof(CielStreamWindow));
-            output.transform.SetParent(source.transform, false);
-            Output = output.GetComponent<CielStreamWindow>();
-            Output.ConfigureCard(camera, CielStreamWindow.PlanTitle, "CielPlanGraphWindow", "ciel.planGraph", new Vector2Int(1552, 873));
-            Build(camera);
+            _surface = new CielDisplaySurface(transform, "Plan Source Camera", "Plan Graph Output", "PlanGraphCanvas",
+                Layer, -21, Back, CielStreamWindow.PlanTitle, "CielPlanGraphWindow", "ciel.planGraph", new Vector2Int(1552, 873));
+            Output = _surface.Output;
+            Build();
         }
 
-        void Build(Camera camera)
+        void Build()
         {
-            var go = new GameObject("PlanGraphCanvas", typeof(Canvas), typeof(CanvasScaler));
-            go.transform.SetParent(transform, false);
-            _canvas = go.GetComponent<Canvas>();
-            _canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            _canvas.worldCamera = camera;
-            _canvas.planeDistance = 1;
-            var scaler = go.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1552, 873);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            var go = _surface.Canvas.gameObject;
             _font = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP" }, 64);
             var root = (RectTransform)go.transform;
             var bg = Box("Back", root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -79,19 +59,12 @@ namespace Ciel.Conversation
             _edges = Box("Edges", _board, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _empty = Label("Empty", _board, 26, Dim, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _empty.alignment = TextAnchor.MiddleCenter;
-            SetLayer(go);
+            _surface.SetLayer(go);
             Show(new CielPlanPresentation());
         }
 
         static RectTransform Box(string name, Transform parent, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var r = (RectTransform)go.transform;
-            r.anchorMin = min; r.anchorMax = max;
-            r.offsetMin = offsetMin; r.offsetMax = offsetMax;
-            return r;
-        }
+            => CielDisplaySurface.Box(name, parent, min, max, offsetMin, offsetMax);
 
         Text Label(string name, RectTransform parent, int size, Color color, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
         {
@@ -106,11 +79,7 @@ namespace Ciel.Conversation
             return text;
         }
 
-        static void SetLayer(GameObject go)
-        {
-            go.layer = Layer;
-            foreach (Transform child in go.transform) SetLayer(child.gameObject);
-        }
+
 
         void Clear()
         {
@@ -144,7 +113,7 @@ namespace Ciel.Conversation
             foreach (var node in p.nodes)
                 foreach (var need in node.needs)
                     if (_boxes.TryGetValue(need, out var from)) Edge(from, _boxes[node.id], scale);
-            SetLayer(_board.gameObject);
+            _surface.SetLayer(_board.gameObject);
         }
 
         RectTransform NodeBox(CielPlanPresentation.Node node, float x, float y)
@@ -211,7 +180,7 @@ namespace Ciel.Conversation
                 _shown = key;
                 Show(p);
             }
-            if (Output.StreamCamera != null) _canvas.worldCamera = Output.StreamCamera;
+            _surface.BindCamera();
         }
     }
 }

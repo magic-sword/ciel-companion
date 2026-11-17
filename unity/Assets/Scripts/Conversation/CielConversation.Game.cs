@@ -3,7 +3,6 @@
 // スイッチを出す。スイッチはゲームごとに覚え（PlayerPrefs の ciel.game.<game>）、つないだとき・会話サーバーが入ってきたとき・
 // 変えたときに env.link（game・on）を送る（topic ciel.game。server/agent/game_env.py）。オンのときだけ、会話サーバーが
 // シエルの体を受け持つ。体を受け持ったか・ゲームの中にいるかは env.state（linked・playing・reason）で返る。
-// 以前の会話サーバー（env.list を送らない）には、以前の形（game.link・game.state）でつなぐ。E6 で消す。
 using System;
 using UnityEngine;
 
@@ -11,7 +10,6 @@ namespace Ciel.Conversation
 {
     partial class CielConversation
     {
-        const string LegacyGamePrefKey = "ciel.minecraft";   // 以前の会話サーバーとつなぐとき・ゲームごとの値がまだ無いとき
         const string GamePrefPrefix = "ciel.game.";
 
         [Serializable]
@@ -23,6 +21,7 @@ namespace Ciel.Conversation
         [Serializable]
         class EnvList
         {
+            public int v;
             public string type;
             public EnvGame[] games;
         }
@@ -31,7 +30,7 @@ namespace Ciel.Conversation
         public bool GameWanted { get; private set; }
         /// 会話サーバーがつなげるゲーム（env.list の最初の 1 つ。今の会話サーバーは 1 つだけつなぐ）。分からなければ空
         public string GameName { get; private set; } = "";
-        /// ゲームの見せる名前（「マイクラ」）。以前の会話サーバーでは空
+        /// ゲームの見せる名前（「マイクラ」）
         public string GameLabel { get; private set; } = "";
         /// 会話サーバーから env.list が届いた（新しい会話サーバー）。届いても、つなげるゲームが無ければ GameName は空
         public bool GameListed { get; private set; }
@@ -39,12 +38,11 @@ namespace Ciel.Conversation
         public bool GameLinked { get; private set; }
         public bool GameInWorld { get; private set; }
         public string GameReason { get; private set; } = "";
-        /// 会話サーバーから env.state か game.state が届いたか（古い会話サーバーは送らない）
+        /// 会話サーバーから env.state が届いたか
         public bool GameKnown { get; private set; }
         float _gameWaitFrom = -1f;
         public float GameWaitingSeconds => _gameWaitFrom < 0 ? 0 : Mathf.Max(0, Time.unscaledTime - _gameWaitFrom);
 
-        void LoadGame() => GameWanted = PlayerPrefs.GetInt(LegacyGamePrefKey, 0) == 1;
 
         public void SetGameWanted(bool on)
         {
@@ -52,7 +50,6 @@ namespace Ciel.Conversation
             GameWanted = on;
             _gameWaitFrom = -1f;
             if (GameName != "") PlayerPrefs.SetInt(GamePrefPrefix + GameName, on ? 1 : 0);
-            PlayerPrefs.SetInt(LegacyGamePrefKey, on ? 1 : 0);
             PlayerPrefs.Save();
             SendGame();
             Changed?.Invoke();
@@ -62,13 +59,8 @@ namespace Ciel.Conversation
         {
             if (_room == null || Status != State.Connected) return;
             if (GameWanted && _gameWaitFrom < 0) _gameWaitFrom = Time.unscaledTime;
-            string json;
-            if (GameListed)
-            {
-                if (GameName == "") return;   // この会話サーバーには、つなげるゲームが無い
-                json = $"{{\"v\":1,\"type\":\"env.link\",\"game\":\"{GameName}\",\"on\":{(GameWanted ? "true" : "false")}}}";
-            }
-            else json = $"{{\"v\":1,\"type\":\"game.link\",\"on\":{(GameWanted ? "true" : "false")}}}";
+            if (!GameListed || GameName == "") return;
+            string json = $"{{\"v\":1,\"type\":\"env.link\",\"game\":\"{GameName}\",\"on\":{(GameWanted ? "true" : "false")}}}";
             try { _room.LocalParticipant.PublishData(System.Text.Encoding.UTF8.GetBytes(json), reliable: true, topic: "ciel.game"); }
             catch (Exception e) { Debug.LogWarning($"[CielConversation] ゲームの設定を送れない: {e.Message}"); }
         }
@@ -89,6 +81,7 @@ namespace Ciel.Conversation
             EnvList list;
             try { list = JsonUtility.FromJson<EnvList>(System.Text.Encoding.UTF8.GetString(data)); }
             catch (Exception ex) { Debug.LogWarning($"[CielConversation] ゲームの一覧を読めない: {ex.Message}"); return; }
+            if (list == null || list.v != 1 || list.type != "env.list") return;
             var first = list?.games != null && list.games.Length > 0 ? list.games[0] : null;
             var name = first != null && IsGameName(first.game) ? first.game : "";
             var changed = !GameListed || name != GameName;
@@ -98,7 +91,7 @@ namespace Ciel.Conversation
             if (name != "")
             {
                 var key = GamePrefPrefix + name;
-                GameWanted = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetInt(key, 0) == 1 : PlayerPrefs.GetInt(LegacyGamePrefKey, 0) == 1;
+                GameWanted = PlayerPrefs.GetInt(key, 0) == 1;
             }
             Debug.Log($"[CielConversation] つなげるゲーム：{(name != "" ? $"{GameLabel}（{name}）" : "なし")}");
             if (changed) SendGame();
@@ -116,18 +109,12 @@ namespace Ciel.Conversation
 
         void OnEnvState(EventJson e)
         {
-            if (e.game != GameName) return;
+            if (e.v != 1 || !GameListed || string.IsNullOrEmpty(GameName) || e.game != GameName) return;
             if (!string.IsNullOrEmpty(e.label)) GameLabel = e.label;
             SetGameState(e.linked, e.playing, e.reason);
         }
 
-        // 以前の会話サーバーの知らせ。新しい会話サーバーは env.state も送るので、一覧が届いていれば見ない
-        void OnGameState(EventJson e)
-        {
-            if (GameListed) return;
-            SetGameState(e.linked, e.in_world, e.reason);
-        }
-
+        // 確認済みの現行環境状態を表示へ投影する。
         void SetGameState(bool linked, bool inWorld, string reason)
         {
             if (!GameKnown || linked != GameLinked || inWorld != GameInWorld || (reason ?? "") != GameReason)

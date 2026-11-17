@@ -38,7 +38,7 @@ class Diary:
 
 
 def packet(on, topic='ciel.game'):
-    return types.SimpleNamespace(topic=topic, data=json.dumps({'v': 1, 'type': 'game.link', 'on': on}).encode('utf-8'))
+    return types.SimpleNamespace(topic=topic, data=json.dumps({'v': 1, 'type': 'env.link', 'game': 'test', 'on': on}).encode('utf-8'))
 
 
 def ctx_with(text):
@@ -191,7 +191,7 @@ class LinkTest(EnvCase):
         self.assertFalse(env.wanted)
         await self.link()
         self.assertTrue(env.playing())
-        self.assertEqual(self.shown[-1], {'v': 1, 'type': 'game.state', 'linked': True, 'in_world': True, 'reason': ''})   # 以前のアプリへ
+        self.assertEqual(self.shown[-1], {'v': 1, 'type': 'env.state', 'game': 'test', 'label': self.env.label, 'linked': True, 'playing': True, 'reason': ''})
         self.assertEqual(env.context(), '[テストの様子]\nシエル：元気')
         # 様子が変わったという知らせで読み直す
         await self.fake.changed(text='シエル：疲れた')
@@ -210,10 +210,10 @@ class LinkTest(EnvCase):
     async def test_env_list_and_env_link_name_the_game(self):
         self.assertEqual(game_env.listing(self.env), {'v': 1, 'type': 'env.list', 'games': [{'game': 'test', 'label': 'テスト'}]})
         self.assertEqual(game_env.listing(None)['games'], [])
-        other = types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'other', 'on': True}).encode())
+        other = types.SimpleNamespace(topic='ciel.game', data=json.dumps({'v': 1, 'type': 'env.link', 'game': 'other', 'on': True}).encode())
         self.env.on_data(other)   # ほかのゲームのスイッチでは動かない
         self.assertFalse(self.env.wanted)
-        self.env.on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'test', 'on': True}).encode()))
+        self.env.on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'v': 1, 'type': 'env.link', 'game': 'test', 'on': True}).encode()))
         await until(lambda: self.env.linked)
         states = [m for m in self.shown if m['type'] == 'env.state']
         self.assertEqual(states[-1], {'v': 1, 'type': 'env.state', 'game': 'test', 'label': 'テスト', 'linked': True,
@@ -226,9 +226,23 @@ class LinkTest(EnvCase):
         self.assertEqual(shown, [])
         on_data(packet(True))
         self.assertEqual(shown[-1]['reason'], 'unavailable')
-        on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'type': 'env.link', 'game': 'x', 'on': True}).encode()))
-        self.assertEqual([m['type'] for m in shown[-2:]], ['env.state', 'game.state'])
+        on_data(types.SimpleNamespace(topic='ciel.game', data=json.dumps({'v': 1, 'type': 'env.link', 'game': 'x', 'on': True}).encode()))
+        self.assertEqual([m['type'] for m in shown[-2:]], ['env.state', 'env.state'])
 
+
+    def test_legacy_and_malformed_switches_cannot_claim_the_body(self):
+        for message in [
+            {'v': 1, 'type': 'game.link', 'on': True},
+            {'v': 2, 'type': 'env.link', 'game': 'test', 'on': True},
+            {'v': 1, 'type': 'env.link', 'game': '', 'on': True},
+            {'v': 1, 'type': 'env.link', 'game': 'test', 'on': 'false'},
+        ]:
+            event = types.SimpleNamespace(topic='ciel.game', data=json.dumps(message).encode())
+            self.env.on_data(event)
+            self.assertFalse(self.env.wanted)
+            shown = []
+            game_env.refuse(shown.append)(event)
+            self.assertEqual(shown, [])
 
 class EventTest(EnvCase):
     async def test_long_skills_become_cards_closed_by_the_end_notice(self):

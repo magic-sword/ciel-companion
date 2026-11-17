@@ -14,6 +14,8 @@
 
 配信用のモデル映像、重畳表示、独立した状態カード、会話グラフ、計画グラフを別の出力として扱う。独立カードは表示だけの出力で、会話接続・音声・モデルをもう一つ起動しない。専用カメラとレイヤーでメイン映像から分離し、音声リスナーを追加しない。
 
+独立した3表示のカメラ・Canvas・ネイティブ出力の生成、レイヤー設定、出力を閉じた後のカメラ復帰は`CielDisplaySurface`が担当する。各表示クラスは文言・配置・状態の投影を担当し、会話状態は`CielActivityPresentation`、計画は`CielPlanPresentation`を使う。
+
 作業と会話・リアクションを並行して示す。旧段一覧から0/0を作らず、確認済み状態と残り実行予算を共通の`CielWorkPresentation`から描画する。配信出力へ依頼者の個人名・記憶・内部ログを載せない。機能の詳細は[表示契約](work-display-contract-ja.md)へ集約する。
 
 会話の処理グラフとゲームの計画グラフは役割を分け、通常プレイでは短い状態カード、説明時には一つのグラフを大きく表示する設計とする。OBSの配置・見本・未反映範囲は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)、通知と現在の実装は[表示契約](work-display-contract-ja.md#会話自発判断の観測activitystate-v2)へ集約する。
