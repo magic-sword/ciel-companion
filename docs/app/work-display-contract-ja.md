@@ -26,7 +26,7 @@ Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのm
 
 ## 会話・自発判断の観測（activity.state v2）
 
-2026-11-17のソース改修。送信・受信・操作画面の表示をv2へ揃えた。本番配布とOBSへの適用は未実施。配信の場面・座標・配置見本は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)を正本とする。
+2026-11-17のソース改修。送信・受信・操作画面の表示をv2へ揃えた。開発・本番とWindowsアプリへ反映し、OBSへ適用済み。確認範囲は[確認状況](../testing/verification-status-ja.md)を参照。配信の場面・座標・配置見本は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)を正本とする。
 
 旧`background_thinking`は実処理から更新されておらず、旧画面の「裏の思考」は自発判断の実行状況を表していなかった。旧フィールドと`detail_version`を撤去し、`Initiative`と`ConversationDecision`の実行箇所から状態を投影する。現在の自発判断は`CIEL_INITIATIVE=1`が既定で、会話・出来事の変化と静かな時間を条件に動く。無条件の常時思考ではない。未採用の大きな状態機械の設計案と、現在の実行ループを混同しない。
 
