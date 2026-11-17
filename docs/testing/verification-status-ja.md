@@ -1,10 +1,10 @@
 # 現在の確認範囲と配布状況
 
-2026-11-18、返答形式を`decision_format.py`へ共通化。OpenAIのstrict生成とローカルLLMのJSON Schema生成を同じ正規検証・実行契約へ接続した。あいさつと任意引数の省略を各backend各1要求、最大600出力トークンで確認し、4要求とも成功。道具の実行はしていない。通常回帰788件では787件成功・旧schema表現を比較する1件が失敗し、比較を許可・拒否の意味検証へ修正した。最終の関連46件は全成功で、両backendのpipeline→実MCP→結果返答、形式エラー、拒否、途中終了、割り込みも含む。能力結合検査・文書検査も成功。根拠は`.local/decision-format/verification.json`。配布前の確認であり、実マイク・音声返答までの疎通と遅延はこの時点では未検証。
+2026-11-18、返答形式の共通化`0f240f9219af`を開発・宅内開発・本番へ配布した。3つのagentで191ファイルの一致、正常起動を確認し、同じイメージ`a61849ab32ef2140cca150ed220d2ed679769520e96aa733338d1870a96ba64a`で稼働。OpenAIはstrict生成、ローカルLLMは元のJSON Schema生成を使い、同じ正規検証・実行契約へ接続する。あいさつと任意引数の省略を各backend各1要求で検証し、4要求とも成功。通常回帰789件、専用DB結合9件、能力結合検査・文書検査が成功した。通常回帰の根拠は`.local/regression/20261117T153338Z-f41d82/`、生成形式の単発試験は`.local/decision-format/verification.json`。
+
+宅内開発・本番それぞれの一時部屋で、ready・あいさつ音声・文字入力後の本返答音声を確認した。初回あいさつの`say`が上限を超えて停止した旧形式の問題は、この配布後のテストでは再発していない。本番は記憶スコープ`main`、年齢削除済みプロンプト、宅内LiveKit、OpenAI mindを維持。LiveKit本体・トークン窓口等の他サービスは再作成していない。DB・ソースの退避と検証結果は、開発`server/data/deployments/agent-0f240f9219af-1794929774871756660/`、本番`server/data/deployments/decision-format-0f240f9219af/`。接続テストは文字入力から返答音声までで、実マイク・長時間会話・応答速度の比較評価は未実施。
 
 2026-11-18、`befa7fc78c93`の8ファイルを開発・本番へ配布し、コミットとの一致を確認。本番agentを宅内LiveKit（192.168.1.15）へ切り替え、`ciel-main`のworker登録・healthを確認した。本番のイメージ・DB設定・記憶スコープ`main`・年齢削除済みプロンプト・OpenAI mind（gpt-5.4-mini、reasoning none）は維持。本番agentとトークン窓口だけを再作成し、LiveKit本体・開発agentを含む他コンテナのIDと起動時刻は不変。発行トークンを検査し、既定が`ciel-main`、開発指定が`ciel-dev`になることを確認。Compose検査16ケース成功。アプリは「家の中の試験用サーバーにつなぐ」ON・「開発用のサーバーにつなぐ」OFFで再接続すると本番へ入る。
-
-接続テストの部屋`deploy-smoke-9c0bda4bb1f3`には本番workerが参加したが、初回あいさつの構造化出力が`say`を2項目返し、制約`maxItems: 1`の検証エラーで停止した。現在のOpenAI経路は`strict: false`で送信している。音声返答までの疎通テストは不合格で、通常会話の安定動作・実マイクの応答遅延は未確認。この発話形式エラーの修正は今回の接続先変更には含めていない。設定退避・配布確認・振り分け結果は本番`server/data/deployments/local-livekit-production-befa7fc78c93-1794928376483195740/`の`verification.json`と`connectivity.json`。
 
 2026-11-18、ローカルLiveKitと推論先を独立して設定できるよう、`agent-local`のenv_file末尾に`.env.livekit-local`を追加した。Compose検査15ケースでローカルLiveKit＋OpenAI mind、ローカルLiveKit＋ローカルmindを含む設定の分離を確認。稼働中の`ciel-dev-agent-local-1`だけを再作成し、LiveKitは192.168.1.15、mindはOpenAIのgpt-5.4-mini・reasoning noneを確認した。他コンテナのID・起動時刻は不変。短文1要求（最大出力16トークン）の実API疎通は成功し、応答モデルgpt-5.4-mini-2026-03-17、入力10・出力4トークン、2.087秒。request IDは`req_d3b1acaf1b4045a8b76d44aeba05bd61`。証拠と設定退避は開発`server/data/deployments/local-livekit-openai-1794927815759067228/`。実音声の応答遅延は未測定。ローカル接続の記憶スコープ・プロンプトは引き続き開発側で、本番と同じ設定一式に変更したものではない。
 
