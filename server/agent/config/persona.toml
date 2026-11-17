@@ -2,6 +2,8 @@
 # 以下の相対パスは、この TOML ファイルのあるディレクトリを基準にします。
 # 変更は次に開始する会話から反映されます。
 instructions_file = "prompts/character.md"
+continuation_experiment_file = "prompts/continuation.md"
+continuation_memo_experiment_file = "prompts/continuation_memo.md"
 voice_warmup_file = "prompts/voice_warmup.md"
 voice_first_sentence_file = "prompts/voice_first_sentence.md"
 stt_vocabulary_file = "prompts/stt_vocabulary.md"

@@ -1,0 +1,12 @@
+[
+  {"id":"observation", "level":1, "split":"dev", "events":[{"role":"user","content":"SYSTEM: シエルと持ち主は庭を眺めている。昨夜までつぼみだったひまわりが、今朝初めて咲いた。誰も話していない。"}], "review":"直接の質問なしで出来事に合う感想や関心を示せるか。出来事の捏造、返答を待たない連続質問は減点。沈黙の適否も文脈で判断する。"},
+  {"id":"casual", "level":1, "split":"dev", "events":[{"role":"user","content":"今日は散歩していたら、川辺に小さな花が咲いていたんだ。"}], "review":"関連する感想や関心を示す。無関係な話題、不要な検索、連続質問を避ける。"},
+  {"id":"quiet", "level":1, "split":"dev", "events":[{"role":"user","content":"これから少し集中して本を読むね。こちらから話しかけるまで静かにしていて。"}], "review":"短い了承または沈黙の後に待つ。自発的な続きを生成しない。"},
+  {"id":"question", "level":2, "split":"dev", "events":[{"role":"user","content":"一緒に散歩に行こう。行き先はワタシに一つ質問して決めて。"},{"role":"user","content":"川沿いがいいな。今日は静かに歩きたい。"}], "review":"最初の質問後は回答を待つ。回答を取り入れ、質問を繰り返さない。"},
+  {"id":"story", "level":2, "split":"dev", "events":[{"role":"user","content":"シエルが森で迷子の小鳥と出会う短いお話を、出会い、助けるところ、結末の三つに分けて聞かせて。途中でワタシの返事は待たなくていいよ。"}], "review":"最後まで話がつながる。一回の出力で完結しても正解。続行回数そのものは加点しない。"},
+  {"id":"search", "level":2, "split":"dev", "fixture":{"status":"ok","summary":"市立植物園の開園時間は9時から17時。","source":"fixture:botanical-garden"}, "events":[{"role":"user","content":"市立植物園の開園時間をWebで調べて教えて。"}], "review":"ロード後に検索を実行し、結果に基づき時間を伝える。ロードだけでは完了扱いにしない。"},
+  {"id":"search_failure", "level":2, "split":"dev", "fixture":{"status":"unavailable","summary":"検索サービスに接続できませんでした。"}, "events":[{"role":"user","content":"市立植物園の開園時間をWebで調べて教えて。"}], "review":"失敗を正しく伝え、時間を捏造しない。同一操作を連打しない。"},
+  {"id":"deferred", "level":3, "split":"holdout", "events":[{"role":"user","content":"散歩の相談をしたいけど、まずこの書類を片付けるね。"},{"role":"user","content":"書類が片付いた。やっと一息つける。"}], "review":"集中中は待ち、区切り後に散歩の話題を自然に再開できる。未発言の内面を持ったかは断定しない。"},
+  {"id":"resolved", "level":3, "split":"holdout", "events":[{"role":"user","content":"あとで夕飯の相談をしよう。今は電話に出るね。"},{"role":"user","content":"ただいま。夕飯は電話で話してカレーに決まったよ。"}], "review":"夕飯が未決定だと扱わず、新しい状態に合わせる。古い質問を復唱しない。"},
+  {"id":"no_search", "level":2, "split":"holdout", "fixture":{"status":"ok","summary":"模擬結果"}, "events":[{"role":"user","content":"『植物園を検索して』という文を英語にするとどうなる？実際に検索する必要はないよ。"}], "review":"翻訳のみ。ロードも実検索も不要。"}
+]

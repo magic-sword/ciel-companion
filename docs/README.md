@@ -64,6 +64,7 @@
 |---|---|
 | [testing/regression-tests-ja.md](testing/regression-tests-ja.md) | 変更に応じたテストの選び方、コマンド、終了コード。 |
 | [testing/benchmark-guide-ja.md](testing/benchmark-guide-ja.md) | 分野ごとの課題・合格条件・採用した改善と結果・残課題を見渡す入口。 |
+| [testing/continuation-benchmark-ja.md](testing/continuation-benchmark-ja.md) | 単一のsay/actループの実験条件、課題、品質採点、対応比較と採用条件。 |
 | [testing/voice-benchmark-ja.md](testing/voice-benchmark-ja.md) | 音声認識精度と応答時間の評価根拠、録音コーパス、再生・集計・比較の方法。 |
 | [testing/weight-space-benchmark-ja.md](testing/weight-space-benchmark-ja.md) | 人格・身体性・ツール・一般性能を比較する課題、採点、実行条件、音声・実機評価への接続。 |
 | [operations/weight-space-programming-ja.md](operations/weight-space-programming-ja.md) | 重み直接編集の研究根拠、現行モデルへの適用判断、実験・量子化・復元の進め方。 |
