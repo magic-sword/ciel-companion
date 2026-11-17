@@ -13,7 +13,7 @@ namespace Ciel.Conversation
         CielConversation _conversation;
         CielDisplaySurface _surface;
         Font _font;
-        Text _status, _initiative, _outcome;
+        Text _status, _continuation, _audio;
         readonly Dictionary<string, Image> _nodes = new();
         static readonly Color Ink = new(0.94f, 0.98f, 1), Cyan = new(.5f, .91f, 1), Back = new(.027f, .11f, .15f);
 
@@ -29,20 +29,28 @@ namespace Ciel.Conversation
             Label(root, "シエルの会話・実行ループ", 40, 30, 960, 50, 34);
             _status = Label(root, "状態の通知を待っています", 40, 86, 960, 50, 24);
             // 右側はOBSのゲーム小窓・シエルと重なる領域。重要な節はX<1000へ収める。
-            Edge(root, new(288,258), new(378,258)); Edge(root,new(618,258),new(668,258));
-            Path(root,new(498,312),new(498,394),new(223,394),new(223,464));
-            Path(root,new(498,394),new(823,394),new(823,464));
-            Path(root,new(223,572),new(223,678),new(408,678));
-            Path(root,new(823,572),new(823,678),new(738,678));
-            Path(root,new(573,624),new(573,344),new(568,344),new(568,312));
+            Edge(root,new(288,258),new(378,258)); Edge(root,new(618,258),new(708,258));
+            // 発話の提出後、継続なら判断へ戻り、待機なら入力待ちへ戻る。
+            Path(root,new(848,204),new(848,170),new(168,170),new(168,204));
+            Path(root,new(988,258),new(1010,258),new(1010,668),new(988,668));
+            Path(root,new(848,614),new(848,590),new(1018,590),new(1018,148),new(498,148),new(498,204));
+            Path(root,new(448,312),new(448,370),new(188,370),new(188,434));
+            Path(root,new(548,312),new(548,434));
+            Path(root,new(188,542),new(188,574),new(848,574),new(848,542));
+            Edge(root,new(658,488),new(708,488));
+            Path(root,new(848,434),new(848,350),new(598,350),new(598,312));
+            Label(root,"待つ",260,135,100,30,20); Label(root,"続ける",900,562,100,30,20);
             Node(root,"idle","入力待ち","発言・出来事",48,204,240);
-            Node(root,"deciding","判断","話す・動く・黙る",378,204,240);
-            Node(root,"finished","返答・終了","操作なし・受付・確認",668,204,320);
-            Node(root,"loading","機能ロード","必要な定義だけ取得",48,464,350);
-            Node(root,"calling","操作を呼ぶ","サービスの結果待ち",658,464,330);
-            Node(root,"reviewing","結果確認","次の判断へ戻す",408,624,330);
-            _initiative = Label(root,"",48,774,950,44,25);
-            _outcome = Label(root,"",48,820,950,38,23);
+            Node(root,"deciding","判断","返事・行動を選ぶ",378,204,240);
+            Node(root,"finished","発話を渡す","再生の完了とは別",708,204,280);
+            Node(root,"loading","機能ロード","必要な定義を取得",48,434,280);
+            Node(root,"calling","操作を呼ぶ","結果を待つ",378,434,280);
+            Node(root,"reviewing","結果確認","判断へ戻す",708,434,280);
+            Node(root,"continuing","続きの生成","同じ会話を続ける",708,614,280);
+            Node(root,"cancelled","中断","次の入力へ",48,614,240);
+            Node(root,"failed","エラー","処理を停止",378,614,240);
+            _continuation = Label(root,"",48,774,950,44,25);
+            _audio = Label(root,"",48,820,950,38,23);
             _surface.SetLayer(go); Show(null, false, 0);
         }
 
@@ -78,14 +86,13 @@ namespace Ciel.Conversation
         public void Show(CielConversation.ActivityState state,bool connected,float age)
         {
             bool fresh=connected&&CielActivityPresentation.Fresh(state,age);
-            string phase=fresh?state.decision?.phase:null;
-            if(phase is "failed" or "cancelled")phase="finished";
+            string phase=fresh?CielActivityPresentation.Position(state):null;
             foreach(var pair in _nodes)pair.Value.color=pair.Key==phase?new Color(.07f,.37f,.42f):new Color(.06f,.17f,.23f);
             // 色だけでなく現在の処理名を上部に表示する。
-            _status.text=!connected?"会話に未接続":!fresh?"最新の状態を確認できません・現在位置の強調を停止":"● "+CielActivityPresentation.Decision(state);
+            _status.text=!connected?"会話に未接続":!fresh?"最新の状態を確認できません・現在位置の強調を停止":"● "+CielActivityPresentation.Continuation(state)+" ／ "+CielActivityPresentation.Decision(state);
             _status.color=fresh?Cyan:new Color(1,.77f,.42f);
-            _initiative.text=fresh?"自発判断："+CielActivityPresentation.Initiative(state):"自発判断：状態未確認";
-            _outcome.text=fresh?"直近："+CielActivityPresentation.Outcome(state):"";
+            _continuation.text=fresh?CielActivityPresentation.Setting(state):"会話の進行：状態未確認";
+            _audio.text=fresh?"音声："+CielActivityPresentation.Audio(state):"";
         }
         void Update()
         {

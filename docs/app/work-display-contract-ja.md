@@ -24,35 +24,34 @@ Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのm
 
 作業と会話・リアクションは並行して示す。例：「石のツルハシ／実行中」と「会話：コメントへの返事を考えています」。発話中だから作業完了とは判断しない。独立配信カードには会話専用行を設け、依頼者の個人名・記憶内容・内部ログを載せない。長時間作業を伴わない機能選択・応答待ちも別に示す。`load_capabilities`等は利用者向けの機能名で表示する。直接の追従など、work以外の体の作業も会話とは別に表示する。
 
-## 会話・自発判断の観測（activity.state v2）
+## 会話・継続の観測（activity.state v3）
 
-2026-11-17のソース改修。送信・受信・操作画面の表示をv2へ揃えた。開発・本番とWindowsアプリへ反映し、OBSへ適用済み。確認範囲は[確認状況](../testing/verification-status-ja.md)を参照。配信の場面・座標・配置見本は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)を正本とする。
+通常会話の単一say/actループを、生成・道具・音声の実状態から表示する。旧initiativeコントローラーとactivity.state v2の受信は撤去し、送信・受信・操作画面・配信カード・会話グラフをv3へ統一する。内面の文章や記憶を新たに公開しない。
 
-旧`background_thinking`は実処理から更新されておらず、旧画面の「裏の思考」は自発判断の実行状況を表していなかった。旧フィールドと`detail_version`を撤去し、`Initiative`と`ConversationDecision`の実行箇所から状態を投影する。現在の自発判断は`CIEL_INITIATIVE=1`が既定で、会話・出来事の変化と静かな時間を条件に動く。無条件の常時思考ではない。未採用の大きな状態機械の設計案と、現在の実行ループを混同しない。
+| 行 | 表示する事実 |
+|---|---|
+| 会話の進行 | 初回応答、続きの生成、道具の結果から再判断、外部入力待ち、中断、エラー |
+| 判断と実行 | 判断、機能ロード、操作・結果待ち、結果確認、発話の提出と判断回数 |
+| 発話の継続 | 有効・無効。開始前と会話モード変更時も更新する |
+| 音声 | SDKから届いた発話・入力受付状態。生成の待機とは別に表示する |
+| 体・作業 | body / goal.stateの確認済み状態。会話の終了を作業成功へ読み替えない |
 
-| 行 | 表示する事実 | 例 |
-|---|---|---|
-| 会話 | 入力・発話・返答の生成と契機 | コメントへの返事、発話中 |
-| 判断と実行 | 通常のsay/actループの実行段階と判断回数 | 判断、機能ロード、操作・結果待ち、結果確認、判断終了、取消、失敗 |
-| 自発判断 | 有効性・待機理由・直近の結果 | 無効、会話優先、モード・歌・登録の条件待ち、静穏待ち、連続判断の抑制、新しい出来事待ち、判断中、今回は黙る |
-| 体・作業 | body / goal.stateの確認済み状態 | 実行中、判断待ち、停止確認中、状態不明 |
+グラフは「入力待ち→判断→発話を渡す」から待機と継続へ分岐する。機能ロード・操作は結果確認を経て判断へ戻る。中断・エラーは通常の終了と分ける。発話の継続中は続きの生成を強調し、生成を止めて音声だけ再生中なら入力待ちと「話しています」を併記する。現在位置の投影であり、進捗率や通過履歴ではない。短時間の遷移は通知の集約により省略される。ゲーム専用の判断経路を通常ループの節へ推測で重ねない。
 
-通常の実行ループの固定構造は「入力待ち→判断→機能ロードまたは操作→結果確認→判断」で、判断から返答・終了へ分岐する。操作画面は共通表示ヘルパーで現在の節を強調する。これは進捗率や実際に通った全履歴ではなく、現在の実行箇所の投影である。ゲーム専用の受付判断は別経路のため、この通常ループの節へ推測で重ねない。ゲームの進行はworkとplanを表示する。自発判断の結果は発話・行動を選んだ事実であり、音声再生完了や作業成功の保証ではない。
-
-`ciel.event`の`activity.state`は`v=2`、`stream_id`、送信ごとの`revision`、`valid_for_s=6`を持つ。状態変更時は250msでまとめ、変更がなくても2秒ごとに通知する。`mind`・`thinking_origin`・`calls`・`body`・`log`に加え、次の構造を送る。思考本文・モデルの理由文・個人の記憶を新規の状態項目へ含めない。
+`ciel.event`の`activity.state`は`v=3`、`stream_id`、送信ごとの`revision`、`valid_for_s=6`を持つ。変更は250msでまとめ、2秒ごとにハートビートする。既存のmind・thinking_origin・calls・body・logと次の構造を送る。
 
 ```json
 {
-  "initiative": {"phase": "waiting", "reason": "new_event", "outcome": "silent"},
-  "decision": {"phase": "reviewing", "step": 2, "outcome": ""}
+  "continuation": {"enabled": true, "phase": "waiting"},
+  "decision": {"phase": "finished", "step": 2, "outcome": "none"}
 }
 ```
 
-`initiative.phase`はdisabled / waiting / scheduled / deciding、`decision.phase`はidle / deciding / loading / calling / reviewing / finished / cancelled / failed。完了の内訳はnone / clarify / blocked / accepted / completeで、acceptedを作業成功にしない。失敗を「黙る」に変換しない。待機理由が同じままでもハートビートで鮮度を確認する。
+continuation.phaseはwaiting / responding / continuing / tool_result / cancelled / failed。enabledは追加の発話継続の有効性であり、無効でも初回応答と道具結果の確認は動く。ひかえめ等への設定変更で有効性が変わった場合は、進行中の継続を取り消して設定を更新する。decision.phaseはidle / deciding / loading / calling / reviewing / finished / cancelled / failed。finishedは判断結果の提出であり、音声再生完了ではない。outcomeのacceptedは受付であり成功ではない。
 
-未対応版・必須項目の欠落・不正な状態は未確認にし、v1へフォールバックしない。古いrevisionと退役streamは無視する。通知停止から6秒を超えたら現在位置・体の現在状態・経過秒数を現況として表示しない。新しい通知で復旧する。goal.stateの鮮度・終端保持は独立して判定し、会話の通知切れだけで確認済みの作業終了を書き換えない。
+未対応版・必須コントローラー欠落・不正なphaseは未確認にし、旧形式へフォールバックしない。古いrevisionと退役streamは無視する。通知停止から6秒を超えたら現在位置・体の現在状態・経過秒数の強調を解除する。goal.stateの鮮度と終端保持は独立して扱う。
 
-反映時は会話サーバーとUnityを一組で更新する。ソースの変更だけで配信済みとは扱わない。通常の配信カードは短い表示を維持する。配信版Windowsの「設定 → 配信 → シエルの会話グラフを開く」で独立出力 `CIEL Broadcast 会話グラフ` を開く。既存会話の状態を描画するだけで、接続・音声・モデルを追加起動しない。現在位置は有効な通知だけで強調し、未接続・6秒超の通知切れでは強調を解除する。グラフ右側はOBSの人物・ゲーム小窓用の余白とする。
+配信版Windowsの「設定 → 配信 → シエルの会話グラフを開く」で独立出力 `CIEL Broadcast 会話グラフ` を開く。モデル・接続・音声を追加起動しない。右側のシエルとゲーム小窓の領域は維持する。[配信画面の配置](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)は別の正本。通知の版変更は会話サーバーとUnityを一組で配布し、起動済みアプリは再起動・再接続する。反映範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
 
 ## ciel.goalの状態通知
 

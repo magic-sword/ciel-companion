@@ -9,7 +9,7 @@ from types import SimpleNamespace as Obj
 import jsonschema
 from capabilities import CapabilityCatalog
 from persona import load_persona
-from tool_decision import ToolDecision
+from tool_decision import ToolDecision, ConversationDecision
 import tools
 from livekit.agents import RunContext, ToolResult, llm
 from livekit.agents.llm import utils
@@ -171,6 +171,9 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.agent.conversation_decision.loop.cancelled)
 
     async def test_spoken_continuation_streams_without_another_user_turn(self):
+        states = []
+        self.agent.conversation_decision = ConversationDecision(observe_continuation=lambda **s: states.append(s))
+        states.clear()
         self.create.side_effect = [self.answer(dict(kind='none'), 'First part.', next='continue'),
                                   self.answer(dict(kind='none'), 'Last part.')]
         chunks = await self.node()
@@ -179,6 +182,25 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Last part.', chunks[1].delta.content)
         self.assertTrue(self.agent.conversation_decision.flow.waiting)
         self.assertEqual(self.create.await_count, 2)
+        self.assertEqual([s['phase'] for s in states], ['responding', 'continuing', 'continuing', 'waiting'])
+        self.assertTrue(all(s['enabled'] for s in states))
+
+    async def test_disabled_continuation_reports_response_and_wait_without_enabling(self):
+        states = []
+        self.agent.conversation_decision = ConversationDecision(observe_continuation=lambda **s: states.append(s))
+        states.clear()
+        value = dict(say=[], act=dict(kind='none'))
+        self.create.return_value = Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps(value)))])
+        with patch.dict('os.environ', {'CIEL_INITIATIVE': '0'}):
+            await self.node()
+        self.assertEqual(states, [dict(enabled=False, phase='responding'), dict(enabled=False, phase='waiting')])
+
+    def test_initial_setting_and_mode_change_are_visible_without_a_model_request(self):
+        from tool_decision import ConversationDecision
+        states = []
+        control = ConversationDecision(observe_continuation=lambda **s: states.append(s), enabled=True)
+        control.configure(False)
+        self.assertEqual(states, [dict(enabled=True, phase='waiting'), dict(enabled=False, phase='waiting')])
 
     async def test_interruption_after_streamed_chunk_stops_continuation(self):
         self.create.return_value = self.answer(dict(kind='none'), 'First part.', next='continue')

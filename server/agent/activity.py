@@ -20,7 +20,7 @@ import uuid
 from collections import deque
 from typing import Callable
 
-VERSION = 2
+VERSION = 3
 PUBLISH_GAP = 0.25   # これより短い間の変化は、まとめて 1 回で送る
 LOG_KEEP = 12
 TEXT_CHARS = 120
@@ -39,7 +39,7 @@ class Activity:
         self.who: str | None = None       # 考えている係（mind：心・talker：小脳）
         self.thinking_origin = ''
         self._mind_epoch = 0
-        self.controllers = {'initiative': dict(phase='disabled', reason='configuration', outcome=''),
+        self.controllers = {'continuation': dict(enabled=False, phase='waiting'),
                             'decision': dict(phase='idle', step=0, outcome='')}
         self.stream_id, self.revision = uuid.uuid4().hex, 0
         self._heartbeat = None

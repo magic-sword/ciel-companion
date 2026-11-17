@@ -606,7 +606,8 @@ async def entrypoint(ctx: JobContext) -> None:
     session.on('agent_state_changed', act.agent_state)
     session.on('function_tools_executed', act.tools_executed)
     agent.conversation_decision = ConversationDecision(observe=lambda **state: act.controller("decision", **state),
-        observe_initiative=lambda **state: act.controller("initiative", **state))
+        observe_continuation=lambda **state: act.controller("continuation", **state),
+        enabled=os.environ.get("CIEL_INITIATIVE", "1") == "1")
     session.on('function_tools_executed', agent.conversation_decision.feedback)
     session.on('user_state_changed', agent.conversation_decision.on_user_state)
     ctx.add_shutdown_callback(agent.conversation_decision.close)
@@ -619,7 +620,11 @@ async def entrypoint(ctx: JobContext) -> None:
     session.on('close', checkup.on_close)
     # 会話のしかた（mode.py）。いまの答え方・覚えていることの出し方は、変わるたびに Unity へ知らせる
     style = mode.ConversationStyle(agent, agent.instructions_for, can_quiet=VOICE == 'irodori')
-    style.publish = notify
+    def publish_style(state):
+        agent.conversation_decision.configure(
+            os.environ.get('CIEL_INITIATIVE', '1') == '1' and style.talk != 'quiet')
+        notify(state)
+    style.publish = publish_style
     history = Conversation()
     session.userdata.history = history
     # 会話のまとめ（議事録など。minutes.py）。始めと終わりは、アプリのボタン・管理用のコマンド（ciel.minutes）と、声（道具 tools/minutes.py）から

@@ -150,17 +150,31 @@ class ToolDecision:
 
 class ConversationDecision:
     """A bounded say/act stream; LiveKit owns audio delivery and interruption."""
-    def __init__(self, observe=lambda **state: None, observe_initiative=lambda **state: None):
+    def __init__(self, observe=lambda **state: None, observe_continuation=lambda **state: None, enabled=True):
         self.observe = observe
-        self.observe_initiative = observe_initiative
+        self.observe_continuation = observe_continuation
+        self.enabled = enabled
+        self.progress("waiting")
         self.speech_id = None
         self.loop = self.flow = None
+
+    def progress(self, phase):
+        self.phase = phase
+        self.observe_continuation(enabled=self.enabled, phase=phase)
+
+    def configure(self, enabled):
+        if self.enabled == enabled:
+            return
+        if self.flow is not None and not self.flow.waiting:
+            self.cancel()
+        self.enabled = enabled
+        self.progress(self.phase)
 
     def cancel(self):
         if self.flow is not None and not self.loop.cancelled:
             self.flow.interrupt()
             self.show("cancelled")
-            self.observe_initiative(phase="waiting", reason="conversation", outcome="cancelled")
+            self.progress("cancelled")
 
     def show(self, phase):
         self.observe(phase=phase, step=self.loop.steps if self.loop else 0,
@@ -187,6 +201,7 @@ class ConversationDecision:
         if self.loop is None or self.speech_id != speech.id:
             self.cancel()
             enabled = os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(owner.style, 'talk', 'normal') != 'quiet'
+            self.enabled = enabled
             self.flow = Continuation(enabled=enabled, speech_chars=120 if enabled else None)
             self.flow.wake()
             self.speech_id, self.loop = speech.id, self.flow.chain
@@ -195,7 +210,8 @@ class ConversationDecision:
             return
         token = flow.generation
         # The SDK re-enters after actual function feedback; never synthesize success.
-        if flow.pending is not None:
+        resuming_tool = flow.pending is not None
+        if resuming_tool:
             flow.finish(token)
         visible = {fn.id: fn for fn in functions}
         source = source if source is not None else ctx
@@ -208,7 +224,8 @@ class ConversationDecision:
         try:
             while not flow.waiting and not loop.cancelled and not getattr(speech, 'interrupted', False):
                 self.show('deciding')
-                self.observe_initiative(phase="deciding", reason="", outcome="")
+                self.progress("tool_result" if resuming_tool else "responding" if flow.steps == 0 else "continuing")
+                resuming_tool = False
                 refused = owner.mind.refused_now(source)
                 schema = flow.schema(owner.capabilities, visible, refused)
                 instruction = (template.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
@@ -250,16 +267,16 @@ class ConversationDecision:
                     return
                 messages.append({'role': 'assistant', 'content': raw})
                 flow.finish(token)
-                self.observe_initiative(phase="waiting" if flow.waiting else "scheduled",
-                    reason="new_event" if flow.waiting else "", outcome="spoke" if text else "silent")
+                self.progress("waiting" if flow.waiting else "continuing")
         except asyncio.CancelledError:
             flow.interrupt()
             if self.loop is loop:
                 self.show("cancelled")
+                self.progress("cancelled")
             raise
         except Exception:
             flow.interrupt()
             if self.loop is loop:
                 self.show("failed")
-                self.observe_initiative(phase="waiting", reason="new_event", outcome="error")
+                self.progress("failed")
             raise

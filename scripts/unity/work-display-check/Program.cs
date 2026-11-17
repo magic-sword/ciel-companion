@@ -89,7 +89,7 @@ class Program
         g.task.state="succeeded"; g.receivedAt-=11;
         Check(CielWorkPresentation.From(g).phase=="succeeded", "terminal remains confirmed historical fact");
         g=Work();
-        var a=new CielConversation.ActivityState { mind="speaking", v=2, valid_for_s=6,
+        var a=new CielConversation.ActivityState { mind="speaking", v=3, valid_for_s=6,
             body=new CielConversation.ActivityBody { version=1, phase="running", title="採集中" } };
         var card=CielAudienceCardState.From(g,a,true,false);
         Check(card.phase=="running" && card.conversation.Contains("話しています"), "work and speech coexist");
@@ -100,7 +100,7 @@ class Program
         g.task.state="needs_decision"; g.task.decision_message="材料がありません";
         Check(CielAudienceCardState.From(g,a,true,false).current.Contains("材料"), "decision evidence");
         g.task.state="succeeded";
-        a=new CielConversation.ActivityState {mind="listening", v=2, valid_for_s=6, body=new CielConversation.ActivityBody {version=1,phase="idle"}};
+        a=new CielConversation.ActivityState {mind="listening", v=3, valid_for_s=6, body=new CielConversation.ActivityBody {version=1,phase="idle"}};
         Check(CielAudienceCardState.From(g,a,true,true).heading.Contains("処理終了"), "processing completion does not claim objective achievement");
         Check(CielAudienceCardState.From(g,a,true,false).phase=="idle", "completion expires");
         Receive(c, "{\"v\":1,\"type\":\"goal.state\"}");
@@ -128,14 +128,27 @@ class Program
         UnityEngine.Time.unscaledTime += 11;
         Check(CielPlanPresentation.From(planned).stale && !CielAudienceCardState.From(planned, null, true, false).current.StartsWith("選択待ち"), "stale plan is marked, not shown as now");
         UnityEngine.Time.unscaledTime -= 11;
-        var live = new CielConversation.ActivityState { v=2, type="activity.state", stream_id="activity-a", revision=1,
-            valid_for_s=6, mind="thinking", initiative=new CielConversation.ActivityController {phase="waiting", reason="quiet"},
+        var live = new CielConversation.ActivityState { v=3, type="activity.state", stream_id="activity-a", revision=1,
+            valid_for_s=6, mind="thinking", continuation=new CielConversation.ActivityContinuation {enabled=true,phase="waiting"},
             decision=new CielConversation.ActivityController {phase="loading", step=1}, body=new CielConversation.ActivityBody {version=1,phase="idle"} };
         void ActivityReceive(string json) => typeof(CielConversation).GetMethod("OnActivity", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(c, new object[] {Encoding.UTF8.GetBytes(json)});
         ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
         Check(c.ActivityFresh && CielActivityPresentation.Decision(c.Activity).Contains("読み込み"), "live controller stage");
         Check(CielAudienceCardState.Conversation(c.Activity).Contains("読み込み"), "tool phase overrides generic thinking");
         Check(CielActivityPresentation.Flow(c.Activity).Contains("● 機能ロード"), "current graph node highlighted");
+        live.decision.phase="finished"; live.continuation.phase="waiting"; live.mind="speaking";
+        Check(CielActivityPresentation.Position(live)=="idle" && CielActivityPresentation.Audio(live)=="話しています", "waiting generation and audio playback are independent");
+        live.decision.phase="deciding"; live.continuation.phase="responding"; live.mind="thinking";
+        Check(!CielAudienceCardState.Conversation(live).Contains("自発"), "ordinary response is not autonomous thought");
+        live.continuation.phase="continuing";
+        Check(CielActivityPresentation.Position(live)=="continuing" && CielAudienceCardState.Conversation(live).Contains("続き"), "continuation has its own node and caption");
+        live.decision.phase="cancelled";
+        Check(CielActivityPresentation.Position(live)=="cancelled", "interruption is not normal completion");
+        live.decision.phase="failed";
+        Check(CielActivityPresentation.Position(live)=="failed", "error is not normal completion");
+        live.continuation.enabled=false;
+        Check(CielActivityPresentation.Setting(live).Contains("無効"), "disabled continuation is explicit");
+        live.decision.phase="loading";live.continuation.phase="tool_result";
         UnityEngine.Time.unscaledTime += 7;
         Check(!c.ActivityFresh && CielAudienceCardState.From(null,c.Activity,true,false,7).phase=="unknown", "stale activity is unknown");
         Check(!CielActivityPresentation.Flow(c.Activity,7).Contains("●"), "stale graph clears highlight");
@@ -147,6 +160,11 @@ class Program
         Check(c.Activity==null, "legacy activity rejected");
         ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
         Check(c.Activity==null, "old snapshot cannot hide protocol error");
+        live.revision=3;live.v=2;ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
+        Check(c.Activity==null,"v2 activity rejected");
+        live.v=3;live.continuation.phase="invalid";ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
+        Check(c.Activity==null,"invalid continuation rejected");
+        live.continuation.phase="waiting";
         live.stream_id="activity-b";live.revision=1;ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
         live.stream_id="activity-a";live.revision=99;ActivityReceive(UnityEngine.JsonUtility.ToJson(live));
         Check(c.Activity.stream_id=="activity-b", "retired stream rejected");

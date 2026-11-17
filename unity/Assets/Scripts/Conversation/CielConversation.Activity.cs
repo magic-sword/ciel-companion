@@ -50,6 +50,13 @@ namespace Ciel.Conversation
         }
 
         [Serializable]
+        public class ActivityContinuation
+        {
+            public bool enabled;
+            public string phase;
+        }
+
+        [Serializable]
         public class ActivityState
         {
             public string type, mind, who;   // mind：idle・listening・thinking・speaking。who：mind・talker
@@ -58,7 +65,8 @@ namespace Ciel.Conversation
             public string stream_id;
             public float valid_for_s;
             public string thinking_origin;
-            public ActivityController initiative, decision;
+            public ActivityController decision;
+            public ActivityContinuation continuation;
             public ActivityCall[] calls;
             public ActivityLog[] log;
             public ActivityBody body;
@@ -76,10 +84,10 @@ namespace Ciel.Conversation
             ActivityState s;
             try { s = JsonUtility.FromJson<ActivityState>(System.Text.Encoding.UTF8.GetString(data)); }
             catch (Exception) { InvalidateActivity(); return; }
-            if (s == null || s.type != "activity.state" || s.v != 2 || string.IsNullOrEmpty(s.stream_id)
+            if (s == null || s.type != "activity.state" || s.v != 3 || string.IsNullOrEmpty(s.stream_id)
                 || s.revision < 1 || float.IsNaN(s.valid_for_s) || s.valid_for_s <= 0 || s.valid_for_s > 6
-                || s.initiative == null || s.decision == null
-                || !(s.initiative.phase is "disabled" or "waiting" or "scheduled" or "deciding")
+                || s.continuation == null || s.decision == null
+                || !(s.continuation.phase is "waiting" or "responding" or "continuing" or "tool_result" or "cancelled" or "failed")
                 || !(s.decision.phase is "idle" or "deciding" or "loading" or "calling" or "reviewing" or "finished" or "cancelled" or "failed")) { InvalidateActivity(); return; }
             if (_retiredActivity.Contains(s.stream_id)) return;
             if (_activityStream == s.stream_id && s.revision <= _activitySequence) return;
@@ -124,15 +132,16 @@ namespace Ciel.Conversation
     {
         public static string Flow(CielConversation.ActivityState a, float age = 0)
         {
-            var phase = Fresh(a, age) ? a.decision?.phase : "unknown";
+            var phase = Fresh(a, age) ? Position(a) : "unknown";
             string Node(string label, bool active) => active ? "<color=#5BF0C8><b>● " + label + "</b></color>" : "<color=#8FB3C3>" + label + "</color>";
             return Node("待機", phase == "idle") + " → " + Node("判断", phase == "deciding") + " → "
-                + Node("返答・終了", phase is "finished" or "cancelled" or "failed")
+                + Node("発話を渡す", phase == "finished") + " → " + Node("続きの生成", phase == "continuing")
+                + " → 待機／判断へ\n" + Node("中断", phase == "cancelled") + "　" + Node("エラー", phase == "failed")
                 + "\n　　　　↓　↑ 結果をもとに再判断\n"
                 + Node("機能ロード／操作", phase is "loading" or "calling") + " → " + Node("結果確認", phase == "reviewing");
         }
 
-        public static bool Fresh(CielConversation.ActivityState a, float age) => a != null && a.v == 2
+        public static bool Fresh(CielConversation.ActivityState a, float age) => a != null && a.v == 3
             && a.valid_for_s > 0 && age >= 0 && age <= a.valid_for_s;
 
         public static string Decision(CielConversation.ActivityState a) => a?.decision?.phase switch {
@@ -151,18 +160,26 @@ namespace Ciel.Conversation
             "idle" => "判断する入力を待っています", _ => "判断状態を確認できていません"
         };
 
-        public static string Initiative(CielConversation.ActivityState a) => a?.initiative?.phase switch {
-            "disabled" => "無効・停止中", "scheduled" => "判断の開始待ち", "deciding" => "自発的に話す・動く・黙るを判断中",
-            "waiting" => a.initiative.reason switch {
-                "conversation" => "会話を優先して待機", "mode" => "会話モード・歌・登録の条件で待機",
-                "quiet" => "会話が落ち着くのを待機", "cooldown" => "連続判断を抑えて待機",
-                "eligible_event" => "対象の出来事を待機", _ => "新しい発言・出来事を待機"
-            }, _ => "有効状態を確認できていません"
+        public static string Continuation(CielConversation.ActivityState a) => a?.continuation?.phase switch {
+            "responding" => "返事を生成中", "continuing" => "続きの発話を生成中",
+            "tool_result" => "道具の結果から再判断中", "waiting" => "新しい発言・出来事を待機",
+            "cancelled" => "会話の生成を中断", "failed" => "会話の生成でエラー",
+            _ => "会話の進行を確認できていません"
         };
 
-        public static string Outcome(CielConversation.ActivityState a) => a?.initiative?.outcome switch {
-            "silent" => "今回は黙ると判断", "acted" => "行動を選択", "spoke" => "発話を選択",
-            "cancelled" => "割り込みで中断", "error" => "判断エラー", _ => "まだ判断結果なし"
+        public static string Audio(CielConversation.ActivityState a) => a?.mind switch {
+            "speaking" => "話しています", "listening" => "入力を受け付けています",
+            "thinking" => "音声を準備中", _ => "発話していません"
         };
+        public static string Setting(CielConversation.ActivityState a) => a?.continuation == null
+            ? "継続設定：未確認" : a.continuation.enabled ? "発話の継続：有効" : "発話の継続：無効";
+
+        public static string Position(CielConversation.ActivityState a) {
+            if (a?.decision?.phase is "cancelled" or "failed") return a.decision.phase;
+            if (a?.decision?.phase is "loading" or "calling" or "reviewing") return a.decision.phase;
+            if (a?.continuation?.phase == "waiting") return "idle";
+            if (a?.continuation?.phase == "continuing") return "continuing";
+            return a?.decision?.phase ?? "idle";
+        }
     }
 }

@@ -84,10 +84,11 @@ class ActivityTest(unittest.TestCase):
 class DetailTest(unittest.TestCase):
     def test_controller_states_replace_dead_background_flag(self):
         a = activity.Activity(None)
-        a.controller('initiative', phase='waiting', reason='quiet', outcome='silent')
+        a.controller('continuation', enabled=True, phase='waiting')
         s = a.state()
-        self.assertEqual(s['v'], 2)
-        self.assertEqual(s['initiative']['reason'], 'quiet')
+        self.assertEqual(s['v'], 3)
+        self.assertEqual(s['continuation'], dict(enabled=True, phase='waiting'))
+        self.assertNotIn('initiative', s)
         self.assertNotIn('background_thinking', s)
         self.assertNotIn('detail_version', s)
 

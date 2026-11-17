@@ -399,7 +399,7 @@ namespace Ciel.Conversation
                 CielPlanWindow.FocusCurrent = !CielPlanWindow.FocusCurrent;
                 Refresh();
             });
-            Note(sec, $"「{CielProcessWindow.Title}」は会話の判断・機能ロード・操作・結果確認と、自発判断の状態を映します。");
+            Note(sec, $"「{CielProcessWindow.Title}」は会話の判断・機能ロード・操作・結果確認と、発話の継続・待機の状態を映します。");
             Note(sec, $"「{CielStreamWindow.PlanTitle}」は、シエルが進めている計画（依存のつながり・いまの段・選択）を映します。"
                 + "表示だけで、計画の変更は言葉で頼みます");
             Note(sec, $"「{CielStreamWindow.CardTitle}」をOBSのウィンドウキャプチャで取り込みます。"

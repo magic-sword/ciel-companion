@@ -118,8 +118,8 @@ namespace Ciel.Conversation
             b.Append(Head("会話・リアクション")).Append("　").Append(Esc(mind)).Append('\n');
             b.Append(Head("判断と実行")).Append("　").Append(Esc(CielActivityPresentation.Decision(a)))
                 .Append("（判断 ").Append(a.decision?.step ?? 0).Append(" 回）\n");
-            b.Append(Head("自発判断")).Append("　").Append(Esc(CielActivityPresentation.Initiative(a))).Append('\n');
-            b.Append("　直近：").Append(Esc(CielActivityPresentation.Outcome(a))).Append('\n');
+            b.Append(Head("会話の進行")).Append("　").Append(Esc(CielActivityPresentation.Continuation(a))).Append('\n');
+            b.Append("　").Append(Esc(CielActivityPresentation.Setting(a))).Append('\n');
             // 呼んでいる道具
             b.Append(Head("呼んでいる道具")).Append('\n');
             if (a.calls == null || a.calls.Length == 0) b.Append("　なし\n");

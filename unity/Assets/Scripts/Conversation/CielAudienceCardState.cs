@@ -81,9 +81,9 @@ namespace Ciel.Conversation
             else if (activity?.mind == "thinking")
             {
                 result.phase = "thinking";
-                bool initiative = activity.thinking_origin == "initiative";
-                result.heading = initiative ? "シエル｜自発的に考え中" : "シエル｜考え中";
-                result.title = initiative ? "自分から話すことを考えています"
+                bool initiative = activity.continuation?.phase == "continuing";
+                result.heading = initiative ? "シエル｜続きの生成中" : "シエル｜考え中";
+                result.title = initiative ? "続きの発話を考えています"
                     : activity.thinking_origin == "tool_result" ? "道具の結果を確認しています"
                     : activity.thinking_origin == "comment" ? "コメントへの返事を考えています" : "返事・次の行動を考えています";
                 result.current = "返事の準備をしています";
@@ -121,13 +121,13 @@ namespace Ciel.Conversation
             if (userSpeaking) return "声を聞いています";
             if (a?.mind == "speaking") return "話しています";
             if (a?.decision?.phase is "loading" or "calling" or "reviewing") return CielActivityPresentation.Decision(a);
-            if (a?.initiative?.phase == "deciding") return "自発的に話す・動く・黙るを判断中";
+            if (a?.continuation?.phase is "responding" or "continuing" or "tool_result" or "cancelled" or "failed") return CielActivityPresentation.Continuation(a);
             if (a?.mind == "thinking") return a.thinking_origin switch {
                 "comment" => "コメントへの返事を考えています",
                 "game" => "ゲーム内の出来事への反応を考えています",
                 "touch" => "触れられたことへの反応を考えています",
                 "tool_result" => "結果を確認しています",
-                "initiative" => "自分から話すことを考えています",
+                "initiative" => "続きの発話を考えています",
                 _ => "返事・次の行動を考えています"
             };
             if (a?.decision?.phase is "deciding" or "loading" or "calling" or "reviewing")

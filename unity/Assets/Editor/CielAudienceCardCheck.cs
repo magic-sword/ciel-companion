@@ -28,7 +28,7 @@ namespace Ciel.EditorTools
                 task = new CielConversation.WorkInfo { session = "server", task_id = "task", revision = 1,
                     title = "鉄を10個集める", state = "running", can_stop = true, remaining_known = true, remaining_ms = 45000 }
             };
-            var activity = new CielConversation.ActivityState { mind = "speaking", v = 2, valid_for_s = 6,
+            var activity = new CielConversation.ActivityState { mind = "speaking", v=3, valid_for_s = 6,
                 body = new CielConversation.ActivityBody { version = 1, phase = "running", title = "鉄鉱石を探している" } };
             var state = CielAudienceCardState.From(goal, activity, true, false);
             Check(state.visible && state.title == goal.task.title && state.conversation.Contains("話しています"), "work and conversation coexist");
@@ -63,7 +63,7 @@ namespace Ciel.EditorTools
             goal.receivedAt -= 11;
             Check(CielWorkPresentation.From(goal).phase == "succeeded", "terminal fact survives lease expiry");
             Check(!CielWorkPresentation.From(goal).canStop, "no terminal stop");
-            var idle = new CielConversation.ActivityState { mind = "listening", v = 2, valid_for_s = 6,
+            var idle = new CielConversation.ActivityState { mind = "listening", v=3, valid_for_s = 6,
                 body = new CielConversation.ActivityBody { version = 1, phase = "idle" } };
             Check(CielAudienceCardState.From(goal, idle, true, true).heading.Contains("処理終了"), "brief completion, without claiming the goal");
             Check(CielAudienceCardState.From(goal, idle, true, false).phase == "idle", "completion expires");

@@ -20,14 +20,18 @@ namespace Ciel.EditorTools
             var camera=go.transform.Find("Process Source Camera").GetComponent<Camera>();
             if(camera.cullingMask != 1<<CielProcessWindow.Layer || camera.GetComponent<AudioListener>()!=null
                 || (main.GetComponent<Camera>().cullingMask & (1<<CielProcessWindow.Layer))!=0)throw new Exception("Process camera isolation");
-            var state=new CielConversation.ActivityState {v=2,valid_for_s=6,
+            var state=new CielConversation.ActivityState {v=3,valid_for_s=6,
                 decision=new CielConversation.ActivityController {phase="calling",step=2},
-                initiative=new CielConversation.ActivityController {phase="waiting",reason="new_event",outcome="silent"}};
+                continuation=new CielConversation.ActivityContinuation {enabled=true,phase="waiting"}};
             foreach(var phase in new[]{"idle","deciding","loading","calling","reviewing","finished","cancelled","failed"})
             {
-                state.decision.phase=phase;window.Show(state,true,0);
+                state.decision.phase=phase;state.continuation.phase=phase=="idle"?"waiting":"responding";window.Show(state,true,0);
                 Render(camera,"process-"+phase);
             }
+            state.decision.phase="deciding"; state.continuation.phase="continuing"; state.mind="speaking";
+            window.Show(state,true,0);Render(camera,"process-continuing");
+            state.decision.phase="finished";state.continuation.phase="waiting";
+            window.Show(state,true,0);Render(camera,"process-speaking-waiting");
             window.Show(state,true,7);
             bool stale=false;foreach(var t in go.GetComponentsInChildren<Text>())stale|=t.text.Contains("強調を停止");
             if(!stale)throw new Exception("Stale graph must be explicit");

@@ -953,7 +953,7 @@ namespace Ciel.EditorTools
                 type.GetProperty("Status").GetSetMethod(true).Invoke(c, new object[] { Ciel.Conversation.CielConversation.State.Connected });
                 Event("{\"v\":1,\"type\":\"env.list\",\"games\":[{\"game\":\"minecraft\",\"label\":\"マイクラ\"}]}");
                 Event("{\"v\":1,\"type\":\"env.state\",\"game\":\"minecraft\",\"label\":\"マイクラ\",\"linked\":true,\"playing\":true,\"reason\":\"\"}");
-                Event("{\"v\":2,\"type\":\"activity.state\",\"stream_id\":\"preview\",\"revision\":1,\"valid_for_s\":6,\"initiative\":{\"phase\":\"waiting\",\"reason\":\"new_event\"},\"decision\":{\"phase\":\"idle\"},\"mind\":\"listening\",\"who\":\"\",\"mind_for\":2.0,"
+                Event("{\"v\":3,\"type\":\"activity.state\",\"stream_id\":\"preview\",\"revision\":1,\"valid_for_s\":6,\"continuation\":{\"enabled\":true,\"phase\":\"waiting\"},\"decision\":{\"phase\":\"idle\"},\"mind\":\"listening\",\"who\":\"\",\"mind_for\":2.0,"
                     + "\"calls\":[{\"label\":\"集める\",\"for_s\":4.0}],\"tasks\":[{\"title\":\"oak_log を 3 個集める\",\"for_s\":12.0}],"
                     + "\"doing\":\"oak_log を 3 個集める\",\"goal_step\":\"\",\"log\":["
                     + "{\"id\":3,\"ago\":6.0,\"text\":\"心へ：作るが始めなかったのに言葉だけで止まったので、次の手をうながした\",\"kind\":\"wait\"},"

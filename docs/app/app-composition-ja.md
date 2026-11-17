@@ -18,7 +18,7 @@
 
 作業と会話・リアクションを並行して示す。旧段一覧から0/0を作らず、確認済み状態と残り実行予算を共通の`CielWorkPresentation`から描画する。配信出力へ依頼者の個人名・記憶・内部ログを載せない。機能の詳細は[表示契約](work-display-contract-ja.md)へ集約する。
 
-会話の処理グラフとゲームの計画グラフは役割を分け、通常プレイでは短い状態カード、説明時には一つのグラフを大きく表示する設計とする。OBSの配置・見本・未反映範囲は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)、通知と現在の実装は[表示契約](work-display-contract-ja.md#会話自発判断の観測activitystate-v2)へ集約する。
+会話の処理グラフとゲームの計画グラフは役割を分け、通常プレイでは短い状態カード、説明時には一つのグラフを大きく表示する設計とする。OBSの配置・見本・未反映範囲は[ciel-crafters-liveの画面設計](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)、通知と現在の実装は[表示契約](work-display-contract-ja.md#会話継続の観測activitystate-v3)へ集約する。
 
 ## 会話の再接続とマイク
 
