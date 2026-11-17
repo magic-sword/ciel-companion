@@ -2,32 +2,52 @@
 
 > 責務：Web調査の依頼、引用確認、結果保持、画面と発話への対応。
 
-この資料はWeb調査の依頼・結果・保持・画面への通知を説明する。サービス境界は[サービス境界](../conversation/service-boundaries-ja.md)、権限と段階的公開は[能力カタログ](../conversation/capability-runtime-ja.md)を参照する。
+検索は`server/search`の独立した認証付きMCPサービスが担当する。CIELの`ResearchService`は接続・結果検証・会話用の整形だけを行い、`WebResearcher`が受付・取消・記録・画面通知を管理する。利用者の依頼と自発的調査は同じ入口を使う。[サービス境界](../conversation/service-boundaries-ja.md)と[能力カタログ](../conversation/capability-runtime-ja.md)を参照。
 
-`ResearchService`と`WebResearcher`を、利用者の依頼と自発的調査の両方から共通MCP入口で利用する。質問・必要な日時を送り、会話全文・人物メモ・資格情報をLLMの任意引数へ出さない。検索処理は`approved_search.py`、許可台帳は`config/search-sources.json`を正本とする。検索にOpenAI・Geminiは使用せず、検索結果は会話モデルへ返す。
+LLMが呼ぶ`research_web`と段階的ロードは維持する。サービスへ渡すのは短い検索語と件数だけで、会話全文・人物メモ・外部APIキーは渡さない。検索サービスの交換でLLMの道具定義を変更しない。現在の実装はWikipedia APIだけで、OpenAI・Geminiのアダプターや記事本文の巡回は未実装。別プロバイダーへの自動フォールバックはない。
 
-同じ会話の同時検索数、処理期限、本文・出典の保持量を制限する。結果の本文と有効な引用、検索処理の完了を確認してから調査済みと扱う。失敗・取消・期限切れを架空の回答で補わない。local・openaiのどちらの会話backendでも同じ許可済みAPIを使い、別プロバイダーへのフォールバックはない。
+## 独立MCPの契約
 
-調査の受付、実行中の表示、共通履歴への記録、結果の発話はホストが担当する。完了通知は[サービス入力](../conversation/service-events-and-reactions-ja.md)からMouthへ渡し、発話済みと生成完了を混同しない。モデル・検索・引用の費用と、ローカルの実行試験は[有料試験](../testing/paid-checks-ja.md)で区別する。
+Streamable HTTPの`/mcp`にBearer認証し、`search(query, limit=3)`を呼ぶ。queryは1～600文字、limitは1～5。応答は`version=1`、`status`、`coverage`（検索範囲）、`content_kind`、`retrieved_at`、`results`、任意の`summary`・`reason`・`retry_after_seconds`からなる。各結果はtitle・url・snippet・attributionと任意のlicense_url・history_urlを持つ。
 
-テストは`server/agent/tests/test_research.py`、サービス境界とpipelineの結合は[回帰テスト](../testing/regression-tests-ja.md)を参照する。
+`status`はok / no_results / unavailable / rate_limited / failed。成功は出典必須、結果なしと障害を区別する。`content_kind=search_snippets`は取得した検索概要、`grounded_summary`は出典番号`[n]`付き生成要約。後者は将来のアダプター用の契約であり、現プロバイダーは生成しない。検索範囲と証拠の種類を会話へ返し、概要を記事本文やWeb全体の確認と扱わない。検索結果は外部資料として扱う。
+
+契約の正本は`server/search/contract.py`。その`SearchReply.model_json_schema()`をJSON化したものが`server/agent/config/search-api.schema.json`で、実HTTPテストが両者の一致を検査する。破損応答・未知の版・出典不足をクライアントで拒否し、内部例外や資格情報を結果へ含めない。会話の結果形式・画面通知は既存のまま。
+
+検索サービス内で要求を直列化し、429・負荷エラーの待機を全接続で共有する。Retry-Afterまたは最低60秒の待機中は追加要求を送らず、自動再試行しない。サービス30秒・会話45秒で打ち切り、取消はMCPセッション終了から検索HTTPへ伝播する。セッションは最大64・無操作90秒、要求bodyは16KiBまで。
+
+## 設定と起動
+
+資格情報は本番`server/.env.shared`の`CIEL_SEARCH_TOKEN`（ランダムASCII32文字以上）。各環境の`server/search/.env`は`SEARCH_CONTACT`（公開連絡先）、`SEARCH_SOURCE=wikipedia-ja`、`SEARCH_PORT`（本番8780・開発8781）。検索コンテナへ渡す資格情報はこのトークンだけで、共有ファイル全体を注入しない。CIEL側は`.env` / `.env.dev`の`CIEL_SEARCH_URL`と共有トークンだけを使う。[環境設定](../operations/local-runtime-ja.md)を参照。
+
+Linuxホストの`server/search`で起動する。
+
+```sh
+# 本番
+ docker compose --env-file ../.env.shared --env-file .env up -d --build
+# 開発（共有資格情報は本番に一つ）
+ docker compose -p ciel-search-dev --env-file ../../../ciel-companion/server/.env.shared --env-file .env up -d --build
+```
+
+127.0.0.1だけで待ち受ける。`GET /health`は資格情報なしで稼働・API版を返すが、外部検索の可用性までは保証しない。`/mcp`は認証必須。これは同一ホストの信頼されたクライアント向け共有トークン方式で、公開インターネット向けOAuthサービスではない。別ホストへ公開する場合はTLS・到達制限・認証方式を別途設計する。CIELと独立にビルド・再起動できる。
 
 ## 許可を確認した検索APIの収集スクリプト
 
-`scripts/server/search-approved.py`は、運営者が公開したAPIの利用条件を確認して登録した接続先だけを検索し、タイトル・URL・検索概要をJSONへ保存する。初期対象は日本語・英語WikipediaのAction APIであり、Web全体の検索ではない。Google検索ページの直接取得は行わない。APIキーや外部LLMは不要。会話の`research_web`も同じ収集処理を使い、日本語Wikipediaに固定して最大3件を検索する。短い検索語を渡し、検索概要・出典・CC BY-SA 4.0の参照を既存の調査記録・画面通知へ載せる。空結果は検索済みで該当なし、API失敗はfailedとして区別する。配布状況は確認状況を参照。
+`scripts/server/search-approved.py`も同じMCP APIを呼び、共通形式の結果を保存する。
 
 ```powershell
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py --list-sources
-.\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py "Python" --source wikipedia-ja --limit 5 --contact "<公開してよい実際の連絡先URLまたはメール>" --output .local/approved-search/result.json
+.\.venv\Scripts\python.exe -B -X utf8 scripts/server/search-approved.py "Python" --limit 3 --output .local/approved-search/result.json
 ```
 
-公開連絡先は`server/.env`の`CIEL_SEARCH_CONTACT`にも設定できる。優先順位と開発用ファイルは[実行設定](../operations/local-runtime-ja.md#本番開発で共通の変数名)を参照。`--contact`は運営者へのUser-Agentに送る公開連絡先。APIキーや秘密情報を指定しない。Wikimediaの[利用案内](https://www.mediawiki.org/wiki/API:Etiquette)と[API利用方針](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines)に従い、専用の識別名、単発のGET、`maxlag=5`を使う。1実行1要求・最大10結果・応答上限1MB・HTTP待ち時間20秒で、再試行やページ送りはしない。複数プロセスの一括実行や定期巡回は対象外。429やAPI負荷エラーでは停止し、`Retry-After`を結果に残す。再実行は待機指示に従う。
+既定の接続先は`server/.env`、資格情報は`server/.env.shared`。開発は`--env-file server/.env.dev`、資格情報の別配置は`--credentials-file`で指定する。プロセス環境変数を優先する。対象や連絡先をCLI・LLMから切り替えない。
 
-許可台帳は`server/agent/config/search-sources.json`。対象API、取得範囲、許可の根拠URL、確認日と再確認期限、利用規約・ライセンスの参照先を保存する。2027-02-15はこの実装の自主的な再確認期限で、運営者が保証する許諾期限ではない。条件の変更を検知した場合は期限前でも見直す。台帳を追加するだけでは接続できず、コード側の接続先一覧とAPIアダプターもレビューして更新する。LLMに接続先の追加・許可判定を任せない。`robots.txt`だけを許可根拠にしない。
+収集本体は`server/search/approved_search.py`、許可台帳は`server/search/config/search-sources.json`。日本語・英語WikipediaのAction APIを登録し、稼働対象はサービス側で選ぶ。運営者が公開したAPIの条件を確認し、検索結果・概要だけを取得する。Google検索ページの直接取得はしない。APIキー・外部LLMは不要。
 
-未登録・期限切れ・範囲違いは通信前に拒否し、HTTPリダイレクトも追わない。検索結果のリンクや、利用条件の参照URLをスクリプトが取得することはない。`content_kind=search_snippets`、`pages_fetched=false`、`untrusted_content=true`をJSONへ付ける。取得した文章は外部資料であり、実行指示として扱わない。概要はHTMLを除去して最大1,200文字に整形し、記事・履歴URL、Wikipedia contributorsの帰属、ライセンス参照を残す。公開・加工時には対象コンテンツの利用条件に従う。会話モデルはこの概要を受け取って返答する。記事本文やWeb全体を確認したとは扱わない。会話側のHTTPは非同期で、取消時は接続を閉じる。同一プロセスの検索を直列化し、429・負荷エラーではRetry-After（指定なしは60秒）まで追加要求を抑止する。
+Wikimediaの[利用案内](https://www.mediawiki.org/wiki/API:Etiquette)と[API利用方針](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines)を根拠に、識別名・公開連絡先入りUser-Agent、単発GET、maxlag=5、応答上限1MB、HTTP待機20秒を使う。記事本文・検索結果リンク・規約URLは自動取得せず、概要のHTMLを除去して最大1,200文字へ整形する。出典・Wikipedia contributorsの帰属・履歴URL・ライセンス参照を保持する。会話の記録と通知にも出典・帰属・ライセンス参照を渡す。
 
-オフライン試験は`server/benchmark/tests/test_approved_search.py`。実APIでの確認範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
+台帳には対象API・取得範囲・許可根拠URL・確認日・再確認期限を保存する。2027-02-15は自主的な再確認期限であり、運営者の許諾期限ではない。未登録・期限切れ・範囲違いは通信前に拒否し、リダイレクトも追わない。対象追加には台帳だけでなく接続先一覧とアダプターのレビューが必要。LLMに接続先追加や許可判定を任せず、robots.txtだけを許可根拠にしない。
+
+独立APIの実HTTP試験は`server/search/tests/test_service.py`、収集のオフライン試験は`server/benchmark/tests/test_approved_search.py`、会話統合は`server/agent/tests/test_research.py`。[回帰テスト](../testing/regression-tests-ja.md)と[配布・確認状況](../testing/verification-status-ja.md)を参照。実マイク・TTS・端末画面の確認はAPI試験と分ける。
 
 ## GeminiのGoogle検索連携の接続試験
 

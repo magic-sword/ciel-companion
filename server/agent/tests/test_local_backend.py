@@ -213,8 +213,8 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         from web_research import WebResearcher
         client = mock.AsyncMock()
         worker = WebResearcher(Conversation(), '')
-        with mock.patch('research_service.async_search', mock.AsyncMock(return_value={
-                'status': 'no_results', 'results': [], 'policy': {}})):
+        with mock.patch('research_service.request_search', mock.AsyncMock(return_value={
+                'status': 'no_results', 'results': [], 'coverage': 'fixture', 'content_kind': 'search_snippets', 'retrieved_at': '2026-11-17T00:00:00+00:00'})):
             self.assertEqual((await worker.search('Python', 'call', None))['status'], 'completed')
         eye = Eyes(mock.Mock(), client=client)
         self.assertIsNone(eye.receive(b'\xff\xd8\xffimage'))

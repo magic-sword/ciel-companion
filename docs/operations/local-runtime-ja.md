@@ -24,12 +24,12 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 | ファイル | 内容 | 読む環境 |
 |---|---|---|
-| 本番`server/.env.shared` | LiveKit・OpenAI・Gemini・YouTubeの資格情報、DBパスワード | 本番・開発・専用ベンチマーク |
+| 本番`server/.env.shared` | LiveKit・OpenAI・Gemini・YouTube・検索MCPの資格情報、DBパスワード | 本番・開発・専用ベンチマーク |
 | 本番`server/.env` | 本番の推論、入力、モデル、Webhook、共有LLMサービスの配置・容量 | 本番だけ |
 | 開発`server/.env.dev` | 開発の推論、入力、モデル、Webhook | 開発だけ |
 | 各端末の`server/agent/.env` | Pythonを直接起動する場合の資格情報と動作設定 | その直接起動だけ。Composeは読まない |
 
-本番は`~/work/ciel-companion/server`、開発は`~/work/ciel-companion-dev/server`。共有ファイルは本番側に一つ置く。`.env.shared`に置ける名前は`LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`OPENAI_API_KEY`、`GEMINI_API_KEY`、`YOUTUBE_API_KEY`、`CIEL_DB_PASSWORD`だけ。backend・モデル・Webhook・記憶スコープは共有しない。モデル・DB・LiveKitを共用することと、本番の動作設定を開発へ継承することを区別する。
+本番は`~/work/ciel-companion/server`、開発は`~/work/ciel-companion-dev/server`。共有ファイルは本番側に一つ置く。`.env.shared`に置ける名前は`LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET`、`OPENAI_API_KEY`、`GEMINI_API_KEY`、`CIEL_SEARCH_TOKEN`、`YOUTUBE_API_KEY`、`CIEL_DB_PASSWORD`だけ。backend・モデル・Webhook・記憶スコープは共有しない。モデル・DB・LiveKitを共用することと、本番の動作設定を開発へ継承することを区別する。
 
 見本は[共通資格情報](../../server/.env.shared.example)、[本番](../../server/.env.example)、[開発](../../server/.env.dev.example)。既存の設定へ見本を丸ごと上書きしない。ベンチマークは`.env.benchmark`を独立して読み、資格情報だけ共有する。`CIEL_BENCH_*`は評価器の制御用であり、本番・開発の変数名の別名ではない。
 
@@ -39,7 +39,9 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 ## 本番・開発で共通の変数名
 
-`CIEL_SEARCH_CONTACT`は検索APIへUser-Agentで送信する公開連絡先（メールまたはURL）。資格情報ではないため`server/.env`または`server/.env.dev`へ置く。単独の`search-approved.py`は既定で手元PCの`server/.env`からこの項目だけを読み、開発用は`--env-file server/.env.dev`で明示する。優先順位は`--contact`、プロセス環境変数、指定ファイル。ほかの設定をプロセス環境へ読み込まない。
+検索の接続先`CIEL_SEARCH_URL`は本番`server/.env`（`http://127.0.0.1:8780/mcp`）、開発`server/.env.dev`（8781）に置く。共通認証トークン`CIEL_SEARCH_TOKEN`は本番`server/.env.shared`に一つ置く。検索サービスは各環境の`server/search/.env`から`SEARCH_CONTACT`（User-Agentへ送る公開連絡先）、`SEARCH_SOURCE`、`SEARCH_PORT`を読む。会話サービスへ検索対象や連絡先を渡さない。旧`CIEL_SEARCH_CONTACT`は撤去する。
+
+単独の`search-approved.py`も同じMCPクライアントを使い、既定で`server/.env`の接続先と`server/.env.shared`のトークンだけを読む。開発は`--env-file server/.env.dev`、別の資格情報は`--credentials-file`で指定し、プロセス環境変数を優先する。[検索サービスの起動手順](../services/web-research-ja.md)を参照。
 
 両方の設定ファイルで次の名前を使う。
 
@@ -55,7 +57,7 @@ CIEL_VOSK_MODEL_PATH=/models/vosk-model-small-ja-0.22
 CIEL_MINUTES_DISCORD_WEBHOOK=
 ```
 
-`CIEL_LLM_BACKEND`は省略時openai。localの音声入力は共有LLM＋CPUのVosk＋Irodori、text入力なら音声認識を使わない。STT_BACKEND空はbackendに連動し、localからOpenAIへ自動で戻さない。画像認識は画像能力を確認したローカルAPIを使い、モデル送信前に既定256pxへ縮小する。[画像の契約](../services/vision-design-ja.md)を参照。Web検索・OpenAI埋め込みによる振り分けはlocalでは使わない。外部LiveKit等への接続は残るため、完全なオフライン化ではない。
+`CIEL_LLM_BACKEND`は省略時openai。localの音声入力は共有LLM＋CPUのVosk＋Irodori、text入力なら音声認識を使わない。STT_BACKEND空はbackendに連動し、localからOpenAIへ自動で戻さない。画像認識は画像能力を確認したローカルAPIを使い、モデル送信前に既定256pxへ縮小する。[画像の契約](../services/vision-design-ja.md)を参照。Web検索は独立MCPを利用する。OpenAI埋め込みによる振り分けはlocalでは使わない。外部LiveKit等への接続は残るため、完全なオフライン化ではない。
 
 `CIEL_LOCAL_LLM_MODEL`はAPIに送るモデルIDの任意の上書き。既定`local`を公開する共有APIでは設定不要。実際の重みは共有API側の`LOCAL_LLM_FILE`が選ぶ。`CIEL_LOCAL_ROLES`は役目別のローカル利用、`CIEL_LOCAL_LLM_CONTROL`は歌唱中のGPU解放先で、既定は`http://127.0.0.1:8095`。モデルの役目別設定やWebhookも環境ごとのファイルで設定できる。
 

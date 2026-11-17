@@ -14,7 +14,7 @@ import httpx
 from dotenv import dotenv_values
 
 REGISTRY = Path(__file__).with_name('config') / 'search-sources.json'
-DEFAULT_ENV = Path(__file__).resolve().parents[1] / '.env'
+DEFAULT_ENV = Path(__file__).with_name('.env')
 ENDPOINTS = {
     'wikipedia-ja': 'https://ja.wikipedia.org/w/api.php',
     'wikipedia-en': 'https://en.wikipedia.org/w/api.php',
@@ -135,10 +135,10 @@ def search(source, query, limit, contact, *, transport=None, registry=REGISTRY):
 def configured_contact(explicit, env_file):
     if explicit is not None:
         return explicit
-    if 'CIEL_SEARCH_CONTACT' in os.environ:
-        return os.environ['CIEL_SEARCH_CONTACT']
+    if 'SEARCH_CONTACT' in os.environ:
+        return os.environ['SEARCH_CONTACT']
     values = dotenv_values(env_file, interpolate=False) if env_file.is_file() else {}
-    return values.get('CIEL_SEARCH_CONTACT')
+    return values.get('SEARCH_CONTACT')
 
 
 def main():
@@ -147,7 +147,7 @@ def main():
     parser.add_argument('--source', choices=ENDPOINTS, default='wikipedia-ja')
     parser.add_argument('--contact', help='Operator public contact URL or email sent in User-Agent')
     parser.add_argument('--env-file', type=Path, default=DEFAULT_ENV,
-                        help='Contact setting only (default: server/.env); use server/.env.dev for development')
+                        help='Contact setting only (default: server/search/.env); use server/search/.env for development')
     parser.add_argument('--limit', type=int, choices=range(1, 11), default=5)
     parser.add_argument('--list-sources', action='store_true')
     parser.add_argument('--output', type=Path)

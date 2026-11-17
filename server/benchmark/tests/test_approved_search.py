@@ -9,7 +9,7 @@ from unittest.mock import patch
 import httpx
 
 ROOT = Path(__file__).resolve().parents[3]
-spec = importlib.util.spec_from_file_location('approved_search', ROOT / 'server/agent/approved_search.py')
+spec = importlib.util.spec_from_file_location('approved_search', ROOT / 'server/search/approved_search.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 

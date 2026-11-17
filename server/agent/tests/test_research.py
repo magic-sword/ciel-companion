@@ -11,8 +11,11 @@ from tools.research import research_web, read_research
 
 
 def response():
-    return dict(status='ok', results=[dict(title='Python', url='https://ja.wikipedia.org/?curid=123',
-        snippet='A programming language.')], policy={'license_url': 'https://creativecommons.org/licenses/by-sa/4.0/'})
+    return dict(version=1, status='ok', coverage='fixture', content_kind='search_snippets',
+        retrieved_at='2026-11-17T00:00:00+00:00', summary=None, results=[dict(title='Python',
+        url='https://ja.wikipedia.org/?curid=123', snippet='A programming language.',
+        attribution='Wikipedia contributors', license_url='https://creativecommons.org/licenses/by-sa/4.0/',
+        history_url=None)])
 
 
 class FakeSpeech:
@@ -29,14 +32,11 @@ class FakeSpeech:
 
 class ResearchTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        cooldown = patch('research_service._retry_until', 0.0)
-        cooldown.start()
-        self.addCleanup(cooldown.stop)
         self.history = Conversation()
         self.user = self.history.reserve()
         self.history.complete(self.user, '明日の休館日を確認して')
         self.client = Obj(responses=Obj(create=AsyncMock(return_value=response())))
-        self.collector = patch('research_service.async_search', self.client.responses.create)
+        self.collector = patch('research_service.request_search', self.client.responses.create)
         self.collector.start()
         self.addCleanup(self.collector.stop)
         self.publish = AsyncMock()
@@ -49,8 +49,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['request_turn_id'], self.user.id)
         self.assertIsNotNone(result['checked_at'])
         args = self.client.responses.create.call_args.args
-        self.assertEqual(args[0], 'wikipedia-ja')
-        self.assertEqual(args[2], 3)
+        self.assertEqual(args[1], 3)
         self.assertNotIn(self.user.text, args)
         self.assertEqual(len(self.history.turns), 1)
         self.assertEqual(result['sources'][0]['url'], 'https://ja.wikipedia.org/?curid=123')
@@ -88,11 +87,11 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         with patch('models.LOCAL_TEST', True):
             result = await self.worker.search('Python', 'local', self.speech)
         self.assertEqual(result['status'], 'completed')
-        self.assertEqual(result['sources'][-1]['title'], 'CC BY-SA 4.0')
+        self.assertEqual(result['sources'][-1]['url'], 'https://creativecommons.org/licenses/by-sa/4.0/')
         self.assertIn('Wikipedia contributors', result['sources'][0]['title'])
 
     async def test_empty_search_and_rate_limit_are_distinct(self):
-        self.client.responses.create.return_value = dict(status='no_results', results=[], policy={})
+        self.client.responses.create.return_value = {**response(), 'status': 'no_results', 'results': []}
         empty = await self.worker.search('unknown', 'empty', self.speech)
         self.assertEqual(empty['status'], 'completed')
         self.assertEqual(empty['sources'], [])
@@ -100,10 +99,6 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         limited = await self.worker.search('Python', 'limited', self.speech)
         self.assertEqual(limited['status'], 'failed')
         self.assertEqual(limited['summary'], '')
-        self.client.responses.create.reset_mock()
-        again = await self.worker.search('Python', 'retry', self.speech)
-        self.assertEqual(again['status'], 'failed')
-        self.client.responses.create.assert_not_awaited()
 
     async def test_timeout_releases_lock(self):
         async def slow(*args, **kwargs):

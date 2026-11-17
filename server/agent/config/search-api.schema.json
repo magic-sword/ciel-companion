@@ -1,0 +1,161 @@
+{
+  "$defs": {
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 1500,
+          "minLength": 1,
+          "pattern": "^https?://[^\\s]+$",
+          "title": "Url",
+          "type": "string"
+        },
+        "snippet": {
+          "maxLength": 1200,
+          "title": "Snippet",
+          "type": "string"
+        },
+        "attribution": {
+          "maxLength": 600,
+          "title": "Attribution",
+          "type": "string"
+        },
+        "license_url": {
+          "anyOf": [
+            {
+              "maxLength": 1500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License Url"
+        },
+        "history_url": {
+          "anyOf": [
+            {
+              "maxLength": 1500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History Url"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "snippet",
+        "attribution"
+      ],
+      "title": "Source",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "no_results",
+        "unavailable",
+        "rate_limited",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "coverage": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Coverage",
+      "type": "string"
+    },
+    "content_kind": {
+      "enum": [
+        "search_snippets",
+        "grounded_summary"
+      ],
+      "title": "Content Kind",
+      "type": "string"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "maxItems": 5,
+      "title": "Results",
+      "type": "array"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "maxLength": 4000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "retry_after_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry After Seconds"
+    }
+  },
+  "required": [
+    "status",
+    "coverage",
+    "content_kind",
+    "retrieved_at",
+    "results"
+  ],
+  "title": "SearchReply",
+  "type": "object"
+}

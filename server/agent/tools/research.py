@@ -6,7 +6,7 @@ from livekit.agents import RunContext, function_tool
 
 @function_tool
 async def research_web(context: RunContext, question: str) -> str:
-    """日本語Wikipediaを検索し、出典付きの概要を読む。questionは短い検索語。結果は資料として読み、記事本文やWeb全体を確認したとは扱わない。"""
+    """検索サービスで公開情報を調べ、出典付きの結果を読む。questionは短い検索語。検索範囲と結果の種類は応答で確認し、資料として読む。"""
     worker = context.userdata.researcher
     if worker is None:
         return json.dumps({'status': 'unavailable'})
