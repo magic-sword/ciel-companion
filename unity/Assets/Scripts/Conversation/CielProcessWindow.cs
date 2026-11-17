@@ -30,7 +30,7 @@ namespace Ciel.Conversation
             _status = Label(root, "状態の通知を待っています", 40, 86, 960, 50, 24);
             // 右側はOBSのゲーム小窓・シエルと重なる領域。重要な節はX<1000へ収める。
             Edge(root,new(288,258),new(378,258)); Edge(root,new(618,258),new(708,258));
-            // 発話の提出後、継続なら判断へ戻り、待機なら入力待ちへ戻る。
+            // 出力には無言も含む。継続なら判断へ戻り、待機なら外部入力へ戻る。
             Path(root,new(848,204),new(848,170),new(168,170),new(168,204));
             Path(root,new(988,258),new(1010,258),new(1010,668),new(988,668));
             Path(root,new(848,614),new(848,590),new(1018,590),new(1018,148),new(498,148),new(498,204));
@@ -40,9 +40,9 @@ namespace Ciel.Conversation
             Edge(root,new(658,488),new(708,488));
             Path(root,new(848,434),new(848,350),new(598,350),new(598,312));
             Label(root,"待つ",260,135,100,30,20); Label(root,"続ける",900,562,100,30,20);
-            Node(root,"idle","入力待ち","発言・出来事",48,204,240);
+            Node(root,"idle","待機","発言・結果・出来事",48,204,240);
             Node(root,"deciding","判断","返事・行動を選ぶ",378,204,240);
-            Node(root,"finished","発話を渡す","再生の完了とは別",708,204,280);
+            Node(root,"finished","出力を確定","話す／無言で進む",708,204,280);
             Node(root,"loading","機能ロード","必要な定義を取得",48,434,280);
             Node(root,"calling","操作を呼ぶ","結果を待つ",378,434,280);
             Node(root,"reviewing","結果確認","判断へ戻す",708,434,280);

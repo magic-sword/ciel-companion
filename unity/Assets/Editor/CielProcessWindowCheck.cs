@@ -30,7 +30,12 @@ namespace Ciel.EditorTools
             }
             state.decision.phase="deciding"; state.continuation.phase="continuing"; state.mind="speaking";
             window.Show(state,true,0);Render(camera,"process-continuing");
+            state.mind="listening";
+            window.Show(state,true,0);Render(camera,"process-silent-continuing");
+            var silent=CielAudienceCardState.From(null,state,true,false);
+            if(!silent.heading.Contains("続きの判断"))throw new Exception("Silent continuation card");
             state.decision.phase="finished";state.continuation.phase="waiting";
+            state.mind="speaking";
             window.Show(state,true,0);Render(camera,"process-speaking-waiting");
             window.Show(state,true,7);
             bool stale=false;foreach(var t in go.GetComponentsInChildren<Text>())stale|=t.text.Contains("強調を停止");

@@ -78,7 +78,8 @@ namespace Ciel.Conversation
                 result.title = "話を聞いています";
                 result.current = "声を受け取っています";
             }
-            else if (activity?.mind == "thinking")
+            else if (CielActivityPresentation.Judging(activity) || (activity?.mind == "thinking"
+                     && !(CielActivityPresentation.Position(activity) is "cancelled" or "failed")))
             {
                 result.phase = "thinking";
                 bool initiative = activity.continuation?.phase == "continuing";
@@ -86,8 +87,9 @@ namespace Ciel.Conversation
                 result.title = initiative ? "次に話す・することを考えています"
                     : activity.thinking_origin == "tool_result" ? "道具の結果を確認しています"
                     : activity.thinking_origin == "comment" ? "コメントへの返事を考えています" : "返事・次の行動を考えています";
-                result.current = "返事の準備をしています";
-                result.elapsed = Seconds(activity.mind_for, age);
+                result.current = activity.mind == "speaking" ? "話しながら次の判断を進めています"
+                    : "話すこと・行動することを選んでいます";
+                result.elapsed = activity.mind == "thinking" ? Seconds(activity.mind_for, age) : "";
                 summary = result.title;
             }
             else if (activity?.mind == "speaking")
@@ -96,6 +98,20 @@ namespace Ciel.Conversation
                 result.heading = "シエル｜発話中";
                 result.title = "話しています";
                 result.current = "声で返事をしています";
+            }
+            else if (activity?.continuation?.phase is "cancelled" or "failed")
+            {
+                result.phase = activity.continuation.phase;
+                result.heading = result.phase == "failed" ? "シエル｜会話のエラー" : "シエル｜会話を中断";
+                result.title = CielActivityPresentation.Continuation(activity);
+                result.current = "次の呼びかけを受け付けます";
+                result.attention = result.phase == "failed";
+            }
+            else if (activity?.continuation?.phase == "waiting")
+            {
+                result.heading = "シエル｜待機中";
+                result.title = CielActivityPresentation.Waiting(activity);
+                result.current = "声をかけると会話を再開します";
             }
             if (goal != null && (goal.Active || (recent && result.phase == "idle")))
             {
@@ -119,7 +135,8 @@ namespace Ciel.Conversation
         public static string Conversation(CielConversation.ActivityState a, bool userSpeaking = false)
         {
             if (userSpeaking) return "声を聞いています";
-            if (a?.mind == "speaking") return "話しています";
+            if (a?.mind == "speaking") return CielActivityPresentation.Judging(a)
+                ? "話しています ／ " + CielActivityPresentation.Continuation(a) : "話しています";
             if (a?.decision?.phase is "loading" or "calling" or "reviewing") return CielActivityPresentation.Decision(a);
             if (a?.continuation?.phase is "responding" or "continuing" or "tool_result" or "cancelled" or "failed") return CielActivityPresentation.Continuation(a);
             if (a?.mind == "thinking") return a.thinking_origin switch {
@@ -127,7 +144,7 @@ namespace Ciel.Conversation
                 "game" => "ゲーム内の出来事への反応を考えています",
                 "touch" => "触れられたことへの反応を考えています",
                 "tool_result" => "結果を確認しています",
-                "initiative" => "続きの発話を考えています",
+                "initiative" => "続きの判断をしています",
                 _ => "返事・次の行動を考えています"
             };
             if (a?.decision?.phase is "deciding" or "loading" or "calling" or "reviewing")
