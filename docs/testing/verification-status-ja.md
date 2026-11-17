@@ -1,8 +1,10 @@
 # 現在の確認範囲と配布状況
 
+2026-11-17、Windows配信版でChromeの最大化・復元後に、配信アプリとMinecraftらしきウィンドウを残してデスクトップ全体が黒化する症状を調査した。Unity 6000.6.4f1・Windows 11・RTX 2060・ドライバ32.0.15.6614で、利用者がDirect3D 12起動時の再現と、同じバイナリを`-force-d3d11`で再起動した後の非再現を目視確認。取得画像には黒化が写らず、キャプチャ操作で復帰するとの報告がある。D3D12ログに`IDXGISwapChain::GetFrameStatistics`の警告があるが、警告と黒化の因果やWindows合成・GPUドライバ内部の原因は未確定。Windows通常版・配信版のビルドでDirect3D 11を明示指定する回避修正を追加した。比較ログは`.local/display-diagnostics/d3d12-before.log`と`d3d11-comparison.log`。長時間運用・別GPUでは未検証。
+
 2026-11-17、Mindcraftの行動選択LLMのセリフを再生成せずIrodori経路へ渡す実装を追加。routeResponseを取り込み、固定の自動行動ナレーションは除外する。通常回帰782件（.local/regression/20261117T124907Z-505362）、追加後の目的管理19件・発話調停25件、Minecraftのruntime/tasks 27件、能力・反応の結合検査が成功。重複通知、古い作業、ユーザー割り込み、同じ質問の再生成抑止を検証した。実Irodori音声と実ゲーム中の発話タイミングは未確認。会話ホストとMinecraft双方の更新が必要で、この変更はまだ稼働環境へ配布していない。
 
-トークン取得先の初期値・保存値表示の修正を含むWindows通常版・配信版を更新済み。`unity/Logs/local-token-default-verified.log`で設定検証・画面構成検証・両`CIEL_BUILD_OK`・Editor終了コード0を確認した（CLIラッパー終了値は1）。サーバーの変更・再配布は不要。Androidと実接続は今回未検証。
+Direct3D 11固定を含むWindows通常版・配信版を更新済み。`unity/Logs/windows-d3d11-build.log`で両`CIEL_BUILD_OK`・Editor終了コード0を確認した。配信版は追加引数なしで再起動し、Player.logのDirect3D 11.0、映像・目的カード・計画グラフ・会話グラフの起動、会話とゲーム接続の復帰を確認。通常版の実起動は未確認。トークン取得先の初期値・保存値表示は、従来の`unity/Logs/local-token-default-verified.log`で設定・画面構成の検証済み。サーバーの変更・再配布は不要。Androidは今回未検証。
 
 2026-11-17、ローカルLiveKitのトークン取得先に初期値`http://192.168.1.15:7883/token`を追加した。未保存・以前の空設定では初期値を使い、保存済みの別URLを優先する。空欄の確定で初期値へ戻し、表示欄も実際の値へそろえる。通常版・配信版の設定保存先は個別で、クラウド／ローカルの選択は維持する。Unityで未設定・旧空値・別URLと選択の保存と再読込・初期値への復帰・明示OFFの維持の5項目が成功。検査は元の端末設定を退避・復元し、実トークン取得や会話接続は行っていない。
 

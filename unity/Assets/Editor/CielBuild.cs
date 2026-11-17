@@ -22,6 +22,7 @@ namespace Ciel.Companion.Editor
         [MenuItem("CIEL/Build/Windows")]
         public static void Windows()
         {
+            ConfigureWindowsGraphics();
             PlayerSettings.runInBackground = true;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.resizableWindow = true;
@@ -31,6 +32,7 @@ namespace Ciel.Companion.Editor
         [MenuItem("CIEL/Build/Windows Broadcast")]
         public static void WindowsBroadcast()
         {
+            ConfigureWindowsGraphics();
             PlayerSettings.runInBackground = true;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.resizableWindow = true;
@@ -41,6 +43,16 @@ namespace Ciel.Companion.Editor
         {
             Windows();
             WindowsBroadcast();
+        }
+
+        static void ConfigureWindowsGraphics()
+        {
+            // D3D12 caused desktop blackouts when Chrome was maximized/restored over
+            // Broadcast on the RTX 2060. The same operation passed with D3D11.
+            // Keep the choice explicit so Unity's automatic API order cannot restore D3D12.
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneWindows64,
+                new[] { UnityEngine.Rendering.GraphicsDeviceType.Direct3D11 });
         }
 
         /// Android：開発用の APK（Unity の開発用の鍵で署名）。端末へは adb install で入れる
