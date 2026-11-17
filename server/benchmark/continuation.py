@@ -77,7 +77,7 @@ class FixtureCatalog:
         return self.fixture
 
 
-def fixed_prompt(variant, catalog):
+def fixed_prompt(variant, catalog, baseline_ref=None):
     persona = load_persona()
     instructions = persona.tool_decide_instructions.split('今回の進行状態：')[0].strip()
     parts = [persona.instructions, persona.self_instructions, instructions]
@@ -85,9 +85,17 @@ def fixed_prompt(variant, catalog):
         parts.append('利用できるサービスは research（Web検索）。定義をロードしてから検索する。')
     config = tomllib.loads(DEFAULT_CONFIG.read_text(encoding='utf-8'))
     if variant != 'control':
-        parts.append((DEFAULT_CONFIG.parent / config['continuation_experiment_file']).read_text(encoding='utf-8'))
+        if variant == 'baseline':
+            if not baseline_ref:
+                raise ValueError('baseline variant requires --baseline-ref')
+            parts.append(subprocess.check_output(['git', 'show',
+                baseline_ref + ':server/agent/config/prompts/continuation.md'], cwd=ROOT).decode('utf-8'))
+        else:
+            parts.append((DEFAULT_CONFIG.parent / config['continuation_experiment_file']).read_text(encoding='utf-8'))
     if variant == 'memo':
         parts.append((DEFAULT_CONFIG.parent / config['continuation_memo_experiment_file']).read_text(encoding='utf-8'))
+    if variant == 'chunked':
+        parts.append((DEFAULT_CONFIG.parent / config['continuation_chunk_experiment_file']).read_text(encoding='utf-8'))
     parts.append(persona.reply_frame)
     return '\n\n'.join(parts)
 
@@ -95,8 +103,10 @@ def fixed_prompt(variant, catalog):
 async def sample(client, args, case, variant, repeat, deadline):
     catalog = FixtureCatalog(case.get('fixture'))
     visible = {x.id: x for x in (catalog.loader, catalog.executor)}
-    loop = runtime.Continuation(enabled=variant != 'control', memo=variant == 'memo', max_steps=args.max_steps)
-    system = fixed_prompt(variant, catalog)
+    loop = runtime.Continuation(enabled=variant != 'control', memo=variant == 'memo', max_steps=args.max_steps,
+                                turn_first=variant != 'baseline', speech_chars=120 if variant == 'chunked' else None,
+                                terminal_wait=variant == 'chunked')
+    system = fixed_prompt(variant, catalog, getattr(args, 'baseline_ref', None))
     messages = [dict(role='system', content=system)]
     trace = dict(case=case['id'], variant=variant, repeat=repeat, prompt_sha256=digest(system),
                  turns=[], status='running', quality=None, calls=[])
@@ -140,7 +150,10 @@ async def sample(client, args, case, variant, repeat, deadline):
                     messages.append(dict(role='user', content='SYSTEM: ' + json.dumps(
                         {'tool': target, 'result': result}, ensure_ascii=False)))
                 # Text delivery is immediate in this fixture. No TTS latency is claimed.
-                loop.finish(token)
+                continued = loop.finish(token)
+                row['continued'] = continued
+                row['terminal_override'] = (call is None and value.get('next') == 'continue'
+                    and value['act']['kind'] in ('clarify', 'blocked', 'accepted') and not continued)
         trace['status'] = 'complete'
     except Exception as error:
         trace['status'] = 'failed'
@@ -187,14 +200,21 @@ async def run(args):
     else:
         cases = [c for c in cases if c['split'] == 'dev']
     variants = args.variants.split(',')
-    if not variants or any(v not in ('control', 'loop', 'memo') for v in variants):
-        raise ValueError('Variants: control,loop,memo')
+    if not variants or len(set(variants)) != len(variants) or any(v not in ('control', 'loop', 'memo', 'baseline', 'chunked') for v in variants):
+        raise ValueError('Unique variants: control,loop,memo,baseline,chunked')
+    baseline_ref = getattr(args, 'baseline_ref', None)
+    if 'baseline' in variants:
+        if not baseline_ref:
+            raise ValueError('baseline requires --baseline-ref')
+        args.baseline_ref = subprocess.check_output(['git', 'rev-parse', '--verify', baseline_ref + '^{commit}'],
+            cwd=ROOT, text=True).strip()
     sources = [Path(__file__), SUITE, ROOT/'server/agent/continuation.py', ROOT/'server/agent/tool_decision.py']
     report = dict(schema='ciel-continuation-v1', suite_sha256=digest(cases),
         commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         source_sha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
         conditions=dict(model=args.model, repeats=args.repeats, temperature=args.temperature, seed=1729,
                         max_tokens=args.max_tokens, max_steps=args.max_steps, budget_seconds=args.budget,
+                        baseline_ref=getattr(args, 'baseline_ref', None),
                         fixtures=True, production_baseline=False, audio=False), trials=[])
     args.output.parent.mkdir(parents=True, exist_ok=True)
     def save():
@@ -221,16 +241,12 @@ async def run(args):
                     report['trials'].append(trace)
                     save()
                     print(json.dumps({k: trace[k] for k in ('case', 'variant', 'repeat', 'status')}, ensure_ascii=True), flush=True)
-                    if trace['status'] != 'complete':
-                        report['stopped'] = 'trial_failed'
-                        save()
-                        return 2
     report['summary'] = summarize(report)
     report['quality_review'] = [dict(case=t['case'], variant=t['variant'], repeat=t['repeat'],
         trace_sha256=t['trace_sha256'], reviewer=None, rubric='continuation-v1',
         scores=None, evidence=None) for t in report['trials']]
     save()
-    return 0
+    return 2 if any(t['status'] != 'complete' for t in report['trials']) else 0
 
 
 def main():
@@ -240,6 +256,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cases')
     parser.add_argument('--variants', default='control,loop')
+    parser.add_argument('--baseline-ref', help='Commit containing the previous continuation prompt; uses say/act/next order')
     parser.add_argument('--repeats', type=int, default=1)
     parser.add_argument('--temperature', type=float, default=0)
     parser.add_argument('--max-steps', type=int, default=8)

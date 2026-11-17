@@ -15,8 +15,10 @@
 | 条件 | 内容 | 目的 |
 |---|---|---|
 | control | 現行ToolDecisionを使い、終端の発話で待機。操作後の結果確認は続ける | 継続機構の有無を比較する対照。現行Initiativeの再現ではない |
-| loop | 同じ基盤にcontinue/waitを追加。別の思考生成・評価呼出しなし | 発話後にも自分で続けられる効果 |
+| loop | nextをsay/actより先に出力し、今回の発話後に話す番を決める。別の思考生成・評価呼出しなし | 回答待ちと必要な続きを両立する効果 |
 | memo | loopに任意の短い継続メモを追加 | メモの追加が本当に必要かの切り分け |
+| baseline | 指定Git版の継続promptとsay/act/next順。実行・採点基盤は候補と共用 | 前回の実験版との対応比較。ホスト全体の再現ではない |
+| chunked | loopに1回1項目・120文字の発話枠と、確認質問等の基盤による待機を追加 | 小さい生成上限での途中切れと、継続指定の矛盾を改善できるか |
 
 初回はcontrol/loopの開発課題を各1回、温度0で動作確認する。次に同じ課題・モデル・出力上限で3反復以上、温度0.3、対応するseedで試す。温度0でseedを変えた反復を、多様な会話の標本とは呼ばない。対照→候補と候補→対照を課題・反復ごとに交替する。候補を確定するまでholdoutは実行せず、最終比較で双方を同条件で測る。memoの比較はloopとの差だけを採点する。
 
@@ -68,7 +70,17 @@
 .\.venv\Scripts\python.exe scripts/server/benchmark-continuation-home.py --variants loop,memo --temperature 0.3 --repeats 3 --output server/benchmark/data/continuation/memo.json --budget 600
 ```
 
-直接接続は `server/benchmark/continuation.py --base-url http://127.0.0.1:18094 --output ...`。既定は開発課題のみ。holdoutの実行は `--cases deferred,resolved,no_search` を明示する。1要求最大90秒、1イベント8推論、全体既定600秒。失敗時は保存して停止する。期限超過を延長して完走扱いにしない。
+直接接続は `server/benchmark/continuation.py --base-url http://127.0.0.1:18094 --output ...`。既定は開発課題のみ。holdoutの実行は `--cases deferred,resolved,no_search` を明示する。1要求最大90秒、1イベント8推論、全体既定600秒。個別の生成失敗は保存して独立した次の試行へ進み、失敗があれば終了コード2。全体期限では停止する。失敗を再試行して上書きせず、期限超過を延長して完走扱いにしない。
+
+前回候補との比較は `--variants baseline,loop --baseline-ref 17c8bf3 --temperature 0.3 --repeats 3` を指定する。baselineは継続指示と出力順だけを旧版に戻す比較であり、他の人格や実行器は共通。採点を含む基盤の変更は双方に適用する。
+
+chunkedの120文字は試験用の生成枠であり、生成後の文字列切り捨てではない。長い内容は複数の決定で渡す。通常の生成上限300tokenは全条件で維持し、長文を短くしただけで品質改善とは扱わない。物語の出会い・助け・結末の充足と、推論回数や発話間の遅延を別々に確認する。clarify/blocked/acceptedでは基盤が待機し、モデルがcontinueを併記してももう一度生成しない。その矛盾はterminal_overrideとして数え、モデルの判断が正しくなったとは報告しない。baseline/loopの比較用条件は矛盾をエラーにする前回の挙動を維持する。
+
+対応比較と匿名のレビュー素材は次で作る。`comparison.json` は課題・反復ごとの差分、`review.json` は条件名と制御出力を隠した会話、`review-key.json` は照合用で評価者には渡さない。品質点は未採点のまま出力する。失敗・欠測の組の差分はnullとし、速い失敗を改善扱いにしない。
+
+```powershell
+.\.venv\Scripts\python.exe server/benchmark/continuation_report.py server/benchmark/data/continuation/turn-first-dev-complete.json --output server/benchmark/data/continuation/turn-first-review
+```
 
 レポートはsuite/ソース/固定prompt/要求/応答の指紋、基点コミット、seed、モデル、API情報、呼出し・模擬結果・全文を保存する。生データはGit対象外。`quality_review`の未入力値は未採点。キャッシュ量はAPIから得られた場合のみ記録する。共有GPUモードはSSHラッパーが前後を保存する。途中の切替・同時負荷の完全な時系列は未観測のため性能の限界として明示する。
 

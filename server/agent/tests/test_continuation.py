@@ -73,6 +73,14 @@ class ContinuationTests(unittest.TestCase):
         self.assertFalse(self.loop.finish(self.token))
 
     def test_clarification_cannot_auto_continue(self):
+        text, call = self.choose(kind='clarify', next='continue')
+        self.assertIn('hello', text)
+        self.assertIsNone(call)
+        self.assertFalse(self.loop.finish(self.token))
+        self.assertTrue(self.loop.waiting)
+
+    def test_previous_benchmark_policy_rejects_conflicting_terminal(self):
+        self.loop.terminal_wait = False
         with self.assertRaisesRegex(ValueError, 'terminal_requires_wait'):
             self.choose(kind='clarify', next='continue')
 
@@ -81,6 +89,25 @@ class ContinuationTests(unittest.TestCase):
         control.wake()
         schema = control.schema(self.catalog, {})
         self.assertEqual(set(schema['properties']), {'say', 'act'})
+
+    def test_turn_choice_precedes_words_without_extra_inference(self):
+        schema = self.loop.schema(self.catalog, {})
+        self.assertEqual(list(schema['properties']), ['next', 'say', 'act', 'memo'])
+        previous = Continuation(turn_first=False)
+        previous.wake()
+        self.assertEqual(list(previous.schema(self.catalog, {})['properties']), ['say', 'act', 'next'])
+
+    def test_chunk_limit_is_generation_contract_not_text_truncation(self):
+        limited = Continuation(speech_chars=120)
+        token = limited.wake()
+        schema = limited.schema(self.catalog, {})
+        self.assertEqual(schema['properties']['say']['maxItems'], 1)
+        self.assertEqual(schema['properties']['say']['items']['properties']['text']['maxLength'], 120)
+        import jsonschema
+        with self.assertRaises(jsonschema.ValidationError):
+            limited.accept(token, dict(next='wait', say=[dict(feeling='neutral', text='x'*121)],
+                act=dict(kind='none')), schema, self.catalog, {})
+        self.assertEqual(limited.steps, 0)
 
     def test_load_requires_actual_feedback_even_if_model_says_wait(self):
         catalog = CapabilityCatalog(tools.MODULES)

@@ -10,8 +10,11 @@ from tool_decision import ToolDecision
 
 
 class Continuation:
-    def __init__(self, *, enabled=True, memo=False, max_steps=8):
+    def __init__(self, *, enabled=True, memo=False, max_steps=8, turn_first=True, speech_chars=None, terminal_wait=True):
         self.enabled, self.memo_enabled = enabled, memo
+        self.turn_first = turn_first
+        self.speech_chars = speech_chars
+        self.terminal_wait = terminal_wait
         self.max_steps = max_steps
         self.generation = 0
         self.waiting = True
@@ -41,9 +44,15 @@ class Continuation:
         if self.steps >= self.max_steps:
             raise TimeoutError('continuation_budget_exhausted')
         value = self.chain.schema(catalog, visible)
+        if self.speech_chars is not None:
+            value['properties']['say']['maxItems'] = 1
+            value['properties']['say']['items']['properties']['text']['maxLength'] = self.speech_chars
         if self.enabled:
             value['properties']['next'] = {'enum': ['continue', 'wait']}
             value['required'].append('next')
+            if self.turn_first:
+                value['properties'] = {'next': value['properties']['next'], **value['properties']}
+                value['required'] = ['next', 'say', 'act']
         if self.memo_enabled:
             # Empty means keep; null means clear. No mandatory rewriting each round.
             value['properties']['memo'] = {'anyOf': [{'type': 'string', 'maxLength': 160}, {'type': 'null'}]}
@@ -57,7 +66,7 @@ class Continuation:
             raise RuntimeError('delivery_pending')
         jsonschema.validate(value, schema)
         kind = value['act']['kind']
-        if value.get('next') == 'continue' and kind in ('clarify', 'blocked', 'accepted'):
+        if not self.terminal_wait and value.get('next') == 'continue' and kind in ('clarify', 'blocked', 'accepted'):
             raise ValueError('terminal_requires_wait')
         if value.get('next') == 'continue' and kind == 'none' and not value['say'] and not value.get('memo'):
             raise ValueError('empty_continuation')
@@ -91,7 +100,8 @@ class Continuation:
         if call is not None:
             # Result review is mandatory regardless of the model's next field.
             return True
-        self.waiting = value.get('next', 'wait') != 'continue'
+        self.waiting = (value['act']['kind'] in ('clarify', 'blocked', 'accepted')
+                        or value.get('next', 'wait') != 'continue')
         if not self.waiting:
             # Preserve operation identities/evidence across spoken continuations.
             self.chain.outcome = None
