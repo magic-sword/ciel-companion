@@ -38,12 +38,12 @@ class Continuation:
         self.waiting = False
         return self.generation
 
-    def schema(self, catalog, visible):
+    def schema(self, catalog, visible, refused=()):
         if self.waiting or self.pending:
             raise RuntimeError('continuation_not_ready')
         if self.steps >= self.max_steps:
             raise TimeoutError('continuation_budget_exhausted')
-        value = self.chain.schema(catalog, visible)
+        value = self.chain.schema(catalog, visible, refused)
         if self.speech_chars is not None:
             value['properties']['say']['maxItems'] = 1
             value['properties']['say']['items']['properties']['text']['maxLength'] = self.speech_chars
@@ -59,7 +59,7 @@ class Continuation:
             value['required'].append('memo')
         return value
 
-    def accept(self, token, value, schema, catalog, visible):
+    def accept(self, token, value, schema, catalog, visible, refused=()):
         if token != self.generation or self.waiting:
             raise RuntimeError('stale_decision')
         if self.pending:
@@ -76,7 +76,7 @@ class Continuation:
             if key in base['required']:
                 base['required'].remove(key)
         try:
-            text, call = self.chain.resolve({k: value[k] for k in ('say', 'act')}, base, catalog, visible)
+            text, call = self.chain.resolve({k: value[k] for k in ('say', 'act')}, base, catalog, visible, refused)
         except Exception:
             self.interrupt()
             raise

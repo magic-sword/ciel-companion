@@ -149,16 +149,18 @@ class ToolDecision:
 
 
 class ConversationDecision:
-    """One bounded decision chain per SpeechHandle, using LiveKit's actual tool results."""
-    def __init__(self, observe=lambda **state: None):
+    """A bounded say/act stream; LiveKit owns audio delivery and interruption."""
+    def __init__(self, observe=lambda **state: None, observe_initiative=lambda **state: None):
         self.observe = observe
+        self.observe_initiative = observe_initiative
         self.speech_id = None
-        self.loop = None
+        self.loop = self.flow = None
 
     def cancel(self):
-        if self.loop is not None and self.loop.outcome is None and not self.loop.cancelled:
-            self.loop.cancelled = True
+        if self.flow is not None and not self.loop.cancelled:
+            self.flow.interrupt()
             self.show("cancelled")
+            self.observe_initiative(phase="waiting", reason="conversation", outcome="cancelled")
 
     def show(self, phase):
         self.observe(phase=phase, step=self.loop.steps if self.loop else 0,
@@ -179,56 +181,85 @@ class ConversationDecision:
                 self.show("reviewing")
 
     async def node(self, owner, ctx, functions, settings, *, source=None):
+        from continuation import Continuation
+        import os
         speech = owner.session.current_speech
         if self.loop is None or self.speech_id != speech.id:
             self.cancel()
-            self.speech_id, self.loop = speech.id, ToolDecision()
-        loop = self.loop
+            enabled = os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(owner.style, 'talk', 'normal') != 'quiet'
+            self.flow = Continuation(enabled=enabled, speech_chars=120 if enabled else None)
+            self.flow.wake()
+            self.speech_id, self.loop = speech.id, self.flow.chain
+        flow, loop = self.flow, self.loop
         if loop.cancelled or getattr(speech, 'interrupted', False):
             return
+        token = flow.generation
+        # The SDK re-enters after actual function feedback; never synthesize success.
+        if flow.pending is not None:
+            flow.finish(token)
         visible = {fn.id: fn for fn in functions}
         source = source if source is not None else ctx
-        self.show('deciding')
-        refused = owner.mind.refused_now(source)
-        try:
-            schema = loop.schema(owner.capabilities, visible, refused)
-        except Exception:
-            if self.loop is loop:
-                self.show("failed")
-            raise
-        instruction = owner.persona.tool_decide_instructions.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
         local = models.is_local('mind')
         messages = ctx.to_provider_format('openai')[0]
-        messages.append({'role': 'user' if local else 'system', 'content': ('SYSTEM: ' if local else '') + instruction})
-        options = models.options('mind', model=models.model('mind'), messages=messages,
-            tools=to_fnc_ctx(llm.ToolContext(functions), strict=True), tool_choice='none',
-            response_format={'type': 'json_schema', 'json_schema': {'name': 'tool_decision', 'schema': schema,
-                **({} if local else {'strict': False})}},
-            max_completion_tokens=600, timeout=90,
-            **({'temperature': 0, 'seed': 1729} if local else {'reasoning_effort': REASONING}))
+        template = owner.persona.tool_decide_instructions
+        if flow.enabled:
+            template += '\n\n' + owner.persona.continuation_experiment + '\n\n' + owner.persona.continuation_chunk_experiment
+        first = True
         try:
-            async with models.create_client('mind', traced=True) as client:
-                response = await client.chat.completions.create(**options)
-            models.record('mind', models.model('mind'), response.usage)
-            if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
-                return
-            decision = json.loads(response.choices[0].message.content or '')
-            text, call = loop.resolve(decision, schema, owner.capabilities, visible, owner.mind.refused_now(source))
-            self.show(('loading' if decision['act']['kind'] == 'load' else 'calling') if call else 'finished')
-            debug_log.record('conversation_decision', speech_id=speech.id, step=loop.steps,
-                             outcome=decision['act']['kind'], notification_owned=loop.notification_owned)
-            # A service that owns its notice still receives feedback, but its
-            # queued announcement remains the only spoken acknowledgement.
-            if call is None and loop.notification_owned and loop.outcome in ('complete', 'accepted'):
-                text = ''
-            yield llm.ChatChunk(id=uuid.uuid4().hex, delta=llm.ChoiceDelta(role='assistant',
-                content=text or None, tool_calls=[call] if call is not None else []))
+            while not flow.waiting and not loop.cancelled and not getattr(speech, 'interrupted', False):
+                self.show('deciding')
+                self.observe_initiative(phase="deciding", reason="", outcome="")
+                refused = owner.mind.refused_now(source)
+                schema = flow.schema(owner.capabilities, visible, refused)
+                instruction = (template.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
+                               if first else loop.context() + '\n' + loop.menu(schema))
+                first = False
+                messages.append({'role': 'user' if local else 'system', 'content': ('SYSTEM: ' if local else '') + instruction})
+                options = models.options('mind', model=models.model('mind'), messages=messages,
+                    tools=to_fnc_ctx(llm.ToolContext(functions), strict=True), tool_choice='none',
+                    response_format={'type': 'json_schema', 'json_schema': {'name': 'tool_decision', 'schema': schema,
+                        **({} if local else {'strict': False})}},
+                    max_completion_tokens=600, timeout=90,
+                    **({'temperature': 0, 'seed': 1729} if local else {'reasoning_effort': REASONING}))
+                async with models.create_client('mind', traced=True) as client:
+                    response = await client.chat.completions.create(**options)
+                models.record('mind', models.model('mind'), response.usage)
+                if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
+                    return
+                if getattr(response.choices[0], 'finish_reason', None) == 'length':
+                    raise RuntimeError('generation_truncated')
+                raw = response.choices[0].message.content or ''
+                decision = json.loads(raw)
+                text, call = flow.accept(token, decision, schema, owner.capabilities, visible,
+                                         owner.mind.refused_now(source))
+                self.show(('loading' if decision['act']['kind'] == 'load' else 'calling') if call else 'finished')
+                debug_log.record('conversation_decision', speech_id=speech.id, step=loop.steps,
+                                 outcome=decision['act']['kind'], next=decision.get('next', 'wait'),
+                                 notification_owned=loop.notification_owned)
+                if call is None and loop.notification_owned and loop.outcome in ('complete', 'accepted'):
+                    text = ''
+                    # The service owns delivery; do not continue with duplicate narration.
+                    flow.pending['value'] = {**decision, 'next': 'wait'}
+                yield llm.ChatChunk(id=uuid.uuid4().hex, delta=llm.ChoiceDelta(role='assistant',
+                    content=text or None, tool_calls=[call] if call is not None else []))
+                if call is not None:
+                    return
+                # Submitted to the SDK stream, not a claim of completed audio playback.
+                # Common history is recorded by the SDK, including interrupted speech.
+                if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
+                    return
+                messages.append({'role': 'assistant', 'content': raw})
+                flow.finish(token)
+                self.observe_initiative(phase="waiting" if flow.waiting else "scheduled",
+                    reason="new_event" if flow.waiting else "", outcome="spoke" if text else "silent")
         except asyncio.CancelledError:
-            loop.cancelled = True
+            flow.interrupt()
             if self.loop is loop:
                 self.show("cancelled")
             raise
         except Exception:
+            flow.interrupt()
             if self.loop is loop:
                 self.show("failed")
+                self.observe_initiative(phase="waiting", reason="new_event", outcome="error")
             raise

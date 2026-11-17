@@ -122,9 +122,9 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.client.__aenter__ = AsyncMock(return_value=Obj(chat=Obj(completions=Obj(create=self.create))))
         self.client.__aexit__ = AsyncMock(return_value=False)
 
-    def answer(self, act, text=''):
+    def answer(self, act, text='', next='wait'):
         return Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps(dict(
-            say=[dict(feeling='neutral', text=text)] if text else [], act=act))))])
+            say=[dict(feeling='neutral', text=text)] if text else [], act=act, next=next))))])
 
     async def node(self):
         with patch.object(self.agent, '_get_activity_or_raise', return_value=Obj(session=self.session)), \
@@ -169,6 +169,27 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.create.side_effect = interrupted
         self.assertEqual(await self.node(), [])
         self.assertTrue(self.agent.conversation_decision.loop.cancelled)
+
+    async def test_spoken_continuation_streams_without_another_user_turn(self):
+        self.create.side_effect = [self.answer(dict(kind='none'), 'First part.', next='continue'),
+                                  self.answer(dict(kind='none'), 'Last part.')]
+        chunks = await self.node()
+        self.assertEqual(len(chunks), 2)
+        self.assertIn('First part.', chunks[0].delta.content)
+        self.assertIn('Last part.', chunks[1].delta.content)
+        self.assertTrue(self.agent.conversation_decision.flow.waiting)
+        self.assertEqual(self.create.await_count, 2)
+
+    async def test_interruption_after_streamed_chunk_stops_continuation(self):
+        self.create.return_value = self.answer(dict(kind='none'), 'First part.', next='continue')
+        with patch.object(self.agent, '_get_activity_or_raise', return_value=Obj(session=self.session)), \
+                patch('models.is_local', return_value=False), patch('models.create_client', return_value=self.client):
+            stream = self.agent._pipeline_llm(self.chat, self.agent.tools, {})
+            first = await anext(stream)
+            self.assertIn('First part.', first.delta.content)
+            self.agent.conversation_decision.on_user_state(Obj(new_state='speaking'))
+            self.assertEqual([chunk async for chunk in stream], [])
+        self.assertEqual(self.create.await_count, 1)
 
     async def test_service_owned_notice_gets_feedback_without_duplicate_speech(self):
         self.create.return_value = self.answer(dict(kind='load', service_ids=['6']))
