@@ -1,6 +1,8 @@
 # 現在の確認範囲と配布状況
 
-2026-11-18、LiveKitと推論設定の分離変更`f95d67fb04db`の4ファイルを開発・本番の配置先へ配布し、コミットのSHA-256との一致を確認した。開発のローカル接続では稼働設定もOpenAI mind・ローカルLiveKitで一致。本番の通常agentは引き続きクラウドLiveKitであり、今回の本番配布はファイル配置のみで、ローカル接続への切替は未実施。配布証拠は各serverの`data/deployments/livekit-inference-f95d67fb04db-1794928070594730638/`（開発）と`livekit-inference-f95d67fb04db-1794928070595809914/`（本番）。
+2026-11-18、`befa7fc78c93`の8ファイルを開発・本番へ配布し、コミットとの一致を確認。本番agentを宅内LiveKit（192.168.1.15）へ切り替え、`ciel-main`のworker登録・healthを確認した。本番のイメージ・DB設定・記憶スコープ`main`・年齢削除済みプロンプト・OpenAI mind（gpt-5.4-mini、reasoning none）は維持。本番agentとトークン窓口だけを再作成し、LiveKit本体・開発agentを含む他コンテナのIDと起動時刻は不変。発行トークンを検査し、既定が`ciel-main`、開発指定が`ciel-dev`になることを確認。Compose検査16ケース成功。アプリは「家の中の試験用サーバーにつなぐ」ON・「開発用のサーバーにつなぐ」OFFで再接続すると本番へ入る。
+
+接続テストの部屋`deploy-smoke-9c0bda4bb1f3`には本番workerが参加したが、初回あいさつの構造化出力が`say`を2項目返し、制約`maxItems: 1`の検証エラーで停止した。現在のOpenAI経路は`strict: false`で送信している。音声返答までの疎通テストは不合格で、通常会話の安定動作・実マイクの応答遅延は未確認。この発話形式エラーの修正は今回の接続先変更には含めていない。設定退避・配布確認・振り分け結果は本番`server/data/deployments/local-livekit-production-befa7fc78c93-1794928376483195740/`の`verification.json`と`connectivity.json`。
 
 2026-11-18、ローカルLiveKitと推論先を独立して設定できるよう、`agent-local`のenv_file末尾に`.env.livekit-local`を追加した。Compose検査15ケースでローカルLiveKit＋OpenAI mind、ローカルLiveKit＋ローカルmindを含む設定の分離を確認。稼働中の`ciel-dev-agent-local-1`だけを再作成し、LiveKitは192.168.1.15、mindはOpenAIのgpt-5.4-mini・reasoning noneを確認した。他コンテナのID・起動時刻は不変。短文1要求（最大出力16トークン）の実API疎通は成功し、応答モデルgpt-5.4-mini-2026-03-17、入力10・出力4トークン、2.087秒。request IDは`req_d3b1acaf1b4045a8b76d44aeba05bd61`。証拠と設定退避は開発`server/data/deployments/local-livekit-openai-1794927815759067228/`。実音声の応答遅延は未測定。ローカル接続の記憶スコープ・プロンプトは引き続き開発側で、本番と同じ設定一式に変更したものではない。
 
