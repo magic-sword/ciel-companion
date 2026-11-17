@@ -48,7 +48,7 @@ namespace Ciel.Conversation
             return list.ToArray();
         }
 
-        public static CielPlanPresentation From(CielConversation.GoalState g)
+        public static CielPlanPresentation From(CielConversation.GoalState g, bool focusCurrent = false)
         {
             var p = new CielPlanPresentation();
             var plan = g?.task?.plan;
@@ -127,6 +127,31 @@ namespace Ciel.Conversation
             }
             p.nodes.Sort((a, b) => a.column != b.column ? a.column.CompareTo(b.column) : a.row.CompareTo(b.row));
             p.summary = NowLine(plan);
+            if (focusCurrent)
+            {
+                var active = new HashSet<string>();
+                foreach (var n in p.nodes) if (n.current || n.state == "running" || n.state == "waiting_choice") active.Add(n.id);
+                if (active.Count > 0)
+                {
+                    var keep = new HashSet<string>(active);
+                    foreach (var n in p.nodes)
+                    {
+                        if (active.Contains(n.id)) foreach (var need in n.needs) keep.Add(need);
+                        foreach (var need in n.needs) if (active.Contains(need)) keep.Add(n.id);
+                    }
+                    int total = p.nodes.Count;
+                    p.nodes.RemoveAll(n => !keep.Contains(n.id));
+                    var columns = new SortedSet<int>();
+                    foreach (var n in p.nodes) columns.Add(n.column);
+                    var mapping = new Dictionary<int, int>();
+                    foreach (var c in columns) mapping[c] = mapping.Count;
+                    foreach (var n in p.nodes) n.column = mapping[n.column];
+                    p.columns = mapping.Count;
+                    p.note = $"現在の作業周辺 {p.nodes.Count}/{total}節（ほかは非表示）・" + p.note;
+                }
+                p.key += ":focus";
+            }
+            if (p.stale) foreach (var n in p.nodes) n.current = false;
             return p;
         }
 

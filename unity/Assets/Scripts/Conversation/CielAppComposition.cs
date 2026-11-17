@@ -24,6 +24,7 @@ namespace Ciel.Conversation
             var stream = IsBroadcast && CielStreamWindow.Supported ? shell.AddComponent<CielStreamWindow>() : null;
             if (IsBroadcast && CielStreamWindow.Supported) shell.AddComponent<CielAudienceCard>();
             if (IsBroadcast && CielStreamWindow.Supported) shell.AddComponent<CielPlanWindow>();
+            if (IsBroadcast && CielStreamWindow.Supported) shell.AddComponent<CielProcessWindow>();
             var ui = shell.AddComponent<CielConversationUI>();
             ui.Configure(_profile, stream);
             shell.SetActive(true);

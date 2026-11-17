@@ -34,6 +34,7 @@ namespace Ciel.Conversation
         Image _youtubeSwitch, _youtubeKnob;
         InputField _youtubeUrl, _localServerUrl;
         Image _cardOutputSwitch, _cardOutputKnob, _planOutputSwitch, _planOutputKnob;
+        Image _processOutputSwitch, _processOutputKnob, _planFocusSwitch, _planFocusKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -386,7 +387,20 @@ namespace Ciel.Conversation
                 plan.Output.SetOpen(!plan.Output.IsOpen);
                 Refresh();
             });
-            Note(sec, $"「{CielStreamWindow.PlanTitle}」は、シエルが進めている計画の全体（依存のつながり・いまの段・選択）を映します。"
+            (_processOutputSwitch, _processOutputKnob) = SwitchRow(sec, "シエルの会話グラフを開く", () =>
+            {
+                var process = GetComponent<CielProcessWindow>();
+                if (process?.Output == null) return;
+                process.Output.SetOpen(!process.Output.IsOpen);
+                Refresh();
+            });
+            (_planFocusSwitch, _planFocusKnob) = SwitchRow(sec, "計画を現在の作業周辺に絞る", () =>
+            {
+                CielPlanWindow.FocusCurrent = !CielPlanWindow.FocusCurrent;
+                Refresh();
+            });
+            Note(sec, $"「{CielProcessWindow.Title}」は会話の判断・機能ロード・操作・結果確認と、自発判断の状態を映します。");
+            Note(sec, $"「{CielStreamWindow.PlanTitle}」は、シエルが進めている計画（依存のつながり・いまの段・選択）を映します。"
                 + "表示だけで、計画の変更は言葉で頼みます");
             Note(sec, $"「{CielStreamWindow.CardTitle}」をOBSのウィンドウキャプチャで取り込みます。"
                 + "クロマキーで緑を抜くと、目的も作業もない間はカードが消えます。映像とは別に位置と大きさを調整できます");
@@ -639,6 +653,10 @@ namespace Ciel.Conversation
             var plan = GetComponent<CielPlanWindow>();
             if (_planOutputSwitch != null && plan?.Output != null)
                 ShowSwitch(_planOutputSwitch, _planOutputKnob, plan.Output.IsOpen);
+            var process = GetComponent<CielProcessWindow>();
+            if (_processOutputSwitch != null && process?.Output != null)
+                ShowSwitch(_processOutputSwitch, _processOutputKnob, process.Output.IsOpen);
+            if (_planFocusSwitch != null) ShowSwitch(_planFocusSwitch, _planFocusKnob, CielPlanWindow.FocusCurrent);
         }
     }
 }

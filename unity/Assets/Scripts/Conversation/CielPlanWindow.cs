@@ -9,6 +9,8 @@ namespace Ciel.Conversation
     public sealed class CielPlanWindow : MonoBehaviour
     {
         public const int Layer = 28;
+        public static bool FocusCurrent { get => PlayerPrefs.GetInt("ciel.planGraph.focus", 1) == 1;
+            set { PlayerPrefs.SetInt("ciel.planGraph.focus", value ? 1 : 0); PlayerPrefs.Save(); } }
         public CielStreamWindow Output { get; private set; }
         CielConversation _conversation;
         Canvas _canvas;
@@ -24,7 +26,7 @@ namespace Ciel.Conversation
         const float ColumnWidth = 440, ColumnGap = 70, BoxGap = 18, LineHeight = 34;
         // The board in the canvas' reference units (1280 x 720 less the title and margins), so the
         // fit does not depend on when Unity lays the canvas out.
-        static readonly Vector2 BoardSize = new Vector2(1280 - 64, 720 - 140);
+        static readonly Vector2 BoardSize = new Vector2(960, 710);
 
         static Color StateColor(string state) => state switch {
             "running" => new Color(0.5f, 0.91f, 1),
@@ -50,7 +52,7 @@ namespace Ciel.Conversation
             var output = new GameObject("Plan Graph Output", typeof(CielStreamWindow));
             output.transform.SetParent(source.transform, false);
             Output = output.GetComponent<CielStreamWindow>();
-            Output.ConfigureCard(camera, CielStreamWindow.PlanTitle, "CielPlanGraphWindow", "ciel.planGraph", new Vector2Int(1280, 720));
+            Output.ConfigureCard(camera, CielStreamWindow.PlanTitle, "CielPlanGraphWindow", "ciel.planGraph", new Vector2Int(1552, 873));
             Build(camera);
         }
 
@@ -64,16 +66,16 @@ namespace Ciel.Conversation
             _canvas.planeDistance = 1;
             var scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
+            scaler.referenceResolution = new Vector2(1552, 873);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
             _font = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP" }, 64);
             var root = (RectTransform)go.transform;
             var bg = Box("Back", root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             bg.gameObject.AddComponent<Image>().color = Back;
-            _title = Label("Title", root, 34, Ink, new Vector2(0, 1), Vector2.one, new Vector2(32, -70), new Vector2(-32, -20));
+            _title = Label("Title", root, 34, Ink, new Vector2(0, 1), Vector2.one, new Vector2(40, -70), new Vector2(-552, -20));
             _title.fontStyle = FontStyle.Bold;
-            _note = Label("Note", root, 20, Dim, new Vector2(0, 1), Vector2.one, new Vector2(32, -104), new Vector2(-32, -72));
-            _board = Box("Board", root, Vector2.zero, Vector2.one, new Vector2(32, 24), new Vector2(-32, -116));
+            _note = Label("Note", root, 20, Dim, new Vector2(0, 1), Vector2.one, new Vector2(40, -134), new Vector2(-552, -72));
+            _board = Box("Board", root, Vector2.zero, Vector2.one, new Vector2(40, 23), new Vector2(-552, -140));
             _edges = Box("Edges", _board, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _empty = Label("Empty", _board, 26, Dim, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _empty.alignment = TextAnchor.MiddleCenter;
@@ -201,7 +203,7 @@ namespace Ciel.Conversation
         {
             if (_conversation == null) return;
             var connected = _conversation.Status == CielConversation.State.Connected;
-            var p = connected ? CielPlanPresentation.From(_conversation.Goal) : new CielPlanPresentation();
+            var p = connected ? CielPlanPresentation.From(_conversation.Goal, FocusCurrent) : new CielPlanPresentation();
             // 描き直すのは計画の版か新しさが変わったときだけ
             var key = p.visible ? p.key : "none";
             if (key != _shown)

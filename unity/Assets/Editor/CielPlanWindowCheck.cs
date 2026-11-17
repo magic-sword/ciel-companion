@@ -49,6 +49,11 @@ namespace Ciel.EditorTools
             var card = CielAudienceCardState.From(goal, null, true, false);
             Check(card.current.StartsWith("選択待ち：white_wool ×3"), "status card shows the plan's step");
             Render(view, "plan-graph-house");
+            var focused = CielPlanPresentation.From(goal, true);
+            Check(focused.nodes.Count == 2, "focus keeps current work and direct dependent");
+            Check(focused.nodes.Exists(n => n.id == "white_bed") && focused.nodes.Exists(n => n.id == "house"), "focus membership");
+            Check(goal.task.plan.nodes.Length == 9 && CielPlanPresentation.From(goal).nodes.Count == 7, "focus never mutates source plan");
+            Render(focused, "plan-graph-focus");
             Debug.Log("CIEL_PLAN_WINDOW_CHECK_OK " + _checks);
         }
 
