@@ -1,24 +1,17 @@
-"""Responses API の Web 検索。検索の成否・引用を検証してから調査記録にする。"""
+"""許可済み検索APIの結果を調査記録と会話へ渡す。"""
 import asyncio
 import logging
-import os
-
-import openai
-
-import models
 from research import packets
-from research_service import ResearchService, parse_response
+from research_service import ResearchService
 
 log = logging.getLogger('ciel-agent.web-research')
 
 
 class WebResearcher:
-    def __init__(self, history, instructions: str, publish=None, client=None):
+    def __init__(self, history, instructions: str, publish=None):
         self.history, self.instructions, self.publish = history, instructions, publish
-        self.model = os.environ.get('CIEL_RESEARCH_MODEL', 'gpt-5.4-mini')
         self.timeout = 45.0
         self.publish_timeout = 3.0
-        self._client = client
         self._lock = asyncio.Lock()
 
     async def notify(self, record):
@@ -31,8 +24,6 @@ class WebResearcher:
                 log.warning('調査結果を画面に送れない：%s', type(exc).__name__)
 
     async def search(self, question: str, call_id: str, speech):
-        if models.LOCAL_TEST:
-            return {'status': 'unavailable', 'reason': 'local_backend'}
         question = question.strip()
         if not question or len(question) > 600:
             return {'status': 'invalid_question'}
@@ -44,9 +35,7 @@ class WebResearcher:
             log.info('Web調査開始：id=%d', record.id)
             try:
                 await self.notify(record)
-                if self._client is None:
-                    self._client = openai.AsyncOpenAI(timeout=self.timeout, max_retries=0)
-                result = await ResearchService(self._client, self.instructions, self.model, self.timeout).search(
+                result = await ResearchService(self.timeout).search(
                     question, record.payload()['requested_at'])
                 record.summary, record.sources, record.clipped = result['summary'], result['sources'], result['clipped']
                 record.status = 'completed'
@@ -73,5 +62,4 @@ class WebResearcher:
             record, self.history, done.chat_items[after:]))
 
     async def close(self):
-        if self._client is not None:
-            await self._client.close()
+        pass  # The search task owns and closes its HTTP client, including cancellation.

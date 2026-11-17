@@ -296,7 +296,7 @@ class Ciel(Agent):
             state = self.session.userdata
             self.capabilities.disabled = {name for name, ready in (
                 ('memory', state.book is not None), ('karaoke', state.song is not None),
-                ('research', state.researcher is not None and not models.LOCAL_TEST),
+                ('research', state.researcher is not None),
                 ('minutes', state.minutes is not None),
                 ('conversation', state.history is not None)) if not ready}
             fns = self.capabilities.select(fns)

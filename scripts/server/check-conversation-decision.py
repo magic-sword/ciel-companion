@@ -18,20 +18,28 @@ spec.loader.exec_module(b)
 from livekit.agents.voice.events import FunctionToolsExecutedEvent
 
 
-async def run(output):
+async def run(output, research=False):
     if output.exists():
         raise ValueError('Output must be new')
     cases = [('search', '会話履歴から「オーロラ」を検索して。', True),
              ('quotation', '「会話履歴を検索して」を英語に訳して。操作はしないで。', False),
              ('chat', '今日は紅茶で休憩しようかな。', False)]
     results = []
+    if research:
+        cases = [('research', 'WikipediaでPythonを検索して、概要を短く教えて。', True),
+                 ('quotation', '「WikipediaでPythonを検索して」を英語に訳して。検索操作はしないで。', False)]
     for name, text, required in cases:
         agent, history = b.Ciel(), b.Conversation()
         agent.mind = b.Mind(history)
         agent.style = b.Obj(talk='chatty', presence='close')
         history.complete(history.reserve(), '次の企画名はオーロラです。', label='持ち主', sure=True)
         speech = b.Obj(id=name, num_steps=1, interrupted=False)
+        speech.chat_items = []
+        speech.add_done_callback = lambda callback: None
         session = b.Obj(userdata=b.State(history=history), current_speech=speech, _global_run_state=None)
+        if research:
+            from web_research import WebResearcher
+            session.userdata.researcher = WebResearcher(history, '')
         chat = b.llm.ChatContext()
         chat.add_message(role='system', content=agent.instructions)
         chat.add_message(role='user', content=text)
@@ -51,8 +59,11 @@ async def run(output):
                         break
                     for call in calls:
                         target = agent.capabilities.target(call)
-                        if target not in ('load_capabilities', 'search_conversation'):
+                        allowed = ('load_capabilities', 'research_web') if research else ('load_capabilities', 'search_conversation')
+                        if target not in allowed:
                             raise ValueError('operation_outside_fixture:' + target)
+                        if target == 'research_web' and target in row['calls']:
+                            raise ValueError('single_search_budget_exceeded')
                         row['calls'].append(target)
                         fn = next(f for f in agent.capabilities.select(agent.tools) if f.id == call.name)
                         call = b.llm.FunctionCall(call_id=call.call_id, name=call.name, arguments=call.arguments)
@@ -77,6 +88,9 @@ async def run(output):
         loop = getattr(getattr(agent, 'conversation_decision', None), 'loop', None)
         row['outcome'] = loop.outcome if loop else None
         found = any(o['tool'] == 'search_conversation' and any(m.get('id') == 1 for m in json.loads(o['result']).get('matches', [])) for o in row['outputs'])
+        if research:
+            found = any(o['tool'] == 'research_web' and json.loads(o['result']).get('status') == 'completed'
+                        and len(json.loads(o['result']).get('sources', [])) > 1 for o in row['outputs'])
         row['passed'] = not row['errors'] and (found if required else not row['calls']) and any(row['replies'])
         results.append(row)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -89,4 +103,6 @@ async def run(output):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    asyncio.run(run(parser.parse_args().output))
+    parser.add_argument('--research', action='store_true', help='One live Wikipedia search plus a no-search quotation case')
+    args = parser.parse_args()
+    asyncio.run(run(args.output, args.research))

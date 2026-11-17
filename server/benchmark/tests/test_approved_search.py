@@ -9,7 +9,7 @@ from unittest.mock import patch
 import httpx
 
 ROOT = Path(__file__).resolve().parents[3]
-spec = importlib.util.spec_from_file_location('approved_search', ROOT / 'scripts/server/search-approved.py')
+spec = importlib.util.spec_from_file_location('approved_search', ROOT / 'server/agent/approved_search.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
@@ -71,7 +71,7 @@ class ApprovedSearchTests(unittest.TestCase):
             self.assertEqual(result['results'], [])
 
     def test_contact_required_before_network(self):
-        with patch.object(module, 'source_policy', return_value={}), patch.object(module.httpx, 'Client') as client:
+        with patch.object(module, 'source_policy', return_value={}), patch.object(module.httpx, 'AsyncClient') as client:
             with self.assertRaisesRegex(ValueError, 'operator_contact_required'):
                 module.search('wikipedia-ja', 'Python', 1, None)
             client.assert_not_called()

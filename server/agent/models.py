@@ -33,7 +33,6 @@ ROLES = {
     'notes': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),                # メモ（notes.py）
     'relationship': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),         # 関係（relationship.py。メモと同じモデル）
     'growth': ('CIEL_NOTES_MODEL', 'gpt-5.4-mini'),               # 出来事から育つ好み（growth.py。メモと同じモデル）
-    'research': ('CIEL_RESEARCH_MODEL', 'gpt-5.4-mini'),          # 調べもの（web_research.py）
     'eyes': ('CIEL_EYES_MODEL', 'gpt-5.4-mini'),                  # 見せてもらった画像の説明文（eyes.py）
 }
 
@@ -57,7 +56,7 @@ OPENAI_ROLES = {r.strip() for r in os.environ.get('CIEL_OPENAI_ROLES', '').split
 LOCAL_MODEL = os.environ.get('CIEL_LOCAL_LLM_MODEL', 'local')             # llama-server の --alias
 LOCAL_TIMEOUT = float(os.environ.get('CIEL_LOCAL_TIMEOUT', '90'))           # 1 回の上限（秒）。歌を聴くあいだは CPU の形で遅い
 _local_client = None
-CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt', 'research'}
+CHAT_ROLES = frozenset(ROLES) - {'talk', 'stt'}
 if OPENAI_ROLES - CHAT_ROLES:
     raise ValueError('CIEL_OPENAI_ROLES contains unsupported roles: ' + ', '.join(sorted(OPENAI_ROLES - CHAT_ROLES)))
 BACKGROUND_ROLES = {'brief', 'notes', 'relationship', 'growth', 'minutes', 'minutes_live'}

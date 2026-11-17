@@ -2,18 +2,17 @@ import asyncio
 import json
 from types import SimpleNamespace as Obj
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from conversation import Conversation
 from research import ResearchBook, packets, web_url
-from web_research import WebResearcher, parse_response
+from web_research import WebResearcher
 from tools.research import research_web, read_research
 
 
-def response(text='休館です(ref)。条件は祝日です。', url='https://example.org/news'):
-    citation = Obj(type='url_citation', url=url, title='公式のお知らせ', start_index=4, end_index=9)
-    return Obj(status='completed', output=[Obj(type='web_search_call', status='completed'),
-        Obj(type='message', content=[Obj(type='output_text', text=text, annotations=[citation])])])
+def response():
+    return dict(status='ok', results=[dict(title='Python', url='https://ja.wikipedia.org/?curid=123',
+        snippet='A programming language.')], policy={'license_url': 'https://creativecommons.org/licenses/by-sa/4.0/'})
 
 
 class FakeSpeech:
@@ -30,12 +29,18 @@ class FakeSpeech:
 
 class ResearchTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        cooldown = patch('research_service._retry_until', 0.0)
+        cooldown.start()
+        self.addCleanup(cooldown.stop)
         self.history = Conversation()
         self.user = self.history.reserve()
         self.history.complete(self.user, '明日の休館日を確認して')
-        self.client = Obj(responses=Obj(create=AsyncMock(return_value=response())), close=AsyncMock())
+        self.client = Obj(responses=Obj(create=AsyncMock(return_value=response())))
+        self.collector = patch('research_service.async_search', self.client.responses.create)
+        self.collector.start()
+        self.addCleanup(self.collector.stop)
         self.publish = AsyncMock()
-        self.worker = WebResearcher(self.history, 'test instructions', self.publish, self.client)
+        self.worker = WebResearcher(self.history, 'test instructions', self.publish)
         self.speech = FakeSpeech()
 
     async def test_search_is_required_and_only_question_is_sent(self):
@@ -43,14 +48,12 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['status'], 'completed')
         self.assertEqual(result['request_turn_id'], self.user.id)
         self.assertIsNotNone(result['checked_at'])
-        args = self.client.responses.create.call_args.kwargs
-        self.assertEqual(args['tool_choice'], 'required')
-        self.assertFalse(args['store'])
-        self.assertEqual(args['tools'], [{'type': 'web_search', 'external_web_access': True}])
-        self.assertEqual(json.loads(args['input'])['question'], '東京の施設の明日の休館日')
-        self.assertNotIn(self.user.text, args['input'])
+        args = self.client.responses.create.call_args.args
+        self.assertEqual(args[0], 'wikipedia-ja')
+        self.assertEqual(args[2], 3)
+        self.assertNotIn(self.user.text, args)
         self.assertEqual(len(self.history.turns), 1)
-        self.assertEqual(result['sources'][0]['url'], 'https://example.org/news')
+        self.assertEqual(result['sources'][0]['url'], 'https://ja.wikipedia.org/?curid=123')
 
     async def test_links_only_messages_from_the_original_reply(self):
         await self.worker.search('休館日', 'call1', self.speech)
@@ -81,8 +84,29 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('private', json.dumps(result))
         self.assertEqual(self.publish.call_args.args[0]['type'], 'research.complete')
 
+    async def test_local_backend_can_search_and_license_is_visible(self):
+        with patch('models.LOCAL_TEST', True):
+            result = await self.worker.search('Python', 'local', self.speech)
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['sources'][-1]['title'], 'CC BY-SA 4.0')
+        self.assertIn('Wikipedia contributors', result['sources'][0]['title'])
+
+    async def test_empty_search_and_rate_limit_are_distinct(self):
+        self.client.responses.create.return_value = dict(status='no_results', results=[], policy={})
+        empty = await self.worker.search('unknown', 'empty', self.speech)
+        self.assertEqual(empty['status'], 'completed')
+        self.assertEqual(empty['sources'], [])
+        self.client.responses.create.return_value = dict(status='rate_limited', results=[])
+        limited = await self.worker.search('Python', 'limited', self.speech)
+        self.assertEqual(limited['status'], 'failed')
+        self.assertEqual(limited['summary'], '')
+        self.client.responses.create.reset_mock()
+        again = await self.worker.search('Python', 'retry', self.speech)
+        self.assertEqual(again['status'], 'failed')
+        self.client.responses.create.assert_not_awaited()
+
     async def test_timeout_releases_lock(self):
-        async def slow(**kwargs):
+        async def slow(*args, **kwargs):
             await asyncio.sleep(1)
         self.client.responses.create.side_effect = slow
         self.worker.timeout = .001
@@ -92,7 +116,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancellation_is_recorded_and_not_linked_to_next_reply(self):
         started = asyncio.Event()
-        async def slow(**kwargs):
+        async def slow(*args, **kwargs):
             started.set()
             await asyncio.sleep(10)
         self.client.responses.create.side_effect = slow
@@ -158,19 +182,6 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ParsingTests(unittest.TestCase):
-    def test_requires_completed_search_and_real_citations(self):
-        for result in (Obj(status='incomplete', output=[]), Obj(status='completed', output=[]), response(url='javascript:alert(1)')):
-            with self.subTest(result=result), self.assertRaises(ValueError):
-                parse_response(result)
-
-    def test_citations_have_stable_numbers_and_text_is_bounded(self):
-        result = response('abcd(ref)' + '本文' * 3000)
-        summary, sources, clipped = parse_response(result)
-        self.assertTrue(summary.startswith('abcd[1]'))
-        self.assertEqual(len(summary), 5000)
-        self.assertTrue(clipped)
-        self.assertEqual(sources[0]['number'], 1)
-
     def test_urls_reject_non_web_schemes_credentials_and_control_chars(self):
         for value in ('file:///C:/secret', 'javascript:alert(1)', 'https://user:pass@example.org', 'https://example.org\n', 'https://[bad'):
             self.assertFalse(web_url(value))

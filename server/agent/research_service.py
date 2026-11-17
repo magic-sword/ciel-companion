@@ -1,61 +1,60 @@
-"""Web research provider: no conversation history, speech handles or UI."""
-import json
+"""Reviewed API search through MCP; no model requests or result-page crawling."""
+import os
 import time
+import asyncio
+from email.utils import parsedate_to_datetime
 
-import models
-from research import web_url
+from approved_search import async_search
 from service_mcp import call_service
 
+_search_lock = asyncio.Lock()
+_retry_until = 0.0
 
-def parse_response(response) -> tuple[str, list[dict], bool]:
-    # モデルの知識だけで答えた結果や、途中で打ち切られた結果を検索済みとしない。
-    if response.status != 'completed' or not any(
-            item.type == 'web_search_call' and item.status == 'completed' for item in response.output):
-        raise ValueError('search_not_completed')
-    sources, chunks, clipped = [], [], False
-    for item in response.output:
-        if item.type != 'message':
-            continue
-        for content in item.content:
-            if content.type != 'output_text':
-                continue
-            text = content.text
-            replacements = []
-            for citation in content.annotations:
-                if citation.type != 'url_citation' or not web_url(citation.url):
-                    continue
-                source = next((s for s in sources if s['url'] == citation.url), None)
-                if source is None:
-                    if len(sources) >= 8:
-                        clipped = True
-                        continue
-                    source = {'number': len(sources) + 1, 'title': citation.title[:200], 'url': citation.url}
-                    sources.append(source)
-                if 0 <= citation.start_index <= citation.end_index <= len(text):
-                    replacements.append((citation.start_index, citation.end_index, f"[{source['number']}]"))
-            for start, end, marker in sorted(replacements, reverse=True):
-                text = text[:start] + marker + text[end:]
-            chunks.append(text)
-    summary = '\n\n'.join(chunks).strip()
-    if not summary or not sources:
-        raise ValueError('no_cited_result')
-    return summary[:5000], sources, clipped or len(summary) > 5000
+
+async def collect(question):
+    global _retry_until
+    async with _search_lock:
+        if time.monotonic() < _retry_until:
+            raise ValueError('search_cooldown')
+        result = await async_search('wikipedia-ja', question, 3, os.environ.get('CIEL_SEARCH_CONTACT'))
+        if result['status'] in ('rate_limited', 'api_error', 'http_error'):
+            delay = 60.0
+            value = result.get('retry_after')
+            try:
+                delay = max(delay, float(value))
+            except (ValueError, TypeError):
+                if value:
+                    try:
+                        delay = max(delay, parsedate_to_datetime(value).timestamp() - time.time())
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+            _retry_until = time.monotonic() + delay
+        return result
 
 
 class ResearchService:
-    def __init__(self, client, instructions, model, timeout):
-        self.client, self.instructions, self.model, self.timeout = client, instructions, model, timeout
+    def __init__(self, timeout=45):
+        self.timeout = timeout
 
     async def search(self, question, requested_at):
         async def execute(arguments):
-            response = await self.client.responses.create(
-                model=self.model, store=False, instructions=self.instructions,
-                input=json.dumps(arguments, ensure_ascii=False),
-                tools=[{'type': 'web_search', 'external_web_access': True}],
-                tool_choice='required', reasoning={'effort': 'low'}, max_output_tokens=2200)
-            models.record('research', self.model, getattr(response, 'usage', None))
-            summary, sources, clipped = parse_response(response)
-            return {'summary': summary, 'sources': sources, 'clipped': clipped, 'checked_at': time.time()}
+            result = await collect(arguments['question'])
+            if result['status'] not in ('ok', 'no_results'):
+                raise ValueError('approved_search_failed:' + result['status'])
+            sources, chunks = [], ['日本語Wikipediaの検索概要。記事本文は未取得。']
+            for row in result['results']:
+                number = len(sources) + 1
+                sources.append(dict(number=number, title=row['title'] + ' — Wikipedia contributors', url=row['url']))
+                chunks.append(f"[{number}] {row['title']}: {row['snippet']}")
+            if sources:
+                number = len(sources) + 1
+                sources.append(dict(number=number, title='CC BY-SA 4.0', url=result['policy']['license_url']))
+                chunks.append(f'出典: Wikipedia contributors / CC BY-SA 4.0 [{number}]。概要はHTML除去・長さ制限済み。')
+            else:
+                chunks.append('該当する検索結果はありません。')
+            summary = '\n\n'.join(chunks)
+            return dict(summary=summary, sources=sources, clipped=False, checked_at=time.time())
+
         schema = {'type': 'object', 'properties': {
             'question': {'type': 'string', 'minLength': 1, 'maxLength': 600},
             'requested_at': {'type': 'string', 'maxLength': 64}},

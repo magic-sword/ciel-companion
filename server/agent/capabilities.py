@@ -29,7 +29,7 @@ class CapabilityCatalog:
             ('1', 'game', 'ゲーム内の体を操作し、目的の作業を依頼する', ('goals',)),
             ('2', 'karaoke', '歌を聴き始める・終える・評価する', ('singing',)),
             ('3', 'memory', '本人確認、同意、本人の思い出の参照・保存・削除', ('people', 'memory')),
-            ('4', 'research', 'Webで調査し、出典付きの結果を読む', ('research',)),
+            ('4', 'research', '日本語Wikipediaを検索し、出典付きの概要を読む', ('research',)),
             ('5', 'minutes', '会議の議事録を作成し、状態や内容を確認する', ('minutes',)),
             ('6', 'conversation', '現在の会話の履歴を探す', ('conversation',)),
             ('7', 'app', '接続しているアプリの表示・動きを操作する', ()),
