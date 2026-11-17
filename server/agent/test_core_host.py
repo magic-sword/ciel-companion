@@ -20,6 +20,10 @@ class HostTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('wooden_pickaxe', result)
         options = create.call_args.kwargs
         self.assertEqual(options['response_format'], {'type':'json_object'})
+        self.assertEqual(options['max_completion_tokens'], 256)
+        self.assertNotIn('max_tokens', options)
+        self.assertNotIn('temperature', options)
+        self.assertEqual(options['reasoning_effort'], 'none')
         self.assertEqual(options['messages'][-1]['content'], 'craft a wooden pickaxe')
         await host.close()
 

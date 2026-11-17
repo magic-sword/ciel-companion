@@ -1,5 +1,6 @@
 """Bind the shared CIEL persona, permitted memory and conversation to external clients."""
 from aiohttp import web
+import os
 import time
 import uuid
 import debug_log
@@ -45,7 +46,10 @@ class CoreHost:
         self.record('core_request', role=purpose, id=ident, model=models.model('mind'),
                          input_chars=sum(len(m['content']) for m in context), queued_seconds=queued_seconds)
         try:
-            options = models.options('mind', model=models.model('mind'), messages=context, max_tokens=max_tokens, temperature=0)
+            options = models.options('mind', model=models.model('mind'), messages=context,
+                max_completion_tokens=max_tokens,
+                **({'temperature': 0} if models.is_local('mind') else {
+                    'reasoning_effort': os.environ.get('CIEL_MIND_REASONING', 'none')}))
             if response_format == 'json':
                 options['response_format'] = {'type':'json_object'}
             response = await self.client.chat.completions.create(**options)

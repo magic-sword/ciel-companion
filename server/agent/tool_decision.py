@@ -8,6 +8,7 @@ import uuid
 import jsonschema
 from livekit.agents import llm
 from livekit.agents.llm._provider_format.openai import to_fnc_ctx
+from livekit.agents.voice.agent_activity import _SpeechHandleContextVar
 from game_decision import REASONING, SAY, spoken
 import models
 import debug_log
@@ -198,7 +199,12 @@ class ConversationDecision:
     async def node(self, owner, ctx, functions, settings, *, source=None):
         from continuation import Continuation
         import os
-        speech = owner.session.current_speech
+        # Preemptive generation starts before the session assigns current_speech.
+        # The SDK task context identifies the generating turn, including when a
+        # previous turn is still being played out.
+        speech = _SpeechHandleContextVar.get(None) or owner.session.current_speech
+        if speech is None:
+            return
         if self.loop is None or self.speech_id != speech.id:
             self.cancel()
             enabled = os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(owner.style, 'talk', 'normal') != 'quiet'

@@ -178,6 +178,23 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         await self.test_normal_pipeline_loads_executes_real_mcp_and_answers_from_result()
         self.assertNotIn('strict', self.create.await_args.kwargs['response_format']['json_schema'])
 
+    async def test_preemptive_generation_uses_its_task_speech_before_playout(self):
+        from livekit.agents.voice.agent_activity import _SpeechHandleContextVar
+        self.session.current_speech = None
+        self.create.return_value = self.answer(dict(kind='none'), 'Ready')
+        token = _SpeechHandleContextVar.set(self.speech)
+        try:
+            chunks = await self.node()
+            self.assertIn('Ready', chunks[0].delta.content)
+            self.assertEqual(self.agent.conversation_decision.speech_id, self.speech.id)
+        finally:
+            _SpeechHandleContextVar.reset(token)
+
+    async def test_generation_without_a_speech_handle_does_not_call_model(self):
+        self.session.current_speech = None
+        self.assertEqual(await self.node(), [])
+        self.create.assert_not_awaited()
+
     async def test_spoken_continuation_streams_without_another_user_turn(self):
         states = []
         self.agent.conversation_decision = ConversationDecision(observe_continuation=lambda **s: states.append(s))

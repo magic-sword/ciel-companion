@@ -294,6 +294,8 @@ Mindcraftの`!getCraftingPlan`は、3×3のレシピが必要で作業台を持�
 
 ## 起動・調査・測定
 
+ゲーム用中核APIの推論も会話と同じ`mind`の接続先を使用する。OpenAIへは`max_completion_tokens`と設定済みのreasoning effortを送り、ローカルへは温度0を送る。旧`max_tokens`はgpt-5.4-miniで400エラーになるため使用しない。接続だけの確認には`scripts/server/smoke-game-link.py`を使う。利用者の会話が操作権を解放した状態で、一時会話から接続・推論バインド・ゲーム内参加を確認し、採掘や移動は指示しない。配布状況と結果は[確認状況](../../testing/verification-status-ja.md)へ記録する。
+
 サービス定義は`server/compose.yaml`等、固定するMinecraft・Node・SDK版はComposeとpackage-lockが正本。秘密・モデル・ワールドはGitへ入れない。EULA同意と既存の接続設定を維持する。
 
 普段のワールドは`scripts/server/reset-minecraft-world.sh`で作り直す。種は`server/compose.yaml`の`SEED`（既定は`MINECRAFT_SEED`の8675309。初期地点がオークの多い森で、すぐそばに水場がある）。作り直しでは、今のワールドと体の拠点の記憶を`server/minecraft/world-resets/<日時>/`へ退避し、ゲーム内の時間を止めて昼（6000）にする。種の候補は`scripts/server/minecraft_seed_probe.py`で、本番に触らない使い捨てのサーバーを起動して、初期地点の地形・周りの原木と水・村までの距離を比べる。
