@@ -1,6 +1,10 @@
 # 現在の確認範囲と配布状況
 
-会話表示をactivity.state v3へ更新。継続・待機・中断・エラーと音声再生を分離し、旧initiative通知を撤去した。unit 771件（`.local/regression/20261117T064911Z-314a43`）、C#表示62項目、能力・反応の結合確認、Unityでのグラフ・計画・状態カード描画確認が成功。Windows通常版・配信版のビルド成功（`unity/Logs/continuation-display-final.log`）。通常応答を自発判断として表示せず、生成待機と音声再生中を同時表示する。実際の配布・受信確認は以下へ追記する。
+2026-11-17、会話表示をactivity.state v3へ更新。継続・待機・中断・エラーと音声再生を分離し、旧initiative通知を撤去した。unit 771件（`.local/regression/20261117T064911Z-314a43`）、C#表示62項目、能力・反応の結合確認、Unityでのグラフ・計画・状態カード描画確認が成功。Windows通常版・配信版のビルド成功（`unity/Logs/continuation-display-final.log`）。通常応答を自発判断として表示せず、生成待機と音声再生中を同時表示する。
+
+実装 `72542e2a3f08d61ad5b151ae4a850fd28403532c` を開発・本番・ローカルLiveKit用開発へ反映し、3環境とも190ファイル一致、health 200、worker登録、再起動0を確認した。開発の根拠は `~/work/ciel-companion-dev/server/data/deployments/agent-72542e2a3f08-1794898283366549896`、本番は `~/work/ciel-companion/server/data/deployments/production-72542e2a3f08`。開発・ローカルimageは `sha256:cf4382667a81ecf41020c7f0af196946612dc70fa3c3a728e011be94fa3dcede`、本番は `sha256:2836d4a2678e2a1499831b58b6be88eac77fe2d56b12d0c3968788fbd7387a7e`。
+
+ローカルLiveKitの一時会話ルームでv3通知4件を受信し、enabled=true、respondingとrevision更新を確認した。試験ルームは削除済み。クラウド開発の試験接続はHTTP 429「connection minutes limit exceeded」で拒否され、クラウド経由の実受信は未確認。配信アプリを含む起動済み旧版は再起動・再接続が必要。今回Windows両版はビルド済みだが自動起動はしていない。Android端末への更新と、人が実会話しながらの表示確認は未実施。新旧形式の混在を互換表示で隠さない。
 
 2026-11-17、通常会話へ単一say/act継続ループを接続し、mainへ統合した実装 `96247600e0f9aa08e6482b10a5d45331344be290` を開発・本番・ローカルLiveKit用開発へ配布した。短い発話の継続・待機、実ツール結果の確認、ユーザー割り込みによる取消を統合し、旧8秒タイマー起動を撤去した。unit 769件、能力・反応の結合確認は成功（`.local/regression/20261117T061935Z-355d8d`）。配布済み開発イメージと一時PostgreSQLによるDB回帰9件も成功。3環境とも190ファイルがコミットと一致し、health 200、worker登録、再起動0、`CIEL_INITIATIVE=1`（既定）を確認した。開発・本番それぞれの配布で他コンテナ不変を確認し、その後ローカルLiveKit用の3サービスを更新した。実音声の自然さ・遅延の比較は未実施。以下の実験時点の未接続・未配布記述は当時の範囲を表す。
 
