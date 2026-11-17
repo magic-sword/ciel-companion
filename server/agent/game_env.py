@@ -347,16 +347,20 @@ class GameEnv:
             await self._refresh()   # 様子を読んでから、受け持ったことにする
             if session is not self._session or (self._stop_event is not None and self._stop_event.is_set()):
                 return
-        self.linked = status == 'linked'
+        linked = status == 'linked'
         bind_tool = self.profile.get('inference', {}).get('bind_tool')
-        if self.linked and bind_tool and getattr(self, 'core_endpoint', None):
+        if linked and bind_tool and getattr(self, 'core_endpoint', None):
+            # Resource updates may arrive during inference preparation. Do not
+            # announce a usable body before the binding has actually succeeded.
+            self.linked = False
             core_url, core_token = self.core_endpoint
             # Binding includes startup preparation of the fixed execution prompt.
             bound = await self._call(bind_tool, {'url': core_url, 'token': core_token}, timeout=BIND_TIMEOUT)
             if bound.get('status') != 'ready':
                 await self._call(self.profile.get('link_tool') or f'{self.game}_link', {'on': False})
-                self.linked = False
+                linked = False
                 status = 'unavailable'
+        self.linked = linked
         self.reason = '' if self.linked else ('busy' if status == 'busy' else 'off' if not on else 'connecting')
         if self.linked:
             log.info('ゲーム（%s）の体を受け持った', self.game)
