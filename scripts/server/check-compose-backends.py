@@ -65,8 +65,23 @@ with tempfile.TemporaryDirectory(prefix='ciel-compose-check-') as folder:
         assert values['CIEL_WHISPER_MODEL_PATH']==settings.get('CIEL_WHISPER_MODEL_PATH','/models-whisper/small'),name
         assert values['CIEL_STT_BACKEND']==settings.get('CIEL_STT_BACKEND',''),name
         results.append({'case':name,'backend':backend,'input':mode or 'voice (default)','isolated':True})
+    (dev/'compose.dev.yaml').write_text(files['dev'])
+    (dev/'compose.livekit-local.yaml').write_text(files['livekit'])
+    (dev/'.env.dev').write_text('CIEL_LLM_BACKEND=local\nCIEL_OPENAI_ROLES=\nCIEL_MIND_MODEL=dev-model\nCIEL_MIND_REASONING=high\n')
+    for roles,model in [('mind','gpt-5.4-mini'),('','local')]:
+        local=dev/'.env.livekit-local'
+        local.write_text('LIVEKIT_LOCAL_BIND=127.0.0.1\nLIVEKIT_LOCAL_KEY=test\nLIVEKIT_LOCAL_SECRET=fake-secret\nCIEL_LOCAL_AGENT_IMAGE=test-image\nCIEL_LOCAL_AGENT_CONFIG='+str(dev/'agent/config')+'\nCIEL_OPENAI_ROLES='+roles+'\nCIEL_MIND_MODEL='+model+'\nCIEL_MIND_REASONING=none\n')
+        command=['docker','compose','--env-file',str(prod/'.env.shared'),'--env-file',str(dev/'.env.dev'),'--env-file',str(local),'-f','compose.dev.yaml','-f','compose.livekit-local.yaml','config','--format','json']
+        result=subprocess.run(command,cwd=dev,env=env,capture_output=True,text=True,check=True)
+        values=json.loads(result.stdout)['services']['agent-local']['environment']
+        assert values['LIVEKIT_URL']=='ws://127.0.0.1:7880' and values['LIVEKIT_API_KEY']=='test'
+        assert values['CIEL_LLM_BACKEND']=='local' and values['CIEL_OPENAI_ROLES']==roles
+        assert values['CIEL_MIND_MODEL']==model and values['CIEL_MIND_REASONING']=='none'
+        assert values['CIEL_MEMORY_SCOPE']=='dev'
+        results.append({'case':'local-livekit-'+('openai-mind' if roles else 'local-mind'),'isolated':True})
 print(json.dumps({'status':'passed','checks':results,'services_restarted':False},ensure_ascii=False))
 """
 if __name__=='__main__':
     sources={'prod':(ROOT/'server/compose.yaml').read_text(encoding='utf-8'),'dev':(ROOT/'server/compose.dev.yaml').read_text(encoding='utf-8')}
+    sources['livekit']=(ROOT/'server/compose.livekit-local.yaml').read_text(encoding='utf-8')
     home.remote(CODE.replace('COMPOSE_SOURCES',repr(sources)))

@@ -33,6 +33,8 @@ services:
       file: compose.dev.yaml
       service: agent-dev
     image: ${CIEL_LOCAL_AGENT_IMAGE:?}
+    env_file:
+      - ./.env.livekit-local   # LiveKit接続先と独立に、この接続専用の推論設定を上書きする
     volumes:
       - ${CIEL_LOCAL_AGENT_CONFIG:?}:/app/config:ro   # 開発の会話サーバーが今使っている設定（livekit-local.sh が渡す）
     environment:

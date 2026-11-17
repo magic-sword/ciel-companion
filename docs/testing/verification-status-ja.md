@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+2026-11-18、ローカルLiveKitと推論先を独立して設定できるよう、`agent-local`のenv_file末尾に`.env.livekit-local`を追加した。Compose検査15ケースでローカルLiveKit＋OpenAI mind、ローカルLiveKit＋ローカルmindを含む設定の分離を確認。稼働中の`ciel-dev-agent-local-1`だけを再作成し、LiveKitは192.168.1.15、mindはOpenAIのgpt-5.4-mini・reasoning noneを確認した。他コンテナのID・起動時刻は不変。短文1要求（最大出力16トークン）の実API疎通は成功し、応答モデルgpt-5.4-mini-2026-03-17、入力10・出力4トークン、2.087秒。request IDは`req_d3b1acaf1b4045a8b76d44aeba05bd61`。証拠と設定退避は開発`server/data/deployments/local-livekit-openai-1794927815759067228/`。実音声の応答遅延は未測定。ローカル接続の記憶スコープ・プロンプトは引き続き開発側で、本番と同じ設定一式に変更したものではない。
+
 2026-11-17、自己紹介で年齢設定を読み上げるとの報告を受け、人物像・自己認識・関係性判断のプロンプト3ファイルから年齢指定を削除した。コミット`ff6b454bc37e`の対象ファイルを本番のconfigマウント元へ配布し、コンテナ内のSHA-256一致と`load_persona`の成功を確認。読み込み指紋は`56be8d4f35360962e2d98d2dc8aae63d27a4e406839c656c66e5db1dbb0b3ed6`。既存ファイルは退避済みで、証拠は本番`server/data/deployments/persona-age-ff6b454bc37e/verification.json`。コンテナは再起動せず稼働を維持した。次に開始する会話から適用され、進行中の会話は開始時の内容を使う。実際の自己紹介生成・発話の変更前後比較は未実施。
 
 2026-11-17、Windows配信版でChromeの最大化・復元後に、配信アプリとMinecraftらしきウィンドウを残してデスクトップ全体が黒化する症状を調査した。Unity 6000.6.4f1・Windows 11・RTX 2060・ドライバ32.0.15.6614で、利用者がDirect3D 12起動時の再現と、同じバイナリを`-force-d3d11`で再起動した後の非再現を目視確認。取得画像には黒化が写らず、キャプチャ操作で復帰するとの報告がある。D3D12ログに`IDXGISwapChain::GetFrameStatistics`の警告があるが、警告と黒化の因果やWindows合成・GPUドライバ内部の原因は未確定。Windows通常版・配信版のビルドでDirect3D 11を明示指定する回避修正を追加した。比較ログは`.local/display-diagnostics/d3d12-before.log`と`d3d11-comparison.log`。長時間運用・別GPUでは未検証。

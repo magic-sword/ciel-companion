@@ -10,7 +10,7 @@
 |---|---|---|
 | `livekit-local` | `livekit/livekit-server:v1.8.4`、設定は`server/livekit-local/livekit.yaml` | 家の中のアドレスだけで開く LiveKit。信号7880、TCPの予備7881、音声のUDP 7882（1ポートにまとめる） |
 | `token-local` | `server/livekit-local/token_server.py` | アプリにトークンを出す窓口（7883の`POST /token`）。LiveKit の開発用トークンサーバーと同じ形（`server_url`・`participant_token`）で返し、部屋に試験用の会話サーバー`ciel-dev`を呼ぶ |
-| `agent-local` | 開発の会話サーバーと同じイメージと設定 | 家の中の LiveKit につなぐ試験用の会話サーバー（8092）。推論は共有GPU（8094）、記憶は開発のスコープ |
+| `agent-local` | 開発の会話サーバーと同じイメージとプロンプト | 家の中の LiveKit につなぐ会話サーバー（8092）。推論先は独立して設定可能。記憶は開発のスコープ |
 
 サービスの定義は`server/compose.livekit-local.yaml`で、開発の`compose.dev.yaml`と一緒に読む。鍵・アドレスは開発の`server/.env.livekit-local`（Git・デプロイの外、権限0600）。家の中のアドレスは本番の`.env.minecraft`の`MC_BIND`を使う。
 
@@ -35,6 +35,21 @@ scripts/server/livekit-local.sh stop
 `start`は、今の開発の会話サーバー（`ciel-dev-agent-dev-1`）のイメージと設定（`/app/config`）で試験用の会話サーバーを起動する。開発の会話サーバーを配布し直したら、`start`をもう一度実行して版をそろえる。初回は鍵を作る。
 
 ## Windows アプリからつなぐ
+
+### LiveKitと推論先を別々に選ぶ
+
+LiveKitは音声通信、LLMは判断・返答生成を担当する。「家の中の試験用サーバーにつなぐ」をONにしたまま、推論だけOpenAIへ送れる。開発の`server/.env.livekit-local`へ次を設定する。APIキーは既存の本番`server/.env.shared`を共有し、このファイルへ複製しない。
+
+```dotenv
+CIEL_LLM_BACKEND=local
+CIEL_OPENAI_ROLES=mind
+CIEL_MIND_MODEL=gpt-5.4-mini
+CIEL_MIND_REASONING=none
+```
+
+`agent-local`は`.env.shared`、`.env.dev`、`.env.livekit-local`の順に読み、最後の設定を優先する。Composeの補間も同じ順序にする。`CIEL_OPENAI_ROLES`のようなenvironment指定だけでなく、役目別モデル名もコンテナへ渡る。設定を変えたら`start`で再作成し、アプリの会話をつなぎ直す。`CIEL_OPENAI_ROLES=`に戻すとmindもローカルへ戻る。開発・本番の会話コンテナの設定や、記憶スコープ・プロンプトの配布先は変わらない。
+
+### 接続操作
 
 設定の「そのほか」→「開発」で、トークンの取得先に`status`が表示するURL（例：`http://192.168.1.15:7883/token`）を入れ、「家の中の試験用サーバーにつなぐ」を入れる。切り替えると、つなぎ直す。家の中のネットワーク専用なので、外出先からはつながらない。
 
