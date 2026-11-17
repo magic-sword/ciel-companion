@@ -65,7 +65,11 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         # The conversation model's request as is, then how to decide, after the conversation
         self.assertEqual(sent['messages'][:2], [{'role': 'system', 'content': 'system'}, {'role': 'user', 'content': 'えらいね'}])
         self.assertTrue(sent['messages'][-1]['content'].startswith('game\n\ndecide\n- none'))
-        self.assertEqual((sent['tools'][0]['function']['name'], sent['tool_choice']), ('say_hi', 'none'))
+        if game_decision.models.is_local('mind'):
+            self.assertEqual((sent['tools'][0]['function']['name'], sent['tool_choice']), ('say_hi', 'none'))
+        else:
+            self.assertNotIn('tools', sent)
+            self.assertNotIn('tool_choice', sent)
         self.assertEqual(list(sent['response_format']['json_schema']['schema']['properties']), ['act', 'say'])
 
     async def test_a_work_is_started_with_the_decided_request(self):
@@ -73,6 +77,19 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.say('いいよ、お願い'), '[happy]作りますね')
         self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': '家を作る'}))
         self.assertEqual(self.runner.start.await_args.kwargs['seconds'], 120)
+
+    async def test_provider_action_request_keeps_json_authority(self):
+        for local in (False, True):
+            with self.subTest(local=local), patch('game_decision.models.is_local', return_value=local), \
+                    patch('game_decision.models.options', side_effect=lambda role, **kw: kw):
+                self.respond({'say': '集めます', 'act': {'kind': 'work', 'request': '原木を集める'}})
+                await self.say('原木を集めて' + str(local))
+                sent = self.create.await_args.kwargs
+                self.assertEqual('tools' in sent, local)
+                self.assertEqual('tool_choice' in sent, local)
+                action = sent['response_format']['json_schema']['schema']['properties']['act']
+                jsonschema.validate({'kind': 'work', 'request': '原木を集める'}, action)
+        self.assertEqual(self.runner.start.await_count, 2)
 
     async def test_a_direct_action_is_used_and_a_refusal_is_told_in_her_words(self):
         self.respond({'say': '行きますね', 'act': {'kind': 'game_come', 'arguments': {}}})

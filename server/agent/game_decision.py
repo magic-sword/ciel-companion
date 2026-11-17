@@ -278,8 +278,8 @@ class GameDecision:
     # ---- the decision ----
     async def handle(self, item, messages, tools=(), note: str = '') -> str | None:
         """messages: the conversation exactly as the conversation model gets it (its fixed instructions first);
-        tools: the same tool schemas it gets. Both are sent unchanged, so the decision and the reply share one
-        cached prefix (Qwen's template puts the tools before the fixed instructions). How to write the decision,
+        tools: the same tool schemas it gets. Local requests retain them for a shared cached prefix
+        (Qwen's template puts tools first); cloud requests use only the JSON action schema. How to write the decision,
         what can be done now and the game's instructions (note) go after the conversation.
         Returns what to say, or None to let the conversation model answer as usual.
         One user item is decided once; a second call for it returns the same words."""
@@ -358,7 +358,10 @@ class GameDecision:
             from decision_format import DecisionFormat
             output = DecisionFormat('decision', decision_schema, local=local)
             options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20, messages=wire,
-                                     **({'tools': tools, 'tool_choice': 'none'} if tools else {}),
+                                     # Local templates keep the shared tool prefix for caching.
+                                     # Hosted models interpret tool_choice=none as prohibiting
+                                     # the game actions too, even though those use the JSON act.
+                                     **({'tools': tools, 'tool_choice': 'none'} if local and tools else {}),
                                      response_format=output.response_format,
                                      **({'temperature': self.TEMPERATURE} if local else {'reasoning_effort': REASONING}))
             response = await self._client.chat.completions.create(**options)

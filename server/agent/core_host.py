@@ -47,7 +47,9 @@ class CoreHost:
                          input_chars=sum(len(m['content']) for m in context), queued_seconds=queued_seconds)
         try:
             options = models.options('mind', model=models.model('mind'), messages=context,
-                max_completion_tokens=max_tokens,
+                # Hosted preparation must have room to finish a response. A one-token
+                # warmup returns HTTP 400 there instead of warming the shared prefix.
+                max_completion_tokens=(256 if purpose == 'game_core_prepare' and not models.is_local('mind') else max_tokens),
                 **({'temperature': 0} if models.is_local('mind') else {
                     'reasoning_effort': os.environ.get('CIEL_MIND_REASONING', 'none')}))
             if response_format == 'json':

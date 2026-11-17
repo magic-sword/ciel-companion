@@ -2,6 +2,12 @@
 
 > 責務：Minecraftの行動・依頼受付・対象指定の実測条件、結果、残課題、生データ。
 
+## OpenAIのゲーム受付拒否（2026-11-18）
+
+本番の再現会話`20261117-163819-ciel-e1b69ef0d89a4d5c9098123a560f4870.jsonl`では、操作権取得後の依頼に`work_decision=none`を選び、準備ができていないと回答した。ゲームへの作業送信は無い。gpt-5.4-mini・reasoning noneで、同じpersona・能力カタログ・ゲームprofile・合成履歴を使い、通常会話用toolsと`tool_choice=none`の併送だけを比較した。採集依頼は旧要求0/3、新要求3/3でwork。挨拶は両要求とも3/3でnone。否定は旧要求3/3でnone、新要求3/3で停止を選び、採集は選ばなかった。当初の評価器は否定の正解をnoneだけとして停止を不合格にしたため、操作開始を防ぐnoneとprofile指定の停止を許容する判定へ修正した。
+
+中核APIの準備では出力上限1がOpenAIの400エラーになることも再現し、OpenAI準備の上限256で成功した。準備失敗はキャッシュ最適化の失敗で、会話モデルの操作拒否とは区別する。診断は別プロセス内の修正版を使い、MCP profileを読むだけで操作権取得・実採集・移動は行っていない。接続スモークだけでは今回の誤判断を検出できない。再実行入口は`scripts/server/check-game-decision-cloud.py`、生データは本番`server/data/deployments/game-decision-cloud-check/comparison.stdout`と`comparison.stderr`。実ワールドでの採集達成・音声認識精度は未検証。
+
 [評価の見取り図](benchmark-guide-ja.md#minecraftの行動)と[採点・再実行の方法](../games/minecraft/minecraft-benchmark-ja.md)から読む。以下は異なる課題集合と時点の実測記録であり、合格数を合算しない。
 
 ## 現在の判断

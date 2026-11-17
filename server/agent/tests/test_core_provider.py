@@ -23,7 +23,7 @@ class CoreProviderTests(unittest.IsolatedAsyncioTestCase):
                     finally:
                         await host.close()
                 sent = create.call_args.kwargs
-                self.assertEqual(sent['max_completion_tokens'], 1)
+                self.assertEqual(sent['max_completion_tokens'], 1 if local else 256)
                 self.assertNotIn('max_tokens', sent)
                 if local:
                     self.assertEqual(sent['temperature'], 0)
