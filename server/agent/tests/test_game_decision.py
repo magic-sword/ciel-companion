@@ -1,4 +1,5 @@
 import json
+import jsonschema
 import types
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -30,6 +31,8 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
 
     @staticmethod
     def reply(value):
+        if not game_decision.models.is_local('mind') and 'arguments' in value.get('act', {}):
+            value = {**value, 'act': {**value['act'], 'arguments': json.dumps(value['act']['arguments'])}}
         if isinstance(value.get('say'), str):   # the tests write plain words; the decision writes parts
             value = {**value, 'say': [{'feeling': 'happy', 'text': value['say']}]}
         return types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
@@ -81,7 +84,10 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.say('来て'), '[happy]ごめんなさい、今は動けないのです')
         told = self.create.await_args.kwargs
         self.assertIn('できませんでした。理由：busy', told['messages'][-1]['content'])
-        self.assertEqual(told['response_format']['json_schema']['schema']['properties']['act']['anyOf'], [game_decision.NONE])
+        act_schema = told['response_format']['json_schema']['schema']['properties']['act']
+        jsonschema.validate({'kind': 'none'}, act_schema)
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate({'kind': 'game_come', 'arguments': '{}'}, act_schema)
 
     async def test_kinds_follow_the_work_state(self):
         kinds = lambda work: [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, work)]
@@ -138,7 +144,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
             sent = self.create.await_args.kwargs
             self.assertNotIn('temperature', sent)
             self.assertIn('reasoning_effort', sent)
-            self.assertFalse(sent['response_format']['json_schema']['strict'])
+            self.assertTrue(sent['response_format']['json_schema']['strict'])
             self.respond({'say': 'x', 'act': {'kind': 'fly_away'}})   # not one of the kinds
             self.assertIsNone(await self.say('飛んで'))
             self.env.use.assert_not_awaited()

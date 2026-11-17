@@ -11,6 +11,7 @@ from livekit.agents.llm._provider_format.openai import to_fnc_ctx
 from game_decision import REASONING, SAY, spoken
 import models
 import debug_log
+from decision_format import DecisionFormat
 
 
 def object_schema(properties):
@@ -240,6 +241,7 @@ class ConversationDecision:
                 resuming_tool = False
                 refused = owner.mind.refused_now(source)
                 schema = flow.schema(owner.capabilities, visible, refused)
+                output = DecisionFormat('tool_decision', schema, local=local)
                 instruction = (template.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
                                if first else loop.context() + '\n' + loop.menu(schema))
                 first = False
@@ -248,8 +250,7 @@ class ConversationDecision:
                 messages.append({'role': 'user' if local else 'system', 'content': ('SYSTEM: ' if local else '') + instruction})
                 options = models.options('mind', model=models.model('mind'), messages=messages,
                     tools=to_fnc_ctx(llm.ToolContext(functions), strict=True), tool_choice='none',
-                    response_format={'type': 'json_schema', 'json_schema': {'name': 'tool_decision', 'schema': schema,
-                        **({} if local else {'strict': False})}},
+                    response_format=output.response_format,
                     max_completion_tokens=600, timeout=90,
                     **({'temperature': 0, 'seed': 1729} if local else {'reasoning_effort': REASONING}))
                 async with models.create_client('mind', traced=True) as client:
@@ -261,10 +262,8 @@ class ConversationDecision:
                     prompt_ms=timings.get('prompt_ms'), predicted_ms=timings.get('predicted_ms'))
                 if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
                     return
-                if getattr(response.choices[0], 'finish_reason', None) == 'length':
-                    raise RuntimeError('generation_truncated')
-                raw = response.choices[0].message.content or ''
-                decision = json.loads(raw)
+                decision = output.decode(response)
+                raw = response.choices[0].message.content
                 text, call = flow.accept(token, decision, schema, owner.capabilities, visible,
                                          owner.mind.refused_now(source))
                 self.show(('loading' if decision['act']['kind'] == 'load' else 'calling') if call else 'finished')

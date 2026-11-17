@@ -103,6 +103,7 @@ class ToolDecisionTests(unittest.TestCase):
 
 class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.local = False
         from agent import Ciel
         from conversation import Conversation
         from mind import Mind
@@ -123,12 +124,14 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.client.__aexit__ = AsyncMock(return_value=False)
 
     def answer(self, act, text='', next='wait', memo=''):
+        if not self.local and 'arguments' in act:
+            act = {**act, 'arguments': json.dumps(act['arguments'])}
         return Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps(dict(
             say=[dict(feeling='neutral', text=text)] if text else [], act=act, next=next, memo=memo))))])
 
     async def node(self):
         with patch.object(self.agent, '_get_activity_or_raise', return_value=Obj(session=self.session)), \
-                patch('models.is_local', return_value=False), patch('models.create_client', return_value=self.client):
+                patch('models.is_local', return_value=self.local), patch('models.create_client', return_value=self.client):
             return [c async for c in self.agent._pipeline_llm(self.chat, self.agent.tools, {})]
 
     async def dispatch(self, call):
@@ -169,6 +172,11 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.create.side_effect = interrupted
         self.assertEqual(await self.node(), [])
         self.assertTrue(self.agent.conversation_decision.loop.cancelled)
+
+    async def test_local_pipeline_uses_the_same_mcp_execution_contract(self):
+        self.local = True
+        await self.test_normal_pipeline_loads_executes_real_mcp_and_answers_from_result()
+        self.assertNotIn('strict', self.create.await_args.kwargs['response_format']['json_schema'])
 
     async def test_spoken_continuation_streams_without_another_user_turn(self):
         states = []

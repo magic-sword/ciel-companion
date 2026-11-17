@@ -78,9 +78,11 @@ CIEL_MIND_REASONING=none
 
 本番は本番の`server/.env`、開発は開発の`server/.env.dev`だけを変更し、対象agentを再作成する。APIキーは既存の`.env.shared`を使い、動作設定へ複製しない。設定例ファイルは切替を有効にしていない。
 
-2026-11-11の実API疎通は残高不足（429・`credit_balance_exhausted`）で停止したため、現在は両環境とも切替指定を空に戻している。キーが設定されていることと、利用可能なAPI残高があることは別。残高追加後に単発から比較し、エラー時は元の設定へ戻す。自動フォールバックで比較条件を変えない。[疎通と復旧の証拠](../testing/voice-results-ja.md#openai部分切替の疎通と復旧)を参照する。
+実際の配布先・稼働設定と疎通結果は[確認状況](../testing/verification-status-ja.md)を参照する。APIエラー時に別backendへ自動で切り替えない。
 
-`mind`は通常の返答と、ゲーム中の発言の決定（`game_decision.py`）が共用する。クラウドの`mind`では、決定のschemaをstrictにせずに渡し、返ってきた決定をschemaで検査する。`listener / brief / thought / minutes_live / minutes / notes / relationship / growth / eyes`も指定可能。`talk / stt / research`や未知の名前は起動時に拒否する。音声入力は既存の`CIEL_STT_BACKEND`とlocal時の規則を保ち、読み上げはIrodoriを継続する。検索はbackendにかかわらず許可済みAPIを使う。埋め込み等のlocal時の制約は維持する。
+`mind`は通常の返答と、ゲーム中の発言の決定（`game_decision.py`）が共用する。両方とも`decision_format.py`で生成形式を選び、OpenAIでは`strict: true`、ローカルでは元のJSON Schemaで生成する。OpenAIの道具引数だけはJSON文字列で受け取り、復号後に元のスキーマで検査する。任意引数を必須化したり、省略をnullへ置き換えたりしない。発話の上限、権限、操作の検査は両経路で共通。拒否・途中終了・不正な出力から操作を実行しない。[返答形式の契約](../conversation/capability-runtime-ja.md#通常会話の構造化判断ループ)を参照する。`listener / brief / minutes_live / minutes / notes / relationship / growth / eyes`も指定可能。`talk / stt / research`や未知の名前は起動時に拒否する。音声入力は既存の`CIEL_STT_BACKEND`とlocal時の規則を保ち、読み上げはIrodoriを継続する。検索はbackendにかかわらず許可済みAPIを使う。埋め込み等のlocal時の制約は維持する。
+
+ローカルLLMへ戻す場合は`CIEL_LLM_BACKEND=local`のまま`CIEL_OPENAI_ROLES=`を空にして対象agentを再作成する。宅内開発agentは`.env.livekit-local`の設定が優先されるので、そこに指定した`CIEL_OPENAI_ROLES`も変更する。本番は`.env`を変更し、宅内LiveKit用のoverlayを重ねて再作成する。[宅内LiveKitの起動手順](local-livekit-ja.md)を使い、接続先・記憶スコープ・プロンプトは維持する。
 
 ローカルLLMの会話prefixと1tokenのウォームアップは、mindがローカルの場合だけ実行する。mindをOpenAIへ切り替えた場合はSTT・TTS等の準備だけを行い、ローカル用のモデルIDやQwen用引数をOpenAIへ送らない。会話開始のデバッグ記録の`role_models`で役目別の実モデルを確認する。`backend=local`は基本方針であり、全役目がローカルという意味ではない。
 

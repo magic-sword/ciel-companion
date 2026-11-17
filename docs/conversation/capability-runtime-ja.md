@@ -69,6 +69,8 @@
 
 ### 通常会話の構造化判断ループ
 
+返答の生成形式は`decision_format.py`でプロバイダーに合わせ、通常会話・ゲーム判断の両方から使用する。ローカルLLMには正規JSON Schemaを渡す。OpenAIには発話・行動・継続状態を`strict: true`で指定し、任意項目や自由なオブジェクトを含み得る`act.arguments`は、正規引数スキーマをdescriptionへ付けたJSON文字列として受け取る。復号後は両経路とも正規スキーマで検証する。任意引数の省略、明示null、値を区別し、既存の実行契約へ戻してから権限を検査する。OpenAIが対応しない配列の重複禁止は生成スキーマから外し、受信後の正規検証で強制する。拒否・出力上限・不正JSON・制約違反はその判断を失敗とし、別モデルや自由文への自動フォールバックはしない。[OpenAIの形式仕様](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)を参照。
+
 `tool_decision.py`と`tool_decide.md`で、ゲームと同じ順序の`say`（感情・文）と`act`を出す。通常の音声・文字pipelineの`Ciel._conversation_node`から`ConversationDecision`を呼び、LiveKitの実行結果で判断を継続する。ゲームの既存の判断、自発判断の入口は維持する。通常会話の旧自由文・任意ツール選択へはフォールバックしない。
 
 - 最初の決定は`none`・`clarify`・`blocked`・`load`・現在使える道具の`call`。雑談・否定・引用・未成立の条件を操作へ強制しない。

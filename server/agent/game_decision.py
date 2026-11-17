@@ -355,18 +355,16 @@ class GameDecision:
         debug_log.record('work_inference', id=request, model=models.model('mind'), stage='initiative' if silent else 'decide' if not note else 'decide_speak',
                          state=(work or {}).get('state'), temperature=self.TEMPERATURE if local else None)
         try:
-            # A cloud schema is not strict (the game's own argument schemas may leave fields optional);
-            # its answer is checked against the same schema below.
+            from decision_format import DecisionFormat
+            output = DecisionFormat('decision', decision_schema, local=local)
             options = models.options('mind', model=models.model('mind'), max_completion_tokens=800, timeout=20, messages=wire,
                                      **({'tools': tools, 'tool_choice': 'none'} if tools else {}),
-                                     response_format={'type': 'json_schema', 'json_schema': {
-                                         'name': 'decision', 'schema': decision_schema, **({} if local else {'strict': False})}},
+                                     response_format=output.response_format,
                                      **({'temperature': self.TEMPERATURE} if local else {'reasoning_effort': REASONING}))
             response = await self._client.chat.completions.create(**options)
             timings = getattr(response, 'timings', None) or {}
             models.record('mind', models.model('mind'), getattr(response, 'usage', None))
-            out = json.loads(response.choices[0].message.content or '')
-            jsonschema.validate(out, decision_schema)
+            out = output.decode(response)
         except Exception as e:
             debug_log.record('game_decision_error', error=type(e).__name__)
             return None
