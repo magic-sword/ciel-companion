@@ -152,6 +152,7 @@ def options(role: str, **kwargs) -> dict:
     kwargs['timeout'] = max(float(kwargs.get('timeout') or 0), LOCAL_TIMEOUT)
     extra = dict(kwargs.get('extra_body') or {})
     extra['chat_template_kwargs'] = {'enable_thinking': False}
+    extra.setdefault('cache_prompt', True)
     kwargs['extra_body'] = extra
     background = role in BACKGROUND_ROLES
     headers = dict(kwargs.get('extra_headers') or {})

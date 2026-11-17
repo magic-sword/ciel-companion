@@ -85,16 +85,16 @@ def fixed_prompt(variant, catalog, baseline_ref=None):
         parts.append('利用できるサービスは research（Web検索）。定義をロードしてから検索する。')
     config = tomllib.loads(DEFAULT_CONFIG.read_text(encoding='utf-8'))
     if variant != 'control':
-        if variant == 'baseline':
+        if variant in ('baseline', 'previous'):
             if not baseline_ref:
                 raise ValueError('baseline variant requires --baseline-ref')
             parts.append(subprocess.check_output(['git', 'show',
                 baseline_ref + ':server/agent/config/prompts/continuation.md'], cwd=ROOT).decode('utf-8'))
         else:
             parts.append((DEFAULT_CONFIG.parent / config['continuation_experiment_file']).read_text(encoding='utf-8'))
-    if variant == 'memo':
+    if variant in ('memo', 'continuous'):
         parts.append((DEFAULT_CONFIG.parent / config['continuation_memo_experiment_file']).read_text(encoding='utf-8'))
-    if variant == 'chunked':
+    if variant in ('chunked', 'continuous', 'previous'):
         parts.append((DEFAULT_CONFIG.parent / config['continuation_chunk_experiment_file']).read_text(encoding='utf-8'))
     parts.append(persona.reply_frame)
     return '\n\n'.join(parts)
@@ -103,9 +103,9 @@ def fixed_prompt(variant, catalog, baseline_ref=None):
 async def sample(client, args, case, variant, repeat, deadline):
     catalog = FixtureCatalog(case.get('fixture'))
     visible = {x.id: x for x in (catalog.loader, catalog.executor)}
-    loop = runtime.Continuation(enabled=variant != 'control', memo=variant == 'memo', max_steps=args.max_steps,
-                                turn_first=variant != 'baseline', speech_chars=120 if variant == 'chunked' else None,
-                                terminal_wait=variant == 'chunked')
+    loop = runtime.Continuation(enabled=variant != 'control', memo=variant in ('memo', 'continuous'), max_steps=args.max_steps,
+                                turn_first=variant != 'baseline', speech_chars=120 if variant in ('chunked', 'continuous', 'previous') else None,
+                                terminal_wait=variant in ('chunked', 'continuous', 'previous'))
     system = fixed_prompt(variant, catalog, getattr(args, 'baseline_ref', None))
     messages = [dict(role='system', content=system)]
     trace = dict(case=case['id'], variant=variant, repeat=repeat, prompt_sha256=digest(system),
@@ -200,10 +200,10 @@ async def run(args):
     else:
         cases = [c for c in cases if c['split'] == 'dev']
     variants = args.variants.split(',')
-    if not variants or len(set(variants)) != len(variants) or any(v not in ('control', 'loop', 'memo', 'baseline', 'chunked') for v in variants):
+    if not variants or len(set(variants)) != len(variants) or any(v not in ('control', 'loop', 'memo', 'baseline', 'chunked', 'continuous', 'previous') for v in variants):
         raise ValueError('Unique variants: control,loop,memo,baseline,chunked')
     baseline_ref = getattr(args, 'baseline_ref', None)
-    if 'baseline' in variants:
+    if set(variants) & {'baseline', 'previous'}:
         if not baseline_ref:
             raise ValueError('baseline requires --baseline-ref')
         args.baseline_ref = subprocess.check_output(['git', 'rev-parse', '--verify', baseline_ref + '^{commit}'],

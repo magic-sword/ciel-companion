@@ -42,7 +42,7 @@ class RoutingTest(unittest.TestCase):
             self.assertEqual(o['model'], 'local')
             self.assertNotIn('reasoning_effort', o)
             self.assertEqual(o['timeout'], models.LOCAL_TIMEOUT)
-            self.assertEqual(o['extra_body'], {'chat_template_kwargs': {'enable_thinking': False}})
+            self.assertEqual(o['extra_body'], {'chat_template_kwargs': {'enable_thinking': False}, 'cache_prompt': True})
             # OpenAI の役目は、そのまま
             self.assertEqual(models.options('mind', model='x', reasoning_effort='low'), {'model': 'x', 'reasoning_effort': 'low'})
 

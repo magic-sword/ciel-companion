@@ -63,7 +63,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent['messages'][:2], [{'role': 'system', 'content': 'system'}, {'role': 'user', 'content': 'えらいね'}])
         self.assertTrue(sent['messages'][-1]['content'].startswith('game\n\ndecide\n- none'))
         self.assertEqual((sent['tools'][0]['function']['name'], sent['tool_choice']), ('say_hi', 'none'))
-        self.assertEqual(list(sent['response_format']['json_schema']['schema']['properties']), ['say', 'act'])
+        self.assertEqual(list(sent['response_format']['json_schema']['schema']['properties']), ['act', 'say'])
 
     async def test_a_work_is_started_with_the_decided_request(self):
         self.respond({'say': '作りますね', 'act': {'kind': 'work', 'request': '家を作る'}})
@@ -86,9 +86,9 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
     async def test_kinds_follow_the_work_state(self):
         kinds = lambda work: [a['properties']['kind']['const'] for a, _ in game_decision.acts(self.env, work)]
         self.assertEqual(kinds(None), ['none', 'work', 'game_come'])
-        self.assertEqual(kinds({'state': 'running'}), ['none', 'tell', 'cancel'])
+        self.assertEqual(kinds({'state': 'running'}), ['none', 'tell', 'cancel', 'replace'])
         self.assertEqual(kinds({'state': 'needs_decision', 'decision': {'actions': ['reply', 'cancel'], 'message': 'q'}}),
-                         ['none', 'reply', 'cancel'])
+                         ['none', 'reply', 'cancel', 'replace'])
         self.assertEqual(kinds({'state': 'cancelling'}), ['none'])
 
     async def test_an_ended_work_is_started_again_with_its_own_request(self):
@@ -103,7 +103,7 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_words_and_answers_go_to_the_work(self):
         self.runner.work = {'state': 'running'}
-        self.respond({'say': '伝えますね', 'act': {'kind': 'tell', 'message': '刈ってね'}})
+        self.respond({'say': '伝えますね', 'act': {'kind': 'tell'}})
         await self.say('刈ってね')
         self.assertEqual(self.runner.tell.await_args.args, ('刈ってね',))
         self.runner.work = {'state': 'needs_decision', 'decision': {'decision_id': 'd', 'actions': ['retry', 'cancel']}}

@@ -67,6 +67,21 @@ class GoalRunner:
             self._watch = asyncio.create_task(self._poll(r['task_id']))
             return r
 
+    async def replace(self, capability, arguments, *, constraints=None, seconds=90, title='', valid=lambda: True):
+        """Never submit a new objective until the same old work has stopped."""
+        old = self.work
+        if not old or old['state'] not in ('accepted', 'running', 'needs_decision') or not valid():
+            return {'status': 'error', 'reason': 'stale_work'}
+        identity = (old['session'], old['task_id'])
+        result = await self.stop()
+        # A cancellation in flight is not permission to start another work. The caller
+        # reports the unconfirmed stop; a new explicit request can retry after status.
+        current = self.work
+        if (not valid() or not current or (current['session'], current['task_id']) != identity
+                or current['state'] not in TERMINAL or self._unknown):
+            return {'status': 'error', 'reason': 'stop_unconfirmed'}
+        return await self.start(capability, arguments, constraints=constraints, seconds=seconds, title=title)
+
     @staticmethod
     def valid(w):
         return (isinstance(w, dict) and type(w.get('version')) is int and w['version'] == 1

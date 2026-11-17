@@ -1,4 +1,4 @@
-"""Experimental session continuation; no production host is wired to this yet.
+"""Bounded conversation continuation shared by the host and evaluation harness.
 
 ToolDecision still validates permissions, staged loading and result evidence.
 The owner supplies delivery/result events; model completion alone is not delivery.
@@ -20,6 +20,7 @@ class Continuation:
         self.waiting = True
         self.pending = None
         self.memo = ''
+        self.silent_memos = set()
         self.steps = 0
         self.chain = ToolDecision()
 
@@ -35,6 +36,7 @@ class Continuation:
         self.interrupt()
         self.chain = ToolDecision()
         self.steps = 0
+        self.silent_memos.clear()
         self.waiting = False
         return self.generation
 
@@ -70,6 +72,11 @@ class Continuation:
             raise ValueError('terminal_requires_wait')
         if value.get('next') == 'continue' and kind == 'none' and not value['say'] and not value.get('memo'):
             raise ValueError('empty_continuation')
+        if value.get('next') == 'continue' and kind == 'none' and not value['say']:
+            memo = ' '.join(str(value.get('memo') or '').split())
+            if memo in self.silent_memos:
+                raise ValueError('repeated_silent_continuation')
+            self.silent_memos.add(memo)
         base = copy.deepcopy(schema)
         for key in ('next', 'memo'):
             base['properties'].pop(key, None)

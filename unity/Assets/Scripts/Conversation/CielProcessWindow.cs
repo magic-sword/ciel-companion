@@ -46,7 +46,7 @@ namespace Ciel.Conversation
             Node(root,"loading","機能ロード","必要な定義を取得",48,434,280);
             Node(root,"calling","操作を呼ぶ","結果を待つ",378,434,280);
             Node(root,"reviewing","結果確認","判断へ戻す",708,434,280);
-            Node(root,"continuing","続きの生成","同じ会話を続ける",708,614,280);
+            Node(root,"continuing","続きの判断","話す・行動・考える",708,614,280);
             Node(root,"cancelled","中断","次の入力へ",48,614,240);
             Node(root,"failed","エラー","処理を停止",378,614,240);
             _continuation = Label(root,"",48,774,950,44,25);

@@ -62,7 +62,7 @@ CIEL側で数量目標を固定したり、自動帰還・不足分の補充を�
 
 期限切れ・中止で終わったworkは再開しない。会話の決定（`game_decision`）は、終わったworkの能力と`arguments`（元の依頼文）を、新しい期限の新しいworkとして始め直せる（`resume`）。体は拠点・設備の記憶と今の持ち物から、続きを計画する。
 
-会話サーバーでは、一つの決定（`game_decision`）が判断待ちの質問への答えを `answer(action=reply, message)`、実行中の作業への言葉を `tell(message)` として選ぶ。messageには、会話の流れを読んだ決定が書いた言葉を渡す（「刈ってあげて」を、聞かれた選択への答えとして渡すなど）。
+会話サーバーでは、一つの決定（`game_decision`）が判断待ちの質問への答えを `answer(action=reply, message)`、実行中の作業への言葉を `tell(message)` として選ぶ。messageには、選択後に持ち主の今回の発言原文を渡す。モデルが生成した確認文は混ぜない。別の目的を依頼・訂正した場合はreplaceを選び、同じ作業の停止を確認して新しいsubmitへ進む。停止未確認では重ねて開始しない。これは既存work 1のcancel/submitの組合せで、プロトコルの版は変えない。
 
 `minecraft_task_cancel` はtask_idを指定する。体へ対象を固定した停止を送り、現在・待機の操作がなくblockedでもないことを確認して `cancelled` とする。確認できないときは `cancelling / stop_unconfirmed` を保ち、新しい作業を拒否する。遅い計画・技の完了・判断回答で再開しない。
 

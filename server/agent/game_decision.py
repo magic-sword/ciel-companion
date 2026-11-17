@@ -87,15 +87,15 @@ def acts(env, work, targets=None):
     out = [(NONE, 'none：話すだけ')]
     state = (work or {}).get('state')
     if state in ('accepted', 'running'):
-        out += [(_alt({'kind': {'const': 'tell'}, 'message': STRING}),
-                 'tell：今の作業へ相手の言葉を渡す（やり方・好み・続けてよいこと）。messageに渡す言葉'),
+        out += [(_alt({'kind': {'const': 'tell'}}),
+                 'tell：今の作業へ相手の言葉を渡す（やり方・好み・続けてよいこと）。発言の原文は基盤が渡す'),
                 (_alt({'kind': {'const': 'cancel'}}), 'cancel：今の作業を止める')]
     elif state == 'needs_decision':
         decision = work.get('decision') or {}
         for action in decision.get('actions') or ['retry', 'cancel']:
             if action == 'reply':
-                out.append((_alt({'kind': {'const': 'reply'}, 'message': STRING}),
-                            f"reply：作業からの質問（{decision.get('message', '')}）へ相手の答えを渡す。messageに相手の答え"))
+                out.append((_alt({'kind': {'const': 'reply'}}),
+                            f"reply：作業からの質問（{decision.get('message', '')}）へ相手の答えを渡す。発言の原文は基盤が渡す"))
             elif action in ('retry', 'cancel'):
                 out.append((_alt({'kind': {'const': action}}),
                             {'retry': 'retry：作業をもう一度試す', 'cancel': 'cancel：作業をやめる'}[action]))
@@ -121,6 +121,10 @@ def acts(env, work, targets=None):
             params = copy.deepcopy(fn.info.raw_schema['parameters'])
             params['additionalProperties'] = False
             out.append((_alt({'kind': {'const': fn.id}, 'arguments': params}), f"{fn.id}：{description}"))
+    if state in ('accepted', 'running', 'needs_decision') and capabilities(env):
+        current = json.dumps(work.get('arguments') or {}, ensure_ascii=False)
+        out.append((_alt({'kind': {'const': 'replace'}, 'request': STRING}),
+                    f'replace：現在の目的は{current}。相手が別の最終成果を依頼・訂正したら、停止を確認してその目的へ切り替える。requestは新しい目的の全体'))
     return out
 
 
@@ -147,8 +151,8 @@ def spoken(say) -> str:
 
 
 def schema(alternatives):
-    """say before act: the words are written first and the action chosen after them (fewer moves on praise)."""
-    properties = {'say': SAY, 'act': {'anyOf': [a for a, _ in alternatives]}}
+    """Choose the operation before narrating it; no-action remains an explicit option."""
+    properties = {'act': {'anyOf': [a for a, _ in alternatives]}, 'say': SAY}
     return {'type': 'object', 'additionalProperties': False, 'properties': properties, 'required': list(properties)}
 
 
@@ -159,12 +163,15 @@ def operations(act, work, env):
     if kind in (None, 'none'):
         return []
     if kind == 'tell':
-        return [('tell_game_task', {'message': act.get('message')})]
+        return [('tell_game_task', {})]
+    if kind == 'replace':
+        name = (capabilities(env) or [{}])[0].get('name')
+        return [('replace_game_task', {'capability': name, 'arguments': {'request': act.get('request')},
+            'expected_work': tuple((work or {}).get(k) for k in ('session', 'task_id'))})]
     if kind == 'cancel' and work and work['state'] in ('accepted', 'running'):
         return [('stop_game_task', {})]
     if kind in ('reply', 'retry', 'cancel'):
-        return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind,
-                                      **({'message': act.get('message')} if kind == 'reply' else {})})]
+        return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind})]
     if kind == 'resume':
         return [('resume_game_task', {'capability': work.get('capability'), 'arguments': copy.deepcopy(work.get('arguments') or {})})]
     if kind == 'work':
@@ -415,12 +422,23 @@ class GameDecision:
         runner, env = self.runner, self.runner.env
         for name, args in ops:
             if name == 'tell_game_task':
-                r = await runner.tell(str(args.get('message') or text)[:2000])
+                r = await runner.tell(text[:2000])
             elif name == 'stop_game_task':
                 r = await self._stop()
             elif name == 'answer_game_task':
                 r = await runner.answer(args['decision_id'], args['action'],
-                                        str(args.get('message') or text)[:2000] if args['action'] == 'reply' else None)
+                                        text[:2000] if args['action'] == 'reply' else None)
+            elif name == 'replace_game_task':
+                if tuple((runner.work or {}).get(k) for k in ('session', 'task_id')) != args['expected_work']:
+                    return '判断している間に対象の作業が変わりました'
+                handoff = _handoff(env, args['capability'])
+                if not handoff:
+                    return '新しい目的を受け付ける入口がありません'
+                request = str(args['arguments']['request'])[:2000]
+                generation = self._generation
+                r = await runner.replace(args['capability'], {handoff['argument']: request},
+                    constraints=copy.deepcopy(handoff['constraints']), seconds=handoff['seconds'], title=request[:100],
+                    valid=lambda: self.authorized() and generation == self._generation)
             elif runner.body_step():
                 return '今の作業の途中なので、先に止める必要がある'
             elif name == 'resume_game_task':

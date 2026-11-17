@@ -135,7 +135,7 @@ namespace Ciel.Conversation
             var phase = Fresh(a, age) ? Position(a) : "unknown";
             string Node(string label, bool active) => active ? "<color=#5BF0C8><b>● " + label + "</b></color>" : "<color=#8FB3C3>" + label + "</color>";
             return Node("待機", phase == "idle") + " → " + Node("判断", phase == "deciding") + " → "
-                + Node("発話を渡す", phase == "finished") + " → " + Node("続きの生成", phase == "continuing")
+                + Node("発話を渡す", phase == "finished") + " → " + Node("続きの判断", phase == "continuing")
                 + " → 待機／判断へ\n" + Node("中断", phase == "cancelled") + "　" + Node("エラー", phase == "failed")
                 + "\n　　　　↓　↑ 結果をもとに再判断\n"
                 + Node("機能ロード／操作", phase is "loading" or "calling") + " → " + Node("結果確認", phase == "reviewing");
@@ -161,7 +161,7 @@ namespace Ciel.Conversation
         };
 
         public static string Continuation(CielConversation.ActivityState a) => a?.continuation?.phase switch {
-            "responding" => "返事を生成中", "continuing" => "続きの発話を生成中",
+            "responding" => "返事を生成中", "continuing" => "続きの判断中",
             "tool_result" => "道具の結果から再判断中", "waiting" => "新しい発言・出来事を待機",
             "cancelled" => "会話の生成を中断", "failed" => "会話の生成でエラー",
             _ => "会話の進行を確認できていません"
@@ -172,7 +172,7 @@ namespace Ciel.Conversation
             "thinking" => "音声を準備中", _ => "発話していません"
         };
         public static string Setting(CielConversation.ActivityState a) => a?.continuation == null
-            ? "継続設定：未確認" : a.continuation.enabled ? "発話の継続：有効" : "発話の継続：無効";
+            ? "継続設定：未確認" : a.continuation.enabled ? "会話の継続：有効" : "会話の継続：無効";
 
         public static string Position(CielConversation.ActivityState a) {
             if (a?.decision?.phase is "cancelled" or "failed") return a.decision.phase;

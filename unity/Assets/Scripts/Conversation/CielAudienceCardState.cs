@@ -82,8 +82,8 @@ namespace Ciel.Conversation
             {
                 result.phase = "thinking";
                 bool initiative = activity.continuation?.phase == "continuing";
-                result.heading = initiative ? "シエル｜続きの生成中" : "シエル｜考え中";
-                result.title = initiative ? "続きの発話を考えています"
+                result.heading = initiative ? "シエル｜続きの判断中" : "シエル｜考え中";
+                result.title = initiative ? "次に話す・することを考えています"
                     : activity.thinking_origin == "tool_result" ? "道具の結果を確認しています"
                     : activity.thinking_origin == "comment" ? "コメントへの返事を考えています" : "返事・次の行動を考えています";
                 result.current = "返事の準備をしています";

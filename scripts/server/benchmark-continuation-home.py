@@ -23,7 +23,7 @@ def status():
     return json.loads(result.stdout)
 
 
-def main():
+def main(script='server/benchmark/continuation.py'):
     args = sys.argv[1:]
     if '--output' not in args or '--base-url' in args:
         raise SystemExit('Pass --output and benchmark options; base URL is owned by this wrapper')
@@ -52,7 +52,7 @@ def main():
                 time.sleep(.25)
         else:
             raise TimeoutError('Tunnel health check failed')
-        result = subprocess.run([sys.executable, str(ROOT/'server/benchmark/continuation.py'),
+        result = subprocess.run([sys.executable, str(ROOT/script),
             '--base-url', f'http://127.0.0.1:{port}', *args], cwd=ROOT)
         return result.returncode
     finally:

@@ -122,9 +122,9 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.client.__aenter__ = AsyncMock(return_value=Obj(chat=Obj(completions=Obj(create=self.create))))
         self.client.__aexit__ = AsyncMock(return_value=False)
 
-    def answer(self, act, text='', next='wait'):
+    def answer(self, act, text='', next='wait', memo=''):
         return Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps(dict(
-            say=[dict(feeling='neutral', text=text)] if text else [], act=act, next=next))))])
+            say=[dict(feeling='neutral', text=text)] if text else [], act=act, next=next, memo=memo))))])
 
     async def node(self):
         with patch.object(self.agent, '_get_activity_or_raise', return_value=Obj(session=self.session)), \
@@ -228,7 +228,7 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(loop.results), 2)
         self.create.return_value = self.answer(dict(kind='complete', evidence=['r2']), 'Already announced')
         chunks = await self.node()
-        self.assertFalse(chunks[0].delta.content)
+        self.assertEqual(chunks, [])
 
     async def test_new_speech_does_not_inherit_pending_actions(self):
         self.create.return_value = self.answer(dict(kind='load', service_ids=['6']))

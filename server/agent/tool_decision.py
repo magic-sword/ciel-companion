@@ -202,9 +202,11 @@ class ConversationDecision:
             self.cancel()
             enabled = os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(owner.style, 'talk', 'normal') != 'quiet'
             self.enabled = enabled
-            self.flow = Continuation(enabled=enabled, speech_chars=120 if enabled else None)
+            self.flow = Continuation(enabled=enabled, memo=enabled, speech_chars=120 if enabled else None)
             self.flow.wake()
             self.speech_id, self.loop = speech.id, self.flow.chain
+            self.messages = None
+            self.awaiting_call = None
         flow, loop = self.flow, self.loop
         if loop.cancelled or getattr(speech, 'interrupted', False):
             return
@@ -216,11 +218,21 @@ class ConversationDecision:
         visible = {fn.id: fn for fn in functions}
         source = source if source is not None else ctx
         local = models.is_local('mind')
-        messages = ctx.to_provider_format('openai')[0]
+        incoming = ctx.to_provider_format('openai')[0]
+        if self.messages is None:
+            self.messages = list(incoming)
+        elif resuming_tool:
+            results = [m for m in incoming if m.get('role') == 'tool'
+                       and m.get('tool_call_id') == self.awaiting_call]
+            if not results:
+                raise RuntimeError('tool_result_message_required')
+            self.messages.extend(results)
+            self.awaiting_call = None
+        messages = self.messages
         template = owner.persona.tool_decide_instructions
         if flow.enabled:
-            template += '\n\n' + owner.persona.continuation_experiment + '\n\n' + owner.persona.continuation_chunk_experiment
-        first = True
+            template += '\n\n' + owner.persona.continuation_experiment + '\n\n' + owner.persona.continuation_chunk_experiment + '\n\n' + owner.persona.continuation_memo_experiment
+        first = not resuming_tool
         try:
             while not flow.waiting and not loop.cancelled and not getattr(speech, 'interrupted', False):
                 self.show('deciding')
@@ -231,6 +243,8 @@ class ConversationDecision:
                 instruction = (template.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
                                if first else loop.context() + '\n' + loop.menu(schema))
                 first = False
+                if flow.memo:
+                    instruction += '\n' + json.dumps({'memo': flow.memo}, ensure_ascii=False)
                 messages.append({'role': 'user' if local else 'system', 'content': ('SYSTEM: ' if local else '') + instruction})
                 options = models.options('mind', model=models.model('mind'), messages=messages,
                     tools=to_fnc_ctx(llm.ToolContext(functions), strict=True), tool_choice='none',
@@ -241,6 +255,10 @@ class ConversationDecision:
                 async with models.create_client('mind', traced=True) as client:
                     response = await client.chat.completions.create(**options)
                 models.record('mind', models.model('mind'), response.usage)
+                timings = getattr(response, 'timings', None) or {}
+                debug_log.record('decision_timing', speech_id=speech.id, step=flow.steps + 1,
+                    cache_n=timings.get('cache_n'), prompt_n=timings.get('prompt_n'),
+                    prompt_ms=timings.get('prompt_ms'), predicted_ms=timings.get('predicted_ms'))
                 if loop.cancelled or self.loop is not loop or getattr(speech, 'interrupted', False):
                     return
                 if getattr(response.choices[0], 'finish_reason', None) == 'length':
@@ -257,9 +275,13 @@ class ConversationDecision:
                     text = ''
                     # The service owns delivery; do not continue with duplicate narration.
                     flow.pending['value'] = {**decision, 'next': 'wait'}
-                yield llm.ChatChunk(id=uuid.uuid4().hex, delta=llm.ChoiceDelta(role='assistant',
-                    content=text or None, tool_calls=[call] if call is not None else []))
+                if text or call is not None:
+                    yield llm.ChatChunk(id=uuid.uuid4().hex, delta=llm.ChoiceDelta(role='assistant',
+                        content=text or None, tool_calls=[call] if call is not None else []))
                 if call is not None:
+                    messages.append({'role': 'assistant', 'tool_calls': [{'id': call.call_id, 'type': 'function',
+                        'function': {'name': call.name, 'arguments': call.arguments}}]})
+                    self.awaiting_call = call.call_id
                     return
                 # Submitted to the SDK stream, not a claim of completed audio playback.
                 # Common history is recorded by the SDK, including interrupted speech.
