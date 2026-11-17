@@ -610,9 +610,11 @@ async def entrypoint(ctx: JobContext) -> None:
         publish_reaction(msg)
     # いまのシエル（activity.py）：心・道具・体の、いまの動き。止まって見えるとき、どこで待っているかをアプリで見る
     act = agent.activity = activity_.Activity(notify)
+    act.start()
+    ctx.add_shutdown_callback(act.close)
     session.on('agent_state_changed', act.agent_state)
     session.on('function_tools_executed', act.tools_executed)
-    agent.conversation_decision = ConversationDecision()
+    agent.conversation_decision = ConversationDecision(observe=lambda **state: act.controller("decision", **state))
     session.on('function_tools_executed', agent.conversation_decision.feedback)
     session.on('user_state_changed', agent.conversation_decision.on_user_state)
     ctx.add_shutdown_callback(agent.conversation_decision.close)
@@ -730,6 +732,7 @@ async def entrypoint(ctx: JobContext) -> None:
             ctx.add_shutdown_callback(decider.close)
         agent.initiative = Initiative(history, voice, decider, agent.persona.initiative_instructions,
             agent.persona.initiative_trigger,
+            observe=lambda **state: act.controller("initiative", **state),
             allowed=lambda: style.talk != 'quiet' and style.presence in ('solo', 'close')
                 and not (song is not None and song.active)
                 and not (book is not None and book.enrolling is not None))

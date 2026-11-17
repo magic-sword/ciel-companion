@@ -58,10 +58,10 @@ namespace Ciel.Conversation
         {
             var c = _conversation;
             var a = connected ? c.Activity : null;
-            var (text, color, show) = a != null ? ActivityChip(c, a) : ("", Idle, false);
+            var (text, color, show) = a != null ? ActivityChip(c, a) : ("状態：通知の確認待ち", Amber, connected);
             SetTask(_activityTask, show, text);
             var body = a?.body;
-            var directBody = body != null && !string.IsNullOrEmpty(body.phase) && body.phase != "idle" && !(c.Goal?.Active ?? false);
+            var directBody = c.ActivityFresh && body != null && !string.IsNullOrEmpty(body.phase) && body.phase != "idle" && !(c.Goal?.Active ?? false);
             SetTask(_bodyWorkTask, directBody, directBody ? "体：" + body.Description : "");
             if (show)
             {
@@ -88,6 +88,7 @@ namespace Ciel.Conversation
         // 札の文言・点の色・出すか
         static (string text, Color color, bool show) ActivityChip(CielConversation c, CielConversation.ActivityState a, bool activeOnly = false)
         {
+            if (!c.ActivityFresh) return ("状態：最新の通知を確認できていません", Amber, true);
             var conversation = CielAudienceCardState.Conversation(a, c.MicEnabled && c.UserSpeaking);
             if (!string.IsNullOrEmpty(conversation)) return ("会話：" + conversation, Mint, true);
             if (a.calls != null && a.calls.Length > 0)
@@ -107,15 +108,18 @@ namespace Ciel.Conversation
 
         static string ActivityText(CielConversation c, CielConversation.ActivityState a)
         {
+            if (!c.ActivityFresh) return "最新の状態通知を確認できていません。接続とアプリ・サーバーの版を確認してください。";
             var b = new StringBuilder();
             string Head(string s) => $"<b><color=#9FDDF0>{s}</color></b>";
+            b.Append(Head("判断・実行の流れ")).Append('\n').Append(CielActivityPresentation.Flow(a)).Append("\n\n");
             // 心
             var mind = a.mind == "thinking" ? $"考えている（{(WhoName(a.who) != "" ? WhoName(a.who) : "返事")}）{Sec(c.ActivitySeconds(a.mind_for))}"
                 : a.mind == "speaking" ? "話している" : a.mind == "listening" ? "聞いている" : "待っている";
             b.Append(Head("会話・リアクション")).Append("　").Append(Esc(mind)).Append('\n');
-            b.Append(Head("裏の思考")).Append(a.background_thinking
-                ? $"　自発的に考えを整理している {Sec(c.ActivitySeconds(a.background_for))}\n"
-                : a.detail_version >= 1 ? "　いまは考えを生成していない\n" : "　詳しい状態はまだ確認できていない\n");
+            b.Append(Head("判断と実行")).Append("　").Append(Esc(CielActivityPresentation.Decision(a)))
+                .Append("（判断 ").Append(a.decision?.step ?? 0).Append(" 回）\n");
+            b.Append(Head("自発判断")).Append("　").Append(Esc(CielActivityPresentation.Initiative(a))).Append('\n');
+            b.Append("　直近：").Append(Esc(CielActivityPresentation.Outcome(a))).Append('\n');
             // 呼んでいる道具
             b.Append(Head("呼んでいる道具")).Append('\n');
             if (a.calls == null || a.calls.Length == 0) b.Append("　なし\n");

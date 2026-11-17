@@ -12,7 +12,7 @@ class Initiative:
     QUIET = 8.0
     COOLDOWN = 30.0
 
-    def __init__(self, history, mouth, decider, template, trigger, *, allowed=lambda: True, clock=time.monotonic):
+    def __init__(self, history, mouth, decider, template, trigger, *, allowed=lambda: True, clock=time.monotonic, observe=lambda **state: None):
         self.history, self.mouth, self.decider = history, mouth, decider
         self.template, self.trigger, self.allowed, self.clock = template, trigger, allowed, clock
         self.counts = collections.Counter()
@@ -27,6 +27,11 @@ class Initiative:
         self._request_task = self._decision_task = self._loop = None
         self._closed = False
         self._opening = 0
+        self.observe = observe
+        self._outcome = ''
+
+    def show(self, phase, reason=''):
+        self.observe(phase=phase, reason=reason, outcome=self._outcome)
 
     def snapshot(self):
         rows = [t for t in self.history.turns if t.ready.is_set() and t.text]
@@ -68,19 +73,34 @@ class Initiative:
         now, snapshot = self.clock(), self.snapshot()
         if snapshot != self._observed:
             self._observed, self._changed = snapshot, now
-        if self.mouth.busy() or not self.allowed():
-            self._changed = now
+        if self._closed:
+            self.show('disabled', 'closed')
             return
-        if (self._closed or snapshot[0] <= self._consumed or now - self._changed < self.QUIET
-                or now - self._last < self.COOLDOWN
-                or self._request_task is not None and not self._request_task.done()):
+        busy, allowed = self.mouth.busy(), self.allowed()
+        if busy or not allowed:
+            self._changed = now
+        if self._request_task is not None and not self._request_task.done():
+            return
+        if busy or not allowed:
+            self.show('waiting', 'conversation' if busy else 'mode')
+            return
+        if snapshot[0] <= self._consumed:
+            self.show('waiting', 'new_event')
+            return
+        if now - self._changed < self.QUIET:
+            self.show('waiting', 'quiet')
+            return
+        if now - self._last < self.COOLDOWN:
+            self.show('waiting', 'cooldown')
             return
         if not self.trigger_allowed():
             self._consumed = snapshot[0]
+            self.show('waiting', 'eligible_event')
             return
         self._consumed, self._last = snapshot[0], now
         self._pending = (snapshot[0], self._generation)
         self.record('scheduled', through=snapshot[0])
+        self.show('scheduled')
         self._request_task = asyncio.create_task(self._request(self._pending))
 
     async def _request(self, token):
@@ -94,8 +114,10 @@ class Initiative:
             raise
         except Exception as error:
             self.record('error', error=type(error).__name__)
+            self._outcome = 'error'
         finally:
             self._pending = self._handle = None
+            self.show('waiting', 'new_event')
 
     async def reply(self, messages, tools, game=''):
         token = self._pending
@@ -104,13 +126,18 @@ class Initiative:
         self._considered = token
         self._decision_task = asyncio.current_task()
         began = self.clock()
+        self.show('deciding')
         try:
             result = await self.decider.consider(messages, tools, self.template, game=game,
                                                  valid=lambda: self.valid(token))
             self.record(result['status'], through=token[0], seconds=round(self.clock()-began, 3),
                         acted=result['acted'], speaks=bool(result['say']))
+            self._outcome = {'spoken': 'spoke', 'failed': 'error'}.get(result['status'], result['status'])
+            self.show('waiting', 'new_event')
             return result['say'] if self.valid(token) else ''
         except asyncio.CancelledError:
+            self._outcome = 'cancelled'
+            self.show('waiting', 'conversation')
             self.record('cancelled', through=token[0], seconds=round(self.clock()-began, 3), speaks=False)
             raise
         finally:
@@ -132,4 +159,5 @@ class Initiative:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        self.show('disabled', 'closed')
         debug_log.record('initiative_summary', counts=dict(self.counts))

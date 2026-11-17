@@ -82,21 +82,23 @@ class ActivityTest(unittest.TestCase):
 
 
 class DetailTest(unittest.TestCase):
-    def test_background_timer_and_cleanup(self):
-        clock, sent = Clock(), []
-        a = activity.Activity(sent.append, clock=clock)
-        a.background(True)
-        clock.now += 4
-        self.assertTrue(a.state()['background_thinking'])
-        self.assertEqual(a.state()['background_for'], 4)
-        self.assertEqual(a.state()['detail_version'], 1)
-        a.publish()
-        before = len(sent)
-        clock.now += 3
-        a.publish()
-        self.assertEqual(len(sent), before)
-        a.background(False)
-        self.assertFalse(a.state()['background_thinking'])
+    def test_controller_states_replace_dead_background_flag(self):
+        a = activity.Activity(None)
+        a.controller('initiative', phase='waiting', reason='quiet', outcome='silent')
+        s = a.state()
+        self.assertEqual(s['v'], 2)
+        self.assertEqual(s['initiative']['reason'], 'quiet')
+        self.assertNotIn('background_thinking', s)
+        self.assertNotIn('detail_version', s)
+
+    def test_heartbeat_advances_revision_without_state_changes(self):
+        sent = []
+        a = activity.Activity(sent.append)
+        a.publish(force=True)
+        a.publish(force=True)
+        self.assertEqual([v['revision'] for v in sent], [1, 2])
+        self.assertEqual(sent[0]['stream_id'], sent[1]['stream_id'])
+        self.assertEqual(sent[1]['valid_for_s'], 6)
 
     def test_repeated_thinking_resets_the_timer_and_is_published(self):
         clock, sent = Clock(), []
@@ -113,6 +115,18 @@ class DetailTest(unittest.TestCase):
 
 
 class BatchTest(unittest.IsolatedAsyncioTestCase):
+    async def test_close_stops_heartbeat_and_late_observers(self):
+        sent = []
+        a = activity.Activity(sent.append)
+        a.start()
+        await asyncio.sleep(0)
+        await a.close()
+        before = len(sent)
+        a.controller('initiative', phase='disabled', reason='closed', outcome='')
+        a.publish(force=True)
+        self.assertEqual(len(sent), before)
+        self.assertIsNone(a._pending)
+
     async def test_changes_close_together_are_sent_once(self):
         sent = []
         a = activity.Activity(sent.append)

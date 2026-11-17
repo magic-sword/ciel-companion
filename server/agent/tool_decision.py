@@ -150,13 +150,19 @@ class ToolDecision:
 
 class ConversationDecision:
     """One bounded decision chain per SpeechHandle, using LiveKit's actual tool results."""
-    def __init__(self):
+    def __init__(self, observe=lambda **state: None):
+        self.observe = observe
         self.speech_id = None
         self.loop = None
 
     def cancel(self):
-        if self.loop is not None:
+        if self.loop is not None and self.loop.outcome is None and not self.loop.cancelled:
             self.loop.cancelled = True
+            self.show("cancelled")
+
+    def show(self, phase):
+        self.observe(phase=phase, step=self.loop.steps if self.loop else 0,
+                     outcome=self.loop.outcome or "" if self.loop else "")
 
     async def close(self):
         self.cancel()
@@ -167,7 +173,10 @@ class ConversationDecision:
 
     def feedback(self, event):
         if self.loop is not None:
+            before = len(self.loop.observed)
             self.loop.feedback(event)
+            if not self.loop.cancelled and len(self.loop.observed) > before:
+                self.show("reviewing")
 
     async def node(self, owner, ctx, functions, settings, *, source=None):
         speech = owner.session.current_speech
@@ -179,8 +188,14 @@ class ConversationDecision:
             return
         visible = {fn.id: fn for fn in functions}
         source = source if source is not None else ctx
+        self.show('deciding')
         refused = owner.mind.refused_now(source)
-        schema = loop.schema(owner.capabilities, visible, refused)
+        try:
+            schema = loop.schema(owner.capabilities, visible, refused)
+        except Exception:
+            if self.loop is loop:
+                self.show("failed")
+            raise
         instruction = owner.persona.tool_decide_instructions.replace('{state}', loop.context()).replace('{actions}', loop.menu(schema))
         local = models.is_local('mind')
         messages = ctx.to_provider_format('openai')[0]
@@ -199,6 +214,7 @@ class ConversationDecision:
                 return
             decision = json.loads(response.choices[0].message.content or '')
             text, call = loop.resolve(decision, schema, owner.capabilities, visible, owner.mind.refused_now(source))
+            self.show(('loading' if decision['act']['kind'] == 'load' else 'calling') if call else 'finished')
             debug_log.record('conversation_decision', speech_id=speech.id, step=loop.steps,
                              outcome=decision['act']['kind'], notification_owned=loop.notification_owned)
             # A service that owns its notice still receives feedback, but its
@@ -209,4 +225,10 @@ class ConversationDecision:
                 content=text or None, tool_calls=[call] if call is not None else []))
         except asyncio.CancelledError:
             loop.cancelled = True
+            if self.loop is loop:
+                self.show("cancelled")
+            raise
+        except Exception:
+            if self.loop is loop:
+                self.show("failed")
             raise

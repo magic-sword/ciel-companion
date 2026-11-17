@@ -9,17 +9,18 @@
 - 体の技：時間のかかる技（ゲームの ciel/long_running）を始めてから、終わりの知らせ（task_done）まで（game_env.py）。
   目的の係が体で進めている段も入れる（goals.py の body_step）。
 - 最近のこと：道具の結果（始めなかった・できた）、技の終わり、心への知らせ（言葉だけで止まった など）。新しいものが先。
-- 送るのは、変わったときだけ（PUBLISH_GAP にまとめる）。経った秒数は、送ったときの値をアプリが数え足す。
+- 状態変更はPUBLISH_GAPでまとめ、2秒ごとの通知で鮮度を確認する。通知が有効な間だけアプリが経過秒数を数える。
 - ゲームの名前は知らない（道具の見せる名前は、ゲーム・アプリの道具の title から）。
 """
 import asyncio
 import itertools
 import json
 import time
+import uuid
 from collections import deque
 from typing import Callable
 
-VERSION = 1
+VERSION = 2
 PUBLISH_GAP = 0.25   # これより短い間の変化は、まとめて 1 回で送る
 LOG_KEEP = 12
 TEXT_CHARS = 120
@@ -38,9 +39,11 @@ class Activity:
         self.who: str | None = None       # 考えている係（mind：心・talker：小脳）
         self.thinking_origin = ''
         self._mind_epoch = 0
-        self.background_thinking = False
-        self._background_at = clock()
-        self._background_epoch = 0
+        self.controllers = {'initiative': dict(phase='disabled', reason='configuration', outcome=''),
+                            'decision': dict(phase='idle', step=0, outcome='')}
+        self.stream_id, self.revision = uuid.uuid4().hex, 0
+        self._heartbeat = None
+        self._closed = False
         self._mind_at = clock()
         self._calls: dict[str, dict] = {}     # call_id → {name, label, at}
         self._body: dict = {'version': 1, 'phase': 'idle'}
@@ -70,12 +73,27 @@ class Activity:
         self._set_mind('thinking')
         self.changed()
 
-    def background(self, active: bool) -> None:
-        """内なる考えを生成している間だけ。考えの本文は送らない。"""
-        if self.background_thinking != active:
-            self.background_thinking, self._background_at = active, self._clock()
-            self._background_epoch += 1
+    def controller(self, name, **state):
+        if self.controllers.get(name) != state:
+            self.controllers[name] = state
             self.changed()
+
+    def start(self):
+        self._heartbeat = asyncio.create_task(self._pulse())
+
+    async def _pulse(self):
+        while True:
+            self.publish(force=True)
+            await asyncio.sleep(2)
+
+    async def close(self):
+        self._closed = True
+        if self._pending is not None:
+            self._pending.cancel()
+            self._pending = None
+        if self._heartbeat is not None:
+            self._heartbeat.cancel()
+            await asyncio.gather(self._heartbeat, return_exceptions=True)
 
     def _set_mind(self, state: str) -> None:
         if state != self.mind:
@@ -174,10 +192,9 @@ class Activity:
         return {
             'v': VERSION, 'type': 'activity.state',
             'mind': self.mind, 'who': self.who or '', 'mind_for': round(now - self._mind_at, 1),
-            'detail_version': 1, 'thinking_origin': self.thinking_origin,
-            'mind_epoch': self._mind_epoch, 'background_epoch': self._background_epoch,
-            'background_thinking': self.background_thinking,
-            'background_for': round(now - self._background_at, 1) if self.background_thinking else 0,
+            'stream_id': self.stream_id, 'revision': self.revision, 'valid_for_s': 6,
+            'thinking_origin': self.thinking_origin, 'mind_epoch': self._mind_epoch,
+            **self.controllers,
             'calls': [{'label': c['label'], 'for_s': round(now - c['at'], 1)} for c in self._calls.values()],
             'body': {**self._body, 'for_s': round(self._body.get('for_s', 0) + now - self._body_at, 1)} if self._body else None,
             'log': [{'id': e['id'], 'ago': round(now - e['at'], 1), 'text': e['text'], 'kind': e['kind']} for e in self._log],
@@ -185,7 +202,7 @@ class Activity:
 
     def changed(self) -> None:
         """変わった：少しまとめてから送る（ループが無ければ、すぐ送る）"""
-        if self.notify is None:
+        if self.notify is None or self._closed:
             return
         try:
             loop = asyncio.get_running_loop()
@@ -195,17 +212,19 @@ class Activity:
         if self._pending is None:
             self._pending = loop.call_later(PUBLISH_GAP, self.publish)
 
-    def publish(self) -> None:
+    def publish(self, force=False) -> None:
         self._pending = None
-        if self.notify is None:
+        if self.notify is None or self._closed:
             return
         s = self.state()
         # 経った秒数だけが違うなら送らない（アプリが数え足す）
-        shown = json.dumps({k: v for k, v in s.items() if k not in ('mind_for', 'background_for')} | {
+        shown = json.dumps({k: v for k, v in s.items() if k not in ('mind_for', 'revision')} | {
             'body': {k: v for k, v in (s.get('body') or {}).items() if k != 'for_s'},
             'calls': [c['label'] for c in s['calls']],
             'log': [e['id'] for e in s['log']]}, ensure_ascii=False, sort_keys=True)
-        if shown == self._shown:
+        if not force and shown == self._shown:
             return
         self._shown = shown
+        self.revision += 1
+        s['revision'] = self.revision
         self.notify(s)

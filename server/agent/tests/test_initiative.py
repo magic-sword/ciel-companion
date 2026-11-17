@@ -35,6 +35,25 @@ class InitiativeTest(unittest.IsolatedAsyncioTestCase):
         self.loop.step()
         await asyncio.sleep(0)
 
+    async def test_observer_distinguishes_waiting_and_failed_decision(self):
+        states = []
+        self.loop.observe = lambda **state: states.append(state)
+        self.loop.step()
+        self.assertEqual(states[-1]['reason'], 'new_event')
+        self.add()
+        self.loop.step()
+        self.assertEqual(states[-1]['reason'], 'quiet')
+        self.now += 9
+        self.loop.step()
+        await asyncio.sleep(0)
+        self.assertEqual(states[-1]['phase'], 'scheduled')
+        self.decider.consider.return_value = dict(status='failed', acted=False, say='')
+        await self.loop.reply([], [])
+        self.assertTrue(any(s['phase'] == 'deciding' for s in states))
+        self.assertEqual(states[-1]['outcome'], 'error')
+        self.assertNotEqual(states[-1]['outcome'], 'silent')
+        self.handle.set_result(None)
+
     async def test_idle_alone_and_own_speech_never_rearm(self):
         await self.schedule()
         self.mouth.say.assert_not_called()

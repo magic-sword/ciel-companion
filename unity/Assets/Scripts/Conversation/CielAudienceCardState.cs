@@ -25,7 +25,16 @@ namespace Ciel.Conversation
                 result.attention = true;
                 return result;
             }
-            result.conversation = Conversation(activity, userSpeaking);
+            if (!CielActivityPresentation.Fresh(activity, age))
+            {
+                result.phase = "unknown";
+                result.heading = "シエル｜状態確認中";
+                result.title = "会話状態の通知を確認できていません";
+                result.current = "接続・アプリとサーバーの版を確認してください";
+                result.attention = true;
+                activity = null;
+            }
+            result.conversation = activity == null ? "状態未確認" : Conversation(activity, userSpeaking);
             var body = activity?.body;
             string work = body != null && body.Active ? body.title : null;
             string summary = "";
@@ -88,36 +97,6 @@ namespace Ciel.Conversation
                 result.title = "話しています";
                 result.current = "声で返事をしています";
             }
-            else if (activity?.background_thinking == true)
-            {
-                result.phase = "background";
-                result.heading = "シエル｜自発的に考え中";
-                result.title = "裏で考えを整理しています";
-                result.current = "考えがまとまるのを待っています";
-                result.elapsed = Seconds(activity.background_for, age);
-                summary = result.title;
-            }
-            else if (activity == null)
-            {
-                result.phase = "unknown";
-                result.heading = "シエル｜状態の確認中";
-                result.title = "状態の通知を待っています";
-                result.current = "まだ待機中かどうかは分かりません";
-            }
-            else if (activity.detail_version < 1)
-            {
-                result.current = "実行中の作業はありません";
-                result.progress = "詳しい思考状態はまだ確認できていません";
-            }
-
-            if (body?.phase == "idle" && body.last_phase == "failed" && result.phase == "idle")
-            {
-                result.phase = "failed";
-                result.heading = "シエル｜作業できませんでした";
-                result.title = string.IsNullOrEmpty(body.last_title) ? "直前の作業" : body.last_title;
-                result.current = string.IsNullOrEmpty(body.last_note) ? "操作画面で理由を確認してください" : body.last_note;
-                result.attention = true;
-            }
             if (goal != null && (goal.Active || (recent && result.phase == "idle")))
             {
                 var view = CielWorkPresentation.From(goal);
@@ -141,6 +120,8 @@ namespace Ciel.Conversation
         {
             if (userSpeaking) return "声を聞いています";
             if (a?.mind == "speaking") return "話しています";
+            if (a?.decision?.phase is "loading" or "calling" or "reviewing") return CielActivityPresentation.Decision(a);
+            if (a?.initiative?.phase == "deciding") return "自発的に話す・動く・黙るを判断中";
             if (a?.mind == "thinking") return a.thinking_origin switch {
                 "comment" => "コメントへの返事を考えています",
                 "game" => "ゲーム内の出来事への反応を考えています",
@@ -149,7 +130,8 @@ namespace Ciel.Conversation
                 "initiative" => "自分から話すことを考えています",
                 _ => "返事・次の行動を考えています"
             };
-            if (a?.background_thinking == true) return "考えを整理しています";
+            if (a?.decision?.phase is "deciding" or "loading" or "calling" or "reviewing")
+                return CielActivityPresentation.Decision(a);
             return "";
         }
     }
