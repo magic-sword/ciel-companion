@@ -58,6 +58,7 @@ case "$ACTION" in
     done
     ;;
   stop)
+    [ ! -f "$PROD/.env.livekit-production" ] || { echo '本番がこのLiveKitを使用中です。本番の接続先を戻してから停止してください。'; exit 1; }
     "${COMPOSE[@]}" stop livekit-local token-local agent-local 2>&1 | tail -4
     "${COMPOSE[@]}" rm -f livekit-local token-local agent-local >/dev/null 2>&1 || true
     ;;

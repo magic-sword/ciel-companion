@@ -79,9 +79,22 @@ with tempfile.TemporaryDirectory(prefix='ciel-compose-check-') as folder:
         assert values['CIEL_MIND_MODEL']==model and values['CIEL_MIND_REASONING']=='none'
         assert values['CIEL_MEMORY_SCOPE']=='dev'
         results.append({'case':'local-livekit-'+('openai-mind' if roles else 'local-mind'),'isolated':True})
+    (prod/'compose.yaml').write_text(files['prod'])
+    (prod/'compose.livekit-production.yaml').write_text(files['production_livekit'])
+    (prod/'.env.livekit-production').write_text('LIVEKIT_LOCAL_BIND=127.0.0.1\nLIVEKIT_LOCAL_KEY=local-key\nLIVEKIT_LOCAL_SECRET=local-secret\n')
+    (prod/'.env').write_text('CIEL_LLM_BACKEND=local\nCIEL_OPENAI_ROLES=mind\nCIEL_MIND_MODEL=gpt-5.4-mini\n')
+    command=['docker','compose','--env-file','.env.shared','--env-file','.env.livekit-production','--env-file','.env','-f','compose.yaml','-f','compose.livekit-production.yaml','config','--format','json']
+    result=subprocess.run(command,cwd=prod,env=env,capture_output=True,text=True,check=True)
+    service=json.loads(result.stdout)['services']['agent'];values=service['environment']
+    assert values['LIVEKIT_URL']=='ws://127.0.0.1:7880' and values['LIVEKIT_API_KEY']=='local-key'
+    assert values['CIEL_AGENT_NAME']=='ciel-main' and values['CIEL_MEMORY_SCOPE']=='main'
+    assert values['CIEL_OPENAI_ROLES']=='mind' and values['CIEL_MIND_MODEL']=='gpt-5.4-mini'
+    assert next(v for v in service['volumes'] if v['target']=='/app/config')['source']==str(prod/'agent/config')
+    results.append({'case':'production-local-livekit-main-scope','isolated':True})
 print(json.dumps({'status':'passed','checks':results,'services_restarted':False},ensure_ascii=False))
 """
 if __name__=='__main__':
     sources={'prod':(ROOT/'server/compose.yaml').read_text(encoding='utf-8'),'dev':(ROOT/'server/compose.dev.yaml').read_text(encoding='utf-8')}
     sources['livekit']=(ROOT/'server/compose.livekit-local.yaml').read_text(encoding='utf-8')
+    sources['production_livekit']=(ROOT/'server/compose.livekit-production.yaml').read_text(encoding='utf-8')
     home.remote(CODE.replace('COMPOSE_SOURCES',repr(sources)))

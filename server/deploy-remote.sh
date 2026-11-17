@@ -36,4 +36,10 @@ python3 environment.py --prod-dir "$PWD"
 for d in agent tts-irodori voice-conversion; do
   if [ -f "$d/compose.yaml" ]; then (cd "$d" && docker compose down) && rm -f "$d/compose.yaml"; fi
 done
-docker compose --env-file .env.shared --env-file .env up -d --build 2>&1 | tail -8
+COMPOSE=(docker compose --env-file .env.shared)
+if [ -f .env.livekit-production ]; then
+  COMPOSE+=(--env-file .env.livekit-production --env-file .env -f compose.yaml -f compose.livekit-production.yaml)
+else
+  COMPOSE+=(--env-file .env)
+fi
+"${COMPOSE[@]}" up -d --build 2>&1 | tail -8

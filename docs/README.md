@@ -56,7 +56,7 @@
 |---|---|
 | [operations/local-runtime-ja.md](operations/local-runtime-ja.md) | 本番・開発の推論設定、設定ファイルの優先順位、切替・反映単位。 |
 | [operations/shared-llm-api-ja.md](operations/shared-llm-api-ja.md) | 共用LLM APIの接続・容量設定・GPU/CPU制御と測定方法。 |
-| [operations/local-livekit-ja.md](operations/local-livekit-ja.md) | 家の中だけのLiveKitと試験用の会話サーバー（試験・測定用）の構成と起動。 |
+| [operations/local-livekit-ja.md](operations/local-livekit-ja.md) | 家の中だけのLiveKit、本番・開発の会話サーバーの接続と起動。 |
 
 ## テストと確認状況
 

@@ -22,7 +22,7 @@ services:
       - LIVEKIT_LOCAL_SECRET=${LIVEKIT_LOCAL_SECRET:?}
       - LIVEKIT_LOCAL_URL=ws://${LIVEKIT_LOCAL_BIND:?}:7880
       - LIVEKIT_LOCAL_BIND=${LIVEKIT_LOCAL_BIND:?}
-      - LIVEKIT_LOCAL_AGENT=ciel-dev
+      - LIVEKIT_LOCAL_AGENT=${LIVEKIT_LOCAL_AGENT:-ciel-dev}
     entrypoint: ['python', '/livekit-local/token_server.py']
     volumes:
       - ./livekit-local:/livekit-local:ro

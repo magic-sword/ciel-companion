@@ -1,15 +1,15 @@
-# 家の中だけの LiveKit（試験用）
+# 家の中だけの LiveKit
 
-> 責務：家の中だけのLiveKitと試験用の会話サーバー（試験・測定用）の構成と起動。
+> 責務：家の中だけのLiveKit、本番・開発の会話サーバーの接続と起動。
 
-クラウドの LiveKit は接続時間に上限があり、上限を超えると本番・開発とも会話に入れない（2026-11-16に429 `connection minutes limit exceeded`を受けた）。試験と測定は、家の中のネットワークだけで動く LiveKit で行える。普段の開発と本番は、これまでどおりクラウドの LiveKit につなぐ。
+クラウドの LiveKit は接続時間に上限があり、上限を超えると会話に入れない。本番・開発とも家の中のネットワークだけで動くLiveKitを選べる。LiveKitの通信先と、LLMの推論先は独立した設定である。
 
 ## 構成
 
 | 部品 | 置き場所 | 役目 |
 |---|---|---|
 | `livekit-local` | `livekit/livekit-server:v1.8.4`、設定は`server/livekit-local/livekit.yaml` | 家の中のアドレスだけで開く LiveKit。信号7880、TCPの予備7881、音声のUDP 7882（1ポートにまとめる） |
-| `token-local` | `server/livekit-local/token_server.py` | アプリにトークンを出す窓口（7883の`POST /token`）。LiveKit の開発用トークンサーバーと同じ形（`server_url`・`participant_token`）で返し、部屋に試験用の会話サーバー`ciel-dev`を呼ぶ |
+| `token-local` | `server/livekit-local/token_server.py` | アプリにトークンを出す窓口（7883の`POST /token`）。開発指定があれば`ciel-dev`、指定がなければ`LIVEKIT_LOCAL_AGENT`を呼ぶ。本番切替時は`ciel-main`を設定する |
 | `agent-local` | 開発の会話サーバーと同じイメージとプロンプト | 家の中の LiveKit につなぐ会話サーバー（8092）。推論先は独立して設定可能。記憶は開発のスコープ |
 
 サービスの定義は`server/compose.livekit-local.yaml`で、開発の`compose.dev.yaml`と一緒に読む。鍵・アドレスは開発の`server/.env.livekit-local`（Git・デプロイの外、権限0600）。家の中のアドレスは本番の`.env.minecraft`の`MC_BIND`を使う。
@@ -35,6 +35,19 @@ scripts/server/livekit-local.sh stop
 `start`は、今の開発の会話サーバー（`ciel-dev-agent-dev-1`）のイメージと設定（`/app/config`）で試験用の会話サーバーを起動する。開発の会話サーバーを配布し直したら、`start`をもう一度実行して版をそろえる。初回は鍵を作る。
 
 ## Windows アプリからつなぐ
+
+### 本番をローカルLiveKitへ接続する
+
+本番の`server/.env.livekit-production`に、既存の開発`server/.env.livekit-local`から`LIVEKIT_LOCAL_BIND`・`LIVEKIT_LOCAL_KEY`・`LIVEKIT_LOCAL_SECRET`だけをコピーして権限0600で保存する。Git・通常配布の対象外であり、`.env.shared`のクラウド資格情報は変更しない。本番の推論設定は引き続き`.env`、プロンプトは本番の`agent/config`、記憶は`main`を使う。
+
+```bash
+docker compose --env-file .env.shared --env-file .env.livekit-production --env-file .env \
+  -f compose.yaml -f compose.livekit-production.yaml up -d --no-build --no-deps agent
+```
+
+本番agentは`ciel-main`として登録される。開発の`.env.livekit-local`には`LIVEKIT_LOCAL_AGENT=ciel-main`を設定し、`token-local`を再作成する。アプリでは「家の中の試験用サーバーにつなぐ」をON、「開発用のサーバーにつなぐ」をOFFにして本番へ入る。開発スイッチがONなら同じ窓口から`ciel-dev`へ入る。既存の会話は移動しないため再接続する。
+
+`deploy-remote.sh`は`.env.livekit-production`の存在を確認して同じoverlayを読み、通常配布後もローカル接続を維持する。`livekit-local.sh stop`は本番が使用中なら停止を拒否する。クラウドへ戻す場合は同ファイルを退避し、通常のComposeで本番agentを再作成して、窓口の既定を`ciel-dev`へ戻す。クラウドの利用上限が解消していることを先に確認する。
 
 ### LiveKitと推論先を別々に選ぶ
 

@@ -33,7 +33,7 @@ else
   DEST='~/work/ciel-companion/server'
   EXCLUDES=()
 fi
-tar -C "$ROOT/server" -cf - --exclude=.env --exclude=.env.shared --exclude=.env.dev --exclude=.env.minecraft --exclude=__pycache__ --exclude=node_modules --exclude=data ${EXCLUDES[@]+"${EXCLUDES[@]}"} . \
+tar -C "$ROOT/server" -cf - --exclude=.env --exclude=.env.shared --exclude=.env.dev --exclude=.env.minecraft --exclude=.env.livekit-local --exclude=.env.livekit-production --exclude=__pycache__ --exclude=node_modules --exclude=data ${EXCLUDES[@]+"${EXCLUDES[@]}"} . \
   | "${SSH[@]}" "mkdir -p $DEST && cd $DEST && tar xf -"
 "${SSH[@]}" "bash $DEST/deploy-remote.sh $([ $MODE = dev ] && echo dev) $MINECRAFT"
 echo DEPLOY_SERVER_DONE

@@ -1,0 +1,9 @@
+# 本番agentの通信だけを家の中のLiveKitへ切り替える。
+# .env.shared → .env.livekit-production → .env の順に補間し、compose.yamlへ重ねる。
+services:
+  agent:
+    environment:
+      - LIVEKIT_URL=ws://${LIVEKIT_LOCAL_BIND:?}:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_LOCAL_KEY:?}
+      - LIVEKIT_API_SECRET=${LIVEKIT_LOCAL_SECRET:?}
+      - CIEL_AGENT_NAME=ciel-main
