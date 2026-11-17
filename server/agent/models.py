@@ -74,8 +74,10 @@ def create_client(role: str, *, traced=False):
     import openai
     if is_local(role):
         import inference_trace
-        return openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0,
-                                 **(inference_trace.client_options() if traced else {}))
+        options = inference_trace.client_options() if traced else {}
+        if 'client' in options:
+            return options['client']
+        return openai.AsyncOpenAI(base_url=LOCAL_URL, api_key='local', max_retries=0)
     return openai.AsyncOpenAI()
 
 

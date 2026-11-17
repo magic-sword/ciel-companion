@@ -6,6 +6,14 @@ import models
 
 
 class CostTest(unittest.TestCase):
+    def test_traced_client_is_used_directly(self):
+        client = object()
+        with mock.patch.object(models, 'is_local', return_value=True), \
+                mock.patch('inference_trace.client_options', return_value={'client': client}), \
+                mock.patch('openai.AsyncOpenAI') as factory:
+            self.assertIs(models.create_client('mind', traced=True), client)
+            factory.assert_not_called()
+
     def test_text_model(self):
         # 入力 1,000（キャッシュ 400）・出力 100 の gpt-5.4-mini
         usd = models.cost('gpt-5.4-mini', 1000, 400, 100)
