@@ -148,6 +148,22 @@ test('a work waits for the reply a mode asks for after interrupting its action',
   assert.equal(result.response, 'carried on');
 });
 
+test('only model dialogue is voiced, without action syntax or cancelled output', async () => {
+  const events=[];
+  const runner=new MindcraftRunner((kind,event)=>events.push({kind,...event}),'Owner');
+  const agent={shut_up:false};
+  runner.current={id:1,request_id:'r',token:{cancelled:false}};
+  runner.bindSpeech(agent);
+  await agent.openChat('Picking up item!');
+  assert.equal(events.length,0);
+  await agent.routeResponse('Owner','I will find wood. !collectBlocks("oak_log", 2)');
+  assert.equal(events.length,1);
+  assert.equal(events[0].text,'I will find wood.');
+  runner.current.token.cancelled=true;
+  await agent.routeResponse('Owner','Old response');
+  assert.equal(events.length,1);
+});
+
 test('a pursue left at a plan choice says so, and the owner speaks into the running pursue', async () => {
   const runner = new MindcraftRunner(() => {}, 'Owner');
   const heard = [];

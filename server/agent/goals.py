@@ -1,5 +1,6 @@
 """Game-independent work client. Plans, steps and repairs belong to the MCP server."""
 import asyncio
+import hashlib
 import json
 import math
 import time
@@ -27,6 +28,8 @@ class GoalRunner:
         self._watch = None
         self._deadline = 0
         self._notified = set()
+        self._last_body_speech = None
+        self._last_body_event = None
         self._stream_id = uuid.uuid4().hex
         self._display_revision = 1
         self._confirmed_at = 0
@@ -120,6 +123,11 @@ class GoalRunner:
             key = (w['task_id'], w['state'], (w.get('decision') or {}).get('decision_id'))
             if key not in self._notified:
                 self._notified.add(key)
+                repeated = ((w.get('decision') or {}).get('message') if w['state'] == 'needs_decision'
+                            else (w.get('evidence') or {}).get('response') if w['state'] == 'succeeded' else None)
+                if (repeated and self._last_body_speech == (w['session'], w['task_id'], repeated.strip()[:600])
+                        and getattr(self._last_body_event, 'status', None) in ('queued', 'generating', 'spoken')):
+                    return True
                 # Inventory/evidence remain in the current-state supplement, not the event timeline.
                 fact = {k: w.get(k) for k in ('task_id', 'state', 'message', 'reason', 'decision')}
                 self.say('game', settle=0.2, instructions=json.dumps({'work_result': fact, 'title': self.title}, ensure_ascii=False), merge=True)
@@ -230,8 +238,17 @@ class GoalRunner:
         text = e.get('text') if isinstance(e, dict) else None
         if not w or e.get('task_id') != w['task_id'] or w['state'] in TERMINAL or not isinstance(text, str) or not text.strip():
             return False
-        self.say('game', settle=0.2, instructions=json.dumps({'work_message': {'task_id': w['task_id'], 'text': text.strip()[:600]},
-                                                             'title': self.title}, ensure_ascii=False), merge=True)
+        identity = (w['session'], w['task_id'])
+        text = text.strip()[:600]
+        event_id = hashlib.sha256(json.dumps([*identity, e.get('revision'), text]).encode()).hexdigest()
+        event = self.say('game', settle=0.2, text=text,
+                 event_id=event_id,
+                 valid=lambda: bool(self.work and self.env.linked and not self._unknown
+                                    and (self.work['session'], self.work['task_id']) == identity
+                                    and self.work['state'] not in ('cancelling', 'cancelled', 'failed')))
+        if event is not None:
+            self._last_body_speech = (*identity, text)
+            self._last_body_event = event
         return True
 
     def body_step(self):

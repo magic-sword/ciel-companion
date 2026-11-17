@@ -7,6 +7,25 @@ from unittest.mock import AsyncMock
 import goals
 
 class WorkTest(unittest.IsolatedAsyncioTestCase):
+    async def test_already_voiced_question_is_not_generated_again(self):
+        await self.runner.start('puzzle.solve', {})
+        self.runner.say = lambda why, **kw: types.SimpleNamespace(status='queued')
+        self.runner.message({'task_id': 'task', 'revision': 1, 'text': 'Which corner?'})
+        self.runner.say = lambda why, **kw: self.lines.append(kw)
+        self.runner.accept({**self.remote, 'revision': 2, 'state': 'needs_decision',
+                            'decision': {'decision_id': 'q', 'message': 'Which corner?'}})
+        self.assertEqual(self.lines, [])
+
+    async def test_body_speech_becomes_invalid_when_the_work_changes_or_stops(self):
+        await self.runner.start('puzzle.solve', {})
+        self.runner.message({'task_id': 'task', 'text': 'Starting.'})
+        valid = self.lines[-1]['valid']
+        self.assertTrue(valid())
+        self.runner.work = {**self.runner.work, 'state': 'cancelling'}
+        self.assertFalse(valid())
+        self.runner.work = {**self.runner.work, 'state': 'running', 'task_id': 'new'}
+        self.assertFalse(valid())
+
     def setUp(self):
         self.remote = {'version': 1, 'session': 'server', 'task_id': 'task', 'request_id': 'request',
                        'revision': 1, 'state': 'running', 'evidence': {}, 'message': ''}
@@ -72,7 +91,7 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         # What the body says during the work is voiced; another work's message is not.
         self.assertTrue(self.runner.message({'task_id': 'task', 'text': 'Starting at the corner.'}))
         self.assertFalse(self.runner.message({'task_id': 'other', 'text': 'x'}))
-        self.assertIn('Starting at the corner.', self.lines[-1]['instructions'])
+        self.assertEqual('Starting at the corner.', self.lines[-1]['text'])
         self.remote.update(state='needs_decision', revision=2, reason='owner_question',
                            decision={'decision_id': 'q', 'kind': 'question', 'actions': ['reply', 'cancel'], 'message': 'Which corner?'})
         self.runner.accept(copy.deepcopy(self.remote))

@@ -668,6 +668,8 @@ async def entrypoint(ctx: JobContext) -> None:
                 act.changed()   # 目的の係が体で進めている段（いま）も変わる
 
             def goal_say(why: str, **kw) -> None:
+                if 'text' in kw:
+                    return voice.say_latest(why, **kw)
                 act.log(kw.get('instructions', '').strip('[]'), 'info')   # 目的の係からの知らせ（いま の最近のこと）
                 voice.react_latest(why, reaction_kind='work.result', **kw)
             goal_runner = goals.GoalRunner(goal_say, publish=goal_publish, env=body)

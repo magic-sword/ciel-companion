@@ -33,6 +33,8 @@ class Mouth:
         self.counts: collections.Counter[str] = collections.Counter()
         self.before_say = None   # 話させる直前に why を知らせる先（pipeline の心が、考える番の返事かを知る。mind.py）
         self._handed = collections.OrderedDict()   # 発話ごとに、文脈へ渡した通知IDを保持する
+        if hasattr(session, 'on'):
+            session.on('user_state_changed', self.reactions.on_user_state)
 
     def busy(self) -> bool:
         s = self.session
@@ -46,6 +48,8 @@ class Mouth:
         debug_log.record('speak', why=why)
         if self.before_say is not None:
             self.before_say(why)
+        if 'text' in kwargs:
+            return self.session.say(kwargs.pop('text'), **kwargs)
         return self.session.generate_reply(**kwargs)
 
     async def say_when_free(self, why: str, *, wait: float = 30.0, anyway: bool = False, settle: float = 0.0,
@@ -72,6 +76,11 @@ class Mouth:
         return not self.busy()
 
     def say_latest(self, why: str, *, settle: float = 0., wait: float = 30., merge: bool = False, **kwargs):
+        if 'text' in kwargs:
+            valid = kwargs.pop('valid', None)
+            event_id = kwargs.pop('event_id', None)
+            return self.reactions.submit('work', 'work.speech', {}, why=why, kwargs=kwargs,
+                                         valid=valid, event_id=event_id, settle=settle)
         kinds = {'minutes': 'minutes.notice', 'research': 'research.result',
                  'image': 'image.received', 'game': 'game.notice'}
         if why not in kinds:

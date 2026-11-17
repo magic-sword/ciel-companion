@@ -44,6 +44,35 @@ class Session:
 
 
 class ReactionsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_body_words_go_directly_to_tts_and_duplicate_delivery_is_rejected(self):
+        calls = []
+        self.session.say = lambda text, **kw: calls.append(text) or self.session.generate_reply(**kw)
+        first = self.mouth.say_latest('game', text='I will gather wood.', event_id='same')
+        self.assertIsNone(self.mouth.say_latest('game', text='I will gather wood.', event_id='same'))
+        await self.until(lambda: first.status == 'spoken')
+        self.assertEqual(calls, ['I will gather wood.'])
+        self.assertEqual(self.session.calls, [{}])
+
+    async def test_body_speech_waits_and_old_work_is_discarded(self):
+        self.session.user_state = 'speaking'
+        valid = True
+        event = self.mouth.say_latest('game', text='old work', valid=lambda: valid)
+        await asyncio.sleep(.06)
+        self.assertFalse(self.session.calls)
+        valid = False
+        await self.until(lambda: event.status == 'expired')
+        self.assertFalse(self.session.calls)
+
+    async def test_user_interrupt_discards_queued_and_playing_body_speech(self):
+        self.session.complete = False
+        self.session.say = lambda text, **kw: self.session.generate_reply(**kw)
+        first = self.mouth.say_latest('game', text='first')
+        second = self.mouth.say_latest('game', text='second')
+        await self.until(lambda: first.handle is not None)
+        self.hub.on_user_state(Obj(new_state='speaking'))
+        self.assertTrue(first.handle.interrupted)
+        self.assertEqual((first.status, second.status), ('cancelled', 'cancelled'))
+
     async def asyncSetUp(self):
         self.session = Session()
         self.mouth = self.session.userdata.mouth = mouth.Mouth(self.session)

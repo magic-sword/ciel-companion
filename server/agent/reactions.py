@@ -17,7 +17,7 @@ log = logging.getLogger('ciel-agent.reactions')
 POLICY = {  # trusted source -> kind -> (priority, maximum lifetime)
     'touch': {'touch.pull': (90, 5), 'touch.contact': (30, 5)},
     'game': {'game.damage': (90, 5), 'game.died': (90, 5), 'game.notice': (40, 30)},
-    'work': {'work.result': (50, 30)},
+    'work': {'work.result': (50, 30), 'work.speech': (40, 30)},
     'comment': {'comment.received': (10, 30)},
     'song': {'song.change': (10, 3)},
     'minutes': {'minutes.notice': (50, 30)},
@@ -40,13 +40,14 @@ class Reaction:
     result: asyncio.Future | None = None
     output_seen: bool = False
     quiet_seconds: float = 0.
+    valid: object = None
 
     @property
     def conversation(self):
-        return self.key[0] in ('game', 'work')
+        return self.key[0] in ('game', 'work') and self.kind != 'work.speech'
 
     def expired(self, now):
-        return self.deadline is not None and now >= self.deadline
+        return (self.deadline is not None and now >= self.deadline) or (self.valid is not None and not self.valid())
 
 
 class Reactions:
@@ -97,7 +98,7 @@ class Reactions:
             self.finish(self.active, 'disconnected')
             self.interrupt(self.active)
 
-    def receive(self, source, envelope, *, why, kwargs=None, settle=0., expression=None, local_expression=False):
+    def receive(self, source, envelope, *, why, kwargs=None, settle=0., expression=None, local_expression=False, valid=None):
         """source/why/kwargs are host adapter arguments, never fields trusted from a sender."""
         if self.closed or not isinstance(source, str) or source not in POLICY or not isinstance(envelope, dict):
             return self.reject('input', 'closed_or_invalid_source')
@@ -126,6 +127,7 @@ class Reactions:
             return self.reject(source, 'expired')
         now = self.clock()
         event = Reaction(key, kind, priority, now + remaining, why, dict(kwargs or {}), now + max(0, settle))
+        event.valid = valid
         if event.conversation:
             # Freshness is checked at ingestion. Accepted facts wake ordinary conversation.
             event.deadline = None
@@ -135,7 +137,7 @@ class Reactions:
         while len(self.seen) > self.REMEMBER:
             self.seen.popitem(last=False)
         self.trace(event, 'received')
-        if source in ('game', 'work'):
+        if event.conversation:
             history = getattr(getattr(self.mouth.session, 'userdata', None), 'history', None)
             if history is None:
                 from conversation import Conversation
@@ -157,7 +159,7 @@ class Reactions:
             return event
         # Coalesce only within the same trusted source and kind. Do not combine authorities.
         for old in list(self.queue.values()):
-            if old.key[0] == source and old.kind == kind:
+            if old.key[0] == source and old.kind == kind and kind != 'work.speech':
                 self.finish(old, 'superseded')
         if len(self.queue) >= self.LIMIT:
             victim = min(self.queue.values(), key=lambda e: (e.priority, e.ready_at))
@@ -229,7 +231,7 @@ class Reactions:
         for event in list(self.queue.values()):
             if event.expired(self.clock()):
                 self.finish(event, 'expired')
-            elif event.key[0] == source:
+            elif event.key[0] == source and event.kind != 'work.speech':
                 self.queue.pop(event.key, None)
                 event.status = 'attached'
                 speech = getattr(self.mouth.session, 'current_speech', None)
@@ -266,6 +268,14 @@ class Reactions:
             self.finish(event, 'cancelled')
             self.interrupt(event)
             raise
+
+    def on_user_state(self, notice):
+        if notice.new_state != 'speaking':
+            return
+        for event in [*self.queue.values(), *([self.active] if self.active else [])]:
+            if event.kind == 'work.speech':
+                self.finish(event, 'cancelled')
+                self.interrupt(event)
 
     async def run(self):
         try:

@@ -89,6 +89,20 @@ export class MindcraftRunner extends BodyCommands {
 
   // A mode that interrupts an action (unstuck, self-defence) asks the model again on its own,
   // outside the work's first message. The work is not over until those replies are handled.
+  bindSpeech(agent) {
+    // Only model responses pass through routeResponse. openChat is also used by
+    // fixed mode narration, so it must not be treated as the model's own speech.
+    agent.openChat=async()=>{};
+    agent.routeResponse=async(_source,message)=>{
+      const c=this.current;
+      if(agent.shut_up || !c || c.token.cancelled)return;
+      this.nativeResponse=String(message).trim();
+      const text=spoken(this.nativeResponse);
+      if(text)this.report('activity',{id:c.id,request_id:c.request_id,command_scope:c.scope??'',
+        stage:'said',command:'',text});
+    };
+  }
+
   trackReplies(agent) {
     const handleMessage = agent.handleMessage.bind(agent);
     agent.handleMessage = async (...args) => {
@@ -157,13 +171,7 @@ export class MindcraftRunner extends BodyCommands {
     if(agent.blocked_actions.length>defaultSettings.blocked_actions.length)console.log('Blocked commands:',agent.blocked_actions.join(', '));
     blacklistCommands(agent.blocked_actions);
     // Transport and process lifecycle belong to CIEL; planning belongs to Agent.
-    agent.openChat=async message=>{
-      this.nativeResponse=String(message).trim();
-      // Told to the owner as it is said ("I'll go and look for sheep"), not only at the end.
-      const c=this.current,text=spoken(this.nativeResponse);
-      if(c&&text)this.report('activity',{id:c.id,request_id:c.request_id,command_scope:c.scope??'',
-        stage:'said',command:'',text});
-    };
+    this.bindSpeech(agent);
     agent.cleanKill=nativeExit(bot,()=>{this.blocked=true;this.interrupt(bot);bot.quit('Mindcraft stopped');});
     const requestInterrupt=agent.requestInterrupt.bind(agent);
     agent.requestInterrupt=()=>{requestInterrupt();this.actionScope.interrupt();};
