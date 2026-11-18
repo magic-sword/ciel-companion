@@ -374,7 +374,7 @@ namespace Ciel.Conversation
             UpdateStatusLine();
 
             // マイク：入れている（光る六角）・切っている（透けた六角）・使えない（薄い）
-            var usable = connected && !c.MicBusy;
+            var usable = connected && (!c.MicBusy || c.MicEnabled); // OFF remains available during startup/publication.
             _micButton.interactable = usable;
             var on = c.MicEnabled && connected;
             _micHex.sprite = LoadSprite(on ? "hex_prism" : "hex");

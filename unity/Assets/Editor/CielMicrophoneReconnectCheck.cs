@@ -24,6 +24,7 @@ namespace Ciel.EditorTools
 
         public static void VerifyAndBuildBroadcast()
         {
+            Run();
             CielAppCompositionCheck.Run();
             Ciel.Companion.Editor.CielBuild.WindowsBroadcast();
         }
@@ -36,6 +37,28 @@ namespace Ciel.EditorTools
             var c = go.GetComponent<CielConversation>();
             try
             {
+                Field(c, "_room", new Room()); Status(c, CielConversation.State.Connected);
+                Field(c, "_busy", true); Field(c, "_recording", true);
+                c.SetMicEnabled(false);
+                Check(!c.MicEnabled, "OFF stops capture even while publication is pending");
+                Check((bool)typeof(CielConversation).GetField("_micStopRequested", Private).GetValue(c),
+                    "OFF survives the asynchronous publication and device-switch waits");
+                Check(c.MicBusy, "pending publication keeps the control busy until cleanup finishes");
+                c.SetMicEnabled(true);
+                Check(!c.MicEnabled, "ON cannot overtake a pending OFF");
+                c.EndConversation();
+                Check(!(bool)typeof(CielConversation).GetField("_micStopRequested", Private).GetValue(c),
+                    "disconnect retires the old stop request");
+                Field(c, "_room", new Room()); Status(c, CielConversation.State.Connected);
+                Field(c, "_busy", true);
+                Check(c.MicEnabled, "pending ON is visible before capture starts");
+                c.SetMicEnabled(false);
+                Check(!c.MicEnabled, "pending ON can be cancelled before capture starts");
+                c.EndConversation();
+                Field(c, "_recording", true);
+                var off = (IEnumerator)Call(c, "MicOff");
+                Check(!off.MoveNext() && !c.MicEnabled && !c.MicBusy, "OFF without a published track completes safely");
+
                 Field(c, "_busy", true); Field(c, "_micRestarting", true); Field(c, "_recording", true);
                 c.EndConversation();
                 Check(!c.MicBusy && !c.MicEnabled, "disconnect clears publish and device-switch flags");
