@@ -1155,7 +1155,12 @@ namespace Ciel.Conversation
             {
                 if (e.v != 2 || e.expires_unix_ms <= 0 || e.ttl_ms <= 0) return;
                 var remaining = e.expires_unix_ms - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                if (remaining <= 0 || remaining > e.ttl_ms + 1000) return;
+                // UTC の小さな同期差は許容するが、表示時間は送信元の TTL 以下にする。
+                if (remaining <= 0 || remaining > (long)e.ttl_ms + 5000)
+                {
+                    Debug.LogWarning($"[CielConversation] 表情通知を破棄：期限切れまたは時計ずれ（remaining={remaining} ms, ttl={e.ttl_ms} ms）");
+                    return;
+                }
                 _expression.Set(e.expression, Math.Min(e.ttl_ms, remaining) / 1000f, e.priority);
                 Debug.Log($"[CielConversation] 表情 {e.expression}（{e.ttl_ms} ms）");
             }

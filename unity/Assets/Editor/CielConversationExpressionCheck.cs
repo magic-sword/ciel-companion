@@ -82,6 +82,16 @@ namespace Ciel.EditorTools
                 Send("happy", 5000, "other.topic");
                 Send("unknown", 5000);
                 if (_expression.Current != "neutral") throw new InvalidOperationException("Ignored event changed the expression: " + _expression.Current);
+                Send("happy", 2000, clockOffsetMs: -3000);
+                Send("happy", 2000, clockOffsetMs: 7000);
+                Send("happy", 2000, version: 1);
+                Send("happy", 0);
+                if (_expression.Current != "neutral") throw new InvalidOperationException("Invalid or expired event was accepted.");
+                Send("happy", 2000, clockOffsetMs: 1800);
+                if (_expression.Current != "happy") throw new InvalidOperationException("Small clock skew rejected a valid expression.");
+                var until = (float)typeof(CielExpression).GetField("_until", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_expression);
+                if (until - Time.time > 2.01f) throw new InvalidOperationException("Clock skew extended expression TTL.");
+                _report.AppendLine("v2: +1800 ms accepted; TTL capped; expired, +7000 ms, v1 and zero TTL rejected");
                 Send(CielExpression.Names[0], 2000);
                 _started = Time.time;
                 EditorApplication.update += Tick;
@@ -90,10 +100,11 @@ namespace Ciel.EditorTools
         }
 
         // 会話サーバー（server/agent/emotion.py）と同じ形の JSON
-        static void Send(string expression, int ttlMs, string topic = "ciel.event")
+        static void Send(string expression, int ttlMs, string topic = "ciel.event", int clockOffsetMs = 0, int version = 2)
         {
             _seq++;
-            var json = $"{{\"v\": 1, \"type\": \"character.expression\", \"seq\": {_seq}, \"expression\": \"{expression}\", \"intensity\": 1.0, \"ttl_ms\": {ttlMs}}}";
+            var expires = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ttlMs + clockOffsetMs;
+            var json = $"{{\"v\": {version}, \"type\": \"character.expression\", \"seq\": {_seq}, \"expression\": \"{expression}\", \"intensity\": 1.0, \"ttl_ms\": {ttlMs}, \"priority\": 0, \"expires_unix_ms\": {expires}}}";
             _receive.Invoke(_conversation, new object[] { Encoding.UTF8.GetBytes(json), null, DataPacketKind.KindReliable, topic });
         }
 
