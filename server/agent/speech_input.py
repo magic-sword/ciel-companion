@@ -7,8 +7,8 @@ def settings(local):
     backend = os.environ.get('CIEL_STT_BACKEND') or ('vosk' if local else 'openai')
     if mode not in ('text', 'voice') or backend not in ('vosk', 'whisper', 'openai'):
         raise ValueError('Invalid CIEL_INPUT or CIEL_STT_BACKEND')
-    if local and mode == 'voice' and backend not in ('vosk', 'whisper'):
-        raise ValueError('Local voice requires local STT; OpenAI fallback is disabled')
+    # Explicit STT selection is independent of text-model routing. An unset
+    # local configuration still uses Vosk; failures never switch providers.
     return mode, backend
 
 def local_stt(*, vad=None, names=(), vocabulary=None):
@@ -33,6 +33,10 @@ def local_stt(*, vad=None, names=(), vocabulary=None):
 
 
 def prepare():
+    if os.environ.get('CIEL_STT_BACKEND') == 'openai':
+        return  # Cloud STT connects with the session; no local decoder is needed.
+    if os.environ.get('CIEL_STT_BACKEND') == 'openai':
+        return  # Cloud STT connects with the session; no local decoder is needed.
     if os.environ.get('CIEL_STT_BACKEND') == 'whisper':
         from whisper_engine import load_model
         load_model(os.environ.get('CIEL_WHISPER_MODEL_PATH', '/models-whisper/small'))

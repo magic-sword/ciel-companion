@@ -20,16 +20,23 @@ class SettingsTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {'CIEL_INPUT':'text'}, clear=True):
             self.assertEqual(speech_input.settings(True), ('text','vosk'))
 
-    def test_no_paid_voice_fallback_in_local_mode(self):
+    def test_explicit_cloud_stt_is_independent_of_local_text_models(self):
         with mock.patch.dict(os.environ, {'CIEL_STT_BACKEND':'openai'}, clear=True):
-            with self.assertRaisesRegex(ValueError,'fallback'):
-                speech_input.settings(True)
+            self.assertEqual(speech_input.settings(True), ('voice','openai'))
+        with mock.patch.dict(os.environ, {'CIEL_STT_BACKEND':''}, clear=True):
+            self.assertEqual(speech_input.settings(True), ('voice','vosk'))
 
     def test_invalid_settings_and_missing_model_fail_explicitly(self):
         with mock.patch.dict(os.environ, {'CIEL_STT_BACKEND':'unknown'}, clear=True):
             with self.assertRaises(ValueError):speech_input.settings(True)
         with mock.patch.dict(os.environ, {'CIEL_VOSK_MODEL_PATH':'not-present-vosk-model'}, clear=True):
             with self.assertRaises(FileNotFoundError):speech_input.local_stt()
+
+    def test_explicit_cloud_stt_does_not_prepare_local_decoder(self):
+        with mock.patch.dict(os.environ, {'CIEL_STT_BACKEND':'openai'}, clear=True), \
+             mock.patch('vosk_engine.load_model') as load:
+            speech_input.prepare()
+            load.assert_not_called()
 
     def test_japanese_token_spaces_do_not_break_stop_requests(self):
         self.assertEqual(text('作業 を 止め て'), '作業を止めて')
@@ -48,6 +55,23 @@ class SettingsTest(unittest.TestCase):
         self.assertIs(result['stt'],namespace['speech_input'].local_stt.return_value)
         namespace['TEXT_ONLY']=True
         self.assertEqual(namespace['make_pipeline']([]), {'turn_detection':'manual'})
+
+    def test_pipeline_cloud_streaming_uses_keywords_and_shared_vad(self):
+        tree=ast.parse((Path(__file__).parents[1]/'agent.py').read_text(encoding='utf-8'))
+        node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='make_pipeline')
+        namespace=dict(TEXT_ONLY=False,STT_BACKEND='openai',speech_input=mock.Mock(),openai=mock.Mock(),
+            models=SimpleNamespace(model=lambda role:'gpt-live-transcribe'), inference=mock.Mock(),
+            ENDPOINT_MODE='dynamic',ENDPOINT_MIN=.6,ENDPOINT_MAX=1.5,
+            interruptions=SimpleNamespace(CONFIRM_SECONDS=.5))
+        exec(compile(ast.Module(body=[node],type_ignores=[]),'agent.py','exec'),namespace)
+        result=namespace['make_pipeline'](['Owner'])
+        namespace['speech_input'].local_stt.assert_not_called()
+        options=namespace['openai'].STT.call_args.kwargs
+        self.assertEqual(options['model'],'gpt-live-transcribe')
+        self.assertEqual(options['language'],'ja')
+        self.assertIn('Owner',options['keywords'])
+        self.assertIs(options['vad'],result['vad'])
+        self.assertIs(result['stt'],namespace['openai'].STT.return_value)
 
 class StreamTest(unittest.IsolatedAsyncioTestCase):
     async def test_interim_arrives_before_eof_and_final_is_not_duplicated(self):
