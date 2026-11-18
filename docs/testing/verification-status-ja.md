@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+本番agentへ`7ae5ee13052c`を配布し、`CIEL_STT_BACKEND=openai` / `CIEL_STT_MODEL=gpt-live-transcribe`へ切り替えた。191ソースの完全一致・worker登録・再起動0・他コンテナ不変・無関係な環境変数不変を確認。証跡は`~/work/ciel-companion/server/data/deployments/openai-stt-7ae5ee13052c-1795018915980289657/`（DB・設定退避を含む）。最初の照合は改行正規化の不統一により失敗し自動復旧、その後候補とコミットのバイト一致を確認して再反映した。反映後の合成3.08秒では途中結果1.770秒、確定結果は3区間（「シエル。」「今日は」「いい天気ですね。」、最後3.957秒）で到着。分割と句読点の違いはあり、逐次接続の成功として扱う。配信アプリをマイクOFFで再接続し、新規会話と表情受信・Traceback 0を確認。開発agentのWhisper設定とコンテナは変更していない。
+
 2026-11-19、LLMの基本backendがlocalでも`CIEL_STT_BACKEND=openai`を明示選択できるようにし、クラウド音声入力時のローカル認識器準備を省略。未指定のlocal→Voskと自動代替なしを維持。通常回帰798件が成功（`.local/regression/20261118T161827Z-6479e2`）。本番イメージのSDK 1.8.3から`gpt-live-transcribe`へ合成音声3.08秒を送信し、途中結果2.142秒・3.150秒、確定3.838秒を観測した。認識文は合成元と一致。検証器の単独HTTPセッションと終了処理の不備も修正した。再現入口は`scripts/server/check-openai-stt.py`。これは接続試験であり、人の声での聞き間違い改善率は未測定。
 
 2026-11-19、OpenAIからの感情指定は本番TTSで読み取れていたが、PCよりサーバーが約1.8秒先行し、Unityの表情受信の未来時刻許容1秒を超えていた。Windows Timeの自動起動・同期を復旧。Unityは表情通知に限り最大5秒の先行を許容し、表示時間を元のTTL以下に制限する。期限切れ・大きな時計ずれの拒否時はログを残す。旧v1を送っていた結合テストも現行v2へ修正した。再生モードで12表情のモデル値・描画・通常への復帰、+1800msの受理とTTL上限、期限切れ・+7000ms・旧版・TTLゼロの拒否を確認。証跡は`.local/expression-integration/conversation/verification.txt`と`unity/Logs/expression-clock-play.log`。期限切れ通知の救済や時計差の自動推定は行わない。
