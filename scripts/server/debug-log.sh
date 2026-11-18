@@ -45,14 +45,19 @@ case "$ACTION" in
     "${SSH[@]}" "$IN_AGENT 'rm -f $DIR/*.jsonl' && echo 'サーバーのログを消した'" ;;
   errors)
     # エラーの係（server/agent/errors.py）が会話をまたいで残したエラーを、場所ごとに数えて、直近を見せる（入れる・切るは要らない）
-    "${SSH[@]}" "$IN_AGENT 'tail -n 500 /app/data/errors.jsonl 2>/dev/null'" | node -e '
-      const rows = require("fs").readFileSync(0, "utf8").split(String.fromCharCode(10)).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    # WindowsのNodeはSSHパイプの標準入力を同期読取するとEOFになる場合がある。
+    # 取得を先に完了させ、接続失敗を「記録なし」として集計しない。
+    ERROR_LOG=$(mktemp)
+    trap 'rm -f -- "$ERROR_LOG"' EXIT
+    "${SSH[@]}" "$IN_AGENT 'if [ -f /app/data/errors.jsonl ]; then tail -n 500 /app/data/errors.jsonl; fi'" > "$ERROR_LOG"
+    node -e '
+      const rows = require("fs").readFileSync(process.argv[1], "utf8").split(String.fromCharCode(10)).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
       if (!rows.length) { console.log("エラーの記録はない"); process.exit(0); }
       const by = new Map();
       for (const r of rows) { const k = r.where + " " + (r.at || "") + " " + r.type; const v = by.get(k) || { n: 0, last: 0, message: "" }; v.n++; v.last = r.t; v.message = r.message; by.set(k, v); }
       console.log("場所ごと（多い順。直近 500 件から）");
       for (const [k, v] of [...by].sort((a, b) => b[1].n - a[1].n)) console.log(String(v.n).padStart(4), k, " 最後：" + new Date(v.last * 1000).toLocaleString("ja-JP"), " " + (v.message || "").slice(0, 80));
-    ' ;;
+    ' "$ERROR_LOG" ;;
   *)
     echo "使い方：$0 on|off|status|pull|clear|errors" >&2; exit 2 ;;
 esac
