@@ -294,6 +294,8 @@ Mindcraftの`!getCraftingPlan`は、3×3のレシピが必要で作業台を持�
 
 ## 起動・調査・測定
 
+直接の移動命令が成功しても、通常会話の中断表示が残る場合は、体の失敗と区別する。ゲーム専用判断へ切り替えるときに通常会話の古い状態を解除する。状態の意味は[表示契約](../../app/work-display-contract-ja.md#会話継続の観測activitystate-v3)、実測・反映範囲は[確認状況](../../testing/verification-status-ja.md)を参照する。
+
 ゲーム用中核APIの推論も会話と同じ`mind`の接続先を使用する。OpenAIへは`max_completion_tokens`と設定済みのreasoning effortを送り、ローカルへは温度0を送る。旧`max_tokens`はgpt-5.4-miniで400エラーになるため使用しない。固定指示の準備用出力上限はローカル1、OpenAI256。OpenAIでは1トークンの上限でも400になったため、応答を終えられる枠を確保する。準備はキャッシュ用の最適化であり、bindの`ready`だけで準備の成功を保証しない。接続だけの確認には`scripts/server/smoke-game-link.py`を使う。利用者の会話が操作権を解放した状態で、一時会話から接続・推論バインド・ゲーム内参加を確認し、採掘や移動は指示しない。配布状況と結果は[確認状況](../../testing/verification-status-ja.md)へ記録する。
 
 OpenAIのゲーム受付は、会話用の道具一覧・`tool_choice=none`を併送せず、構造化出力の操作候補を使う。通常会話の道具禁止がゲームの操作拒否にもつながる事象を再現した。`scripts/server/check-game-decision-cloud.py`をagentコンテナ内の`/app`で実行すると、現在のpersona・MCP profile・能力カタログを使い、採集依頼・挨拶・否定を各3回判断する（有料API、実行・操作権取得なし）。`--compare`は旧要求との対応比較も行う。採集依頼はwork、挨拶はnone、否定はnoneまたは停止を正解とする。採集そのものの成功はこの検査では判定しない。

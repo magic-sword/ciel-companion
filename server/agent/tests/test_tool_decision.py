@@ -265,3 +265,31 @@ class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(old.cancelled)
         self.assertEqual(self.agent.conversation_decision.loop.outcome, 'none')
         self.assertIn('Hello', chunks[0].delta.content)
+
+    async def test_speaking_after_finished_response_does_not_mark_it_cancelled(self):
+        self.create.return_value = self.answer(dict(kind='none'), 'Done')
+        await self.node()
+        control = self.agent.conversation_decision
+        control.on_user_state(Obj(new_state='speaking'))
+        self.assertEqual(control.phase, 'waiting')
+        self.assertTrue(control.loop.cancelled)
+
+    async def test_game_reply_retires_previous_cancelled_conversation(self):
+        self.create.return_value = self.answer(dict(kind='load', service_ids=['6']))
+        await self.node()
+        control = self.agent.conversation_decision
+        old = control.loop
+        control.on_user_state(Obj(new_state='speaking'))
+        self.assertEqual(control.phase, 'cancelled')
+        states = []
+        control.observe = lambda **state: states.append(state)
+        self.agent.game_decision = Obj(supported=lambda: True, handle=AsyncMock(return_value='Coming'))
+        self.agent.mind.is_owner = lambda: True
+        self.speech.id = 'game-turn'
+        chunks = await self.node()
+        self.assertEqual(chunks, ['Coming'])
+        self.assertEqual(control.phase, 'waiting')
+        self.assertEqual(states[-1], dict(phase='idle', step=0, outcome=''))
+        self.assertTrue(old.cancelled)
+        self.assertIsNone(control.loop)
+        self.assertEqual(self.create.await_count, 1)

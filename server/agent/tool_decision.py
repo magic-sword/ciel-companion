@@ -174,9 +174,20 @@ class ConversationDecision:
 
     def cancel(self):
         if self.flow is not None and not self.loop.cancelled:
+            active = not self.flow.waiting
             self.flow.interrupt()
-            self.show("cancelled")
-            self.progress("cancelled")
+            if active:
+                self.show("cancelled")
+                self.progress("cancelled")
+
+    def handoff(self):
+        """Retire this loop when a different controller handles the new input."""
+        if self.flow is not None:
+            self.flow.interrupt()
+        self.loop = self.flow = None
+        self.speech_id = None
+        self.show("idle")
+        self.progress("waiting")
 
     def show(self, phase):
         self.observe(phase=phase, step=self.loop.steps if self.loop else 0,

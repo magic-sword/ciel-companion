@@ -333,6 +333,10 @@ class Ciel(Agent):
             if user_item is not None and not any(getattr(i, 'type', '') == 'function_call_output' for i in tail):
                 # One decision: what to say and what to do (game_decision.py). It gets this reply's request as is;
                 # the game's instructions go with its actions after the conversation (they say which capability does what).
+                # This route can return without entering the normal conversation loop.
+                # Retire its previous state; game progress is reported separately.
+                if controller := getattr(self, 'conversation_decision', None):
+                    controller.handoff()
                 reply = await decision.handle(user_item, ctx.to_provider_format('openai')[0],
                                               to_fnc_ctx(llm.ToolContext(fns), strict=True), note=self._game_text())
                 if reply is not None:
