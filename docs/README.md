@@ -95,6 +95,7 @@
 | [services/local-stt-ja.md](services/local-stt-ja.md) | CPU音声認識のアダプター、途中/確定結果、モデル配置と評価方法。 |
 | [services/shared-memory-ja.md](services/shared-memory-ja.md) | 本人確認・保存同意・DBスコープ、共有記憶と競合・忘却の実装契約。 |
 | [services/people-memory-ja.md](services/people-memory-ja.md) | 利用者による人物・声・メモの登録、訂正、参照、削除の操作。 |
+| [services/associative-memory-ja.md](services/associative-memory-ja.md) | 長期記憶・短期記憶を関連性で検索し、会話とゲームの出来事を結び付けて思い出す仕組みの設計案と、評価・移行段階・採用条件。 |
 | [services/meeting-minutes-ja.md](services/meeting-minutes-ja.md) | 議事録の受付、対象範囲、ライブ・清書・送信・保存の契約。 |
 | [services/meeting-bridge-ja.md](services/meeting-bridge-ja.md) | 会議へ参加する端末の音声・映像設定と利用手順。 |
 | [services/web-research-ja.md](services/web-research-ja.md) | Web調査の依頼、引用確認、結果保持、画面と発話への対応。 |
