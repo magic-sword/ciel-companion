@@ -1,11 +1,12 @@
 """Offline recall benchmark: which stored memories reach the conversation model for a turn.
 
-Stage 0 of docs/services/associative-memory-ja.md. Deterministic: no LLM, no DB, no game.
+Stage 0 of docs/services/associative-memory-ja.md. Deterministic except --retriever mind (an LLM picks): no DB, no game.
 It measures retrieval (what is put in front of the model), not whether Ciel then says it.
 
 Run from the repository root:
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever current --out <report.json>
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever recall [--embedder NAME] [--keys KEYS.json] --out <report.json>
+  .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever mind --llm-url URL [--thinking] [--embedder NAME] [--keys KEYS.json] --out <report.json>
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py write-keys --llm-url URL --out KEYS.json
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py compare <base.json> <candidate.json>
 """
@@ -197,7 +198,61 @@ class RecallMethod(CurrentMethod):
         return recalled + [i for i in items if i.id not in {r.id for r in recalled}]
 
 
-RETRIEVERS = {'current': CurrentMethod, 'recall': RecallMethod}
+class MindMethod(RecallMethod):
+    """System 2 variant: the same search proposes a wider list, then an LLM (the mind) picks what matters.
+    Experimental (prompts/recall_mind.md). The latency of each LLM call is recorded."""
+    id = 'mind'
+    PROMPT = Path(__file__).with_name('prompts') / 'recall_mind.md'
+    POOL = 8
+    POOL_MIN = 0.2
+
+    def __init__(self, embedder=None, keys=None, llm_url='', model='local', thinking=False):
+        super().__init__(embedder, keys)
+        self.llm_url, self.model, self.thinking = llm_url.rstrip('/'), model, thinking
+        self.instructions = self.PROMPT.read_text(encoding='utf-8')
+        self.calls: list[dict] = []
+        self.config = {**self.config, 'llm': model, 'thinking': thinking, 'pool': self.POOL, 'pool_min': self.POOL_MIN,
+                       'prompt_sha256': hashlib.sha256(self.instructions.encode()).hexdigest()}
+
+    def retrieve(self, memories, ctx):
+        import time
+        import httpx
+        items = CurrentMethod.retrieve(self, memories, ctx)
+        pool = [self.candidate(m) for m in memories if m.kind != 'like']
+        query = ' '.join(t['text'] for t in ctx.turns if t['role'] == 'user')
+        situation = recall.Situation(presence=ctx.presence, person_id=ctx.speaker, world=ctx.world)
+        got = recall.rank(pool, situation, query, self._vector(query, True), ctx.now, k=self.POOL, min_relevance=self.POOL_MIN)
+        chosen = []
+        if got:
+            request = {'now': f'{ctx.now:%Y-%m-%d %H:%M}',
+                       'conversation': [{'speaker': ctx.people.get(ctx.speaker, '相手') if t['role'] == 'user'
+                                         else 'シエル', 'text': t['text']} for t in ctx.turns],
+                       'candidates': [{'id': r.id, 'when': recall.ago(r.at, ctx.now), 'text': r.text, 'past': r.past} for r in got]}
+            body = {'model': self.model, 'temperature': 0, 'response_format': {'type': 'json_object'},
+                    'chat_template_kwargs': {'enable_thinking': self.thinking},
+                    'messages': [{'role': 'system', 'content': self.instructions},
+                                 {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]}
+            t0 = time.perf_counter()
+            r = httpx.post(self.llm_url + '/chat/completions', json=body, timeout=300)
+            ms = (time.perf_counter() - t0) * 1000
+            r.raise_for_status()
+            data = r.json()
+            try:
+                out = json.loads(data['choices'][0]['message']['content'] or '{}')
+            except ValueError:
+                out = {}
+            ids = {c.id for c in got}
+            chosen = [i for i in out.get('use', []) if i in ids][:recall.TOP_K]
+            timings = data.get('timings') or {}
+            self.calls.append({'ms': round(ms, 1), 'prompt_n': timings.get('prompt_n'), 'predicted_n': timings.get('predicted_n'),
+                               'thought': out.get('thought', '')})
+        by_id = {r.id: r for r in got}
+        auto = {i.id for i in items if i.channel == 'auto'}
+        recalled = [Item(i, 'auto', past=by_id[i].past, recalled=True) for i in chosen if i not in auto]
+        return recalled + [i for i in items if i.id not in {r.id for r in recalled}]
+
+
+RETRIEVERS = {'current': CurrentMethod, 'recall': RecallMethod, 'mind': MindMethod}
 
 
 def write_keys(suite: dict, llm_url: str, model: str = 'local') -> dict:
@@ -334,6 +389,8 @@ def main(argv=None):
     s.add_argument('--retriever', default='current', choices=sorted(RETRIEVERS))
     s.add_argument('--embedder', default='', help='sentence-transformers model for --retriever recall')
     s.add_argument('--keys', help='keys file from write-keys')
+    s.add_argument('--llm-url', help='OpenAI-compatible URL for --retriever mind')
+    s.add_argument('--thinking', action='store_true', help='let the mind think before answering (--retriever mind)')
     s.add_argument('--out')
     w = sub.add_parser('write-keys')
     w.add_argument('--llm-url', required=True)
@@ -350,12 +407,22 @@ def main(argv=None):
         print(f'{len(keys["keys"])} keys')
         return
     if args.command == 'score':
-        if args.retriever == 'recall':
+        if args.retriever in ('recall', 'mind'):
             keys = json.loads(Path(args.keys).read_text(encoding='utf-8'))['keys'] if args.keys else {}
-            retriever = RecallMethod(recall.SentenceEmbedder(args.embedder) if args.embedder else None, keys)
+            embedder = recall.SentenceEmbedder(args.embedder) if args.embedder else None
+            if args.retriever == 'mind':
+                if not args.llm_url:
+                    parser.error('--retriever mind needs --llm-url')
+                retriever = MindMethod(embedder, keys, args.llm_url, thinking=args.thinking)
+            else:
+                retriever = RecallMethod(embedder, keys)
         else:
             retriever = RETRIEVERS[args.retriever]()
         report = run(retriever, load_suite())
+        if getattr(retriever, 'calls', None) is not None:
+            ms = sorted(c['ms'] for c in retriever.calls)
+            report['llm_calls'] = {'n': len(ms), 'median_ms': ms[len(ms) // 2] if ms else None,
+                                   'max_ms': ms[-1] if ms else None, 'calls': retriever.calls}
         text = json.dumps(report, ensure_ascii=False, indent=1)
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
