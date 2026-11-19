@@ -784,6 +784,15 @@ class SpeakerBook:
     def owner_name(self) -> str:
         return next((k.name for k in self.known if k.person_id == self.owner_id), '') if self.owner_id is not None else ''
 
+    def recall_person(self) -> int | None:
+        """関連性で思い出す（recall.py）ときに、メモを候補にしてよい人：直前の発言が声で確かに本人と分かり、
+        お話を覚える同意があり、忘れる依頼の処理中でも保存情報の確認不能でもない人。ほかは None"""
+        sp = self.last
+        if sp is None or sp.person_id is None or not self.last_sure or sp.memory_suppressed or not self._shared_available:
+            return None
+        k = next((k for k in self.known if k.person_id == sp.person_id), None)
+        return k.person_id if k is not None and k.notes_ok else None
+
     async def greeting_context(self, private: bool) -> str:
         """会話の始めのあいさつに添える、端末の持ち主のこと（ひとり・身近な人のときだけ。無ければ空）。
         声ではまだ確かめていないので「たぶん」とする。覚えていること（同意があり、忘れる依頼の処理中でないもの）は

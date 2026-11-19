@@ -57,7 +57,10 @@ class Diary:
         except Exception as e:
             log.warning('シエルの出来事を読めない: %s', type(e).__name__)
 
-    def add(self, kind: str, text: str, at: datetime | None = None) -> None:
+    def add(self, kind: str, text: str, at: datetime | None = None, *, memory_kind: str = 'diary',
+            world: str | None = None, ref: str | None = None, importance: int = 3) -> None:
+        """出来事を残す。ゲームの場所・大きな出来事は memory_kind（game_place・game_event）とワールド・参照を添えて、
+        関連性で思い出せる記憶にする（recall.py。座標はゲーム側が持ち、ここには参照だけを置く）"""
         text = ' '.join(text.split())[:TEXT_CHARS] if isinstance(text, str) else ''
         if not text:
             return
@@ -66,7 +69,8 @@ class Diary:
         log.info('シエルの出来事を残した（%s）', kind)
         debug_log.record('ciel_event', event_kind=kind, text=text)
         if self.store is not None:
-            task = asyncio.create_task(self._save(kind, text))
+            task = asyncio.create_task(self._save(kind, text, dict(memory_kind=memory_kind, world=world, ref=ref,
+                                                                   importance=importance)))
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
 
@@ -75,11 +79,25 @@ class Diary:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
 
-    async def _save(self, kind: str, text: str) -> None:
+    async def _save(self, kind: str, text: str, memory: dict | None = None) -> None:
         try:
-            await run_memory_job('record_event', lambda: self.store.add_ciel_event(kind, text, KEEP))
+            await run_memory_job('record_event', lambda: self.store.add_ciel_event(kind, text, KEEP, **(memory or {})))
         except Exception as e:
             log.warning('シエルの出来事を残せない: %s', type(e).__name__)
+
+    def invalidate(self, ref: str) -> None:
+        """ゲームの場所が無くなった：その場所の記憶を「前は」にする（消さない）"""
+        if self.store is None or not ref:
+            return
+        async def run() -> None:
+            try:
+                n = await run_memory_job('record_event', lambda: self.store.invalidate_memories(ref))
+                log.info('場所が無くなった記憶 %s 件', n)
+            except Exception as e:
+                log.warning('場所の記憶を直せない: %s', type(e).__name__)
+        task = asyncio.create_task(run())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     def lines(self, now: datetime | None = None) -> list[str]:
         """考える係に渡す形（「きのう：気になって調べた：…」）。古い順"""

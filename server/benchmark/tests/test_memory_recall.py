@@ -93,6 +93,19 @@ class MemoryRecallTest(unittest.TestCase):
         self.assertEqual([], rows['public_private_note']['forbidden_auto'])
         self.assertEqual(0, rows['public_private_note']['auto_count'])
 
+    def test_recall_method_uses_host_policy(self):
+        rows = {r['id']: r for r in run_with(mr.RecallMethod(), self.suite)}
+        # Words and dates alone already reach the diary, places of this world and time-scoped questions.
+        for case in ('diary_song_recent', 'village_found', 'old_world_base', 'yesterday', 'note_beyond_cap'):
+            self.assertEqual(1.0, rows[case]['recall_auto'], case)
+        # The same eligibility as the host: nothing private, foreign or from another world.
+        for case in ('public_private_note', 'other_person_note', 'old_world_base', 'abstain_sea'):
+            self.assertEqual([], rows[case]['forbidden_auto'], case)
+        self.assertEqual(0, rows['control_smalltalk']['auto_count'] - 10)   # no memory pushed into unrelated talk
+        # Usage keys connect a rest to the base; given them, the base is recalled.
+        keyed = mr.RecallMethod(keys={'ユウと森の横に作った拠点。ベッドとチェストがある': '休む、寝る、夜を越す'})
+        self.assertEqual(1.0, {r['id']: r for r in run_with(keyed, self.suite)}['base_rest']['recall_auto'])
+
     def test_partial_recall_and_rank(self):
         case = next(c for c in self.suite['cases'] if c['id'] == 'house_multi')
         memories, _ = mr.build_case(self.suite, case)

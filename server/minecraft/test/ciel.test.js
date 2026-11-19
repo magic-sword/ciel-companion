@@ -130,6 +130,38 @@ test('MCP：道具の印・受け持ち・技の終わりの知らせ・様子�
   }
 });
 
+test('言葉：覚えておく場所（拠点・家）は、参照つきの記憶にする', () => {
+  const moved = eventFor({ kind: 'base_set', home: [10, 64, -3], previous: [0, 70, 0], stations: ['crafting_table', 'chest'] });
+  assert.equal(moved.say, undefined);   // 話すきっかけにはしない（記憶に残すだけ）
+  assert.deepEqual(moved.memorable, [
+    { kind: 'place_lost', ref: 'base/0,70,0' },
+    { kind: 'game_place', importance: 4, ref: 'base/10,64,-3', text: 'マイクラで拠点を決めた（作業台・チェストのそば）' }]);
+  const again = eventFor({ kind: 'base_set', home: [10, 64, -3], previous: [10, 64, -3], stations: [] });
+  assert.deepEqual(again.memorable.map(m => m.kind), ['game_place']);   // 同じ場所で決め直しても、無くなったことにしない
+  const house = eventFor({ kind: 'built', what: 'house', name: 'cottage', at: [1, 2, 3] });
+  assert.deepEqual(house.memorable, [{ kind: 'game_place', importance: 4, ref: 'house/1,2,3', text: 'マイクラで家（cottage）を建てた' }]);
+  assert.equal(eventFor({ kind: 'built', what: 'wall' }), null);
+});
+
+test('ワールドの識別：体のデータに残し、作り直したワールドでは新しくなる', async () => {
+  const { worldId } = await import('../src/world-id.js');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ciel-world-'));
+  try {
+    const first = worldId(dir, 'mc', 25565);
+    assert.match(first, /^[\w-]{8,64}$/);
+    assert.equal(worldId(dir, 'mc', 25565), first);
+    assert.notEqual(worldId(dir, 'other', 25565), first);
+    fs.rmSync(path.join(dir, 'world-mc-25565.id'));   // ワールドを作り直すと、体のデータは退避される
+    assert.notEqual(worldId(dir, 'mc', 25565), first);
+    assert.equal(worldId(null, 'mc', 25565), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('言葉：出来事の選び方と、技の終わり', () => {
   assert.equal(eventFor({ kind: 'hurt', amount: 1, health: 18 }), null);   // 小さなダメージは言わない
   assert.equal(eventFor({ kind: 'hurt', amount: 5, health: 12 }).urgency, 'urgent');

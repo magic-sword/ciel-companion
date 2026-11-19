@@ -39,7 +39,16 @@
 | 拠点・名前を付けた場所 | 体の中にあり、会話からは見えない | 届かない |
 | 家を建てた・村を見つけたなど | 記録しない | 届かない |
 
-あいさつに添える持ち主のメモ（新しい5件）は、15件に含まれるので別に数えません。
+あいさつに添える持ち主のメモ（新しい5件）は、15件に含まれるので別に数えません。この`current`は段階0の基準で、関連性で思い出す前の会話サーバーです。
+
+## 関連性で思い出す方式
+
+`RecallMethod`（`--retriever recall`）は、`current`の渡し方に、会話サーバーの`recall.eligible`・`recall.rank`で選んだ記憶を足します。公開範囲・本人・ワールドの判定と順位づけは会話サーバーと同じコードです。
+
+- **問い：** 課題の相手の発言。
+- **鍵：** `write-keys`で、会話サーバーと同じ指示（`prompts/memory_keys.md`）から書いたもの。OpenAI互換の窓口（共有GPU APIなど）へ温度0で送り、指示のハッシュとモデル名を一緒に残します。指定しなければ鍵なし。
+- **埋め込み：** `--embedder`のsentence-transformersのモデル。指定しなければ、文字の重なりと日付だけで思い出します。
+- **重要度：** 場所は4、ほかは3（会話サーバーと同じ）。
 
 ## 指標
 
@@ -61,13 +70,15 @@
 
 ```powershell
 .\.venv\Scripts\python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever current --out .local/memory-recall/current-baseline.json
+.\.venv\Scripts\python.exe -B -X utf8 server/benchmark/memory_recall.py write-keys --llm-url http://127.0.0.1:18094/v1 --out .local/memory-recall/keys.json
+.\.venv\Scripts\python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever recall --keys .local/memory-recall/keys.json --embedder cl-nagoya/ruri-v3-30m --out .local/memory-recall/recall.json
 .\.venv\Scripts\python.exe -B -X utf8 server/benchmark/memory_recall.py compare <基準.json> <候補.json>
 .\.venv\Scripts\python.exe -B -X utf8 -m unittest server/benchmark/tests/test_memory_recall.py
 ```
 
 - **報告：** 課題集のハッシュ、検索方式の名前と設定、Gitのコミット、課題ごとの値を残します。
 - **比較：** 課題集のハッシュが同じときだけ比べ、課題ごとの差、想起が上がった・下がった数、新しく増えた漏れ・古い事実の数を出します。
-- **候補の足し方：** 段階1の検索方式は、`retrieve(memories, context)`で`Item(id, channel, past)`の並びを返す部品として`RETRIEVERS`に足します。埋め込みモデルを使う候補は、モデルの名前と版を設定に残します。
+- **候補の足し方：** ほかの検索方式は、`retrieve(memories, context)`で`Item(id, channel, past)`の並びを返す部品として`RETRIEVERS`に足します。報告の`retriever_config`に、埋め込みモデル・鍵の数・上位件数・しきい値が残ります。
 
 ## 決まっていないこと
 

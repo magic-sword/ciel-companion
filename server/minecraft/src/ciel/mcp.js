@@ -180,7 +180,7 @@ export function makeServer(hub, sessionId) {
     async (uri) => {
       const l = mine();
       const s = l ? { label: LABEL, linked: true, playing: l.playing(), reason: '', text: l.text(), fingerprint: hub.fingerprint(),
-        body: l.body, work: l.work.view(), references: hub.references?.() ?? null }
+        body: l.body, work: l.work.view(), references: hub.references?.() ?? null, world: l.state?.world ?? null }
         : { label: LABEL, linked: false, playing: false, reason: hub.controller || hub.busy ? 'busy' : 'off', text: stateText(null, null, false) };
       return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(s) }] };
     });

@@ -6,7 +6,8 @@ model-visible actor ID, raw SQL, or alternate Store access policy here.
 from service_mcp import call_service
 
 
-OPERATIONS = frozenset({'consolidate_notes', 'revise_relationship', 'grow_preferences', 'record_event', 'load_events'})
+OPERATIONS = frozenset({'consolidate_notes', 'revise_relationship', 'grow_preferences', 'record_event', 'load_events',
+                        'index_memories'})
 
 
 async def run_memory_job(operation, handler):

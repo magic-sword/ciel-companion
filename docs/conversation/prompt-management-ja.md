@@ -29,6 +29,8 @@
 | `server/agent/config/prompts/presence_solo.md`・`presence_close.md`・`presence_public.md` | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | `server/agent/config/prompts/speakers.md` | 「[発言者：…]」の読み方、名前を聞く・同意を取る流れ、人についての道具の使い方（2 人でも多人数でも。`CIEL_VOICE=irodori` で Realtime API のとき）。処理は `speakers.py`・`tools/people.py` |
 | `server/agent/config/prompts/notes.md` | 会話の裏でメモを書く記録係（別の文字のモデル）への指示。処理は `notes.py`。[メモの決定記録](../services/shared-memory-ja.md) |
+| `server/agent/config/prompts/memory_keys.md` | 記憶・メモに、思い出すきっかけの言葉を付ける係（メモと同じ文字のモデル）への指示。処理は `recall.py` の `KeyWriter`。[関連性で思い出す記憶](../services/associative-memory-ja.md) |
+| `server/agent/config/prompts/recall_note.md` | 返事の補足に添える「思い出したこと」の見出し。処理は `recall.context`。[関連性で思い出す記憶](../services/associative-memory-ja.md) |
 | `server/agent/config/prompts/conversation.md` | 接続中の共通履歴を検索する道具の使い方。[共通会話履歴](conversation-pipeline-ja.md)。今の日時（「[今：…]」と道具 `current_time`）の使い方。[今の日時](conversation-pipeline-ja.md) |
 | `server/agent/config/prompts/relationship.md` | 会話の終わりに、シエルがその人をどう思っているか（関係）を書き直す係への指示。処理は `relationship.py`。[関係の決定記録](../services/shared-memory-ja.md) |
 | `server/agent/config/prompts/minutes.md`・`minutes_live.md`・`minutes_voice.md` | 会話のまとめ（議事録など）の清書・ライブの差分・声での頼まれ方。処理は `minutes.py`・`summaries/`。[議事録の決定記録](../services/meeting-minutes-ja.md) |

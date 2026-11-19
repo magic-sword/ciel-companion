@@ -48,8 +48,11 @@ export function setBase(bot) {
         const found = bot.findBlocks({ matching: b => b?.name === name, maxDistance: HOME_RADIUS, count: 1 })[0];
         if (found) stations[name] = [found.x, found.y, found.z];
     }
+    const previous = bot.base?.home ?? null;
     bot.base = { home: [home.x, home.y, home.z], stations };
     save(bot);
+    // The host keeps the base as a place it can recall (and the old one as a place that was).
+    bot.emit?.('ciel_base', { home: bot.base.home, previous, stations: Object.keys(stations) });
     return bot.base;
 }
 

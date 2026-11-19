@@ -545,6 +545,12 @@ class GameEnv:
     def snapshot(self):
         return self.state.get('fingerprint')
 
+    @property
+    def world(self) -> str | None:
+        """今のワールドの識別（ゲームが様子に入れる。ワールドを作り直すと変わる）。思い出す記憶をワールドで分ける"""
+        world = self.state.get('world') if self.linked else None
+        return f'{self.game}:{world}' if world else None
+
     async def _on_message(self, message) -> None:
         root = getattr(message, 'root', None)
         if isinstance(root, mcp_types.ResourceUpdatedNotification) and str(root.params.uri).rstrip('/') == 'game://state':
@@ -587,8 +593,9 @@ class GameEnv:
             return
         if not self.linked:
             return
-        if e.get('memorable'):
-            self._remember(e['memorable'])
+        memorable = e.get('memorable')
+        for m in (memorable if isinstance(memorable, list) else [memorable] if memorable else []):
+            self._remember(m)
         urgency = e.get('urgency')
         if e.get('say') and self.activity is not None:
             self.activity.log(e['say'].strip('[]'), 'error' if urgency == 'urgent' else 'info')
@@ -709,10 +716,31 @@ class GameEnv:
         if self.say is not None:
             self.say('game', settle=settle, instructions=line, merge=True, reaction_kind=kind, reaction_event=event)
 
-    def _remember(self, text: str) -> None:
-        if self.diary is not None and text not in self._remembered:
-            self._remembered.add(text)
-            try:
-                self.diary.add(self.game, text)
-            except Exception as e:
-                log.info('日記に書けない：%s', type(e).__name__)
+    def _remember(self, memorable) -> None:
+        """体が残したい出来事。文だけ（倒した・倒れた）か、場所・大きな出来事の {text, kind, ref, importance}。
+        ref はゲームの中の場所の参照で、ワールドの識別を前に付けて残す（ワールドを作り直したら別の場所）"""
+        if self.diary is None:
+            return
+        if isinstance(memorable, dict):
+            text, kind = str(memorable.get('text') or ''), memorable.get('kind')
+            if kind == 'place_lost':
+                ref = self._ref(memorable.get('ref'))
+                if ref:
+                    self.diary.invalidate(ref)
+                return
+            extra = {'memory_kind': kind if kind in ('game_place', 'game_event') else 'diary',
+                     'world': self.world, 'ref': self._ref(memorable.get('ref')),
+                     'importance': int(memorable.get('importance') or 3)}
+        else:
+            text, extra = str(memorable), {}
+        if not text or text in self._remembered:
+            return
+        self._remembered.add(text)
+        try:
+            self.diary.add(self.game, text, **extra)
+        except Exception as e:
+            log.info('日記に書けない：%s', type(e).__name__)
+
+    def _ref(self, ref) -> str | None:
+        world = self.world
+        return f'{world}/{ref}' if world and isinstance(ref, str) and ref else None

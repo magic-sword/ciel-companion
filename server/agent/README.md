@@ -22,6 +22,8 @@ pipeline・Realtimeなどで使うプロンプト本文は、UTF-8のMarkdownと
 | [presence_solo.md](config/prompts/presence_solo.md)・[presence_close.md](config/prompts/presence_close.md)・[presence_public.md](config/prompts/presence_public.md) | その場にいる人（ひとり・身近な人・人前）ごとの、覚えている人のメモの使い方。処理は `mode.py`・`speakers.py` |
 | [speakers.md](config/prompts/speakers.md) | 発言者の補足情報、自己紹介・他者紹介の仮名簿、本人確認と同意後の永続保存、本人の保存状態の確認、人についての道具（`tools/people.py`）の使い方 |
 | [notes.md](config/prompts/notes.md) | 会話の裏で、その人について覚えておくメモを書く記録係（`notes.py`、別の文字のモデル）への指示 |
+| [memory_keys.md](config/prompts/memory_keys.md) | 記憶・メモに、思い出すきっかけの言葉を付ける係（`recall.py` の `KeyWriter`、メモと同じ文字のモデル）への指示 |
+| [recall_note.md](config/prompts/recall_note.md) | 返事の補足に添える「思い出したこと」の見出し（`recall.context`） |
 | [conversation.md](config/prompts/conversation.md) | 今の接続中の会話を検索する道具の使い方。構成・検証は[共通会話履歴](../../docs/conversation/conversation-pipeline-ja.md) |
 | [minutes_voice.md](config/prompts/minutes_voice.md) | 議事録の開始・終了・過去分の作成、議事録IDによる状態・内容・送信結果の照会。[議事録の決定記録](../../docs/services/meeting-minutes-ja.md) |
 | [research.md](config/prompts/research.md)・[research_voice.md](config/prompts/research_voice.md) | Web検索の調査係への指示と、シエルによる検索・出典参照の使い方。[Web調査の記録](../../docs/services/web-research-ja.md) |

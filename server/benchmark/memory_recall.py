@@ -5,6 +5,8 @@ It measures retrieval (what is put in front of the model), not whether Ciel then
 
 Run from the repository root:
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever current --out <report.json>
+  .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py score --retriever recall [--embedder NAME] [--keys KEYS.json] --out <report.json>
+  .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py write-keys --llm-url URL --out KEYS.json
   .venv/Scripts/python.exe -B -X utf8 server/benchmark/memory_recall.py compare <base.json> <candidate.json>
 """
 import argparse
@@ -20,6 +22,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).with_name('memory_recall_cases.json')
 AGENT = ROOT / 'server/agent'
+sys.path.insert(0, str(AGENT))
+import recall  # noqa: E402  (the same eligibility and ranking as the host)
 
 # Neutral filler: distinct, and unrelated to every case topic (rest, base, song, zombie, village, house, ...).
 NOTE_SUBJECTS = ['好きな果物', '好きな色', '好きな花', '好きな文房具', '好きなお菓子', '好きな飲み物',
@@ -153,7 +157,74 @@ class CurrentMethod:
         return items
 
 
-RETRIEVERS = {'current': CurrentMethod}
+class RecallMethod(CurrentMethod):
+    """今の渡し方（最近のメモ・好み）に、関連性で思い出したこと（server/agent/recall.py）を足す。
+    鍵は write-keys で会話サーバーと同じ指示から書いたもの（無ければ鍵なし）、埋め込みは --embedder のモデル"""
+    id = 'recall'
+
+    def __init__(self, embedder=None, keys: dict | None = None):
+        super().__init__()
+        self.embedder, self.keys = embedder, keys or {}
+        self._vectors = {}
+        self.config = {**self.config, 'embedder': getattr(embedder, 'name', '') or None,
+                       'keys': len(self.keys), 'top_k': recall.TOP_K, 'min_relevance': recall.MIN_RELEVANCE,
+                       'cosine_floor': recall.COSINE_FLOOR}
+
+    def _vector(self, text: str, query: bool):
+        if self.embedder is None:
+            return None
+        key = (text, query)
+        if key not in self._vectors:
+            self._vectors[key] = self.embedder.embed([text], query=query)[0]
+        return self._vectors[key]
+
+    def candidate(self, m: Memory):
+        keys = self.keys.get(m.text, '')
+        doc = recall.document(recall.Candidate(id=m.id, kind=m.kind, text=m.text, at=m.at, keys=keys))
+        return recall.Candidate(id=m.id, kind=m.kind, text=m.text, at=m.at, keys=keys, person_id=m.person,
+                                world=m.world, ref=m.ref, invalidated_at=m.invalidated_at,
+                                importance=4 if m.kind == 'game_place' else 3, embedding=self._vector(doc, False))
+
+    def retrieve(self, memories: list[Memory], ctx: Context) -> list[Item]:
+        items = super().retrieve(memories, ctx)
+        pool = [self.candidate(m) for m in memories if m.kind != 'like']
+        query = ' '.join(t['text'] for t in ctx.turns if t['role'] == 'user')
+        situation = recall.Situation(presence=ctx.presence, person_id=ctx.speaker, world=ctx.world)
+        got = recall.rank(pool, situation, query, self._vector(query, True), ctx.now)
+        auto = {i.id for i in items if i.channel == 'auto'}
+        recalled = [Item(r.id, 'auto', past=r.past) for r in got if r.id not in auto]
+        return recalled + [i for i in items if i.id not in {r.id for r in recalled}]
+
+
+RETRIEVERS = {'current': CurrentMethod, 'recall': RecallMethod}
+
+
+def write_keys(suite: dict, llm_url: str, model: str = 'local') -> dict:
+    """課題の記憶（埋め草も含む）に、会話サーバーと同じ指示で鍵を書く（OpenAI 互換の窓口。温度 0）"""
+    import httpx
+    sys.path.insert(0, str(AGENT))
+    from persona import load_persona
+    instructions = load_persona().memory_keys_instructions
+    texts = []
+    for case in suite['cases']:
+        memories, _ = build_case(suite, case)
+        texts += [m.text for m in memories if m.kind != 'like' and m.text not in texts]
+    out = {}
+    for start in range(0, len(texts), recall.KeyWriter.BATCH):
+        batch = texts[start:start + recall.KeyWriter.BATCH]
+        body = {'model': model, 'temperature': 0, 'response_format': {'type': 'json_object'},
+                'chat_template_kwargs': {'enable_thinking': False},
+                'messages': [{'role': 'system', 'content': instructions},
+                             {'role': 'user', 'content': json.dumps(
+                                 {'memories': [{'id': str(i), 'text': t} for i, t in enumerate(batch)]}, ensure_ascii=False)}]}
+        r = httpx.post(llm_url.rstrip('/') + '/chat/completions', json=body, timeout=300)
+        r.raise_for_status()
+        keys = json.loads(r.json()['choices'][0]['message']['content'] or '{}').get('keys') or {}
+        for i, t in enumerate(batch):
+            k = keys.get(str(i))
+            if isinstance(k, str) and k.strip():
+                out[t] = ' '.join(k.split())[:recall.KEY_CHARS]
+    return {'instructions_sha256': hashlib.sha256(instructions.encode()).hexdigest(), 'model': model, 'keys': out}
 
 
 def score_case(case: dict, memories: list[Memory], items: list[Item]) -> dict:
@@ -257,13 +328,30 @@ def main(argv=None):
     sub = parser.add_subparsers(dest='command', required=True)
     s = sub.add_parser('score')
     s.add_argument('--retriever', default='current', choices=sorted(RETRIEVERS))
+    s.add_argument('--embedder', default='', help='sentence-transformers model for --retriever recall')
+    s.add_argument('--keys', help='keys file from write-keys')
     s.add_argument('--out')
+    w = sub.add_parser('write-keys')
+    w.add_argument('--llm-url', required=True)
+    w.add_argument('--model', default='local')
+    w.add_argument('--out', required=True)
     c = sub.add_parser('compare')
     c.add_argument('base')
     c.add_argument('candidate')
     args = parser.parse_args(argv)
+    if args.command == 'write-keys':
+        keys = write_keys(load_suite(), args.llm_url, args.model)
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(keys, ensure_ascii=False, indent=1), encoding='utf-8')
+        print(f'{len(keys["keys"])} keys')
+        return
     if args.command == 'score':
-        report = run(RETRIEVERS[args.retriever](), load_suite())
+        if args.retriever == 'recall':
+            keys = json.loads(Path(args.keys).read_text(encoding='utf-8'))['keys'] if args.keys else {}
+            retriever = RecallMethod(recall.SentenceEmbedder(args.embedder) if args.embedder else None, keys)
+        else:
+            retriever = RETRIEVERS[args.retriever]()
+        report = run(retriever, load_suite())
         text = json.dumps(report, ensure_ascii=False, indent=1)
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)

@@ -114,7 +114,11 @@ async function houseAt(bot, house, name, site) {
     bot.keepItems = item => materials(blueprint, bot)[item] || 0;
     const blueprint = houseBlueprint(bot, house, site.corner, site.turns);
     reserve(bot, blueprint);
-    return await runPlan(bot, houseSteps(blueprint, bot), { title: name });
+    const done = await runPlan(bot, houseSteps(blueprint, bot), { title: name });
+    // A finished house is a place the host can recall later ("the house we built").
+    if (done && remaining(blueprint, bot).length === 0)
+        bot.emit?.('ciel_built', { what: 'house', name, at: [site.corner.x, site.corner.y, site.corner.z] });
+    return done;
 }
 
 // The house's own place is not dug up for materials, while it is built or after.

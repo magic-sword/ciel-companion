@@ -152,7 +152,44 @@ CREATE TABLE IF NOT EXISTS ciel_like_history (
 ALTER TABLE people ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'main';
 ALTER TABLE people ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT false;
 ALTER TABLE person_notes ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'main';
+-- 関連性で思い出す記憶（recall.py。docs/services/associative-memory-ja.md）。シエル自身の記憶で、人には結び付けない。
+-- keys は思い出すきっかけの言葉（NULL はまだ書いていない）。embedded_text は埋め込んだ文（本文＋鍵）。
+CREATE TABLE IF NOT EXISTS memories (
+    id bigserial PRIMARY KEY,
+    kind text NOT NULL,
+    tag text NOT NULL DEFAULT '',
+    text text NOT NULL,
+    keys text,
+    importance smallint NOT NULL DEFAULT 3,
+    occurred_at timestamptz NOT NULL DEFAULT now(),
+    last_recalled_at timestamptz,
+    recall_count integer NOT NULL DEFAULT 0,
+    world text,
+    ref text,
+    invalidated_at timestamptz,
+    source text,
+    source_id bigint,
+    embedding vector,
+    embedding_model text,
+    embedded_text text,
+    UNIQUE (source, source_id)
+);
+CREATE INDEX IF NOT EXISTS memories_ref ON memories(ref);
+-- 人のメモの索引。メモの表とは分ける（メモの表の書き込みは版番号を進め、書き込み中のメモの整理を捨てさせるため）
+CREATE TABLE IF NOT EXISTS note_index (
+    note_id bigint PRIMARY KEY REFERENCES person_notes(id) ON DELETE CASCADE,
+    keys text NOT NULL DEFAULT '',
+    keyed_text text NOT NULL DEFAULT '',
+    embedding vector,
+    embedding_model text,
+    embedded_text text
+);
+INSERT INTO memories (kind, tag, text, occurred_at, source, source_id)
+    SELECT 'diary', kind, text, at, 'ciel_events', id FROM ciel_events
+    ON CONFLICT (source, source_id) DO NOTHING;
 """
+# 埋め込んだ文：本文と鍵（鍵が無ければ本文だけ）。索引の要不要を SQL で比べるときと同じ形
+DOC_SQL = "{t} || CASE WHEN COALESCE({k}, '') = '' THEN '' ELSE E'\\n' || {k} END"
 SCOPES = ('main', 'dev')
 
 
@@ -285,13 +322,95 @@ class Store:
 
     # ---- シエル自身の出来事（diary.py。人には結び付けない） ----
 
-    async def add_ciel_event(self, kind: str, text: str, keep: int) -> None:
-        """出来事を 1 つ足す。keep 個を超えたら古いものから消す"""
+    async def add_ciel_event(self, kind: str, text: str, keep: int, *, memory_kind: str = 'diary',
+                             world: str | None = None, ref: str | None = None, importance: int = 3) -> None:
+        """出来事を 1 つ足す。ciel_events（好みが育つ材料）は keep 個を超えたら古いものから消す。
+        思い出す記憶（memories）には、消さずに同じ出来事を残す"""
         async with self.conn.transaction():
-            await self.conn.execute('INSERT INTO ciel_events (kind, text) VALUES (%s, %s)', (kind, text))
+            row = await (await self.conn.execute(
+                'INSERT INTO ciel_events (kind, text) VALUES (%s, %s) RETURNING id, at', (kind, text))).fetchone()
+            await self.conn.execute(
+                'INSERT INTO memories (kind, tag, text, occurred_at, world, ref, importance, source, source_id) '
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, 'ciel_events', %s) ON CONFLICT (source, source_id) DO NOTHING",
+                (memory_kind, kind, text, row[1], world, ref, importance, row[0]))
             await self.conn.execute(
                 'DELETE FROM ciel_events WHERE id NOT IN (SELECT id FROM ciel_events ORDER BY at DESC, id DESC LIMIT %s)',
                 (keep,))
+
+    # ---- 関連性で思い出す（recall.py） ----
+
+    async def invalidate_memories(self, ref: str) -> int:
+        """ゲームの場所が無くなった：その場所の記憶に、無くなった時刻を付ける（消さない）"""
+        cur = await self.conn.execute(
+            "UPDATE memories SET invalidated_at = now() WHERE ref = %s AND kind = 'game_place' AND invalidated_at IS NULL",
+            (ref,))
+        return cur.rowcount
+
+    async def recall_candidates(self, model: str, world: str | None, person_id: int | None) -> list:
+        """思い出す候補（recall.Candidate）。人のメモは、呼び出し側が確かめた本人の分だけ"""
+        from recall import Candidate
+        rows = await (await self.conn.execute(
+            'SELECT id, kind, text, keys, importance, occurred_at, world, ref, invalidated_at, '
+            'CASE WHEN embedding_model = %s THEN embedding END FROM memories '
+            'WHERE world IS NULL OR world = %s', (model, world))).fetchall()
+        out = [Candidate(id=f'mem:{i}', kind=kind, text=text, keys=keys or '', importance=imp, at=at, world=w, ref=ref,
+                         invalidated_at=inv, embedding=None if emb is None else np.asarray(emb, dtype=np.float32))
+               for i, kind, text, keys, imp, at, w, ref, inv, emb in rows]
+        if person_id is not None:
+            notes = await (await self.conn.execute(
+                'SELECT n.id, n.text, CASE WHEN i.keyed_text = n.text THEN i.keys END, n.updated_at, '
+                'CASE WHEN i.embedding_model = %s AND i.embedded_text = ' + DOC_SQL.format(t='n.text', k='i.keys')
+                + ' THEN i.embedding END '
+                'FROM person_notes n LEFT JOIN note_index i ON i.note_id = n.id WHERE n.person_id = %s',
+                (model, person_id))).fetchall()
+            out += [Candidate(id=f'note:{i}', kind='note', text=text, keys=keys or '', at=at, person_id=person_id,
+                              embedding=None if emb is None else np.asarray(emb, dtype=np.float32))
+                    for i, text, keys, at, emb in notes]
+        return out
+
+    async def mark_recalled(self, ids: list[str]) -> None:
+        mem = [int(i.split(':', 1)[1]) for i in ids if i.startswith('mem:')]
+        if mem:
+            await self.conn.execute(
+                'UPDATE memories SET last_recalled_at = now(), recall_count = recall_count + 1 WHERE id = ANY(%s)', (mem,))
+
+    async def unindexed(self, model: str, want_keys: bool, limit: int) -> list[dict]:
+        """鍵か埋め込みがまだの記憶・メモ（新しいものから）。keys が None は、鍵をまだ書いていない"""
+        mem_doc = DOC_SQL.format(t='text', k='keys')
+        rows = await (await self.conn.execute(
+            'SELECT id, text, keys FROM memories WHERE (%s AND keys IS NULL) OR embedding_model IS DISTINCT FROM %s '
+            'OR embedded_text IS DISTINCT FROM ' + mem_doc + ' ORDER BY id DESC LIMIT %s',
+            (want_keys, model, limit))).fetchall()
+        out = [{'id': f'mem:{i}', 'text': text, 'keys': keys} for i, text, keys in rows]
+        if len(out) < limit:
+            note_doc = DOC_SQL.format(t='n.text', k='i.keys')
+            notes = await (await self.conn.execute(
+                'SELECT n.id, n.text, CASE WHEN i.keyed_text = n.text THEN i.keys END FROM person_notes n '
+                'JOIN people p ON p.id = n.person_id LEFT JOIN note_index i ON i.note_id = n.id '
+                'WHERE p.notes_consented_at IS NOT NULL AND ' + visible(self.scope) + ' AND '
+                '(i.note_id IS NULL OR (%s AND i.keyed_text IS DISTINCT FROM n.text) '
+                'OR i.embedding_model IS DISTINCT FROM %s OR i.embedded_text IS DISTINCT FROM ' + note_doc + ') '
+                'ORDER BY n.id DESC LIMIT %s', (want_keys, model, limit - len(out)))).fetchall()
+            out += [{'id': f'note:{i}', 'text': text, 'keys': keys} for i, text, keys in notes]
+        return out
+
+    async def set_index(self, id: str, text: str, keys: str, embedding, model: str, doc: str) -> None:
+        """鍵と埋め込みを残す。text は鍵を書いたときの本文（その間にメモが書き直されたら、次にやり直す）"""
+        table, key = id.split(':', 1)
+        if table == 'mem':
+            await self.conn.execute(
+                'UPDATE memories SET keys = %s, embedding = %s, embedding_model = %s, embedded_text = %s WHERE id = %s',
+                (keys, embedding, model, doc, int(key)))
+        elif table == 'note':
+            await self.conn.execute(
+                'INSERT INTO note_index (note_id, keys, keyed_text, embedding, embedding_model, embedded_text) '
+                'SELECT id, %s, %s, %s, %s, %s FROM person_notes WHERE id = %s '
+                'ON CONFLICT (note_id) DO UPDATE SET keys = EXCLUDED.keys, keyed_text = EXCLUDED.keyed_text, '
+                'embedding = EXCLUDED.embedding, embedding_model = EXCLUDED.embedding_model, '
+                'embedded_text = EXCLUDED.embedded_text',
+                (keys, text, embedding, model, doc, int(key)))
+        else:
+            raise ValueError(id)
 
     async def ciel_events(self, limit: int) -> list[tuple[int, datetime, str, str]]:
         """新しい順に（番号、日時、種類、文）"""

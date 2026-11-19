@@ -15,6 +15,7 @@ import { Eye } from './eye.js';
 import { PlayerLocator } from './player-locator.js';
 import { Pointing } from './pointing.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
+import { worldId } from './world-id.js';
 
 const env = process.env;
 const MC = {
@@ -26,6 +27,8 @@ const MC = {
   hideErrors: true,  // つなげないときの詳しいエラーは出さない（下の 'error' で短く出す）
 };
 const OWNER = env.MC_OWNER || null;
+// ワールドの識別（world-id.js）。会話サーバーが、ゲームの場所の記憶をワールドで分ける
+const WORLD = worldId(env.CIEL_BODY_DATA, env.MC_HOST, env.MC_PORT);
 const pointing = new Pointing(env.CIEL_POINTING_FILE, OWNER);
 const BODY_HOST = env.BODY_HOST ?? '127.0.0.1';   // 外から入る口は開かない
 const BODY_PORT = Number(env.BODY_PORT ?? 8768);
@@ -127,7 +130,7 @@ async function look(id) {
 }
 
 let blocks = {};
-const state = () => ({ ...summarize(bot, runner.doing(), blocks), body: runner.snapshot() });
+const state = () => ({ ...summarize(bot, runner.doing(), blocks), body: runner.snapshot(), world: WORLD });
 setInterval(() => {
   if (link) send('state', state());
 }, STATE_EVERY_MS);
@@ -184,6 +187,9 @@ function connect() {
     send('event', { kind: 'chat', who, text, owner: who === OWNER });
   });
   b.on('rain', () => send('event', { kind: 'weather', raining: Boolean(b.isRaining) }));
+  // 覚えておく場所（拠点・建てた家）。会話サーバーが、関連性で思い出せる記憶にする（座標は体が持ち、参照だけを渡す）
+  b.on('ciel_base', (e) => send('event', { kind: 'base_set', home: e.home, previous: e.previous ?? null, stations: e.stations ?? [] }));
+  b.on('ciel_built', (e) => send('event', { kind: 'built', what: e.what, name: e.name, at: e.at }));
   b.on('time', () => {
     const now = isNight(b.time.timeOfDay);
     if (night !== null && now !== night) send('event', { kind: now ? 'night' : 'day' });

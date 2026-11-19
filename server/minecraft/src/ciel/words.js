@@ -207,6 +207,20 @@ function bodyEventFor(m, owner) {
       }
       return null;
     }
+    case 'base_set': {
+      // 拠点は場所の記憶として残す。前の拠点は「前は」の記憶にする（ref は体の中の場所の参照。座標の文字にしない）
+      const has = { crafting_table: '作業台', furnace: 'かまど', chest: 'チェスト' };
+      const near = (m.stations ?? []).map(s => has[s]).filter(Boolean);
+      const memorable = [];
+      if (m.previous && m.previous.join(',') !== (m.home ?? []).join(',')) memorable.push({ kind: 'place_lost', ref: `base/${m.previous.join(',')}` });
+      memorable.push({ kind: 'game_place', importance: 4, ref: `base/${(m.home ?? []).join(',')}`,
+        text: near.length ? `マイクラで拠点を決めた（${near.join('・')}のそば）` : 'マイクラで拠点を決めた' });
+      return { kind: 'base_set', urgency: null, key: 'base_set', memorable };
+    }
+    case 'built':
+      if (m.what !== 'house') return null;
+      return { kind: 'built', urgency: null, key: 'built', memorable: [{ kind: 'game_place', importance: 4,
+        ref: `house/${(m.at ?? []).join(',')}`, text: `マイクラで家（${m.name}）を建てた` }] };
     case 'defeated':
       return { kind: 'defeated', urgency: 'normal', key: 'defeated', memorable: `マイクラで ${m.name} を倒した`,
         say: `[マイクラ：${m.name}を倒した]` };

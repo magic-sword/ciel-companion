@@ -188,7 +188,7 @@ class Mind:
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 text = self._marked(text)
             out.add_message(**turn_message(t, text))
-        notes = self._notes(deep=True, memory=turn.get('memory'))
+        notes = self._notes(deep=True, memory='\n\n'.join(x for x in (turn.get('memory'), turn.get('recall')) if x))
         self.handed = None
         if tail_users:
             # 切れ目を待っている知らせは、相手への返事の中で伝える。長い話の途中で聞く係が議事録を始めると、

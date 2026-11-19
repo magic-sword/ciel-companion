@@ -25,6 +25,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()  # models.py を含む各モジュールが環境変数を読む前に設定する
@@ -65,6 +66,7 @@ import models
 import speech_input
 import mouth
 import notes
+import recall
 import relationship
 import singing
 import soundcheck
@@ -78,6 +80,10 @@ import voice_conversion
 import voice_preparation
 import volume
 import youtube_chat
+from jst import JST
+
+# 思い出すのにかけてよい時間（秒）。超えたら、その返事には思い出したことを添えない
+RECALL_TIMEOUT = float(os.environ.get('CIEL_RECALL_TIMEOUT', '0.8'))
 from conversation import Conversation
 from conversation_recording import ConversationRecorder
 from web_research import WebResearcher
@@ -245,6 +251,7 @@ class Ciel(Agent):
         self.mind: mind.Mind | None = None      # pipeline の心（entrypoint がつなぐ）
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
+        self.recall = None                       # recall.Recall（関連性で思い出す。DB があるときだけ）
         self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
@@ -264,6 +271,27 @@ class Ciel(Agent):
         async for chunk in self.conversation_decision.node(self, ctx, functions, settings, source=source):
             yield chunk
 
+    async def _recall_for(self, chat_ctx) -> str | None:
+        """今の話から思い出したこと（recall.py）。今回の相手の発言、無ければ最後の出来事を問いにする。
+        返事を遅らせないよう、時間の上限を超えたら添えない"""
+        if self.recall is None:
+            return None
+        query = mind._user_text(mind._tail(list(chat_ctx.items)))
+        history = getattr(self.session.userdata, 'history', None)
+        if not query and history is not None:
+            last = next((t for t in reversed(history.turns) if t.role in ('user', 'event') and t.text), None)
+            query = mind._event_fact(last.text) if last is not None else ''
+        style, book, game = self.style, self.session.userdata.book, getattr(self, 'game', None)
+        situation = recall.Situation(presence=style.presence if style else 'solo',
+                                     person_id=book.recall_person() if book is not None else None,
+                                     world=game.world if game is not None else None)
+        try:
+            items = await asyncio.wait_for(self.recall.for_turn(query, situation), RECALL_TIMEOUT)
+        except Exception as e:
+            logger.info('思い出せない：%s', type(e).__name__)
+            return None
+        return recall.context(items, datetime.now(JST), self.persona.recall_note) or None
+
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
         """pipeline：返事を作るかをコードで決め（mind.py の route）、心の返事を流す。ゲーム中の持ち主の発言は、
         心と同じ固定の指示・道具の一覧・履歴で、先に話すこととすることを一つの決定にする（game_decision.py）"""
@@ -277,6 +305,7 @@ class Ciel(Agent):
                 await ctx.room.local_participant.publish_data(json.dumps(validated), reliable=True, topic='ciel.event')
         turn_started = time.monotonic()
         turn = await self.replies.pipeline_turn() if self.replies is not None else {}
+        turn['recall'] = await self._recall_for(chat_ctx)
         debug_log.record('voice_turn_prepare', speech_id=getattr(self.session.current_speech, 'id', None),
                          ms=round((time.monotonic()-turn_started)*1000, 2))
         who = self.mind.route(chat_ctx, turn)
@@ -530,6 +559,10 @@ async def entrypoint(ctx: JobContext) -> None:
     # シエル自身に本当にあった出来事（diary.py）。好みが育つ材料にする（growth.py）
     ciel_diary = diary.Diary(store)
     await ciel_diary.load()
+    # 関連性で思い出す（recall.py）。埋め込みモデルは裏で読み込んでおく（初めの返事を待たせない）
+    embedder = recall.make_embedder() if store is not None else None
+    if embedder is not None:
+        asyncio.create_task(embedder.warm())
     # 出来事から育った好み（growth.py）。芯の好みのあとに、会話モデルと内なる考えへ渡す
     grown = []
     if store is not None:
@@ -758,6 +791,11 @@ async def entrypoint(ctx: JobContext) -> None:
 
     # その人について覚えておくメモを、会話の裏で書く（notes.py。覚えている人で、お話を覚えることに同意した人だけ）
     note_taker = notes.NoteTaker(book, agent.persona.notes_instructions, history) if book is not None and store else None
+    indexer = None
+    if store is not None:
+        agent.recall = recall.Recall(store, embedder)
+        indexer = recall.Indexer(store, embedder, recall.KeyWriter(agent.persona.memory_keys_instructions))
+        indexer.start()   # 鍵と埋め込みがまだの記憶・メモを、会話の裏で埋める
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
@@ -818,6 +856,8 @@ async def entrypoint(ctx: JobContext) -> None:
         for result in await asyncio.gather(minute_taker.flush(), memories(), return_exceptions=True):
             if isinstance(result, BaseException):
                 logger.warning('会話の後片付けに失敗 error=%s', type(result).__name__)
+        if indexer is not None:
+            await indexer.close()
         if store is not None:
             await store.close()
     grower = growth.Grower(store, ciel_diary, agent.persona.self_instructions, agent.persona.growth_instructions)
