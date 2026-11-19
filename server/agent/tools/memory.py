@@ -32,7 +32,7 @@ async def remember_about_speaker(context: RunContext, note: str):
 
 @function_tool
 async def forget_about_speaker(context: RunContext, what: str):
-    """いま話している本人に「忘れて」「それは別の人の話」と頼まれたことを、短い言葉で渡す（例：「ルミナス王国のこと」）。
+    """いま話している本人に「忘れて」「それは別の人の話」と頼まれたことを、短い言葉で渡す（例：「旅行の話」）。
     呼ぶ前には何も言わない。結果が戻ったら、ひとことで返す。"""
     return await service(context).forget(what)
 
