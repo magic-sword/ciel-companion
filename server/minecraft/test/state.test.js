@@ -60,3 +60,21 @@ test('向いている方角（mineflayer の yaw は北が 0、西が π/2）', 
   assert.equal(at(Math.PI / 4), 'northwest');
   assert.equal(facing(null), null);
 });
+
+test('今の拠点：距離と、無くなった道具の置き場（読み込まれていない所はあるものとする）', async () => {
+  const { baseSummary } = await import('../src/state.js');
+  const { baseLine, stateText } = await import('../src/ciel/words.js');
+  const blocks = { '1,64,0': 'crafting_table', '2,64,0': 'air' };
+  const bot = {
+    entity: { position: new Vec3(3, 64, 4) },
+    base: { home: [0, 64, 0], stations: { crafting_table: [1, 64, 0], chest: [2, 64, 0], furnace: [90, 64, 0] } },
+    blockAt: (p) => (blocks[`${p.x},${p.y},${p.z}`] ? { name: blocks[`${p.x},${p.y},${p.z}`] } : null),
+  };
+  const b = baseSummary(bot);
+  assert.deepEqual(b, { home: [0, 64, 0], distance: 5, stations: ['crafting_table', 'furnace'], gone: ['chest'] });
+  assert.equal(baseLine(b), '拠点：0,64,0（ここから 5 ブロック。作業台・かまどがある。チェストは無くなっている）');
+  assert.equal(baseLine(null), '拠点：まだ決めていない');
+  assert.equal(baseSummary({ base: null }), null);
+  const text = stateText({ connected: true, health: 20, food: 20, inventory: {}, base: b }, null, true);
+  assert.match(text, /\n拠点：0,64,0/);
+});

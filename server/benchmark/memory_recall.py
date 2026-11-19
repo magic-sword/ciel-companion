@@ -200,11 +200,11 @@ class RecallMethod(CurrentMethod):
 
 class MindMethod(RecallMethod):
     """System 2 variant: the same search proposes a wider list, then an LLM (the mind) picks what matters.
-    Experimental (prompts/recall_mind.md). The latency of each LLM call is recorded."""
+    Same pool and instructions as the host's recall.MindRecall. The latency of each LLM call is recorded."""
     id = 'mind'
-    PROMPT = Path(__file__).with_name('prompts') / 'recall_mind.md'
-    POOL = 8
-    POOL_MIN = 0.2
+    PROMPT = AGENT / 'config/prompts/recall_mind.md'   # the host's own instructions (MindRecall)
+    POOL = recall.MindRecall.POOL
+    POOL_MIN = recall.MindRecall.POOL_MIN
 
     def __init__(self, embedder=None, keys=None, llm_url='', model='local', thinking=False):
         super().__init__(embedder, keys)

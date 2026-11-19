@@ -252,6 +252,7 @@ class Ciel(Agent):
         self.style = None                        # mode.ConversationStyle（pipeline の小脳の指示を選ぶ）
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
         self.recall = None                       # recall.Recall（関連性で思い出す。DB があるときだけ）
+        self.mind_recall = None                  # recall.MindRecall（心が見極めた記憶と思ったこと。次の返事に 1 回）
         self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
@@ -281,16 +282,33 @@ class Ciel(Agent):
         if not query and history is not None:
             last = next((t for t in reversed(history.turns) if t.role in ('user', 'event') and t.text), None)
             query = mind._event_fact(last.text) if last is not None else ''
-        style, book, game = self.style, self.session.userdata.book, getattr(self, 'game', None)
-        situation = recall.Situation(presence=style.presence if style else 'solo',
-                                     person_id=book.recall_person() if book is not None else None,
-                                     world=game.world if game is not None else None)
+        situation = self.recall_situation()
         try:
             items = await asyncio.wait_for(self.recall.for_turn(query, situation), RECALL_TIMEOUT)
         except Exception as e:
             logger.info('思い出せない：%s', type(e).__name__)
-            return None
-        return recall.context(items, datetime.now(JST), self.persona.recall_note) or None
+            items = []
+        # システム2：心が前の静かな間に見極めた記憶と、思ったこと（recall.MindRecall。1 回だけ）
+        thought = None
+        if self.mind_recall is not None and history is not None:
+            thought = self.mind_recall.take(situation, history.last_id, lambda turn: sum(
+                1 for t in history.between(turn) if t.role == 'user' and t.text))
+        if thought is not None:
+            seen = {r.id for r in items}
+            extra = [r for r in thought.items if r.id not in seen]
+            self.recall.shown(r.id for r in extra)
+            items = items + extra
+        parts = [recall.context(items, datetime.now(JST), self.persona.recall_note)]
+        if thought is not None and thought.text:
+            parts.append(f'{self.persona.thought_note.strip()}\n{thought.text}')
+        return '\n\n'.join(p for p in parts if p) or None
+
+    def recall_situation(self) -> recall.Situation:
+        """思い出すときの場（公開範囲・本人・ワールド）。システム1 と 2 で同じものを使う"""
+        style, book, game = self.style, self.session.userdata.book, getattr(self, 'game', None)
+        return recall.Situation(presence=style.presence if style else 'solo',
+                                person_id=book.recall_person() if book is not None else None,
+                                world=game.world if game is not None else None)
 
     async def _pipeline_llm(self, chat_ctx, tools, model_settings):
         """pipeline：返事を作るかをコードで決め（mind.py の route）、心の返事を流す。ゲーム中の持ち主の発言は、
@@ -796,6 +814,10 @@ async def entrypoint(ctx: JobContext) -> None:
         agent.recall = recall.Recall(store, embedder)
         indexer = recall.Indexer(store, embedder, recall.KeyWriter(agent.persona.memory_keys_instructions))
         indexer.start()   # 鍵と埋め込みがまだの記憶・メモを、会話の裏で埋める
+        if PIPELINE and history is not None and agent.persona.recall_mind_instructions:
+            # システム2：静かな間に、心が思い出しを見極める（返事の始まりを待たせない。docs/services/associative-memory-ja.md）
+            agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions)
+            agent.mind_recall.start(history, agent.recall_situation)
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
@@ -858,6 +880,8 @@ async def entrypoint(ctx: JobContext) -> None:
                 logger.warning('会話の後片付けに失敗 error=%s', type(result).__name__)
         if indexer is not None:
             await indexer.close()
+        if agent.mind_recall is not None:
+            await agent.mind_recall.close()
         if store is not None:
             await store.close()
     grower = growth.Grower(store, ciel_diary, agent.persona.self_instructions, agent.persona.growth_instructions)

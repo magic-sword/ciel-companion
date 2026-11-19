@@ -2,6 +2,7 @@
 // ブロックと敵は、シエルの目から見えるものだけを入れる（sight.js。地中の鉱石を話して不自然だった。2026-11-06）
 import { FLOWER_NAMES } from './names.js';
 import { canSee, notices, remember } from './sight.js';
+import { base as readBase } from './vendor/mindcraft/src/agent/library/base.js';
 
 const NEAR = 16;          // 近くとみなす距離（ブロック）
 const NIGHT_START = 13000;   // timeOfDay（0〜23999）。13000〜23000 は敵が湧く暗さ
@@ -46,6 +47,22 @@ export function nearbyBlocks(bot) {
   return counts;
 }
 
+// 今の拠点（決めていなければ null）。道具の置き場は、読み込まれている所で別のブロックになっていたら gone に入れる
+// （まだ読み込まれていない所は分からないので、あるものとして数える）。記録は書き換えない（使うときに base.js が直す）
+export function baseSummary(bot) {
+  const b = bot ? readBase(bot) : null;
+  if (!b?.home) return null;
+  const me = bot.entity?.position;
+  const [x, y, z] = b.home;
+  const kept = [], gone = [];
+  for (const [name, at] of Object.entries(b.stations ?? {})) {
+    const block = bot.blockAt?.({ x: at[0], y: at[1], z: at[2] });
+    (block && block.name !== name ? gone : kept).push(name);
+  }
+  const distance = me ? round(Math.hypot(me.x - x, me.y - y, me.z - z)) : null;
+  return { home: b.home, distance, stations: kept, gone };
+}
+
 export function summarize(bot, doing, blocks = {}) {
   if (!bot || !bot.entity) return { connected: false, doing: doing ?? null };
   const me = bot.entity.position;
@@ -71,6 +88,7 @@ export function summarize(bot, doing, blocks = {}) {
     hostiles: near.filter(({ e }) => e.type === 'hostile' && notices(bot, e)).map(({ e, distance }) => ({ name: e.name, distance })),
     blocks,
     footing: footing(bot),
+    base: baseSummary(bot),
     doing: doing ?? null,
   };
 }

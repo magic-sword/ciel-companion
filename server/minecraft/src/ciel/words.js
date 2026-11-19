@@ -148,6 +148,17 @@ export function refused(m) {
 
 const counts = (o) => Object.entries(o ?? {}).sort((a, b) => b[1] - a[1]);
 
+const STATION_NAMES = { crafting_table: '作業台', furnace: 'かまど', chest: 'チェスト' };
+// 今の拠点の 1 行。思い出した拠点が今もあるかを、返事のたびに見られるようにする（docs/services/associative-memory-ja.md）
+export function baseLine(b) {
+  if (!b?.home) return '拠点：まだ決めていない';
+  const names = (list) => (list ?? []).map((n) => STATION_NAMES[n] ?? n).join('・');
+  const parts = [b.distance == null ? '' : `ここから ${Math.round(b.distance)} ブロック`,
+    b.stations?.length ? `${names(b.stations)}がある` : '',
+    b.gone?.length ? `${names(b.gone)}は無くなっている` : ''].filter(Boolean);
+  return `拠点：${b.home.join(',')}` + (parts.length ? `（${parts.join('。')}）` : '');
+}
+
 // 心と小脳へ渡す様子の文（見出しは会話サーバーが付ける）
 export function stateText(s, owner, linked = true) {
   if (!linked) return 'シエルの体とつながっていない（マイクラの中のことは分からない）';
@@ -166,6 +177,7 @@ export function stateText(s, owner, linked = true) {
   const blocks = counts(s.blocks).slice(0, BLOCKS_SHOWN);
   if (blocks.length) lines.push('近くのブロック：' + blocks.map(([k, n]) => `${k}×${n}`).join('、'));
   if (owner && !players.some((p) => p.name === owner)) lines.push(`${owner}（持ち主）は近くにいない`);
+  lines.push(baseLine(s.base));
   return lines.join('\n');
 }
 

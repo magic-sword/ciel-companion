@@ -8,6 +8,11 @@
 - 公開範囲：本人のメモは、本人と分かり、保存に同意していて、ひとり・身近な人のときだけ候補にする（eligible）。
   ゲームの記憶は今のワールドのものだけ。無効になった記憶（壊れた拠点）は「前は」として渡す。
 評価器（server/benchmark/memory_recall.py）も同じ eligible・rank を使う。
+
+システム1とシステム2（Inner Thoughts。設計文書の「分担」）：
+- システム1（Recall.for_turn）：返事のたびに LLM を使わずに探し、強く当たった上位 3 件を添える（数 ms〜数十 ms）。
+- システム2（MindRecall）：会話が静かになったら、同じ検索の広い候補から、心（brief の役目のモデル）が今の話に
+  本当に合うものを選び、思ったことを 1 文書く（1〜2 秒）。結果は次の返事に 1 回だけ添える。
 """
 from __future__ import annotations
 
@@ -391,30 +396,163 @@ class Recall:
         self.last: list[Recalled] = []
         self._shown: dict[str, float] = {}
 
-    async def for_turn(self, query: str, s: Situation) -> list[Recalled]:
+    def now(self) -> datetime:
+        from jst import JST
+        return self.clock() if self.clock else datetime.now(JST)
+
+    async def search(self, query: str, s: Situation, *, min_relevance: float | None = None) -> tuple[list[Recalled], int]:
+        """関連の高い順の全候補と、候補の数（LLM は使わない）"""
         query = ' '.join((query or '').split())
         if not query or self.store is None:
-            self.last = []
-            return []
-        from jst import JST
-        now = self.clock() if self.clock else datetime.now(JST)
-        t0 = time.perf_counter()
+            return [], 0
         model = self.embedder.name if self.embedder is not None else ''
         candidates = await self.store.recall_candidates(model, s.world, s.person_id if s.presence in PRIVATE else None)
         qv = (await self.embedder.aembed([query], query=True))[0] if self.embedder is not None else None
+        return rank(candidates, s, query, qv, self.now(), k=len(candidates), min_relevance=min_relevance), len(candidates)
+
+    def shown(self, ids) -> None:
+        """返事に添えた（同じ記憶を続けて添えにくくする）"""
+        t = self.monotonic()
+        for i in ids:
+            self._shown[i] = t
+
+    async def for_turn(self, query: str, s: Situation) -> list[Recalled]:
+        t0 = time.perf_counter()
+        items, count = await self.search(query, s)
         t = self.monotonic()
         recent = {i for i, at in self._shown.items() if t - at < self.REPEAT_SECONDS}
-        items = rank(candidates, s, query, qv, now, k=len(candidates) or TOP_K)
         for r in items:
             if r.id in recent:
                 r.score = round(r.score * self.REPEAT_FACTOR, 4)
         items = sorted(items, key=lambda r: r.score, reverse=True)[:TOP_K]
-        for r in items:
-            self._shown[r.id] = t
+        self.shown(r.id for r in items)
         if items:
             await self.store.mark_recalled([r.id for r in items])
         self.last = items
         import debug_log
-        debug_log.record('recall', candidates=len(candidates), chosen=[r.id for r in items],
+        debug_log.record('recall', candidates=count, chosen=[r.id for r in items],
                          scores=[r.score for r in items], ms=round((time.perf_counter() - t0) * 1000, 1))
         return items
+
+
+# ---- システム2：心が見極める ----
+
+@dataclass
+class Thought:
+    """心が見極めた結果。次の返事に 1 回だけ添える"""
+    items: list[Recalled]
+    text: str
+    situation: Situation
+    turn: int            # 見極めた最後の発言（conversation.Turn.id）
+    at: float            # monotonic
+
+
+class MindRecall:
+    """会話が静かになったら（ローカルでは inference_activity が決める）、最後の発言から広めに探した候補を心に渡し、
+    今の話に合う記憶と、思ったこと 1 文を受け取る（prompts/recall_mind.md）。返事の始まりを待たせないため、
+    返事の流れからは呼ばない。結果は take() で次の返事が 1 回だけ使う"""
+    POOL = 8              # 心に見せる候補の数
+    POOL_MIN = 0.2        # 候補にする関連度の下限（システム1 の 0.35 より広く拾い、心が絞る）
+    TURNS = 8             # 心に見せる最近の発言
+    TTL = 300.0           # これより古い結果は使わない
+    STALE_TURNS = 2       # 見極めたあと、相手の発言がこれより多く進んだら使わない
+    POLL = 2.0
+
+    def __init__(self, recall: Recall, instructions: str, *, client=None, monotonic=time.monotonic) -> None:
+        self.recall, self.instructions, self.client = recall, instructions, client
+        self.monotonic = monotonic
+        self.thought: Thought | None = None
+        self.considered = 0   # 見極めた最後の発言
+        self._task: asyncio.Task | None = None
+
+    async def consider(self, rows: list, query: str, s: Situation, turn: int) -> Thought | None:
+        """rows：最近の発言（conversation.Turn）。候補が無ければ LLM を呼ばない"""
+        import debug_log
+        import models
+        t0 = time.perf_counter()
+        found, _ = await self.recall.search(query, s, min_relevance=self.POOL_MIN)
+        pool = found[:self.POOL]
+        self.considered = turn
+        if not pool:
+            return None
+        now = self.recall.now()
+        request = {'now': f'{now:%Y-%m-%d %H:%M}',
+                   'conversation': [{'speaker': t.name, 'text': t.text[:300]} for t in rows[-self.TURNS:]],
+                   'candidates': [{'id': r.id, 'when': ago(r.at, now), 'text': r.text, 'past': r.past} for r in pool]}
+        if self.client is None:
+            self.client = models.create_client('brief')
+        model = models.model('brief')
+        r = await models.client_for('brief', self.client).chat.completions.create(**models.options(
+            'brief', model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=20.0,
+            messages=[{'role': 'system', 'content': self.instructions},
+                      {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+        models.record('brief', model, getattr(r, 'usage', None))
+        try:
+            out = json.loads(r.choices[0].message.content or '{}')
+        except ValueError:
+            out = {}
+        by_id = {c.id: c for c in pool}
+        use = out.get('use') if isinstance(out.get('use'), list) else []
+        items = [by_id[i] for i in dict.fromkeys(str(i) for i in use) if i in by_id][:TOP_K]
+        text = ' '.join(str(out.get('thought') or '').split())[:200] if items else ''
+        debug_log.record('recall_mind', candidates=len(pool), chosen=[c.id for c in items], thought=bool(text),
+                         ms=round((time.perf_counter() - t0) * 1000, 1))
+        self.thought = Thought(items, text, s, turn, self.monotonic()) if items else None
+        return self.thought
+
+    def take(self, s: Situation, turn: int, user_turns_since) -> Thought | None:
+        """次の返事が使う（1 回だけ）。場面が変わった（人前になった・別の人・別のワールド）、古い、話が進みすぎたものは捨てる"""
+        t, self.thought = self.thought, None
+        if t is None:
+            return None
+        if (t.situation.presence, t.situation.person_id, t.situation.world) != (s.presence, s.person_id, s.world):
+            return None
+        if self.monotonic() - t.at > self.TTL or user_turns_since(t.turn) > self.STALE_TURNS:
+            return None
+        return t
+
+    def start(self, history, situation) -> None:
+        """history：conversation.Conversation、situation：今の Situation を返す関数"""
+        if self._task is None:
+            self._task = asyncio.create_task(self._run(history, situation))
+
+    async def close(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+            self._task = None
+
+    async def _run(self, history, situation) -> None:
+        import inference_activity
+        import models
+        while True:
+            await asyncio.sleep(self.POLL)
+            try:
+                if models.is_local('brief') and not inference_activity.activity.available():
+                    continue   # 話している間・話し終えてすぐは待つ（返事の始まりを遅らせない）
+                await self.step(history, situation)
+            except asyncio.CancelledError:
+                raise
+            except inference_activity.Deferred:
+                continue       # 途中で話し始めた。次の静かな間にやり直す
+            except Exception as e:
+                log.info('思い出し：心が見極められない：%s', type(e).__name__)
+
+    async def step(self, history, situation) -> Thought | None:
+        through = history.settled_through()
+        rows = [t for t in history.turns if t.id <= through and t.ready.is_set() and t.text
+                and t.role in ('user', 'assistant', 'event')]
+        last = next((t for t in reversed(rows) if t.role in ('user', 'event')), None)
+        if last is None or last.id <= self.considered:
+            return None
+        from mind import _event_fact
+        query = last.text if last.role == 'user' else _event_fact(last.text)
+        shown = [{'role': t.role, 'name': t.name, 'text': _event_fact(t.text) if t.role == 'event' else t.text} for t in rows]
+        return await self.consider([_Row(**r) for r in shown], query, situation(), last.id)
+
+
+@dataclass
+class _Row:
+    role: str
+    name: str
+    text: str

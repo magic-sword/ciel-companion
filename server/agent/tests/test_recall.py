@@ -255,3 +255,66 @@ class SpeakerTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def mind_client(content):
+    reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))], usage=None)
+    return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(return_value=reply))))
+
+
+class MindRecallTest(unittest.IsolatedAsyncioTestCase):
+    """システム2：心が広めの候補から選び、次の返事に 1 回だけ渡す"""
+
+    def setUp(self):
+        self.t = [0.0]
+        base = c('mem:1', 'game_place', '森の横の拠点。ベッドがある', keys='休む、寝る', importance=4)
+        gone = c('mem:2', 'game_place', '前の拠点', keys='休む', invalidated_at=NOW - timedelta(days=1))
+        self.recall = recall.Recall(FakeStore([base, gone, c('mem:3', text='鶏を見た')]), None, clock=lambda: NOW,
+                                    monotonic=lambda: self.t[0])
+
+    def mind(self, content):
+        client = mind_client(content)
+        return recall.MindRecall(self.recall, '指示', client=client, monotonic=lambda: self.t[0]), client
+
+    async def test_only_offered_candidates_and_a_thought_with_them(self):
+        m, client = self.mind('{"use": ["mem:1", "mem:9", "mem:1", "mem:2"], "thought": "拠点で休もう"}')
+        rows = [SimpleNamespace(name='ユウ', text='疲れた、休みたい')]
+        got = await m.consider(rows, '疲れた、休みたい', Situation(), turn=5)
+        self.assertEqual([r.id for r in got.items], ['mem:1', 'mem:2'])
+        self.assertEqual(got.text, '拠点で休もう')
+        request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
+        self.assertEqual({x['id']: x['past'] for x in request['candidates']}, {'mem:1': False, 'mem:2': True})
+        self.assertEqual(m.considered, 5)
+
+    async def test_nothing_chosen_or_nothing_found(self):
+        m, client = self.mind('{"use": [], "thought": "何か"}')
+        self.assertIsNone(await m.consider([], '疲れた、休みたい', Situation(), 1))
+        self.assertIsNone(await m.consider([], 'まったく別の話', Situation(), 2))
+        self.assertEqual(client.chat.completions.create.await_count, 1)   # 候補が無ければ心を呼ばない
+
+    async def test_taken_once_and_only_in_the_same_scene(self):
+        m, _ = self.mind('{"use": ["mem:1"], "thought": "拠点で休もう"}')
+        s = Situation('solo', 2, 'w')
+        none_since = lambda turn: 0
+        await m.consider([], '休みたい', s, 1)
+        self.assertIsNotNone(m.take(s, 2, none_since))
+        self.assertIsNone(m.take(s, 2, none_since))
+        await m.consider([], '休みたい', s, 1)
+        self.assertIsNone(m.take(Situation('public', 2, 'w'), 2, none_since))
+        await m.consider([], '休みたい', s, 1)
+        self.t[0] = recall.MindRecall.TTL + 1
+        self.assertIsNone(m.take(s, 2, none_since))
+        self.t[0] = 0
+        await m.consider([], '休みたい', s, 1)
+        self.assertIsNone(m.take(s, 9, lambda turn: recall.MindRecall.STALE_TURNS + 1))
+
+    async def test_step_considers_each_new_turn_once(self):
+        from conversation import Conversation
+        history = Conversation()
+        history.complete(history.reserve(), '疲れた、休みたい', label='ユウ')
+        m, client = self.mind('{"use": ["mem:1"], "thought": "拠点で休もう"}')
+        self.assertIsNotNone(await m.step(history, lambda: Situation()))
+        self.assertIsNone(await m.step(history, lambda: Situation()))
+        history.complete(history.reserve(role='assistant'), '拠点で休む？', label='シエル')
+        self.assertIsNone(await m.step(history, lambda: Situation()))   # シエルの発言では見極め直さない
+        self.assertEqual(client.chat.completions.create.await_count, 1)
