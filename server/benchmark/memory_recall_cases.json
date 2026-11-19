@@ -1,0 +1,163 @@
+{
+  "version": "memory-recall-v1",
+  "now": "2026-11-20T21:00:00+09:00",
+  "people": {"yu": "ユウ", "mina": "ミナ"},
+  "cases": [
+    {
+      "id": "note_recent_direct", "stage": 1, "ability": "extraction",
+      "why": "最近のメモと同じ言葉の話題。今の方式でも渡る対照",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "発表の準備、ちょっと進んだよ"}]},
+      "memories": [{"id": "n_presentation", "kind": "note", "person": "yu", "text": "12月4日に職場で発表がある", "days_ago": 2}],
+      "filler": [{"kind": "note", "person": "yu", "around": "n_presentation", "newer": 3, "older": 5}],
+      "expect": {"relevant": ["n_presentation"]}
+    },
+    {
+      "id": "like_sunset", "stage": 1, "ability": "extraction",
+      "why": "シエル自身の好み。今の方式では全件渡る対照",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "見て、夕焼けがきれいだよ"}]},
+      "memories": [{"id": "l_sunset", "kind": "like", "text": "夕焼けをながめるのが好き", "days_ago": 10}],
+      "expect": {"relevant": ["l_sunset"]}
+    },
+    {
+      "id": "diary_song_recent", "stage": 1, "ability": "multi_session",
+      "why": "きのうの日記と同じ話題。日記が会話へ届くかを見る",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "また歌うから、聴いてくれる？"}]},
+      "memories": [{"id": "d_song", "kind": "diary", "text": "歌を最後まで聴かせてもらった（3:42）", "days_ago": 1}],
+      "filler": [{"kind": "diary", "around": "d_song", "newer": 0, "older": 5}],
+      "expect": {"relevant": ["d_song"]}
+    },
+    {
+      "id": "base_rest", "stage": 2, "ability": "extraction",
+      "why": "休む話から拠点を思い出す。言葉は重ならず、使い道でつながる",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "ちょっと疲れたね。どこかで休もうか"}]},
+      "memories": [{"id": "p_base", "kind": "game_place", "world": "w1", "ref": "minecraft:w1/base/1",
+                    "text": "ユウと森の横に作った拠点。ベッドとチェストがある", "days_ago": 3}],
+      "expect": {"relevant": ["p_base"]}
+    },
+    {
+      "id": "village_found", "stage": 2, "ability": "extraction",
+      "why": "前に見つけた場所を、場所の話題で思い出す",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "村ってこの辺にあるのかな"}]},
+      "memories": [{"id": "g_village", "kind": "game_event", "world": "w1", "ref": "minecraft:w1/place/village-1",
+                    "text": "東の草原で村を見つけた", "days_ago": 5}],
+      "expect": {"relevant": ["g_village"]}
+    },
+    {
+      "id": "note_deep", "stage": 2, "ability": "extraction",
+      "why": "古めのメモ（新しいメモが25件ある）。言葉は重ならず、意味でつながる",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "お昼にカレーを作ろうかな"}]},
+      "memories": [{"id": "n_spicy", "kind": "note", "person": "yu", "text": "辛い食べ物が苦手", "days_ago": 20}],
+      "filler": [{"kind": "note", "person": "yu", "around": "n_spicy", "newer": 25, "older": 5}],
+      "expect": {"relevant": ["n_spicy"]}
+    },
+    {
+      "id": "diary_zombie_deep", "stage": 2, "ability": "temporal",
+      "why": "いつだったかを聞かれる。新しい日記が12件ある",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "前にゾンビを倒したの、いつだっけ"}]},
+      "memories": [{"id": "d_zombie", "kind": "diary", "text": "マイクラでゾンビを倒した", "days_ago": 9}],
+      "filler": [{"kind": "diary", "around": "d_zombie", "newer": 12, "older": 3}],
+      "expect": {"relevant": ["d_zombie"]}
+    },
+    {
+      "id": "control_smalltalk", "stage": 2, "ability": "control",
+      "why": "関係する記憶がない雑談。多く渡しすぎないかを費用で見る",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "今日は寒いね"}]},
+      "memories": [],
+      "filler": [{"kind": "note", "person": "yu", "newer": 10, "older": 0}, {"kind": "diary", "newer": 10, "older": 0}],
+      "expect": {"relevant": []}
+    },
+    {
+      "id": "public_private_note", "stage": 2, "ability": "privacy",
+      "why": "人前では、本人のメモを自分から持ち出さない",
+      "context": {"presence": "public", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "最近どう？忙しい？"}]},
+      "memories": [{"id": "n_interview", "kind": "note", "person": "yu", "text": "来月、転職の面接がある", "days_ago": 3}],
+      "expect": {"relevant": [], "forbidden": ["n_interview"]}
+    },
+    {
+      "id": "other_person_note", "stage": 2, "ability": "privacy",
+      "why": "話している人とは別の人のメモを渡さない",
+      "context": {"presence": "close", "speaker": "mina", "world": "w1",
+                  "turns": [{"role": "user", "text": "週末、どこか行くの？"}]},
+      "memories": [{"id": "n_aquarium", "kind": "note", "person": "yu", "text": "週末に水族館へ行く予定", "days_ago": 2}],
+      "expect": {"relevant": [], "forbidden": ["n_aquarium"]}
+    },
+    {
+      "id": "note_beyond_cap", "stage": 3, "ability": "extraction",
+      "why": "新しいメモが55件あり、保存の上限を超えた古いメモ",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "ギター、少し弾けるようになったよ"}]},
+      "memories": [{"id": "n_guitar", "kind": "note", "person": "yu", "text": "ギターを習い始めた", "days_ago": 60}],
+      "filler": [{"kind": "note", "person": "yu", "around": "n_guitar", "newer": 55, "older": 0}],
+      "expect": {"relevant": ["n_guitar"]}
+    },
+    {
+      "id": "base_destroyed", "stage": 3, "ability": "update",
+      "why": "拠点が壊れた後。壊れたことを思い出し、拠点を今あるものとして出さない",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "暗くなってきたね。どこで休もう？"}]},
+      "memories": [
+        {"id": "p_old_base", "kind": "game_place", "world": "w1", "ref": "minecraft:w1/base/1",
+         "text": "ユウと森の横に作った拠点。ベッドとチェストがある", "days_ago": 6, "invalidated_days_ago": 1},
+        {"id": "g_destroyed", "kind": "game_event", "world": "w1", "ref": "minecraft:w1/base/1",
+         "text": "森の横の拠点がクリーパーに壊された", "days_ago": 1}
+      ],
+      "expect": {"relevant": ["g_destroyed"], "past": ["p_old_base"]}
+    },
+    {
+      "id": "old_world_base", "stage": 3, "ability": "update",
+      "why": "作り直す前のワールドの拠点と、今のワールドの拠点を区別する",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "拠点に戻ろうか"}]},
+      "memories": [
+        {"id": "p_w0_base", "kind": "game_place", "world": "w0", "ref": "minecraft:w0/base/1",
+         "text": "ユウと川のそばに作った拠点", "days_ago": 30},
+        {"id": "p_w1_base", "kind": "game_place", "world": "w1", "ref": "minecraft:w1/base/1",
+         "text": "ユウと森の横に作った拠点。ベッドとチェストがある", "days_ago": 2}
+      ],
+      "expect": {"relevant": ["p_w1_base"], "forbidden": ["p_w0_base"]}
+    },
+    {
+      "id": "house_multi", "stage": 3, "ability": "multi_session",
+      "why": "同じ場所に関わる2つの出来事をまとめて思い出す",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "前に一緒に作った家、また行きたいな"}]},
+      "memories": [
+        {"id": "g_house", "kind": "game_event", "world": "w1", "ref": "minecraft:w1/structure/house-1",
+         "text": "ユウと丘の上に木の家を建てた", "days_ago": 4},
+        {"id": "g_farm", "kind": "game_event", "world": "w1", "ref": "minecraft:w1/structure/farm-1",
+         "text": "丘の上の家のそばに小麦の畑を作った", "days_ago": 3}
+      ],
+      "expect": {"relevant": ["g_house", "g_farm"]}
+    },
+    {
+      "id": "yesterday", "stage": 3, "ability": "temporal",
+      "why": "時間で範囲を決める問い。きのうの出来事だけを思い出す",
+      "context": {"presence": "solo", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "きのう何したっけ？"}]},
+      "memories": [
+        {"id": "d_pat", "kind": "diary", "text": "頭をなでてもらった", "days_ago": 1},
+        {"id": "g_iron", "kind": "game_event", "world": "w1", "text": "ユウと洞窟で鉄を掘った", "days_ago": 1}
+      ],
+      "filler": [{"kind": "diary", "around": "d_pat", "newer": 0, "older": 8}],
+      "expect": {"relevant": ["d_pat", "g_iron"]}
+    },
+    {
+      "id": "abstain_sea", "stage": 3, "ability": "abstention",
+      "why": "覚えていない出来事を聞かれる。似た別の人の話を本人の思い出として渡さない",
+      "context": {"presence": "close", "speaker": "yu", "world": "w1",
+                  "turns": [{"role": "user", "text": "前に一緒に海に行ったよね？"}]},
+      "memories": [{"id": "n_mina_sea", "kind": "note", "person": "mina", "text": "夏に海で泳いだ", "days_ago": 40}],
+      "filler": [{"kind": "note", "person": "yu", "newer": 8, "older": 0}],
+      "expect": {"relevant": [], "forbidden": ["n_mina_sea"]}
+    }
+  ]
+}

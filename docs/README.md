@@ -65,6 +65,7 @@
 | [testing/regression-tests-ja.md](testing/regression-tests-ja.md) | 変更に応じたテストの選び方、コマンド、終了コード。 |
 | [testing/benchmark-guide-ja.md](testing/benchmark-guide-ja.md) | 分野ごとの課題・合格条件・採用した改善と結果・残課題を見渡す入口。 |
 | [testing/continuation-benchmark-ja.md](testing/continuation-benchmark-ja.md) | 単一のsay/actループの実験条件、課題、品質採点、対応比較と採用条件。 |
+| [testing/memory-recall-benchmark-ja.md](testing/memory-recall-benchmark-ja.md) | 会話の1ターンで、関係する記憶が会話モデルへ届くかを測る課題・指標・今の方式の再現範囲・実行と比較の方法。 |
 | [testing/voice-benchmark-ja.md](testing/voice-benchmark-ja.md) | 音声認識精度と応答時間の評価根拠、録音コーパス、再生・集計・比較の方法。 |
 | [testing/weight-space-benchmark-ja.md](testing/weight-space-benchmark-ja.md) | 人格・身体性・ツール・一般性能を比較する課題、採点、実行条件、音声・実機評価への接続。 |
 | [operations/weight-space-programming-ja.md](operations/weight-space-programming-ja.md) | 重み直接編集の研究根拠、現行モデルへの適用判断、実験・量子化・復元の進め方。 |
@@ -72,7 +73,7 @@
 | [testing/verification-status-ja.md](testing/verification-status-ja.md) | 現在の機能確認・配布状況と、カテゴリ別の実測資料への索引。 |
 | [testing/minecraft-results-ja.md](testing/minecraft-results-ja.md) | Minecraftの行動・依頼受付・対象指定の実測条件、結果、残課題、生データ。 |
 | [testing/voice-results-ja.md](testing/voice-results-ja.md) | 音声認識・本返答の速度の実測条件、改善結果、残課題、生データ。 |
-| [testing/capability-results-ja.md](testing/capability-results-ja.md) | 能力追加・公開方式・キャッシュの比較条件、改善結果、残課題、生データ。 |
+| [testing/capability-results-ja.md](testing/capability-results-ja.md) | 能力追加・公開方式・キャッシュ・記憶の想起の比較条件、改善結果、残課題、生データ。 |
 | [testing/weight-space-results-ja.md](testing/weight-space-results-ja.md) | 人格・身体表現の指示候補の採点条件、採用判断、残課題、生データ。 |
 | [testing/vision-results-ja.md](testing/vision-results-ja.md) | 画像API・会話添付の実測条件、改善結果、残課題、生データ。 |
 
