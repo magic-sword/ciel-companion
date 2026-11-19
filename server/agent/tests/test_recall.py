@@ -204,6 +204,16 @@ class GameMemoryTest(unittest.IsolatedAsyncioTestCase):
              {'memory_kind': 'game_place', 'world': 'minecraft:w1', 'ref': 'minecraft:w1/base/1,2,3', 'importance': 4}),
             ('minecraft', 'マイクラで zombie を倒した', {})])
 
+    def test_a_base_set_again_elsewhere_is_a_new_memory(self):
+        env = self.env()
+        place = {'kind': 'game_place', 'importance': 4, 'text': 'マイクラで拠点を決めた'}
+        env._remember({**place, 'ref': 'base/1,2,3'})
+        env._remember({**place, 'ref': 'base/1,2,3'})
+        env._remember({'kind': 'place_lost', 'ref': 'base/1,2,3'})
+        env._remember({**place, 'ref': 'base/9,9,9'})
+        self.assertEqual([a[2]['ref'] for a in env.diary.added],
+                         ['minecraft:w1/base/1,2,3', 'minecraft:w1/base/9,9,9'])
+
     def test_without_world_no_reference_is_made(self):
         env = self.env()
         env.state = {}

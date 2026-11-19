@@ -80,6 +80,7 @@ class Item:
     id: str
     channel: str       # auto: put in front of the model; tool: only through a tool the model must call
     past: bool = False
+    recalled: bool = False   # chosen by relevance for this turn (not pushed regardless of the topic)
 
 
 def build_case(suite: dict, case: dict) -> tuple[list[Memory], Context]:
@@ -192,7 +193,7 @@ class RecallMethod(CurrentMethod):
         situation = recall.Situation(presence=ctx.presence, person_id=ctx.speaker, world=ctx.world)
         got = recall.rank(pool, situation, query, self._vector(query, True), ctx.now)
         auto = {i.id for i in items if i.channel == 'auto'}
-        recalled = [Item(r.id, 'auto', past=r.past) for r in got if r.id not in auto]
+        recalled = [Item(r.id, 'auto', past=r.past, recalled=True) for r in got if r.id not in auto]
         return recalled + [i for i in items if i.id not in {r.id for r in recalled}]
 
 
@@ -251,6 +252,8 @@ def score_case(case: dict, memories: list[Memory], items: list[Item]) -> dict:
         # An invalidated memory is acceptable only when the retriever marks it as the past.
         'stale_as_current': sorted(i.id for i in auto if (i.id in past or by_id[i.id].invalidated_at) and not i.past),
         'past_marked': sorted(i.id for i in auto if i.id in past and i.past),
+        # Relevance picks that are neither expected nor allowed context: noise the model must ignore.
+        'recalled_extra': sorted(i.id for i in auto if i.recalled and i.id not in relevant and i.id not in past),
         'auto_count': len(auto),
         'auto_chars': sum(len(by_id[i.id].text) for i in auto),
     }
@@ -272,6 +275,7 @@ def summarize(rows: list[dict]) -> dict:
             'full_recall_auto': sum(r['recall_auto'] == 1 for r in applicable),
             'forbidden_auto': sum(len(r['forbidden_auto']) for r in sel),
             'stale_as_current': sum(len(r['stale_as_current']) for r in sel),
+            'recalled_extra': sum(len(r.get('recalled_extra', [])) for r in sel),
             'auto_count_mean': mean(r['auto_count'] for r in sel),
             'auto_chars_mean': mean(r['auto_chars'] for r in sel),
         }

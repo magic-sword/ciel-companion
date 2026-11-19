@@ -159,7 +159,7 @@ class GameEnv:
         self._input_epoch = None
         self._input_seq = -1
         self._input_ids = set()
-        self._remembered: set[str] = set()
+        self._remembered: set[tuple[str, str | None]] = set()
         self._stop_event: asyncio.Event | None = None
 
     # ---- つなぐ ----
@@ -733,9 +733,11 @@ class GameEnv:
                      'importance': int(memorable.get('importance') or 3)}
         else:
             text, extra = str(memorable), {}
-        if not text or text in self._remembered:
+        # 同じ文でも場所が違えば別の記憶（拠点を決め直したときなど）
+        seen = (text, extra.get('ref'))
+        if not text or seen in self._remembered:
             return
-        self._remembered.add(text)
+        self._remembered.add(seen)
         try:
             self.diary.add(self.game, text, **extra)
         except Exception as e:

@@ -31,7 +31,9 @@ MIN_RELEVANCE = 0.35      # これより関係の薄い記憶は添えない（�
 RECENCY_DAYS = 30.0       # 新しさの重みが半分ほど減る目安。古くても関係が深ければ思い出せるよう、下限を残す
 RECENCY_FLOOR = 0.6
 KEY_CHARS = 120
-EMBED_MODEL = os.environ.get('CIEL_RECALL_EMBEDDER', 'cl-nagoya/ruri-v3-30m').strip()
+DEFAULT_EMBEDDER = 'cl-nagoya/ruri-v3-30m'
+DEFAULT_EMBEDDER_REVISION = '24899e5de370b56d179604a007c0d727bf144504'   # イメージに入れる版（Dockerfile と同じ）
+EMBED_MODEL = os.environ.get('CIEL_RECALL_EMBEDDER', DEFAULT_EMBEDDER).strip()
 # ruri-v3 の埋め込みは、関係のない文どうしでも近さが 0.6 前後になる。それより上を 0〜1 に引き直す
 COSINE_FLOOR = float(os.environ.get('CIEL_RECALL_COSINE_FLOOR', '0.65'))
 
@@ -172,7 +174,9 @@ def document(c: Candidate) -> str:
 
 
 def rank(candidates: list[Candidate], s: Situation, query: str, query_vec: np.ndarray | None, now: datetime,
-         *, k: int = TOP_K, min_relevance: float = MIN_RELEVANCE) -> list[Recalled]:
+         *, k: int | None = None, min_relevance: float | None = None) -> list[Recalled]:
+    k = TOP_K if k is None else k
+    min_relevance = MIN_RELEVANCE if min_relevance is None else min_relevance
     out = []
     window = time_window(query, now)
     for c in candidates:
@@ -240,8 +244,8 @@ class Embedder:
 class SentenceEmbedder(Embedder):
     """sentence-transformers のモデル（既定は ruri-v3-30m。CPU）。初めて使うときに読み込む"""
 
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, name: str, revision: str | None = None) -> None:
+        self.name, self.revision = name, revision
         self._model = None
         self._lock = threading.Lock()
 
@@ -253,7 +257,7 @@ class SentenceEmbedder(Embedder):
         if self._model is None:
             from sentence_transformers import SentenceTransformer   # 重いので使うときに読む
             t0 = time.perf_counter()
-            self._model = SentenceTransformer(self.name, device='cpu')
+            self._model = SentenceTransformer(self.name, device='cpu', revision=self.revision)
             log.info('思い出し：埋め込みモデル %s を読み込んだ（%.1f 秒）', self.name, time.perf_counter() - t0)
         return self._model
 
@@ -272,7 +276,7 @@ def make_embedder() -> Embedder | None:
     except ImportError:
         log.warning('思い出し：sentence-transformers が無いので、文字の重なりだけで思い出す')
         return None
-    return SentenceEmbedder(EMBED_MODEL)
+    return SentenceEmbedder(EMBED_MODEL, DEFAULT_EMBEDDER_REVISION if EMBED_MODEL == DEFAULT_EMBEDDER else None)
 
 
 # ---- 使い道の鍵 ----

@@ -11,6 +11,10 @@ huggingface_hub==0.25.2   # speechbrain 1.0.3 は、これより新しい版の 
 requests==2.32.4
 psycopg[binary]==3.2.9
 pgvector==0.4.1
+# 関連性で思い出す記憶の埋め込み（recall.py、cl-nagoya/ruri-v3-30m。CPU）。torch は Dockerfile で先に入れる
+sentence-transformers==3.4.1
+transformers==4.48.3
+sentencepiece==0.2.0
 
 vosk==0.3.45   # CPU streaming Japanese STT; no external API
 faster-whisper==1.2.1  # CPU int8, offline model files; VAD-delimited recognition

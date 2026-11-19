@@ -156,3 +156,100 @@ class SharedMemoryPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await dev.device_owner('test-device-3', 'hash-d'), self.pid)
         self.assertFalse(await dev.unpair_device('test-device-3', 'hash-d'))
         self.assertIsNotNone(await self.a.identity(self.pid))
+
+
+@unittest.skipUnless(os.environ.get('CIEL_TEST_DB_URL'), 'isolated PostgreSQL not configured')
+class RecallPostgresTests(unittest.IsolatedAsyncioTestCase):
+    """Associative recall tables (memories / note_index) on a disposable database."""
+    MODEL = 'test-embedder'
+
+    async def asyncSetUp(self):
+        self.env = patch.dict(os.environ, {'CIEL_DB_URL': os.environ['CIEL_TEST_DB_URL'], 'CIEL_MEMORY_SCOPE': 'main'})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        import psycopg
+        probe = await psycopg.AsyncConnection.connect(os.environ['CIEL_TEST_DB_URL'], autocommit=True)
+        database = (await (await probe.execute('SELECT current_database()')).fetchone())[0]
+        await probe.close()
+        if database != 'ciel_concurrency_test':
+            self.fail('CIEL_TEST_DB_URL must point to ciel_concurrency_test')
+        self.store = await Store.open()
+        self.assertIsNotNone(self.store)
+        await self.store.conn.execute('DELETE FROM memories')
+        await self.store.conn.execute('DELETE FROM ciel_events')
+        self.pid = await self.store.remember_person('Synthetic recall person', [np.ones(192)])
+
+    async def asyncTearDown(self):
+        await self.store.conn.execute('DELETE FROM memories')
+        await self.store.conn.execute('DELETE FROM ciel_events')
+        await self.store.delete_person(self.pid)
+        await self.store.close()
+
+    async def add_note(self, text):
+        snapshot = await self.store.memory_snapshot(self.pid)
+        self.assertTrue(await self.store.apply_notes(self.pid, snapshot, [text], {}, []))
+        return next(i for i, t in await self.store.notes(self.pid) if t == text)
+
+    async def test_events_stay_in_memories_after_the_diary_drops_them(self):
+        for i in range(3):
+            await self.store.add_ciel_event('minecraft', f'event {i}', keep=1)
+        self.assertEqual(len(await self.store.ciel_events(10)), 1)
+        got = await self.store.recall_candidates(self.MODEL, None, None)
+        self.assertEqual(sorted(c.text for c in got), ['event 0', 'event 1', 'event 2'])
+
+    async def test_places_are_scoped_to_their_world_and_invalidated_not_deleted(self):
+        await self.store.add_ciel_event('minecraft', 'base A', 10, memory_kind='game_place', world='mc:w1',
+                                        ref='mc:w1/base/1,2,3', importance=4)
+        await self.store.add_ciel_event('minecraft', 'base B', 10, memory_kind='game_place', world='mc:w2',
+                                        ref='mc:w2/base/1,2,3', importance=4)
+        self.assertEqual(await self.store.invalidate_memories('mc:w1/base/1,2,3'), 1)
+        self.assertEqual(await self.store.invalidate_memories('mc:w1/base/1,2,3'), 0)
+        got = {c.text: c for c in await self.store.recall_candidates(self.MODEL, 'mc:w1', None)}
+        self.assertEqual(set(got), {'base A'})
+        self.assertIsNotNone(got['base A'].invalidated_at)
+        self.assertEqual(got['base A'].importance, 4)
+        other = await self.store.recall_candidates(self.MODEL, 'mc:w2', None)
+        self.assertIsNone(other[0].invalidated_at)
+
+    async def test_index_is_written_and_redone_when_the_note_changes(self):
+        await self.store.add_ciel_event('minecraft', 'built a house', 10)
+        nid = await self.add_note('likes curry')
+        note_id = f'note:{nid}'
+        todo = {r['id']: r for r in await self.store.unindexed(self.MODEL, True, 10)}
+        self.assertIn(note_id, todo)
+        mem_id = next(i for i in todo if i.startswith('mem:'))
+        vec = np.array([1, 0, 0, 0], dtype=np.float32)
+        await self.store.set_index(mem_id, 'built a house', 'home, rest', vec, self.MODEL, 'built a house\nhome, rest')
+        await self.store.set_index(note_id, 'likes curry', 'food', vec, self.MODEL, 'likes curry\nfood')
+        self.assertEqual(await self.store.unindexed(self.MODEL, True, 10), [])
+        got = {c.id: c for c in await self.store.recall_candidates(self.MODEL, None, self.pid)}
+        self.assertEqual(got[mem_id].keys, 'home, rest')
+        self.assertEqual(got[note_id].keys, 'food')
+        np.testing.assert_allclose(got[note_id].embedding, vec)
+        # Another embedding model: vectors are not mixed and the work is listed again.
+        other = {c.id: c for c in await self.store.recall_candidates('other-model', None, self.pid)}
+        self.assertIsNone(other[note_id].embedding)
+        self.assertEqual(len(await self.store.unindexed('other-model', True, 10)), 2)
+        # The note is rewritten: its old keys and vector are not used, and it is indexed again.
+        snapshot = await self.store.memory_snapshot(self.pid)
+        self.assertTrue(await self.store.apply_notes(self.pid, snapshot, [], {nid: 'likes mild curry'}, []))
+        got = {c.id: c for c in await self.store.recall_candidates(self.MODEL, None, self.pid)}
+        self.assertEqual(got[note_id].keys, '')
+        self.assertIsNone(got[note_id].embedding)
+        self.assertEqual([r['id'] for r in await self.store.unindexed(self.MODEL, True, 10)], [note_id])
+
+    async def test_notes_only_for_the_given_person_and_recall_is_counted(self):
+        await self.add_note('private note')
+        self.assertFalse([c for c in await self.store.recall_candidates(self.MODEL, None, None) if c.kind == 'note'])
+        await self.store.add_ciel_event('minecraft', 'saw a village', 10)
+        mem = (await self.store.recall_candidates(self.MODEL, None, None))[0]
+        await self.store.mark_recalled([mem.id, 'note:1'])
+        row = await (await self.store.conn.execute(
+            'SELECT recall_count, last_recalled_at IS NOT NULL FROM memories WHERE id = %s',
+            (int(mem.id.split(':')[1]),))).fetchone()
+        self.assertEqual(tuple(row), (1, True))
+
+    async def test_notes_without_consent_are_not_indexed(self):
+        await self.add_note('note')
+        await self.store.conn.execute('UPDATE people SET notes_consented_at = NULL WHERE id = %s', (self.pid,))
+        self.assertEqual([r for r in await self.store.unindexed(self.MODEL, True, 10) if r['id'].startswith('note:')], [])
