@@ -210,13 +210,14 @@ def ago(at: datetime, now: datetime) -> str:
 
 
 def context(items: list[Recalled], now: datetime, header: str) -> str:
-    """会話へ添える補足。見出しは prompts/recall_note.md（中身の名前と性質だけを書く。ciel-prompt-writing）"""
+    """会話へ添える補足。見出しは prompts/recall_note.md（中身の名前だけ。使い方は固定の指示 prompts/mind.md に書く。ciel-prompt-writing）"""
     if not items:
         return ''
     lines = [header.strip()]
     for r in items:
         when = ago(r.at, now)
-        text = f'前は、{r.text}（今はもう無い）' if r.past else r.text
+        # かっこ書きにしない（返事に注釈を書き出させやすい。2026-11-20 の比較）
+        text = f'{r.text}。でも、その場所は今はもう無い' if r.past else r.text
         lines.append(f'- {when}：{text}')
     return '\n'.join(lines)
 

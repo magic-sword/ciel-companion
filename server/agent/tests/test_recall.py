@@ -82,7 +82,7 @@ class RankTest(unittest.TestCase):
         got = recall.rank([gone], Situation(), 'どこで休む', None, NOW)
         self.assertTrue(got[0].past)
         text = recall.context(got, NOW, HEADER)
-        self.assertIn('前は、森の横に拠点を決めた（今はもう無い）', text)
+        self.assertIn('森の横に拠点を決めた。でも、その場所は今はもう無い', text)
 
     def test_time_words_pick_that_day(self):
         y = recall.time_window('きのう何したっけ？', NOW)

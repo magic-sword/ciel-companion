@@ -20,7 +20,7 @@ HTTPヘッダー・認証情報を記録せず、既知のsecret/password/API ke
 
 本番の音声認識だけOpenAIへ切り替える場合は`server/.env`で`CIEL_STT_BACKEND=openai`、`CIEL_STT_MODEL=gpt-live-transcribe`を明示する。LLMの基本backendがlocalでも、この明示指定を許可する。未指定時のlocal→Vosk、失敗時に別providerへ自動で切り替えない規則は維持する。音声はOpenAIへ送信され、API利用料が発生する。話している途中の文字と確定結果を既存の会話経路へ渡し、返答モデルとIrodoriの声は別設定のまま扱う。開発側の`server/.env.dev`は独立する。反映には本番agentの再作成が必要。
 
-関連性で思い出す記憶（[設計と実装状況](../services/associative-memory-ja.md)）は、DBがあるとき動く。`CIEL_RECALL_EMBEDDER`は埋め込みモデル（既定`cl-nagoya/ruri-v3-30m`、空で埋め込みを使わない。sentence-transformersが無いときも使わない）、`CIEL_RECALL_COSINE_FLOOR`は近さを引き直す下限（既定0.65）、`CIEL_RECALL_TIMEOUT`は1回の思い出しにかけてよい秒数（既定0.8）。
+関連性で思い出す記憶（[設計と実装状況](../services/associative-memory-ja.md)）は、DBがあるとき動く。`CIEL_RECALL_EMBEDDER`は埋め込みモデル（既定`cl-nagoya/ruri-v3-30m`。会話サーバーのイメージに版`24899e5d`を入れてあり、起動中は取りに行かない。空で埋め込みを使わない。sentence-transformersが無いときも使わない。読み込むと会話ごとのプロセスのメモリーが約160MB増える）、`CIEL_RECALL_COSINE_FLOOR`は近さを引き直す下限（既定0.65）、`CIEL_RECALL_TIMEOUT`は1回の思い出しにかけてよい秒数（既定0.8）。
 
 `CIEL_INITIATIVE`はpipelineの自発判断を有効にする（既定`1`、`0`で停止）。新しい会話・出来事のあとだけ考え、同じ状況での定期推論は行わない。`ConversationDecision`と`continuation.py`が発話継続を管理する。旧8秒待機のInitiativeは起動しない。persona.tomlと指示本文も同じコミットで配置する。初版の判断品質と未確認範囲は[能力とキャッシュの実測](../testing/capability-results-ja.md#自発判断の初版)、通常サービスへの反映は[確認状況](../testing/verification-status-ja.md)を参照する。
 
