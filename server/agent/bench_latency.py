@@ -12,6 +12,7 @@
 
 測るもの（発言ごと）：
   first … 話し終わり（声の最後のフレームを送った時刻）から、シエルの声（相づちを含む）が始まるまで
+  reply … 話し終わりから、返事の声（相づちのトラックを除く）が始まるまで
   segs  … シエルの声のかたまり（話し終わりからの始まりと終わりの秒。相づちのトラックの分も入る）
   nods  … 話している途中に始まったシエルの声（話の途中の相づち。話し終わりからの秒なので負になる）
   thinking … アプリに「考えています」と知らせた時刻（agent.thinking の on。話し終わりからの秒。turns.py）
@@ -97,9 +98,12 @@ class Voices:
 
     def __init__(self) -> None:
         self.tracks: dict[str, Listener] = {}
+        self.reply: Listener | None = None   # 返事の声のトラック（相づちのトラック以外）
 
-    def listen(self, track: rtc.Track) -> asyncio.Task:
+    def listen(self, track: rtc.Track, name: str = '') -> asyncio.Task:
         self.tracks[track.sid] = listener = Listener()
+        if 'aizuchi' not in (name or ''):
+            self.reply = listener
         return asyncio.create_task(listener.run(track))
 
     @property
@@ -153,7 +157,7 @@ async def main() -> None:
     def on_track(track, pub, participant):
         print(f"{time.strftime('%H:%M:%S')} 受信 {participant.identity} {pub.name}", flush=True)
         if track.kind == rtc.TrackKind.KIND_AUDIO:
-            tasks.append(listener.listen(track))
+            tasks.append(listener.listen(track, pub.name))
     room.on('track_subscribed', on_track)
     await room.connect(os.environ['LIVEKIT_URL'], token)
     source = rtc.AudioSource(SR, 1)
@@ -174,14 +178,24 @@ async def main() -> None:
             await asyncio.sleep(max(0, t - time.perf_counter()))
     pump_task = asyncio.create_task(pump())
 
-    async def wait_reply(n_before: int, limit: float = 20) -> None:
-        """シエルが話し始め（limit 秒まで待つ）、話し終えて QUIET_SECONDS 静かになるまで待つ。
-        話している途中の相づち（t0 より前に始まった声）は数えない"""
+    async def wait_reply(n_before: int, limit: float = 60) -> float | None:
+        """返事の声（相づちのトラック以外）が始まるまで（limit 秒まで）待ち、話し終えて QUIET_SECONDS 静かになるまで待つ。
+        話し終わりのすぐの相づちだけで次へ進むと、ローカル推論で返事の始まりが遅いとき、返事に重ねて話してしまう。
+        返事の声が始まった時刻を返す"""
         t0 = time.time()
-        while not [x for x in listener.segs[n_before:] if x[0] > t0 - 0.1] and time.time() - t0 < limit:
+        reply = listener.reply
+        before = len(reply.segs) if reply is not None else 0
+        began = None
+        while time.time() - t0 < limit:
+            reply = listener.reply
+            new = [x for x in (reply.segs[before:] if reply is not None else []) if x[0] > t0 - 0.1]
+            if new:
+                began = new[0][0]
+                break
             await asyncio.sleep(0.05)
-        while listener.quiet_for() < QUIET_SECONDS and time.time() - t0 < limit + 40:
+        while listener.quiet_for() < QUIET_SECONDS and time.time() - t0 < limit + 60:
             await asyncio.sleep(0.05)
+        return began
 
     await wait_reply(0)   # あいさつが終わるまで
     results = []
@@ -198,12 +212,13 @@ async def main() -> None:
             while queue:
                 await asyncio.sleep(0.005)
             t_end = time.time()
-            await wait_reply(n_before)
+            began = await wait_reply(n_before)
             nods = [s for s in listener.segs[n_before:] if t_start < s[0] <= t_end - 0.1]
             segs = [s for s in listener.segs[n_before:] if s[0] > t_end - 0.1]
             first = segs[0][0] - t_end if segs else None
             think = [t - t_end for t in thinking if t > t_end - 0.5]
             r = {'text': text, 'first': None if first is None else round(first, 2),
+                 'reply': None if began is None else round(began - t_end, 2),   # 返事の声（相づちを除く）
                  'nods': [round(a - t_end, 2) for a, _ in nods],
                  'thinking': round(think[0], 2) if think else None,
                  'segs': [[round(a - t_end, 2), round((b or a) - t_end, 2)] for a, b in segs]}
