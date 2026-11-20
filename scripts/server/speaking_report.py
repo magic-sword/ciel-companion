@@ -6,7 +6,9 @@
 Stage 0 of docs/conversation/speaking-motivation-ja.md (the baseline): Ciel's lines that did not answer a
 user line (she spoke up on her own), how many of them got an answer, lines cut off by the user, and the
 inferences per user line. Stage 1: the ideas and scores the mind wrote (recall.MindRecall with
-CIEL_MIND_IDEAS=1), with the score weighted by the output probabilities of 1-5.
+CIEL_MIND_IDEAS=1), with the score weighted by the output probabilities of 1-5. Stage 2 (CIEL_MIND_IDEAS=2):
+the ideas put into the next reply, and how much of each the reply used (character bigrams of the idea that
+the reply contains; read the pairs too, a reply can use an idea in other words).
 """
 import argparse
 import collections
@@ -15,6 +17,17 @@ import statistics
 from pathlib import Path
 
 ANSWER_S = 15.0   # a user line within this many seconds after Ciel spoke up counts as an answer
+USED = 0.3        # share of the idea's bigrams found in the reply that counts as used
+
+
+def bigrams(text):
+    t = ''.join(ch for ch in text if ch.isalnum())
+    return {t[i:i + 2] for i in range(len(t) - 1)}
+
+
+def overlap(idea, reply):
+    a = bigrams(idea)
+    return len(a & bigrams(reply)) / len(a) if a else 0.0
 
 
 def rows_of(path):
@@ -85,6 +98,20 @@ def ideas(rows):
     }
 
 
+def placed(rows):
+    replies = [r for r in rows if r.get('kind') == 'item' and r.get('role') == 'assistant' and r.get('text')]
+    pairs = []
+    for r in rows:
+        if r.get('kind') == 'recall_turn' and r.get('idea'):
+            reply = next((x for x in replies if x['t'] > r['t']), None)
+            text = reply['text'] if reply else ''
+            pairs.append({'idea': r['idea'], 'kind': r.get('idea_kind'), 'level': r.get('idea_level'),
+                          'age_s': r.get('idea_age_s'), 'reply': text, 'overlap': round(overlap(r['idea'], text), 2)})
+    turns = sum(1 for r in rows if r.get('kind') == 'recall_turn')
+    return {'replies_checked': turns, 'placed': len(pairs), 'used': sum(1 for x in pairs if x['overlap'] >= USED),
+            'pairs': pairs}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('logs', nargs='+')
@@ -93,7 +120,7 @@ def main():
     out = {}
     for path in a.logs:
         rows = rows_of(path)
-        out[Path(path).name] = {'baseline': baseline(rows), 'ideas': ideas(rows)}
+        out[Path(path).name] = {'baseline': baseline(rows), 'ideas': ideas(rows), 'placed': placed(rows)}
         b, s = out[Path(path).name]['baseline'], out[Path(path).name]['ideas']
         print(f'== {Path(path).name}')
         print(f"  相手の発言 {b['user_lines']}  シエルの発言 {b['ciel_lines']}（あいさつ {b['greetings']}）  自分から {b['spoke_up']}"
@@ -108,6 +135,11 @@ def main():
             for i in s['samples']:
                 w = f"{i['weighted']:.2f}" if isinstance(i.get('weighted'), (int, float)) else '-'
                 print(f"    [{i['turn']}] {i['kind']:7} {i['score']} ({w}) {i['text']}  ← {i.get('about', '')}")
+        q = out[Path(path).name]['placed']
+        if q['placed']:
+            print(f"  返事に置いた考え {q['placed']}/{q['replies_checked']}  返事が使った（2字組の重なり{USED:.0%}以上） {q['used']}")
+            for x in q['pairs']:
+                print(f"    {x['level']} {x['kind']:7} {x['overlap']:.2f} {x['idea']}\n      → {x['reply'][:90]}")
     if a.json:
         Path(a.json).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
 

@@ -364,3 +364,41 @@ class MindIdeasTest(unittest.IsolatedAsyncioTestCase):
                   tok('"score": '), tok(' 5', [(' 5', 0.5), ('5', 0.25), ('a', 0.25)])]
         self.assertEqual(recall.score_weights(tokens), [3.4, 5.0])
         self.assertEqual(recall.score_weights(None), [])
+
+
+class MindIdeaPlacementTest(unittest.IsolatedAsyncioTestCase):
+    """段階2：中くらいより上で最も高い考えを、次の返事に 1 回だけ置く"""
+
+    def setUp(self):
+        self.t = [0.0]
+        self.recall = recall.Recall(FakeStore([]), None, clock=lambda: NOW, monotonic=lambda: self.t[0])
+
+    async def mind(self, ideas, place=True, s=Situation('solo', 2, 'w')):
+        client = mind_client(__import__('json').dumps({'use': [], 'ideas': ideas}, ensure_ascii=False))
+        with patch.object(recall.MindRecall, 'IDEAS', True), patch.object(recall.MindRecall, 'PLACE', place):
+            m = recall.MindRecall(self.recall, '指示', ideas_instructions='考えの指示', client=client,
+                                  monotonic=lambda: self.t[0])
+        with patch('models.is_local', return_value=False):
+            await m.consider([], '話', s, 4)
+        return m
+
+    async def test_highest_above_medium_once(self):
+        s, since = Situation('solo', 2, 'w'), lambda turn: 1
+        m = await self.mind([{'kind': 'feel', 'text': '寒いね', 'score': 3}, {'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}])
+        self.assertEqual(m.take_idea(s, since).text, '拠点を作ろう')
+        self.assertIsNone(m.take_idea(s, since))   # 1 回だけ
+
+    async def test_low_other_scene_stale_or_log_only_are_not_placed(self):
+        s, since = Situation('solo', 2, 'w'), lambda turn: 1
+        m = await self.mind([{'kind': 'feel', 'text': '寒いね', 'score': 2}])
+        self.assertIsNone(m.take_idea(s, since))
+        m = await self.mind([{'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}])
+        self.assertIsNone(m.take_idea(Situation('public', 2, 'w'), since))
+        m = await self.mind([{'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}])
+        self.assertIsNone(m.take_idea(s, lambda turn: recall.MindRecall.STALE_TURNS + 1))
+        m = await self.mind([{'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}])
+        self.t[0] = recall.MindRecall.TTL + 1
+        self.assertIsNone(m.take_idea(s, since))
+        self.t[0] = 0
+        m = await self.mind([{'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}], place=False)
+        self.assertIsNone(m.take_idea(s, since))

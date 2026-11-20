@@ -297,10 +297,12 @@ class Ciel(Agent):
             logger.info('思い出せない：%s', type(e).__name__)
             items = []
         # システム2：心が前の静かな間に見極めた記憶と、思ったこと（recall.MindRecall。1 回だけ）
-        thought = None
+        thought = idea = None
         if self.mind_recall is not None and history is not None:
-            thought = self.mind_recall.take(situation, history.last_id, lambda turn: sum(
-                1 for t in history.between(turn) if t.role == 'user' and t.text))
+            since = lambda turn: sum(1 for t in history.between(turn) if t.role == 'user' and t.text)
+            thought = self.mind_recall.take(situation, history.last_id, since)
+            # 段階2（docs/conversation/speaking-motivation-ja.md）：心が話したいと思ったこと（中くらいより上）も 1 回置く
+            idea = self.mind_recall.take_idea(situation, since)
         if thought is not None:
             seen = {r.id for r in items}
             extra = [r for r in thought.items if r.id not in seen]
@@ -308,10 +310,15 @@ class Ciel(Agent):
             items = items + extra
         debug_log.record('recall_turn', fast=len(items) - (len(extra) if thought is not None else 0),
                          mind=len(extra) if thought is not None else 0, thought=bool(thought is not None and thought.text),
-                         mind_age_s=round(self.mind_recall.monotonic() - thought.at, 1) if thought is not None else None)
+                         mind_age_s=round(self.mind_recall.monotonic() - thought.at, 1) if thought is not None else None,
+                         idea=idea.text if idea is not None else None, idea_kind=idea.kind if idea is not None else None,
+                         idea_level=round(idea.level, 2) if idea is not None else None,
+                         idea_age_s=round(self.mind_recall.monotonic() - idea.at, 1) if idea is not None else None)
         parts = [recall.context(items, datetime.now(JST), self.persona.recall_note)]
-        if thought is not None and thought.text:
-            parts.append(f'{self.persona.thought_note.strip()}\n{thought.text}')
+        lines = list(dict.fromkeys(x for x in (thought.text if thought is not None else '',
+                                               idea.text if idea is not None else '') if x))
+        if lines:
+            parts.append(self.persona.thought_note.strip() + '\n' + '\n'.join(lines))
         return '\n\n'.join(p for p in parts if p) or None
 
     def recall_situation(self) -> recall.Situation:

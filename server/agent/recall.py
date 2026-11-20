@@ -532,16 +532,21 @@ class MindRecall:
     # シエルが話している間も送る（返事の文を作り終えていればモデルは空いている）。全部ローカルでは、静かになるのを
     # 待つと、次の発言まで約 8 秒空かないと間に合わなかった（2026-11-20）。0 で静かになるまで待つ
     WHILE_SPEAKING = os.environ.get('CIEL_RECALL_MIND_SPEAKING', '1') != '0'
-    # 段階1（docs/conversation/speaking-motivation-ja.md）：同じ 1 回で、話したいことと点も出す（prompts/recall_mind_ideas.md）。
-    # 記憶の候補が無くても呼ぶ（回数は相手の発言の数まで）。まだ話し方には使わず、記録だけする。1 で入れる
-    IDEAS = os.environ.get('CIEL_MIND_IDEAS', '0') == '1'
+    # 話し出す動機（docs/conversation/speaking-motivation-ja.md）：同じ 1 回で、話したいことと点も出す
+    # （prompts/recall_mind_ideas.md）。記憶の候補が無くても呼ぶ（回数は相手の発言の数まで）。
+    # 1：記録だけ（段階1）。2：中くらいより上の考えを、次の返事に「心に浮かんだこと」として 1 回置く（段階2）
+    IDEAS = os.environ.get('CIEL_MIND_IDEAS', '0') in ('1', '2')
+    PLACE = os.environ.get('CIEL_MIND_IDEAS', '0') == '2'
+    MEDIUM = 2.5          # これより上（中くらい以上）の考えだけ返事に置く。低い考えは話さない
 
     def __init__(self, recall: Recall, instructions: str, *, ideas_instructions: str = '', client=None, game=None,
                  monotonic=time.monotonic) -> None:
         self.recall, self.client = recall, client
         self.ideas_on = self.IDEAS and bool(ideas_instructions)
         self.instructions = ideas_instructions if self.ideas_on else instructions
-        self.ideas: list[Idea] = []   # 最後に考えた、話したいこと（段階2 から使う）
+        self.place = self.ideas_on and self.PLACE
+        self.ideas: list[Idea] = []   # 最後に考えた、話したいこと
+        self._ideas_situation: Situation | None = None
         self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）
         self.monotonic = monotonic
         self.thought: Thought | None = None
@@ -590,6 +595,7 @@ class MindRecall:
             logprobs = getattr(r.choices[0], 'logprobs', None)
             self.ideas = parse_ideas(out.get('ideas'), score_weights(_field(logprobs, 'content') if logprobs else None),
                                      turn, self.monotonic())
+            self._ideas_situation = s
             usage = getattr(r, 'usage', None)
             debug_log.record('mind_ideas', turn=turn, candidates=len(pool), ms=ms,
                              output_tokens=getattr(usage, 'completion_tokens', None),
@@ -609,6 +615,22 @@ class MindRecall:
         if self.monotonic() - t.at > self.TTL or user_turns_since(t.turn) > self.STALE_TURNS:
             return None
         return t
+
+    def take_idea(self, s: Situation, user_turns_since) -> Idea | None:
+        """段階2：次の返事に置く考え（1 回だけ）。中くらいより上で最も高いもの。場面が変わった・古い・話が進みすぎたものは
+        捨てる（take と同じ決まり）"""
+        ideas, self.ideas = self.ideas, []
+        if not self.place or not ideas or self._ideas_situation is None:
+            return None
+        k = self._ideas_situation
+        if (k.presence, k.person_id, k.world) != (s.presence, s.person_id, s.world):
+            return None
+        best = max(ideas, key=lambda i: i.level)
+        if best.level <= self.MEDIUM:
+            return None
+        if self.monotonic() - best.at > self.TTL or user_turns_since(best.turn) > self.STALE_TURNS:
+            return None
+        return best
 
     def start(self, history, situation) -> None:
         """history：conversation.Conversation、situation：今の Situation を返す関数"""
