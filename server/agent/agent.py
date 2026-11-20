@@ -298,6 +298,9 @@ class Ciel(Agent):
             extra = [r for r in thought.items if r.id not in seen]
             self.recall.shown(r.id for r in extra)
             items = items + extra
+        debug_log.record('recall_turn', fast=len(items) - (len(extra) if thought is not None else 0),
+                         mind=len(extra) if thought is not None else 0, thought=bool(thought is not None and thought.text),
+                         mind_age_s=round(self.mind_recall.monotonic() - thought.at, 1) if thought is not None else None)
         parts = [recall.context(items, datetime.now(JST), self.persona.recall_note)]
         if thought is not None and thought.text:
             parts.append(f'{self.persona.thought_note.strip()}\n{thought.text}')

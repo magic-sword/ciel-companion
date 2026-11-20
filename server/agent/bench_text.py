@@ -4,7 +4,8 @@
 音声で話しかける bench_latency.py は、音声認識の区切り方で返事が作り直され、回ごとに揺れが大きい。ここでは発言を文字で
 送り、推論・キャッシュの違いだけを比べる。家の中の LiveKit（docs/operations/local-livekit-ja.md）の試験用の会話サーバーで使う。
 
-  python bench_text.py [--agent ciel-dev] [--rounds 2]
+  python bench_text.py [--agent ciel-dev] [--rounds 2] [--lines 台本.txt] [--pause 秒]
+  --lines は 1 行 1 発言の台本（既定は LINES）。--pause は、返事を話し終えてから次の発言までの間（静かな間に動く処理を見るとき）。
 
 測るもの（発言ごと）：送ってから、シエルの返事の声が始まるまでの秒（first）と、話し終えるまで（done）。
 推論の最初の文字までの時間とキャッシュは、その部屋の開発ログを scripts/server/conversation_latency_report.py で読む。
@@ -57,7 +58,10 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--agent', default='ciel-dev')
     ap.add_argument('--rounds', type=int, default=2)
+    ap.add_argument('--lines', help='1 行 1 発言の台本（UTF-8）')
+    ap.add_argument('--pause', type=float, default=0.0, help='返事を話し終えてから次の発言までの秒')
     args = ap.parse_args()
+    lines = ([x.strip() for x in open(args.lines, encoding='utf-8') if x.strip()] if args.lines else LINES)
     room_name = f'bench-text-{uuid.uuid4().hex[:8]}'
     lk = api.LiveKitAPI()
     await lk.room.create_room(api.CreateRoomRequest(name=room_name, agents=[api.RoomAgentDispatch(agent_name=args.agent)]))
@@ -87,13 +91,15 @@ async def main() -> None:
     await wait_reply(time.time())   # あいさつが終わるまで
     results = []
     for _ in range(args.rounds):
-        for line in LINES:
+        for line in lines:
             sent = time.time()
             await room.local_participant.send_text(line, topic='lk.chat')
             first, done = await wait_reply(sent)
             r = {'text': line, 'first': None if first is None else round(first, 2), 'done': None if done is None else round(done, 2)}
             results.append(r)
             print(json.dumps(r, ensure_ascii=False), flush=True)
+            if args.pause > 0:
+                await asyncio.sleep(args.pause)
     firsts = [r['first'] for r in results if r['first'] is not None]
     if firsts:
         print(f'SUMMARY first: median {np.median(firsts):.2f}s  p90 {np.percentile(firsts, 90):.2f}s  max {max(firsts):.2f}s  '
