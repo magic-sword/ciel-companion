@@ -458,8 +458,9 @@ class MindRecall:
     STALE_TURNS = 2       # 見極めたあと、相手の発言がこれより多く進んだら使わない
     POLL = 2.0
 
-    def __init__(self, recall: Recall, instructions: str, *, client=None, monotonic=time.monotonic) -> None:
+    def __init__(self, recall: Recall, instructions: str, *, client=None, game=None, monotonic=time.monotonic) -> None:
         self.recall, self.instructions, self.client = recall, instructions, client
+        self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）
         self.monotonic = monotonic
         self.thought: Thought | None = None
         self.considered = 0   # 見極めた最後の発言
@@ -478,6 +479,7 @@ class MindRecall:
         now = self.recall.now()
         request = {'now': f'{now:%Y-%m-%d %H:%M}',
                    'conversation': [{'speaker': t.name, 'text': t.text[:300]} for t in rows[-self.TURNS:]],
+                   **({'game': g} if (g := self.game() if self.game is not None else None) else {}),
                    'candidates': [{'id': r.id, 'when': ago(r.at, now), 'text': r.text, 'past': r.past} for r in pool]}
         if self.client is None:
             self.client = models.create_client('brief')

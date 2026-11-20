@@ -816,7 +816,8 @@ async def entrypoint(ctx: JobContext) -> None:
         indexer.start()   # 鍵と埋め込みがまだの記憶・メモを、会話の裏で埋める
         if PIPELINE and history is not None and agent.persona.recall_mind_instructions:
             # システム2：静かな間に、心が思い出しを見極める（返事の始まりを待たせない。docs/services/associative-memory-ja.md）
-            agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions)
+            agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions, game=lambda: (
+                agent.game.context() if getattr(agent, 'game', None) is not None else None))
             agent.mind_recall.start(history, agent.recall_situation)
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
