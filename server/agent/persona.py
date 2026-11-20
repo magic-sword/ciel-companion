@@ -46,6 +46,7 @@ class Persona:
     listener_instructions: str
     game_decide_instructions: str
     tool_decide_instructions: str
+    tool_decide_state_instructions: str
     execution_instructions: str
     tool_discovery_instructions: str
     tasks_instructions: str
@@ -84,7 +85,7 @@ class Persona:
              self.conversation_instructions, self.research_instructions, self.research_voice_instructions,
              self.singing_voice_instructions, self.singing_feedback, self.mind_instructions,
              self.initiative_instructions, self.initiative_trigger,
-             self.mind_brief_instructions, self.listener_instructions, self.game_decide_instructions, self.tool_decide_instructions, self.tool_discovery_instructions, self.tasks_instructions,
+             self.mind_brief_instructions, self.listener_instructions, self.game_decide_instructions, self.tool_decide_instructions, self.tool_decide_state_instructions, self.tool_discovery_instructions, self.tasks_instructions,
              self.game_instructions, self.app_instructions, self.execution_instructions,
              self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions, self.stream_note, self.voice_warmup, self.voice_first_sentence, self.stt_vocabulary, self.reply_frame, self.continuation_experiment, self.continuation_chunk_experiment, self.continuation_memo_experiment,
              self.recall_note, self.memory_keys_instructions, self.recall_mind_instructions, self.thought_note,
@@ -113,7 +114,7 @@ def load_persona() -> Persona:
                 'minutes_instructions', 'minutes_live_instructions', 'minutes_voice_instructions',
                 'conversation_instructions',
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
-                'mind_instructions', 'initiative_instructions', 'initiative_trigger', 'mind_brief_instructions', 'listener_instructions', 'game_decide_instructions', 'tool_decide_instructions', 'tool_discovery_instructions', 'tasks_instructions',
+                'mind_instructions', 'initiative_instructions', 'initiative_trigger', 'mind_brief_instructions', 'listener_instructions', 'game_decide_instructions', 'tool_decide_instructions', 'tool_decide_state_instructions', 'tool_discovery_instructions', 'tasks_instructions',
                 'game_instructions', 'app_instructions', 'execution_instructions',
                 'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'stream_note', 'voice_warmup', 'voice_first_sentence', 'stt_vocabulary', 'reply_frame', 'continuation_experiment', 'continuation_chunk_experiment', 'continuation_memo_experiment', 'recall_note', 'memory_keys_instructions', 'recall_mind_instructions', 'thought_note'):
         file_key = f'{key}_file'

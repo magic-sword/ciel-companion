@@ -18,6 +18,7 @@ import persona
 import tools
 from capabilities import CapabilityCatalog
 from core_host import CoreHost
+from tool_decision import continuation_enabled, decision_rules
 from livekit.agents import llm
 from livekit.agents.llm._provider_format.openai import to_fnc_ctx
 
@@ -36,7 +37,7 @@ async def check(args):
         wire_tools = to_fnc_ctx(llm.ToolContext(functions), strict=True)
         owner = object.__new__(agent.Ciel)
         owner.persona, owner.grown, owner.capabilities, owner.game = p, '', catalog, env
-        fixed = owner.instructions_for('normal', 'solo') + '\n\n' + catalog.summary() + '\n\n' + p.reply_frame
+        fixed = owner.instructions_for('normal', 'solo') + '\n\n' + catalog.summary() + '\n\n' + decision_rules(p, continuation_enabled(owner)) + '\n\n' + p.reply_frame
         alternatives = game_decision.acts(env, None)
         assert any(a['properties']['kind']['const'] == 'work' for a, _ in alternatives)
         decision = game_decision.GameDecision(None, p.game_decide_instructions)

@@ -59,6 +59,15 @@ class MindBuildTest(unittest.TestCase):
         self.assertEqual(texts[-1][1], '[発言者：ゆうき]\nオリオン座だよ')
         self.assertIn('[今：朝]', texts[-2][1])
 
+    def test_an_earlier_same_utterance_stays_in_the_history(self):
+        # 前と同じ言葉（2 回目の「うん」）でも、前の分は過去の発言として残す。消すと履歴の途中が変わり、キャッシュが外れる
+        h = history_with(('user', 'うん', 'ゆうき'), ('assistant', 'よかったのです', None),
+                         ('user', 'うん', 'ゆうき'))
+        out = mind.Mind(h, style=Style()).build(self.livekit_ctx(('user', 'うん')))
+        texts = [(i.role, i.text_content) for i in out.items]
+        self.assertEqual(texts[1:3], [('user', 'ゆうき：うん'), ('assistant', 'よかったのです')])
+        self.assertEqual([t for r, t in texts if r == 'user' and 'うん' in t], ['ゆうき：うん', 'うん'])
+
     def test_quiet_reminder_and_memory_and_minutes(self):
         minutes = mock.Mock()
         minutes.context.return_value = '[議事録状態] {}'
