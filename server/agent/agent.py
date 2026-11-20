@@ -55,7 +55,7 @@ import app_env
 import game_env
 import goals
 import game_decision
-from tool_decision import ConversationDecision, ToolDecision
+from tool_decision import ConversationDecision, ToolDecision, continuation_enabled, decision_rules
 from capabilities import CapabilityCatalog
 from session_mcp import SessionMCP
 import mind
@@ -306,6 +306,8 @@ class Ciel(Agent):
             instructions = llm.ChatMessage(role='system', content=[self.instructions_for(
                 style.talk if style else 'normal', style.presence if style else 'solo')
                 + '\n\n' + self.capabilities.summary()
+                # How a reply's decision is written: the same for the conversation, so before the history (tool_decision.py)
+                + '\n\n' + decision_rules(self.persona, continuation_enabled(self))
                 # Last in the fixed prefix: what a reply is. Earlier positions did not reduce annotations.
                 + '\n\n' + self.persona.reply_frame])
             if index is None:

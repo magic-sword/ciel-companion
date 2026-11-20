@@ -2,6 +2,7 @@
 import asyncio
 import copy
 import json
+import os
 import time
 import uuid
 
@@ -13,6 +14,24 @@ from game_decision import REASONING, SAY, spoken
 import models
 import debug_log
 from decision_format import DecisionFormat
+
+
+def continuation_enabled(owner) -> bool:
+    """Whether this conversation's decisions may continue without a new input (continuation.py)."""
+    return os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(getattr(owner, 'style', None), 'talk', 'normal') != 'quiet'
+
+
+def decision_rules(persona, enabled: bool) -> str:
+    """How every reply's say/act decision is written. It is the same for the whole conversation, so it belongs in
+    the fixed prefix (agent.py puts it right before the reply frame); only the state and the menu follow the turn.
+    When these ~900 tokens followed the history, every reply re-read the history: llama-server restores a hybrid
+    model only from checkpoints, made at the last user message and a few hundred tokens before the prompt end,
+    which then fell inside these rules, past the part shared with the next reply."""
+    parts = [persona.tool_decide_instructions]
+    if enabled:
+        parts += [persona.continuation_experiment, persona.continuation_chunk_experiment,
+                  persona.continuation_memo_experiment]
+    return '\n\n'.join(p.strip() for p in parts if p and p.strip())
 
 
 def object_schema(properties):
@@ -209,7 +228,6 @@ class ConversationDecision:
 
     async def node(self, owner, ctx, functions, settings, *, source=None):
         from continuation import Continuation
-        import os
         # Preemptive generation starts before the session assigns current_speech.
         # The SDK task context identifies the generating turn, including when a
         # previous turn is still being played out.
@@ -218,7 +236,7 @@ class ConversationDecision:
             return
         if self.loop is None or self.speech_id != speech.id:
             self.cancel()
-            enabled = os.environ.get('CIEL_INITIATIVE', '1') == '1' and getattr(owner.style, 'talk', 'normal') != 'quiet'
+            enabled = continuation_enabled(owner)
             self.enabled = enabled
             self.flow = Continuation(enabled=enabled, memo=enabled, speech_chars=120 if enabled else None)
             self.flow.wake()
@@ -247,9 +265,8 @@ class ConversationDecision:
             self.messages.extend(results)
             self.awaiting_call = None
         messages = self.messages
-        template = owner.persona.tool_decide_instructions
-        if flow.enabled:
-            template += '\n\n' + owner.persona.continuation_experiment + '\n\n' + owner.persona.continuation_chunk_experiment + '\n\n' + owner.persona.continuation_memo_experiment
+        # The rules are in the fixed prefix (decision_rules); this turn's tail carries only the state and the menu.
+        template = owner.persona.tool_decide_state_instructions.strip()
         first = not resuming_tool
         try:
             while not flow.waiting and not loop.cancelled and not getattr(speech, 'interrupted', False):

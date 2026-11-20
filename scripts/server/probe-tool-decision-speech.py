@@ -53,7 +53,7 @@ async def prepare():
         captured.update(messages=bench.messages_for(ctx), tools=[dict(type='function', function=s) for s in schemas])
         controller = bench.ToolDecision()
         actions = controller.schema(agent.capabilities, {f.id: f for f in functions}, agent.mind.refused_now(chat))
-        captured['instruction'] = agent.persona.tool_decide_instructions.replace('{state}', controller.context()).replace(
+        captured['instruction'] = agent.persona.tool_decide_state_instructions.strip().replace('{state}', controller.context()).replace(
             '{actions}', controller.menu(actions))
         yield bench.llm.ChatChunk(id='capture', delta=bench.llm.ChoiceDelta(role='assistant', content=''))
 

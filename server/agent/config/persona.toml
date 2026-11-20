@@ -50,7 +50,10 @@ mind_brief_instructions_file = "prompts/mind_brief.md"
 listener_instructions_file = "prompts/listener.md"
 # ゲーム中の持ち主の発言に、話す言葉としてすることを一つの決定で返す（game_decision.py）。{actions} にその状態でできることが入る
 game_decide_instructions_file = "prompts/game_decide.md"
+# 通常の会話の say/act の決定（tool_decision.py）。書き方は会話の間変わらないので、固定の指示の最後（返事の前提の直前）に置く。
+# 毎回変わる進行状態と選択肢だけを、今回の発言の後ろに置く（前の返事との共通部分がそこまで伸び、キャッシュが履歴の終わりまで効く）
 tool_decide_instructions_file = "prompts/tool_decide.md"
+tool_decide_state_instructions_file = "prompts/tool_decide_state.md"
 execution_instructions_file = "prompts/execution_api.md"
 # 付箋（board.py）：「[今のタスク]」と、頼みの発言に付く印の読み方（心と小脳の両方に渡す）
 tasks_instructions_file = "prompts/tasks.md"

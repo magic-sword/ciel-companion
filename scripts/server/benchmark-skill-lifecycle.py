@@ -157,7 +157,7 @@ async def run(args):
                         if controller is not None:
                             refused = agent.mind.refused_now(chat)
                             decision_schema = controller.schema(agent.capabilities, visible, refused)
-                            instruction = agent.persona.tool_decide_instructions.replace('{state}', controller.context()).replace(
+                            instruction = agent.persona.tool_decide_state_instructions.strip().replace('{state}', controller.context()).replace(
                                 '{actions}', controller.menu(decision_schema))
                             messages.append(dict(role='user', content='SYSTEM: ' + instruction))
                             options = dict(tool_choice='none', response_format={'type': 'json_schema',

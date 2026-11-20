@@ -97,8 +97,10 @@ class ToolDecisionTests(unittest.TestCase):
         self.assertEqual(speech, '')
         self.assertIsNotNone(call)
         persona = load_persona()
-        self.assertIn('{state}', persona.tool_decide_instructions)
+        self.assertIn('{state}', persona.tool_decide_state_instructions)
+        self.assertNotIn('{state}', persona.tool_decide_instructions)
         self.assertNotEqual(persona.fingerprint, replace(persona, tool_decide_instructions='changed').fingerprint)
+        self.assertNotEqual(persona.fingerprint, replace(persona, tool_decide_state_instructions='changed').fingerprint)
 
 
 class ConversationDecisionTests(unittest.IsolatedAsyncioTestCase):
