@@ -475,8 +475,9 @@ class MindRecall:
         # 無くなった物（壊れた拠点）は心に見せない。今の拠点と取り違えて「あの場所へ戻ろう」と考えた（2026-11-20、5/5）。
         # 無くなった物は、システム1 が「今はもう無い」と書いて添える
         pool = [r for r in found if not r.past][:self.POOL]
-        self.considered = turn
         if not pool:
+            self.considered = turn
+            debug_log.record('recall_mind', candidates=0, chosen=[], thought=False, ms=round((time.perf_counter() - t0) * 1000, 1))
             return None
         now = self.recall.now()
         request = {'now': f'{now:%Y-%m-%d %H:%M}',
@@ -491,6 +492,7 @@ class MindRecall:
             messages=[{'role': 'system', 'content': self.instructions},
                       {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
         models.record('brief', model, getattr(r, 'usage', None))
+        self.considered = turn   # 心が答えた（途中で取り消されたら、次の静かな間に同じ発言をやり直す）
         try:
             out = json.loads(r.choices[0].message.content or '{}')
         except ValueError:
@@ -527,8 +529,10 @@ class MindRecall:
             self._task = None
 
     async def _run(self, history, situation) -> None:
+        import debug_log
         import inference_activity
         import models
+        debug_log.record('recall_mind_start', local=models.is_local('brief'))
         while True:
             await asyncio.sleep(self.POLL)
             try:
@@ -540,7 +544,8 @@ class MindRecall:
             except inference_activity.Deferred:
                 continue       # 途中で話し始めた。次の静かな間にやり直す
             except Exception as e:
-                log.info('思い出し：心が見極められない：%s', type(e).__name__)
+                log.warning('思い出し：心が見極められない：%s', type(e).__name__)
+                debug_log.record('recall_mind_error', error=type(e).__name__)
 
     async def step(self, history, situation) -> Thought | None:
         through = history.settled_through()
@@ -548,6 +553,12 @@ class MindRecall:
                 and t.role in ('user', 'assistant', 'event')]
         last = next((t for t in reversed(rows) if t.role in ('user', 'event')), None)
         if last is None or last.id <= self.considered:
+            seen = (through, len(history.turns), last.id if last is not None else None)
+            if seen != getattr(self, '_idle', None):
+                self._idle = seen
+                import debug_log
+                debug_log.record('recall_mind_idle', through=through, turns=len(history.turns),
+                                 last=seen[2], considered=self.considered)
             return None
         from mind import _event_fact
         query = last.text if last.role == 'user' else _event_fact(last.text)
