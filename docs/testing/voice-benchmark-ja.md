@@ -107,7 +107,7 @@ JSONLの`audio`はmanifestのあるディレクトリから解決する。各音
 
 `stt`は本番と同じ`vosk_engine.Decoder`を使う。既定20ms刻みの実時間入力、2秒の追加無音、最後にEOF確定。モデル全ファイルのSHA-256と、プロセス内初回ロード時間を別に記録する（OSキャッシュまで冷えた起動時間ではない）。非実時間では途中結果・自然確定の遅延をnullにする。既存の[合成3文試験](../services/local-stt-ja.md)は入力・刻み・正解が異なるため直接比較しない。
 
-`live`はLiveKitを使う。ローカルSTT/共有LLM/Irodoriに設定した**名前付きの試験用worker**を明示し、そのworkerの実際の設定をconditionsに記録する。ワーカーは起動済みで、試験専用DB/記憶スコープにする。毎回新規の部屋に参加するが、永続記憶は自動初期化しない。道具を呼ぶ指示やゲーム操作は別の専用評価へ分ける。
+`live`はLiveKitを使う。測定には[家の中のLiveKit](../operations/local-livekit-ja.md#測定)の接続先・鍵を渡し、クラウドの接続時間を使わない。ローカルSTT/共有LLM/Irodoriに設定した**名前付きの試験用worker**を明示し、そのworkerの実際の設定をconditionsに記録する。ワーカーは起動済みで、試験専用DB/記憶スコープにする。毎回新規の部屋に参加するが、永続記憶は自動初期化しない。道具を呼ぶ指示やゲーム操作は別の専用評価へ分ける。
 
 ```powershell
 # LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRETをプロセス環境へ設定済み

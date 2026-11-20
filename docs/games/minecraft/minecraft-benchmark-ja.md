@@ -275,11 +275,11 @@ docker compose --env-file .env.benchmark -f compose.benchmark.yaml --profile run
   --mode conversation --task gather_logs --seed 11 --repeats 1
 ```
 
-各試行は新しい LiveKit の部屋へ `ciel-task-bench` を明示して接続する。要求の版・backend・モデル識別名・試行IDを dispatch metadata（`ciel.benchmark` v1）で照合し、不一致や旧形式は**推論前に拒否**する。さらに会話ログの同じ情報と人物設定のハッシュを確認してから課題を送る。更新時は `agent-bench` と `benchmark-runner` の両方を再ビルドする。
+各試行は、[家の中のLiveKit](../../operations/local-livekit-ja.md#測定)の新しい部屋へ `ciel-task-bench` を明示して接続する（`.env.benchmark`の`CIEL_BENCH_LIVEKIT_URL`・`_KEY`・`_SECRET`。未設定やクラウドの接続先なら始めない。会話サーバーのポートは8093）。要求の版・backend・モデル識別名・試行IDを dispatch metadata（`ciel.benchmark` v1）で照合し、不一致や旧形式は**推論前に拒否**する。さらに会話ログの同じ情報と人物設定のハッシュを確認してから課題を送る。更新時は `agent-bench` と `benchmark-runner` の両方を再ビルドする。
 
 試験モードでは初回あいさつを生成せず、`benchmark_ready` を確認してから課題を送る。初回あいさつと依頼の長い推論が競合することを防ぎ、課題の入力を計測の入口にそろえる。通常の会話のあいさつは変更しない。
 
-OpenAI と比較する場合は `.env.benchmark` の `CIEL_BENCH_BACKEND=openai` とモデル識別名を設定し、agent-bench を再作成する。実行にも `--backend openai --allow-paid` が必要。必要なら `CIEL_MIND_MODEL` 等を明示する（各役目の実際のモデル名はログに残る）。ローカルモードでも LiveKit の利用は発生する。公開 Web 検索・画像・音声認識は、先に作ったローカル試験モードと同じ制限になる。
+OpenAI と比較する場合は `.env.benchmark` の `CIEL_BENCH_BACKEND=openai` とモデル識別名を設定し、agent-bench を再作成する。実行にも `--backend openai --allow-paid` が必要。必要なら `CIEL_MIND_MODEL` 等を明示する（各役目の実際のモデル名はログに残る）。LiveKitは家の中のものを使い、クラウドの接続時間は使わない。公開 Web 検索・画像・音声認識は、先に作ったローカル試験モードと同じ制限になる。
 
 Python 3.11以降と `server/agent/requirements-test.txt` があるホストなら、`server/` から `python -m benchmark.run ...` でも実行できる。設定は `.env.benchmark`、会話モードでは加えて `.env.shared` を読み、環境変数が優先する。
 

@@ -231,6 +231,10 @@ class ConversationDriver:
     async def open(self):
         from livekit import api, rtc
         import benchmark_contract
+        url = os.environ.get('LIVEKIT_URL', '')
+        if not url or '.livekit.cloud' in url:
+            # 測定はクラウドの接続時間を使わない（docs/operations/local-livekit-ja.md）
+            raise RuntimeError('Set CIEL_BENCH_LIVEKIT_URL/KEY/SECRET to the in-house LiveKit; the cloud is not used for measurements')
         self.room, self.lk = rtc.Room(), api.LiveKitAPI()
         ready, linked = asyncio.Event(), asyncio.Event()
 

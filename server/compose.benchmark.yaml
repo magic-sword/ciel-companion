@@ -81,6 +81,11 @@ services:
       - ./.env.shared
       - ./.env.benchmark
     environment:
+      # Measurements use the in-house LiveKit, never the cloud minutes (docs/operations/local-livekit-ja.md).
+      # Empty values replace the cloud ones from .env.shared, so a missing setting fails instead of falling back.
+      LIVEKIT_URL: ${CIEL_BENCH_LIVEKIT_URL:-}
+      LIVEKIT_API_KEY: ${CIEL_BENCH_LIVEKIT_KEY:-}
+      LIVEKIT_API_SECRET: ${CIEL_BENCH_LIVEKIT_SECRET:-}
       CIEL_DB_URL: ''
       CIEL_LLM_BACKEND: local
       CIEL_OPENAI_ROLES: ''
@@ -150,7 +155,10 @@ services:
     env_file: ./.env.shared
     environment:
       CIEL_AGENT_NAME: ciel-task-bench
-      CIEL_AGENT_PORT: '8092'
+      CIEL_AGENT_PORT: '8093'            # 8092 is the in-house LiveKit's test agent (agent-local)
+      LIVEKIT_URL: ${CIEL_BENCH_LIVEKIT_URL:-}
+      LIVEKIT_API_KEY: ${CIEL_BENCH_LIVEKIT_KEY:-}
+      LIVEKIT_API_SECRET: ${CIEL_BENCH_LIVEKIT_SECRET:-}
       CIEL_MODEL: pipeline
       CIEL_VOICE: irodori
       CIEL_INPUT: text

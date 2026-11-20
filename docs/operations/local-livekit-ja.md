@@ -70,7 +70,15 @@ CIEL_MIND_REASONING=none
 
 ## 測定
 
-試験用の会話サーバーのコンテナの中で、往復を重ねる測定を流せる。クラウドの接続時間を使わない。
+**測定・確認・試験の会話は、家の中のLiveKitを使う。** クラウドのLiveKitの接続時間は、本番の利用者の会話に残す（上限を超えると、本番も開発も会話に入れなくなる。2026-11-20に開発の確認で上限に達した）。試験用の会話サーバーのコンテナ（`ciel-dev-agent-local-1`）は、家の中のLiveKitの`LIVEKIT_URL`・鍵を持っているので、測定のスクリプトはこのコンテナの中で動かす。開発の会話サーバー（`ciel-dev-agent-dev-1`）や本番のコンテナの中で動かすと、クラウドへつながる。
+
+1. 開発へ配布したあと、`scripts/server/livekit-local.sh start`で試験用の会話サーバーを同じ版にそろえる。
+2. 配布の疎通確認：`scripts/server/smoke-livekit.py`を`ciel-dev-agent-local-1`の中で`--agent ciel-dev`で動かす（挨拶の声・文字の発言・返事の声）。
+3. 会話の記録を読む処理（心の見極め・今のまとめ・メモ）を確かめるときは、合成した声で話しかける`bench_latency.py`を使う。文字で送る`bench_text.py`の発言は、会話の記録（声の文字起こしの確定で書く）に本文が入らない。`--lines`に1行1発言の台本、`--pause`に返事のあとの間（秒）を渡すと、静かな間に動く処理まで見られる。部屋の名前は最初の行（`room=…`）に出る。
+4. 料金：音声認識（Whisper）と読み上げ（Irodori）は家の中で動く。返事の文の役目（`mind`）は、`.env.livekit-local`の`CIEL_OPENAI_ROLES`次第でOpenAIを使う（2026-11-20は`mind`がgpt-5.4-miniで、1回の返事が約0.003ドル）。回す前に回数から見積もる。
+5. Minecraftのベンチマーク（`compose.benchmark.yaml`）も家の中のLiveKitを使う。ベンチマーク環境の`.env.benchmark`に`CIEL_BENCH_LIVEKIT_URL`・`CIEL_BENCH_LIVEKIT_KEY`・`CIEL_BENCH_LIVEKIT_SECRET`（このLiveKitの値）を置く。未設定やクラウドの接続先なら、実行器は試験を始めない。ベンチマークの会話サーバーは8093で動き、試験用の会話サーバー（8092）と並べられる。
+
+試験用の会話サーバーのコンテナの中で、往復を重ねる測定を流せる。
 
 ```bash
 source scripts/server/ssh-target.sh "" && "${SSH[@]}" 'docker exec ciel-dev-agent-local-1 sh -c "cd /app && python bench_latency.py --agent ciel-dev --rounds 2"'
