@@ -181,10 +181,15 @@ class Mind:
             out.items.append(llm.ChatMessage(role='user', content=[
                 '[わたしの姿]（わたし、シエルの見た目の絵。いつも知っている自分の姿）',
                 llm.ImageContent(image=self.self_image, inference_detail='low')]))
-        for t in self._window():
+        window = self._window()
+        # 今回の発言として記録に入った分は、最後のシエルの返事より後ろの行だけ。それより前の同じ言葉
+        # （2 回目の「うん」・同じ質問のくり返し）は過去の発言として残す：消すと履歴の途中が変わり、
+        # そこから後ろのキャッシュが毎回外れた（2026-11-20）
+        current = next((n for n in range(len(window), 0, -1) if window[n - 1].role == 'assistant'), 0)
+        for n, t in enumerate(window):
             text = t.text[:TURN_CHARS]
             if t.role == 'user':
-                if any(text in u for u in tail_users):
+                if n >= current and any(text in u for u in tail_users):
                     continue   # 今回の発言（の切れ端）は、LiveKit の側の分を使う
                 text = self._marked(text)
             out.add_message(**turn_message(t, text))
