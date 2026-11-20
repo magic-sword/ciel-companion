@@ -542,6 +542,7 @@ class MindRecall:
             except asyncio.CancelledError:
                 raise
             except inference_activity.Deferred:
+                debug_log.record('recall_mind_deferred')
                 continue       # 途中で話し始めた。次の静かな間にやり直す
             except Exception as e:
                 log.warning('思い出し：心が見極められない：%s', type(e).__name__)

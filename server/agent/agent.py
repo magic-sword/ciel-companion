@@ -817,7 +817,8 @@ async def entrypoint(ctx: JobContext) -> None:
         agent.recall = recall.Recall(store, embedder)
         indexer = recall.Indexer(store, embedder, recall.KeyWriter(agent.persona.memory_keys_instructions))
         indexer.start()   # 鍵と埋め込みがまだの記憶・メモを、会話の裏で埋める
-        if PIPELINE and history is not None and agent.persona.recall_mind_instructions:
+        if (PIPELINE and history is not None and agent.persona.recall_mind_instructions
+                and os.environ.get('CIEL_RECALL_MIND', '1') != '0'):   # 0 で切る（測定で、ありとなしを比べる）
             # システム2：静かな間に、心が思い出しを見極める（返事の始まりを待たせない。docs/services/associative-memory-ja.md）
             agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions, game=lambda: (
                 agent.game.context() if getattr(agent, 'game', None) is not None else None))

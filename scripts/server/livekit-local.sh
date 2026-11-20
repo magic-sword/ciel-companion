@@ -5,6 +5,8 @@
 #                                            開発へ配布したことのある別の版で起動する（変更の前後を比べるとき）
 #   scripts/server/livekit-local.sh measure  試験・測定用に起動する（start と同じ版で、返事の役目も含めて推論をすべて共有GPUのローカルへ。
 #                                            料金がかからない。終わったら start で普段の設定に戻す）
+#   CIEL_RECALL_MIND=0 scripts/server/livekit-local.sh measure
+#                                            心の見極めを切って起動する（ありとなしの比較）
 #   scripts/server/livekit-local.sh stop     止める（普段の開発・本番には触らない）
 #   scripts/server/livekit-local.sh status   動いているか、アプリに入れるトークンの取得先
 # 置き場所は開発（~/work/ciel-companion-dev/server）。compose.livekit-local.yaml と livekit-local/ をそこへ送る。
@@ -21,7 +23,7 @@ if [ "$ACTION" = start ] || [ "$ACTION" = measure ]; then
 fi
 
 REVISION=${LIVEKIT_LOCAL_REVISION:+$(git -C "$ROOT" rev-parse --verify "$LIVEKIT_LOCAL_REVISION^{commit}")}
-"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION bash -s" <<'REMOTE'
+"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1} bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/work/ciel-companion-dev/server
 PROD=../../ciel-companion/server
@@ -72,6 +74,6 @@ case "$ACTION" in
 esac
 docker ps --format '{{.Names}} {{.Status}}' | grep -E 'ciel-dev-(livekit|token|agent)-local' || echo '家の中の LiveKit は止まっている'
 docker logs --since 5m ciel-dev-agent-local-1 2>&1 | grep -c 'registered worker' | sed 's/^/試験用の会話サーバーの worker 登録：/' || true
-docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル）"' 2>/dev/null || true
+docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル） 心の見極め=${CIEL_RECALL_MIND:-1}"' 2>/dev/null || true
 echo "アプリのトークンの取得先：http://$LIVEKIT_LOCAL_BIND:7883/token"
 REMOTE
