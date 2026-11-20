@@ -120,7 +120,7 @@ def spoke(rows):
                 f"{r.get('status')}:{r['reason']}" if r.get('reason') else r.get('status') for r in ups)),
             'after_reply_s': [r.get('after_reply_s') for r in said],
             'generate_s': [r.get('generate_s') for r in ups if r.get('generate_s') is not None],
-            'scheduled': [{k: r.get(k) for k in ('level', 'idea_kind', 'text', 'overlap', 'reply_playing')}
+            'scheduled': [{k: r.get(k) for k in ('level', 'idea_kind', 'text', 'overlap', 'reply_playing', 'reply')}
                           for r in ups if r.get('status') == 'scheduled'],
             'dropped': [{k: r.get(k) for k in ('reason', 'level', 'text', 'overlap')}
                         for r in ups if r.get('status') == 'dropped']}
@@ -159,7 +159,7 @@ def main():
         if u['statuses']:
             print(f"  自分から話す：{u['statuses']}  返事を話し終えてから(s) {u['after_reply_s']}  作るのに(s) {u['generate_s']}")
             for x in u['scheduled']:
-                print(f"    頼んだ {x['level']} {x['idea_kind']} 重なり{x['overlap']} 返事の声の間={x['reply_playing']} {x['text']}")
+                print(f"    頼んだ {x['level']} {x['idea_kind']} 重なり{x['overlap']} 返事の声の間={x['reply_playing']} {x['text']}  ← 返事：{x.get('reply') or ''}")
             for x in u['dropped']:
                 print(f"    落とした {x['reason']} {x['level']} 重なり{x['overlap']} {x['text']}")
     if a.json:

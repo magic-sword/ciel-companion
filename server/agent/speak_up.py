@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """話す番で、自分から話す（docs/conversation/speaking-motivation-ja.md の段階3）。
 
-心の見極め（recall.MindRecall）が相手の発言 N について「高い」考え（点が HIGH より上）を出したら、シエルの返事 N を
-話している間（か、話し終えて LATE 秒まで）に、その考えを話す返事を口に頼む（mouth.say('idea')）。LiveKit は、順番を
-待っている返事の文と声も先に作るので、返事 N の声の間に言葉ができる。声にするのは、返事 N を話し終えて GAP 秒、
-相手が話し始めなかったときだけ（hold）。それまでに相手が話し始めたら捨てる。
+心の見極め（recall.MindRecall）は、シエルの返事 N を読んでから、相手の発言 N について話したいことを考える。
+「高い」考え（点が HIGH より上）が出たら、その考えを話す返事を口に頼み（mouth.say('idea')）、言葉ができたらそのまま
+話す（hold）。沈黙の長さは決めない：考えが終われば話し出すのが、自分で考えて話す振る舞いとして自然（2026-11-21
+利用者が決めた）。返事 N をまだ話していれば、その後に続ける。相手と重なったら、今の割り込みの仕組みが読み上げを止める。
+話し出す前に相手が次の発言を始めたら、考えは前の発言についてのものなので捨てる。
 
 - 推論は増やさない：考えと点は、相手の発言ごとの心の 1 回で出ている。ここは話す言葉を 1 回作るだけで、時間では考え直さない。
 - 新しさ：返事 N と 2 字組が REPEAT 以上重なる考えは話さない（返事で答えたことを繰り返さない）。
@@ -33,11 +34,6 @@ def overlap(idea: str, said: str) -> float:
 class SpeakUp:
     POLL = 0.25
     HIGH = 3.5            # これより上（高い・とても高い）の考えだけ、自分から話す
-    GAP = 1.5             # 返事を話し終えて、相手がこれだけ話し始めなければ声にする
-    # 返事を話し終えてからこれより遅く考えがそろったら話さない。全部ローカルでは、心は返事の文を作り終えてから動き
-    # （約6秒）、1文の返事の声より長いので、考えはいつも話し終えたあとにそろった（3.0秒では話す考え13回のうち1回だけ話せた。
-    # 2026-11-21）。相手が黙っている間は話してよいので、15秒まで待つ。相手が話し始めたら hold が捨てる
-    LATE = 15.0
     WAIT = 20.0           # 声にする番を待つ上限
     REPEAT = 0.3          # 返事とこれ以上重なる考えは話さない
     ANSWER = 15.0         # 自分から話したあと、これだけの間に相手が話せば「答えた」
@@ -114,8 +110,8 @@ class SpeakUp:
             drop = 'low'
         elif not self.allowed():
             drop = 'mode'
-        elif self.reply is None or (self.reply_ended is not None and self.clock() - self.reply_ended > self.LATE):
-            drop = 'late'
+        elif self.reply is None:
+            drop = 'no_reply'
         elif getattr(self.session, 'user_state', None) == 'speaking':
             drop = 'user_speaking'
         elif self.reply_ended is None and not self._reply_generated():
@@ -125,7 +121,7 @@ class SpeakUp:
         self.mind_recall.ideas = []   # 1 つの発言の考えは 1 回だけ見る
         fields = dict(level=round(best.level, 2), idea_kind=best.kind, text=best.text, turn=best.turn,
                       threshold=self.threshold, overlap=round(overlap(best.text, self.reply_text), 2),
-                      reply_playing=self.reply_ended is None)
+                      reply_playing=self.reply_ended is None, reply=self.reply_text[:120])
         if drop is not None:
             debug_log.record('speak_up', status='dropped', reason=drop, **fields)
             return
@@ -141,25 +137,19 @@ class SpeakUp:
     # ---- 声にする番 ----
 
     async def wait_turn(self) -> bool:
-        """返事 N を話し終えて GAP 秒、相手が話し始めなければ True。話し始めたら False"""
+        """返事 N を話し終えたら True（話している途中なら、話し終えるまで待つ）。その前に相手が話し始めたら False"""
         deadline = self.clock() + self.WAIT
-        quiet_since = None
         while self.clock() < deadline:
             if self._user_spoke.is_set() or getattr(self.session, 'user_state', None) == 'speaking':
                 return False
             current = getattr(self.session, 'current_speech', None)
-            playing = current is not None and current is not self.handle and not current.done()
-            if playing:
-                quiet_since = None
-            elif quiet_since is None:
-                quiet_since = self.reply_ended if self.reply_ended is not None else self.clock()
-            if quiet_since is not None and self.clock() - quiet_since >= self.GAP:
+            if not (current is not None and current is not self.handle and not current.done()):
                 return True
             await asyncio.sleep(0.05)
         return False
 
     async def hold(self, source):
-        """自分から話す返事の文を作り切ってから、声にする番まで待って流す。番が来なければ何も流さない"""
+        """自分から話す返事の文を作り切ってから、返事 N を話し終えるのを待って流す。相手が先に話し始めたら流さない"""
         began = self.clock()
         chunks = [c async for c in source]
         made = self.clock()

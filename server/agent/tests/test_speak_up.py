@@ -60,25 +60,23 @@ class SpeakUpTest(unittest.IsolatedAsyncioTestCase):
         self.up.step()
         self.assertEqual(len(self.said), 1)
 
-    def test_low_repeat_stale_mode_or_late_ideas_are_dropped(self):
+    def test_low_repeat_stale_mode_or_unreplied_ideas_are_dropped(self):
         cases = {
             'low': dict(idea=self.idea(level=3.4)),
             'repeat': dict(idea=self.idea(text='鎖は鉄インゴット1個と鉄塊2個'), reply='鎖を作るには鉄インゴット1個と鉄塊2個が要るのです'),
             'stale': dict(idea=self.idea(turn=0)),
             'mode': dict(idea=self.idea(), allowed=False),
-            'late': dict(idea=self.idea(), late=True),
+            'no_reply': dict(idea=self.idea(), no_reply=True),
         }
         for name, c in cases.items():
             with self.subTest(name):
                 self.said.clear()
+                self.session.current_speech = None
                 self.up = speak_up.SpeakUp(self.session, self.mouth, self.mind, self.history, '{idea}',
                                            allowed=lambda: c.get('allowed', True), clock=lambda: self.t[0])
                 self.up.replied(c.get('reply', 'そうですね'))
-                self.playing()
-                if c.get('late'):
-                    self.session.current_speech.finished = True
-                    self.up.step()
-                    self.t[0] += speak_up.SpeakUp.LATE + 1
+                if not c.get('no_reply'):
+                    self.playing()
                 self.mind.ideas = [c['idea']]
                 self.up.step()
                 self.assertEqual(self.said, [])
@@ -95,7 +93,18 @@ class SpeakUpTest(unittest.IsolatedAsyncioTestCase):
         self.up.step()
         self.assertEqual(self.up.unanswered, 0)
 
-    async def test_hold_speaks_after_the_gap_and_drops_when_the_user_starts(self):
+    def test_idea_ready_long_after_the_reply_is_still_said(self):
+        # 沈黙の長さは決めない：考えが終われば話す
+        self.up.replied('倒れないための準備ですね。')
+        self.playing()
+        self.session.current_speech.finished = True
+        self.up.step()
+        self.t[0] += 60
+        self.mind.ideas = [self.idea()]
+        self.up.step()
+        self.assertEqual(len(self.said), 1)
+
+    async def test_hold_speaks_after_the_reply_and_drops_when_the_user_starts(self):
         async def source():
             yield 'こんにちは'
         real = [0.0]

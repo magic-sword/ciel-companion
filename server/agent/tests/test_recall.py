@@ -402,3 +402,39 @@ class MindIdeaPlacementTest(unittest.IsolatedAsyncioTestCase):
         self.t[0] = 0
         m = await self.mind([{'kind': 'suggest', 'text': '拠点を作ろう', 'score': 4}], place=False)
         self.assertIsNone(m.take_idea(s, since))
+
+
+class MindReadsReplyTest(unittest.IsolatedAsyncioTestCase):
+    """話したいことは、シエル自身の返事を読んでから考える（返事と食い違わない）"""
+
+    async def test_waits_for_the_reply_then_shows_it(self):
+        from conversation import Conversation
+        t = [0.0]
+        history = Conversation()
+        history.complete(history.reserve(), 'ゾンビと戦うのって怖くない？', label='ユウ')
+        client = mind_client('{"use": [], "ideas": []}')
+        with patch.object(recall.MindRecall, 'IDEAS', True):
+            m = recall.MindRecall(recall.Recall(FakeStore([]), None, clock=lambda: NOW), '指示',
+                                  ideas_instructions='考えの指示', client=client, monotonic=lambda: t[0])
+        with patch('models.is_local', return_value=False):
+            self.assertIsNone(await m.step(history, lambda: Situation()))
+            self.assertEqual(client.chat.completions.create.await_count, 0)   # 返事を待つ
+            m.replied(history.last_id, '[happy]怖くないのです！')
+            await m.step(history, lambda: Situation())
+        request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
+        self.assertEqual(request['conversation'][-1], {'speaker': 'シエル', 'text': '怖くないのです！'})
+
+    async def test_no_reply_after_a_while_thinks_without_it(self):
+        from conversation import Conversation
+        t = [0.0]
+        history = Conversation()
+        history.complete(history.reserve(), '疲れた', label='ユウ')
+        client = mind_client('{"use": [], "ideas": []}')
+        with patch.object(recall.MindRecall, 'IDEAS', True):
+            m = recall.MindRecall(recall.Recall(FakeStore([]), None, clock=lambda: NOW), '指示',
+                                  ideas_instructions='考えの指示', client=client, monotonic=lambda: t[0])
+        with patch('models.is_local', return_value=False):
+            await m.step(history, lambda: Situation())
+            t[0] = recall.MindRecall.REPLY_WAIT + 1
+            await m.step(history, lambda: Situation())
+        self.assertEqual(client.chat.completions.create.await_count, 1)

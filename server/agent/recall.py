@@ -540,6 +540,9 @@ class MindRecall:
     PLACE = os.environ.get('CIEL_MIND_IDEAS', '0') == '2'
     SPEAK = os.environ.get('CIEL_MIND_IDEAS', '0') == '3'
     MEDIUM = 2.5          # これより上（中くらい以上）の考えだけ返事に置く。低い考えは話さない
+    # 話したいことを考えるときは、シエル自身の返事を読んでから考える（返事と食い違う・同じことを言う考えが出た。
+    # 2026-11-21）。返事が来ないとき（黙った・道具だけ）は、これだけ待ってから返事なしで考える
+    REPLY_WAIT = 30.0
 
     def __init__(self, recall: Recall, instructions: str, *, ideas_instructions: str = '', client=None, game=None,
                  monotonic=time.monotonic) -> None:
@@ -550,6 +553,8 @@ class MindRecall:
         self.speak = self.ideas_on and self.SPEAK
         self.ideas: list[Idea] = []   # 最後に考えた、話したいこと
         self._ideas_situation: Situation | None = None
+        self.reply: tuple[int, str] | None = None   # 最後の返事：(答えた相手の発言, 文)
+        self._reply_wait: tuple[int, float] | None = None
         self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）
         self.monotonic = monotonic
         self.thought: Thought | None = None
@@ -619,6 +624,12 @@ class MindRecall:
             return None
         return t
 
+    def replied(self, turn: int, text: str) -> None:
+        """シエルが相手の発言 turn に返事を作り終えた（agent._pipeline_llm）。感情の印は外す"""
+        text = ' '.join(re.sub(r'\[[a-z_]+\]', '', text).split())
+        if text:
+            self.reply = (turn, text)
+
     def take_idea(self, s: Situation, user_turns_since) -> Idea | None:
         """段階2：次の返事に置く考え（1 回だけ）。中くらいより上で最も高いもの。場面が変わった・古い・話が進みすぎたものは
         捨てる（take と同じ決まり）"""
@@ -683,6 +694,16 @@ class MindRecall:
         from mind import _event_fact
         query = last.text if last.role == 'user' else _event_fact(last.text)
         shown = [{'role': t.role, 'name': t.name, 'text': _event_fact(t.text) if t.role == 'event' else t.text} for t in rows]
+        if self.ideas_on and last.role == 'user':
+            # 返事を読んでから考える。返事はまだ話している途中で、履歴に入っていないことが多い
+            if self.reply is None or self.reply[0] < last.id:
+                if self._reply_wait is None or self._reply_wait[0] != last.id:
+                    self._reply_wait = (last.id, self.monotonic())
+                if self.monotonic() - self._reply_wait[1] < self.REPLY_WAIT:
+                    return None
+            elif not any(r['role'] == 'assistant' and r['text'] == self.reply[1]
+                         for r in shown[next(i for i, t in enumerate(rows) if t is last):]):
+                shown.append({'role': 'assistant', 'name': 'シエル', 'text': self.reply[1]})
         return await self.consider([_Row(**r) for r in shown], query, situation(), last.id)
 
 

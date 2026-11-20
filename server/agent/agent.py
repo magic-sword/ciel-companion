@@ -478,6 +478,12 @@ class Ciel(Agent):
                              tools_given=len(fns), blocked=blocked)
             if self.speak_up is not None and not idea and done:
                 self.speak_up.replied(''.join(text))   # 話す考えが、この返事と重なっていないかを見る
+            if (self.mind_recall is not None and not idea and done and self.mind.reply_origin == 'reply'
+                    and (history := getattr(self.session.userdata, 'history', None)) is not None):
+                # 心は、この返事を読んでから話したいことを考える（返事と食い違わない・同じことを言わない）
+                answered = next((x.id for x in reversed(history.turns) if x.role == 'user' and x.text), None)
+                if answered is not None:
+                    self.mind_recall.replied(answered, ''.join(text))
             try:
                 self.mind.after_reply(done)
             except Exception:
