@@ -280,10 +280,11 @@ class MindRecallTest(unittest.IsolatedAsyncioTestCase):
         m, client = self.mind('{"use": ["mem:1", "mem:9", "mem:1", "mem:2"], "thought": "拠点で休もう"}')
         rows = [SimpleNamespace(name='ユウ', text='疲れた、休みたい')]
         got = await m.consider(rows, '疲れた、休みたい', Situation(), turn=5)
-        self.assertEqual([r.id for r in got.items], ['mem:1', 'mem:2'])
+        self.assertEqual([r.id for r in got.items], ['mem:1'])
         self.assertEqual(got.text, '拠点で休もう')
         request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
-        self.assertEqual({x['id']: x['past'] for x in request['candidates']}, {'mem:1': False, 'mem:2': True})
+        # 無くなった拠点（mem:2）は心に見せない（今の拠点と取り違える）。システム1 が「今はもう無い」と添える
+        self.assertEqual([x['id'] for x in request['candidates']], ['mem:1'])
         self.assertEqual(m.considered, 5)
 
     async def test_nothing_chosen_or_nothing_found(self):

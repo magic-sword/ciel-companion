@@ -472,7 +472,9 @@ class MindRecall:
         import models
         t0 = time.perf_counter()
         found, _ = await self.recall.search(query, s, min_relevance=self.POOL_MIN)
-        pool = found[:self.POOL]
+        # 無くなった物（壊れた拠点）は心に見せない。今の拠点と取り違えて「あの場所へ戻ろう」と考えた（2026-11-20、5/5）。
+        # 無くなった物は、システム1 が「今はもう無い」と書いて添える
+        pool = [r for r in found if not r.past][:self.POOL]
         self.considered = turn
         if not pool:
             return None
@@ -480,7 +482,7 @@ class MindRecall:
         request = {'now': f'{now:%Y-%m-%d %H:%M}',
                    'conversation': [{'speaker': t.name, 'text': t.text[:300]} for t in rows[-self.TURNS:]],
                    **({'game': g} if (g := self.game() if self.game is not None else None) else {}),
-                   'candidates': [{'id': r.id, 'when': ago(r.at, now), 'text': r.text, 'past': r.past} for r in pool]}
+                   'candidates': [{'id': r.id, 'when': ago(r.at, now), 'text': r.text} for r in pool]}
         if self.client is None:
             self.client = models.create_client('brief')
         model = models.model('brief')

@@ -199,7 +199,8 @@ class RecallMethod(CurrentMethod):
 
 
 class MindMethod(RecallMethod):
-    """System 2 variant: the same search proposes a wider list, then an LLM (the mind) picks what matters.
+    """System 1 + System 2, as the host: the fast top-3 search, plus what an LLM (the mind) picks from a wider list
+    without invalidated memories.
     Same pool and instructions as the host's recall.MindRecall. The latency of each LLM call is recorded."""
     id = 'mind'
     PROMPT = AGENT / 'config/prompts/recall_mind.md'   # the host's own instructions (MindRecall)
@@ -221,13 +222,15 @@ class MindMethod(RecallMethod):
         pool = [self.candidate(m) for m in memories if m.kind != 'like']
         query = ' '.join(t['text'] for t in ctx.turns if t['role'] == 'user')
         situation = recall.Situation(presence=ctx.presence, person_id=ctx.speaker, world=ctx.world)
-        got = recall.rank(pool, situation, query, self._vector(query, True), ctx.now, k=self.POOL, min_relevance=self.POOL_MIN)
+        ranked = recall.rank(pool, situation, query, self._vector(query, True), ctx.now, k=len(pool), min_relevance=self.POOL_MIN)
+        fast = [r for r in ranked if r.relevance >= recall.MIN_RELEVANCE][:recall.TOP_K]   # System 1, as the host
+        got = [r for r in ranked if not r.past][:self.POOL]                               # what the mind sees
         chosen = []
         if got:
             request = {'now': f'{ctx.now:%Y-%m-%d %H:%M}',
                        'conversation': [{'speaker': ctx.people.get(ctx.speaker, '相手') if t['role'] == 'user'
                                          else 'シエル', 'text': t['text']} for t in ctx.turns],
-                       'candidates': [{'id': r.id, 'when': recall.ago(r.at, ctx.now), 'text': r.text, 'past': r.past} for r in got]}
+                       'candidates': [{'id': r.id, 'when': recall.ago(r.at, ctx.now), 'text': r.text} for r in got]}
             body = {'model': self.model, 'temperature': 0, 'response_format': {'type': 'json_object'},
                     'chat_template_kwargs': {'enable_thinking': self.thinking},
                     'messages': [{'role': 'system', 'content': self.instructions},
@@ -246,9 +249,10 @@ class MindMethod(RecallMethod):
             timings = data.get('timings') or {}
             self.calls.append({'ms': round(ms, 1), 'prompt_n': timings.get('prompt_n'), 'predicted_n': timings.get('predicted_n'),
                                'thought': out.get('thought', '')})
-        by_id = {r.id: r for r in got}
+        by_id = {r.id: r for r in ranked}
+        picked = [r.id for r in fast] + [i for i in chosen if i not in {r.id for r in fast}]   # the reply gets both
         auto = {i.id for i in items if i.channel == 'auto'}
-        recalled = [Item(i, 'auto', past=by_id[i].past, recalled=True) for i in chosen if i not in auto]
+        recalled = [Item(i, 'auto', past=by_id[i].past, recalled=True) for i in picked if i not in auto]
         return recalled + [i for i in items if i.id not in {r.id for r in recalled}]
 
 
