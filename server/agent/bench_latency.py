@@ -6,7 +6,7 @@
 本番の会話サーバーは入らない部屋を作り、agent_name を付けた試験用の会話サーバー（CIEL_AGENT_NAME）だけを呼ぶ。
 声は読み上げサービス（Irodori-TTS）で、シエルとは違う声（大人の男性）で作る。
 
-  python bench_latency.py [--agent ciel-bench] [--rounds 1] [--lines 台本.txt] [--pause 秒] [--room-prefix 名前]
+  python bench_latency.py [--agent ciel-bench] [--rounds 1] [--lines 台本.txt] [--pause 秒] [--room-prefix 名前] [--presence solo]
   --lines は 1 行 1 発言の台本（既定は LINES）。--pause は、返事を話し終えてから次の発言までの間（静かな間に動く処理を見るとき）。
   測定には家の中の LiveKit（docs/operations/local-livekit-ja.md）を使い、クラウドの接続時間を使わない。
 
@@ -121,6 +121,8 @@ async def main() -> None:
     ap.add_argument('--lines', help='1 行 1 発言の台本（UTF-8）')
     ap.add_argument('--pause', type=float, default=0.0, help='返事を話し終えてから次の発言までの秒')
     ap.add_argument('--room-prefix', default='bench')
+    ap.add_argument('--presence', choices=('auto', 'solo', 'close', 'public'), default='auto',
+                    help='その場にいる人をアプリと同じ知らせで決める（読み上げの声を話者の確認が2人に分けると、auto ではひとりでなくなる）')
     args = ap.parse_args()
     lines = [x.strip() for x in open(args.lines, encoding='utf-8') if x.strip()] if args.lines else LINES
     room_name = f'{args.room_prefix}-{uuid.uuid4().hex[:8]}'
@@ -198,6 +200,9 @@ async def main() -> None:
         return began
 
     await wait_reply(0)   # あいさつが終わるまで
+    if args.presence != 'auto':   # アプリが送る会話のしかたと同じ（mode.py の ciel.style）。会話サーバーが部屋に入ってから送る
+        await room.local_participant.publish_data(
+            json.dumps({'talk': 'normal', 'presence': args.presence}), reliable=True, topic='ciel.style')
     results = []
     for _ in range(args.rounds):
         for line, pcm in zip(lines, voices):
