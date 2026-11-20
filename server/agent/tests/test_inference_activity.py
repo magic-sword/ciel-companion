@@ -59,3 +59,51 @@ class ActivityTest(unittest.IsolatedAsyncioTestCase):
         task.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await task
+
+
+class WhileSpeakingTest(unittest.IsolatedAsyncioTestCase):
+    """話している間の推論（心の見極め）：返事を作り終えていれば、シエルが話していても送る"""
+
+    def ready(self, activity):
+        activity.generated_at -= 1
+
+    async def test_runs_while_ciel_speaks_but_not_while_replying_or_the_owner_speaks(self):
+        activity = Activity()
+        operation = AsyncMock(return_value='ok')
+        activity.update(agent=True)            # シエルが話している
+        self.ready(activity)
+        self.assertEqual(await activity.run(operation, while_speaking=True), 'ok')
+        with self.assertRaises(Deferred):
+            await activity.run(operation)      # ふつうの裏の推論は待つ
+        with activity.replying():
+            with self.assertRaises(Deferred):
+                await activity.run(operation, while_speaking=True)
+        with self.assertRaises(Deferred):       # 作り終えた直後は少し待つ
+            await activity.run(operation, while_speaking=True)
+        self.ready(activity)
+        activity.update(user=True)
+        with self.assertRaises(Deferred):
+            await activity.run(operation, while_speaking=True)
+
+    async def test_a_new_reply_or_the_owner_cancels_it_but_ciel_speaking_does_not(self):
+        for cancel in ('reply', 'user'):
+            activity = Activity()
+            self.ready(activity)
+            started = asyncio.Event()
+
+            async def operation():
+                started.set()
+                await asyncio.Event().wait()
+            task = asyncio.create_task(activity.run(operation, while_speaking=True))
+            await started.wait()
+            activity.update(agent=True)
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            if cancel == 'reply':
+                with activity.replying():
+                    pass
+            else:
+                activity.update(user=True)
+            with self.assertRaises(Deferred):
+                await task
+            self.assertFalse(activity.speaking_requests)

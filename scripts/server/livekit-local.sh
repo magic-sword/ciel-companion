@@ -23,7 +23,7 @@ if [ "$ACTION" = start ] || [ "$ACTION" = measure ]; then
 fi
 
 REVISION=${LIVEKIT_LOCAL_REVISION:+$(git -C "$ROOT" rev-parse --verify "$LIVEKIT_LOCAL_REVISION^{commit}")}
-"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1} bash -s" <<'REMOTE'
+"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1} CIEL_RECALL_MIND_SPEAKING=${CIEL_RECALL_MIND_SPEAKING:-1} bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/work/ciel-companion-dev/server
 PROD=../../ciel-companion/server
@@ -74,6 +74,6 @@ case "$ACTION" in
 esac
 docker ps --format '{{.Names}} {{.Status}}' | grep -E 'ciel-dev-(livekit|token|agent)-local' || echo '家の中の LiveKit は止まっている'
 docker logs --since 5m ciel-dev-agent-local-1 2>&1 | grep -c 'registered worker' | sed 's/^/試験用の会話サーバーの worker 登録：/' || true
-docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル） 心の見極め=${CIEL_RECALL_MIND:-1}"' 2>/dev/null || true
+docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル） 心の見極め=${CIEL_RECALL_MIND:-1} 話している間も=${CIEL_RECALL_MIND_SPEAKING:-1}"' 2>/dev/null || true
 echo "アプリのトークンの取得先：http://$LIVEKIT_LOCAL_BIND:7883/token"
 REMOTE

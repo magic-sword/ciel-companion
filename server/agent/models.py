@@ -122,8 +122,9 @@ async def background_completion(client, **kwargs):
     return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=''.join(content)))], usage=usage)
 
 
-def client_for(role: str, default):
-    """その役目の呼び先（ローカルなら llama-server の OpenAI 互換の窓口。そうでなければ default をそのまま）"""
+def client_for(role: str, default, *, while_speaking: bool = False):
+    """その役目の呼び先（ローカルなら llama-server の OpenAI 互換の窓口。そうでなければ default をそのまま）。
+    while_speaking：裏の推論を、シエルが話している間も送る（返事を作っている間と相手が話している間は送らない。inference_activity）"""
     global _local_client
     if not is_local(role):
         return default
@@ -134,7 +135,7 @@ def client_for(role: str, default):
         async def create(**kwargs):
             async def operation(**values):
                 return await background_completion(_local_client, **values)
-            return await inference_activity.activity.run(operation, **kwargs)
+            return await inference_activity.activity.run(operation, while_speaking=while_speaking, **kwargs)
         return SimpleNamespace(base_url=_local_client.base_url,
                                chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     return _local_client

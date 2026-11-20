@@ -264,7 +264,15 @@ class Ciel(Agent):
     def llm_node(self, chat_ctx, tools, model_settings):
         if not PIPELINE or self.mind is None:
             return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
-        return self._pipeline_llm(chat_ctx, tools, model_settings)
+        return self._tracked(self._pipeline_llm(chat_ctx, tools, model_settings))
+
+    @staticmethod
+    async def _tracked(stream):
+        """返事を作っている間を inference_activity に知らせる（話している間に送る裏の推論が、返事の生成と重ならないように）"""
+        import inference_activity
+        with inference_activity.activity.replying():
+            async for chunk in stream:
+                yield chunk
 
     async def _conversation_node(self, ctx, functions, settings, *, source=None):
         if not hasattr(self, 'conversation_decision'):

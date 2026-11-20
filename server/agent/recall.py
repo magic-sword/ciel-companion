@@ -456,7 +456,10 @@ class MindRecall:
     TURNS = 8             # 心に見せる最近の発言
     TTL = 300.0           # これより古い結果は使わない
     STALE_TURNS = 2       # 見極めたあと、相手の発言がこれより多く進んだら使わない
-    POLL = 2.0
+    POLL = 1.0
+    # シエルが話している間も送る（返事の文を作り終えていればモデルは空いている）。全部ローカルでは、静かになるのを
+    # 待つと、次の発言まで約 8 秒空かないと間に合わなかった（2026-11-20）。0 で静かになるまで待つ
+    WHILE_SPEAKING = os.environ.get('CIEL_RECALL_MIND_SPEAKING', '1') != '0'
 
     def __init__(self, recall: Recall, instructions: str, *, client=None, game=None, monotonic=time.monotonic) -> None:
         self.recall, self.instructions, self.client = recall, instructions, client
@@ -487,7 +490,7 @@ class MindRecall:
         if self.client is None:
             self.client = models.create_client('brief')
         model = models.model('brief')
-        r = await models.client_for('brief', self.client).chat.completions.create(**models.options(
+        r = await models.client_for('brief', self.client, while_speaking=self.WHILE_SPEAKING).chat.completions.create(**models.options(
             'brief', model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=20.0,
             messages=[{'role': 'system', 'content': self.instructions},
                       {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
@@ -532,12 +535,13 @@ class MindRecall:
         import debug_log
         import inference_activity
         import models
-        debug_log.record('recall_mind_start', local=models.is_local('brief'))
+        debug_log.record('recall_mind_start', local=models.is_local('brief'), while_speaking=self.WHILE_SPEAKING)
         while True:
             await asyncio.sleep(self.POLL)
             try:
-                if models.is_local('brief') and not inference_activity.activity.available():
-                    continue   # 話している間・話し終えてすぐは待つ（返事の始まりを遅らせない）
+                a = inference_activity.activity
+                if models.is_local('brief') and not (a.available_while_speaking() if self.WHILE_SPEAKING else a.available()):
+                    continue   # 相手が話している間・返事を作っている間は待つ（返事の始まりを遅らせない）
                 await self.step(history, situation)
             except asyncio.CancelledError:
                 raise

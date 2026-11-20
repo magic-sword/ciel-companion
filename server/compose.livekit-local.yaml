@@ -46,4 +46,5 @@ services:
       - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-local}
       - CIEL_OPENAI_ROLES=${CIEL_OPENAI_ROLES:-}
       - CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1}   # 0 で心の見極め（recall.MindRecall）を切る。測定の比較用
+      - CIEL_RECALL_MIND_SPEAKING=${CIEL_RECALL_MIND_SPEAKING:-1}   # 0 で、シエルが話している間は心の見極めを送らない
     restart: 'no'
