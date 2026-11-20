@@ -253,6 +253,7 @@ class Ciel(Agent):
         self.replies = None                      # turns.TurnReplies（pipeline で、返事の前に話者を決める）
         self.recall = None                       # recall.Recall（関連性で思い出す。DB があるときだけ）
         self.mind_recall = None                  # recall.MindRecall（心が見極めた記憶と思ったこと。次の返事に 1 回）
+        self.speak_up = None                     # speak_up.SpeakUp（高い考えを、返事を話し終えた番で自分から話す）
         self.activity = None                     # activity.Activity（いまのシエル。アプリの「いま」の札）
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
@@ -426,8 +427,12 @@ class Ciel(Agent):
         trace_token = inference_trace.correlation.set(dict(request_id=request_id, speech_id=speech, role=who))
         debug_log.record('model_request', role=who, id=request_id, model=models.model('mind'),
                          reaction_id=reaction.key[-1] if reaction else None, speech_id=speech)
+        source = self._conversation_node(ctx, fns, model_settings, source=chat_ctx)
+        idea = self.mind.reply_origin == 'idea' and self.speak_up is not None
+        if idea:   # 自分から話す返事：文を作り切ってから、返事を話し終えて相手が話し始めない番まで待つ（speak_up.py）
+            source = self.speak_up.hold(source)
         try:
-            async for chunk in self._conversation_node(ctx, fns, model_settings, source=chat_ctx):
+            async for chunk in source:
                 if reactions and not reactions.allowed(speech_id):
                     expired = True
                     break
@@ -471,6 +476,8 @@ class Ciel(Agent):
             debug_log.record('model_response', id=request_id, role=who, seconds=round(time.monotonic()-generation_started,3))
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
+            if self.speak_up is not None and not idea and done:
+                self.speak_up.replied(''.join(text))   # 話す考えが、この返事と重なっていないかを見る
             try:
                 self.mind.after_reply(done)
             except Exception:
@@ -841,6 +848,14 @@ async def entrypoint(ctx: JobContext) -> None:
                 ideas_instructions=agent.persona.recall_mind_ideas_instructions, game=lambda: (
                 agent.game.context() if getattr(agent, 'game', None) is not None else None))
             agent.mind_recall.start(history, agent.recall_situation)
+            if agent.mind_recall.speak and agent.persona.idea_voice:
+                # 段階3：高い考えを、返事を話し終えた番で自分から話す（docs/conversation/speaking-motivation-ja.md）
+                import speak_up
+                agent.speak_up = speak_up.SpeakUp(session, voice, agent.mind_recall, history, agent.persona.idea_voice,
+                    allowed=lambda: (agent.style is None or (agent.style.talk in ('normal', 'chatty')
+                                                              and agent.style.presence == 'solo')))
+                session.on('user_state_changed', agent.speak_up.on_user_state)
+                agent.speak_up.start()
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す
     relation_keeper = (relationship.RelationKeeper(book, note_taker, agent.persona.relationship_instructions, history)
@@ -905,6 +920,8 @@ async def entrypoint(ctx: JobContext) -> None:
             await indexer.close()
         if agent.mind_recall is not None:
             await agent.mind_recall.close()
+        if agent.speak_up is not None:
+            await agent.speak_up.close()
         if store is not None:
             await store.close()
     grower = growth.Grower(store, ciel_diary, agent.persona.self_instructions, agent.persona.growth_instructions)

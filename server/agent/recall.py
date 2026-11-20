@@ -534,9 +534,11 @@ class MindRecall:
     WHILE_SPEAKING = os.environ.get('CIEL_RECALL_MIND_SPEAKING', '1') != '0'
     # 話し出す動機（docs/conversation/speaking-motivation-ja.md）：同じ 1 回で、話したいことと点も出す
     # （prompts/recall_mind_ideas.md）。記憶の候補が無くても呼ぶ（回数は相手の発言の数まで）。
-    # 1：記録だけ（段階1）。2：中くらいより上の考えを、次の返事に「心に浮かんだこと」として 1 回置く（段階2）
-    IDEAS = os.environ.get('CIEL_MIND_IDEAS', '0') in ('1', '2')
+    # 1：記録だけ（段階1）。2：中くらいより上の考えを、次の返事に「心に浮かんだこと」として 1 回置く（段階2）。
+    # 3：高い考えを、返事を話し終えた番で自分から話す（段階3、speak_up.py）。返事には置かない
+    IDEAS = os.environ.get('CIEL_MIND_IDEAS', '0') in ('1', '2', '3')
     PLACE = os.environ.get('CIEL_MIND_IDEAS', '0') == '2'
+    SPEAK = os.environ.get('CIEL_MIND_IDEAS', '0') == '3'
     MEDIUM = 2.5          # これより上（中くらい以上）の考えだけ返事に置く。低い考えは話さない
 
     def __init__(self, recall: Recall, instructions: str, *, ideas_instructions: str = '', client=None, game=None,
@@ -545,6 +547,7 @@ class MindRecall:
         self.ideas_on = self.IDEAS and bool(ideas_instructions)
         self.instructions = ideas_instructions if self.ideas_on else instructions
         self.place = self.ideas_on and self.PLACE
+        self.speak = self.ideas_on and self.SPEAK
         self.ideas: list[Idea] = []   # 最後に考えた、話したいこと
         self._ideas_situation: Situation | None = None
         self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）

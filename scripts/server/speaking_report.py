@@ -8,7 +8,8 @@ user line (she spoke up on her own), how many of them got an answer, lines cut o
 inferences per user line. Stage 1: the ideas and scores the mind wrote (recall.MindRecall with
 CIEL_MIND_IDEAS=1), with the score weighted by the output probabilities of 1-5. Stage 2 (CIEL_MIND_IDEAS=2):
 the ideas put into the next reply, and how much of each the reply used (character bigrams of the idea that
-the reply contains; read the pairs too, a reply can use an idea in other words).
+the reply contains; read the pairs too, a reply can use an idea in other words). Stage 3 (CIEL_MIND_IDEAS=3):
+the high ideas Ciel said at the open turn after her reply (speak_up.py), and why the others were dropped.
 """
 import argparse
 import collections
@@ -112,6 +113,19 @@ def placed(rows):
             'pairs': pairs}
 
 
+def spoke(rows):
+    ups = [r for r in rows if r.get('kind') == 'speak_up']
+    said = [r for r in ups if r.get('status') == 'spoken']
+    return {'statuses': dict(collections.Counter(
+                f"{r.get('status')}:{r['reason']}" if r.get('reason') else r.get('status') for r in ups)),
+            'after_reply_s': [r.get('after_reply_s') for r in said],
+            'generate_s': [r.get('generate_s') for r in ups if r.get('generate_s') is not None],
+            'scheduled': [{k: r.get(k) for k in ('level', 'idea_kind', 'text', 'overlap', 'reply_playing')}
+                          for r in ups if r.get('status') == 'scheduled'],
+            'dropped': [{k: r.get(k) for k in ('reason', 'level', 'text', 'overlap')}
+                        for r in ups if r.get('status') == 'dropped']}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('logs', nargs='+')
@@ -120,7 +134,8 @@ def main():
     out = {}
     for path in a.logs:
         rows = rows_of(path)
-        out[Path(path).name] = {'baseline': baseline(rows), 'ideas': ideas(rows), 'placed': placed(rows)}
+        out[Path(path).name] = {'baseline': baseline(rows), 'ideas': ideas(rows), 'placed': placed(rows),
+                                'spoke': spoke(rows)}
         b, s = out[Path(path).name]['baseline'], out[Path(path).name]['ideas']
         print(f'== {Path(path).name}')
         print(f"  相手の発言 {b['user_lines']}  シエルの発言 {b['ciel_lines']}（あいさつ {b['greetings']}）  自分から {b['spoke_up']}"
@@ -140,6 +155,13 @@ def main():
             print(f"  返事に置いた考え {q['placed']}/{q['replies_checked']}  返事が使った（2字組の重なり{USED:.0%}以上） {q['used']}")
             for x in q['pairs']:
                 print(f"    {x['level']} {x['kind']:7} {x['overlap']:.2f} {x['idea']}\n      → {x['reply'][:90]}")
+        u = out[Path(path).name]['spoke']
+        if u['statuses']:
+            print(f"  自分から話す：{u['statuses']}  返事を話し終えてから(s) {u['after_reply_s']}  作るのに(s) {u['generate_s']}")
+            for x in u['scheduled']:
+                print(f"    頼んだ {x['level']} {x['idea_kind']} 重なり{x['overlap']} 返事の声の間={x['reply_playing']} {x['text']}")
+            for x in u['dropped']:
+                print(f"    落とした {x['reason']} {x['level']} 重なり{x['overlap']} {x['text']}")
     if a.json:
         Path(a.json).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
 
