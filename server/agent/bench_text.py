@@ -10,6 +10,8 @@
 測るもの（発言ごと）：送ってから、シエルの返事の声が始まるまでの秒（first）と、話し終えるまで（done）。
 推論の最初の文字までの時間とキャッシュは、その部屋の開発ログを scripts/server/conversation_latency_report.py で読む。
 必要な環境変数：LIVEKIT_URL・LIVEKIT_API_KEY・LIVEKIT_API_SECRET。
+文字で送った発言は、会話の記録（conversation.py。声の文字起こしの確定で書く）に本文が入らない。記録を読む処理（心の見極め・
+今のまとめ・メモ）を確かめるときは、合成した声で話しかける bench_latency.py を使う。
 """
 import argparse
 import asyncio

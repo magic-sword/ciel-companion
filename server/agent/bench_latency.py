@@ -6,7 +6,9 @@
 本番の会話サーバーは入らない部屋を作り、agent_name を付けた試験用の会話サーバー（CIEL_AGENT_NAME）だけを呼ぶ。
 声は読み上げサービス（Irodori-TTS）で、シエルとは違う声（大人の男性）で作る。
 
-  python bench_latency.py [--agent ciel-bench] [--rounds 1]
+  python bench_latency.py [--agent ciel-bench] [--rounds 1] [--lines 台本.txt] [--pause 秒] [--room-prefix 名前]
+  --lines は 1 行 1 発言の台本（既定は LINES）。--pause は、返事を話し終えてから次の発言までの間（静かな間に動く処理を見るとき）。
+  測定には家の中の LiveKit（docs/operations/local-livekit-ja.md）を使い、クラウドの接続時間を使わない。
 
 測るもの（発言ごと）：
   first … 話し終わり（声の最後のフレームを送った時刻）から、シエルの声（相づちを含む）が始まるまで
@@ -112,8 +114,13 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--agent', default='ciel-bench')
     ap.add_argument('--rounds', type=int, default=1)
+    ap.add_argument('--lines', help='1 行 1 発言の台本（UTF-8）')
+    ap.add_argument('--pause', type=float, default=0.0, help='返事を話し終えてから次の発言までの秒')
+    ap.add_argument('--room-prefix', default='bench')
     args = ap.parse_args()
-    room_name = f'bench-{uuid.uuid4().hex[:8]}'
+    lines = [x.strip() for x in open(args.lines, encoding='utf-8') if x.strip()] if args.lines else LINES
+    room_name = f'{args.room_prefix}-{uuid.uuid4().hex[:8]}'
+    print(f'room={room_name}', flush=True)
     lk = api.LiveKitAPI()
     await lk.room.create_room(api.CreateRoomRequest(
         name=room_name, agents=[api.RoomAgentDispatch(agent_name=args.agent)]))
@@ -122,7 +129,7 @@ async def main() -> None:
 
     async with aiohttp.ClientSession() as http:
         voices = []
-        for line in LINES:
+        for line in lines:
             parts = [line] if isinstance(line, str) else line
             gap = np.zeros(int(PAUSE_SECONDS * SR), '<i2')
             pcms = [await synth(http, t) for t in parts]
@@ -179,7 +186,7 @@ async def main() -> None:
     await wait_reply(0)   # あいさつが終わるまで
     results = []
     for _ in range(args.rounds):
-        for line, pcm in zip(LINES, voices):
+        for line, pcm in zip(lines, voices):
             text = line if isinstance(line, str) else '…'.join(line)
             n_before = len(listener.segs)
             t_start = time.time()
@@ -202,6 +209,8 @@ async def main() -> None:
                  'segs': [[round(a - t_end, 2), round((b or a) - t_end, 2)] for a, b in segs]}
             results.append(r)
             print(json.dumps(r, ensure_ascii=False), flush=True)
+            if args.pause > 0:
+                await asyncio.sleep(args.pause)
     firsts = [r['first'] for r in results if r['first'] is not None]
     if firsts:
         print(f'SUMMARY first: median {np.median(firsts):.2f}s  min {min(firsts):.2f}s  max {max(firsts):.2f}s  '
