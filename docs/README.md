@@ -85,6 +85,7 @@
 | [conversation/prompt-management-ja.md](conversation/prompt-management-ja.md) | Markdown/TOMLの指示管理、ロード・指紋・編集・評価の契約。 |
 | [conversation/capability-runtime-ja.md](conversation/capability-runtime-ja.md) | 能力カタログ、段階的な公開、呼び出し権限と実行管理。 |
 | [conversation/agent-state-machine-ja.md](conversation/agent-state-machine-ja.md) | 会話・道具の呼び出し・体の行動を、状態機械と状態ごとの能力の束で組み直す設計案と、評価・移行段階・採用条件。 |
+| [conversation/speaking-motivation-ja.md](conversation/speaking-motivation-ja.md) | シエルが自分から話す・黙る・割って入るかを、考えの話したい気持ちと会話の様子から決める仕組みの設計案と、評価・移行段階・採用条件。 |
 | [conversation/service-boundaries-ja.md](conversation/service-boundaries-ja.md) | 各サービスと会話ホスト、公開操作と基盤専用操作の分担。 |
 | [conversation/service-events-and-reactions-ja.md](conversation/service-events-and-reactions-ja.md) | 非同期入力の契約、TTL・優先・集約・発話/表情の調停。 |
 | [conversation/errors-design-ja.md](conversation/errors-design-ja.md) | 失敗の分類、利用者へ見せる通知、正常状態へ変換しない規則。 |
