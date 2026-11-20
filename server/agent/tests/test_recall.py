@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import numpy as np
 
@@ -319,3 +319,48 @@ class MindRecallTest(unittest.IsolatedAsyncioTestCase):
         history.complete(history.reserve(role='assistant'), '拠点で休む？', label='シエル')
         self.assertIsNone(await m.step(history, lambda: Situation()))   # シエルの発言では見極め直さない
         self.assertEqual(client.chat.completions.create.await_count, 1)
+
+
+class MindIdeasTest(unittest.IsolatedAsyncioTestCase):
+    """段階1：同じ 1 回で、話したいことと点も出す（記録だけで、返事に添えるものは変えない）"""
+
+    def setUp(self):
+        base = c('mem:1', 'game_place', '森の横の拠点。ベッドがある', keys='休む、寝る', importance=4)
+        self.recall = recall.Recall(FakeStore([base]), None, clock=lambda: NOW, monotonic=lambda: 0.0)
+
+    def mind(self, content, logprobs=None):
+        client = mind_client(content)
+        client.chat.completions.create.return_value.choices[0].logprobs = logprobs
+        with patch.object(recall.MindRecall, 'IDEAS', True):
+            m = recall.MindRecall(self.recall, '指示', ideas_instructions='考えの指示', client=client, monotonic=lambda: 0.0)
+        return m, client
+
+    async def test_ideas_even_without_candidates_and_reply_note_unchanged(self):
+        out = ('{"use": [], "thought": "x", "ideas": [{"kind": "ask", "about": "鉄", "text": "鉄は何個要るか聞きたい", '
+               '"pro": ["役に立つ", "続く", "三つ目"], "con": ["しつこい"], "score": 4}, '
+               '{"kind": "zzz", "text": "まとめたい", "score": "2"}, {"text": "", "score": 5}, {"text": "点が無い"}]}')
+        m, client = self.mind(out)
+        with patch('models.is_local', return_value=True), patch('models.client_for', lambda role, default, **k: default):
+            got = await m.consider([], 'まったく別の話', Situation(), 3)
+        self.assertIsNone(got)   # 選んだ記憶が無いので、次の返事に添えるものは今までどおり無い
+        kwargs = client.chat.completions.create.await_args.kwargs
+        self.assertEqual(kwargs['messages'][0]['content'], '考えの指示')
+        self.assertTrue(kwargs['logprobs'])
+        self.assertEqual([(i.kind, i.score, i.turn) for i in m.ideas], [('ask', 4, 3), ('other', 2, 3)])
+        self.assertEqual(m.ideas[0].pro, ['役に立つ', '続く'])
+        self.assertEqual(m.ideas[0].level, 4.0)
+
+    async def test_off_by_default(self):
+        client = mind_client('{"use": []}')
+        with patch.object(recall.MindRecall, 'IDEAS', False):
+            m = recall.MindRecall(self.recall, '指示', ideas_instructions='考えの指示', client=client)
+        self.assertIsNone(await m.consider([], 'まったく別の話', Situation(), 1))
+        self.assertEqual(client.chat.completions.create.await_count, 0)   # 候補が無ければ今までどおり呼ばない
+
+    def test_score_weights_from_logprobs(self):
+        import math
+        tok = lambda t, alts=(): {'token': t, 'top_logprobs': [{'token': k, 'logprob': math.log(p)} for k, p in alts]}
+        tokens = [tok('{"'), tok('score'), tok('":'), tok(' '), tok('3', [('3', 0.6), ('4', 0.4)]), tok(', "x": 3'),
+                  tok('"score": '), tok(' 5', [(' 5', 0.5), ('5', 0.25), ('a', 0.25)])]
+        self.assertEqual(recall.score_weights(tokens), [3.4, 5.0])
+        self.assertEqual(recall.score_weights(None), [])

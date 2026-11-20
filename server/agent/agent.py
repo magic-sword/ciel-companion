@@ -830,7 +830,8 @@ async def entrypoint(ctx: JobContext) -> None:
         if (PIPELINE and history is not None and agent.persona.recall_mind_instructions
                 and os.environ.get('CIEL_RECALL_MIND', '1') != '0'):   # 0 で切る（測定で、ありとなしを比べる）
             # システム2：静かな間に、心が思い出しを見極める（返事の始まりを待たせない。docs/services/associative-memory-ja.md）
-            agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions, game=lambda: (
+            agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions,
+                ideas_instructions=agent.persona.recall_mind_ideas_instructions, game=lambda: (
                 agent.game.context() if getattr(agent, 'game', None) is not None else None))
             agent.mind_recall.start(history, agent.recall_situation)
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける

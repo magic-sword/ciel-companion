@@ -7,6 +7,7 @@
 #                                            料金がかからない。終わったら start で普段の設定に戻す）
 #   CIEL_RECALL_MIND=0 scripts/server/livekit-local.sh measure
 #                                            心の見極めを切って起動する（ありとなしの比較）
+#   CIEL_MIND_IDEAS=1 scripts/server/livekit-local.sh measure   # 心が話したいことと点も出す（段階1。記録だけ）
 #   scripts/server/livekit-local.sh stop     止める（普段の開発・本番には触らない）
 #   scripts/server/livekit-local.sh status   動いているか、アプリに入れるトークンの取得先
 # 置き場所は開発（~/work/ciel-companion-dev/server）。compose.livekit-local.yaml と livekit-local/ をそこへ送る。
@@ -23,7 +24,7 @@ if [ "$ACTION" = start ] || [ "$ACTION" = measure ]; then
 fi
 
 REVISION=${LIVEKIT_LOCAL_REVISION:+$(git -C "$ROOT" rev-parse --verify "$LIVEKIT_LOCAL_REVISION^{commit}")}
-"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1} CIEL_RECALL_MIND_SPEAKING=${CIEL_RECALL_MIND_SPEAKING:-1} bash -s" <<'REMOTE'
+"${SSH[@]}" "ACTION=$ACTION REVISION=$REVISION CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1} CIEL_RECALL_MIND_SPEAKING=${CIEL_RECALL_MIND_SPEAKING:-1} CIEL_MIND_IDEAS=${CIEL_MIND_IDEAS:-0} bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/work/ciel-companion-dev/server
 PROD=../../ciel-companion/server
@@ -74,6 +75,6 @@ case "$ACTION" in
 esac
 docker ps --format '{{.Names}} {{.Status}}' | grep -E 'ciel-dev-(livekit|token|agent)-local' || echo '家の中の LiveKit は止まっている'
 docker logs --since 5m ciel-dev-agent-local-1 2>&1 | grep -c 'registered worker' | sed 's/^/試験用の会話サーバーの worker 登録：/' || true
-docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル） 心の見極め=${CIEL_RECALL_MIND:-1} 話している間も=${CIEL_RECALL_MIND_SPEAKING:-1}"' 2>/dev/null || true
+docker exec ciel-dev-agent-local-1 sh -c 'echo "試験用の会話サーバーの推論：backend=${CIEL_LLM_BACKEND:-?} OpenAIの役目=[${CIEL_OPENAI_ROLES}]（空ならすべてローカル） 心の見極め=${CIEL_RECALL_MIND:-1} 話している間も=${CIEL_RECALL_MIND_SPEAKING:-1} 話したいこと=${CIEL_MIND_IDEAS:-0}"' 2>/dev/null || true
 echo "アプリのトークンの取得先：http://$LIVEKIT_LOCAL_BIND:7883/token"
 REMOTE

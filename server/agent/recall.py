@@ -447,6 +447,77 @@ class Thought:
     at: float            # monotonic
 
 
+IDEA_KINDS = ('ask', 'correct', 'recall', 'suggest', 'feel')
+SCORE_RE = re.compile(r'"score"\s*:\s*$')
+
+
+@dataclass
+class Idea:
+    """心が考えた、シエルが自分から話したいこと（段階1：まだ話し方には使わず、記録だけする）。
+    score は書いた点、weighted は 1〜5 の書き出し確率で重みを付けた点（ローカルで確率が取れたときだけ）"""
+    kind: str
+    about: str
+    text: str
+    pro: list[str]
+    con: list[str]
+    score: int
+    weighted: float | None
+    turn: int
+    at: float
+
+    @property
+    def level(self) -> float:
+        return self.weighted if self.weighted is not None else float(self.score)
+
+
+def _field(o, name):
+    return o.get(name) if isinstance(o, dict) else getattr(o, name, None)
+
+
+def score_weights(tokens) -> list[float | None]:
+    """書き出しの確率（chat.completions の logprobs.content）から、"score": のあとの数字ごとに、1〜5 の確率で
+    重みを付けた平均を、出てきた順に返す。書いた点だけを見ると 3 に固まり、3.2 と 3.8 を区別できなかった
+    （docs/conversation/speaking-motivation-ja.md）"""
+    out, text = [], ''
+    for tok in tokens or []:
+        token = _field(tok, 'token') or ''
+        if token.strip() and SCORE_RE.search(text) and token.strip()[:1] in '12345':
+            weights = {}
+            for alt in _field(tok, 'top_logprobs') or []:
+                k, lp = (_field(alt, 'token') or '').strip(), _field(alt, 'logprob')
+                if k in ('1', '2', '3', '4', '5') and isinstance(lp, (int, float)):
+                    weights[int(k)] = weights.get(int(k), 0.0) + math.exp(lp)
+            total = sum(weights.values())
+            out.append(round(sum(k * w for k, w in weights.items()) / total, 3) if total > 0 else None)
+        text += token
+    return out
+
+
+def _lines(d: dict, key: str) -> list[str]:
+    v = d.get(key)
+    return [' '.join(str(x).split())[:80] for x in v if str(x).strip()][:2] if isinstance(v, list) else []
+
+
+def parse_ideas(raw, weighted: list, turn: int, at: float) -> list[Idea]:
+    """心の出力の ideas を読む。点が 1〜5 で無いもの・中身の無いものは捨てる。多くても 2 つ"""
+    ideas = []
+    for i, d in enumerate(raw if isinstance(raw, list) else []):
+        if not isinstance(d, dict):
+            continue
+        text = ' '.join(str(d.get('text') or '').split())[:120]
+        try:
+            score = int(d.get('score'))
+        except (TypeError, ValueError):
+            continue
+        if not text or not 1 <= score <= 5:
+            continue
+        kind = str(d.get('kind') or '')
+        ideas.append(Idea(kind if kind in IDEA_KINDS else 'other', ' '.join(str(d.get('about') or '').split())[:80],
+                          text, _lines(d, 'pro'), _lines(d, 'con'), score,
+                          weighted[i] if i < len(weighted) else None, turn, at))
+    return ideas[:2]
+
+
 class MindRecall:
     """会話が静かになったら（ローカルでは inference_activity が決める）、最後の発言から広めに探した候補を心に渡し、
     今の話に合う記憶と、思ったこと 1 文を受け取る（prompts/recall_mind.md）。返事の始まりを待たせないため、
@@ -460,9 +531,16 @@ class MindRecall:
     # シエルが話している間も送る（返事の文を作り終えていればモデルは空いている）。全部ローカルでは、静かになるのを
     # 待つと、次の発言まで約 8 秒空かないと間に合わなかった（2026-11-20）。0 で静かになるまで待つ
     WHILE_SPEAKING = os.environ.get('CIEL_RECALL_MIND_SPEAKING', '1') != '0'
+    # 段階1（docs/conversation/speaking-motivation-ja.md）：同じ 1 回で、話したいことと点も出す（prompts/recall_mind_ideas.md）。
+    # 記憶の候補が無くても呼ぶ（回数は相手の発言の数まで）。まだ話し方には使わず、記録だけする。1 で入れる
+    IDEAS = os.environ.get('CIEL_MIND_IDEAS', '0') == '1'
 
-    def __init__(self, recall: Recall, instructions: str, *, client=None, game=None, monotonic=time.monotonic) -> None:
-        self.recall, self.instructions, self.client = recall, instructions, client
+    def __init__(self, recall: Recall, instructions: str, *, ideas_instructions: str = '', client=None, game=None,
+                 monotonic=time.monotonic) -> None:
+        self.recall, self.client = recall, client
+        self.ideas_on = self.IDEAS and bool(ideas_instructions)
+        self.instructions = ideas_instructions if self.ideas_on else instructions
+        self.ideas: list[Idea] = []   # 最後に考えた、話したいこと（段階2 から使う）
         self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）
         self.monotonic = monotonic
         self.thought: Thought | None = None
@@ -478,7 +556,7 @@ class MindRecall:
         # 無くなった物（壊れた拠点）は心に見せない。今の拠点と取り違えて「あの場所へ戻ろう」と考えた（2026-11-20、5/5）。
         # 無くなった物は、システム1 が「今はもう無い」と書いて添える
         pool = [r for r in found if not r.past][:self.POOL]
-        if not pool:
+        if not pool and not self.ideas_on:
             self.considered = turn
             debug_log.record('recall_mind', candidates=0, chosen=[], thought=False, ms=round((time.perf_counter() - t0) * 1000, 1))
             return None
@@ -490,10 +568,12 @@ class MindRecall:
         if self.client is None:
             self.client = models.create_client('brief')
         model = models.model('brief')
+        # 点の重み付けに、書き出しの確率を使う（共有GPU API。クラウドの考えるモデルは返さないので頼まない）
+        probs = {'logprobs': True, 'top_logprobs': 5} if self.ideas_on and models.is_local('brief') else {}
         r = await models.client_for('brief', self.client, while_speaking=self.WHILE_SPEAKING).chat.completions.create(**models.options(
             'brief', model=model, reasoning_effort='low', response_format={'type': 'json_object'}, timeout=20.0,
             messages=[{'role': 'system', 'content': self.instructions},
-                      {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]))
+                      {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}], **probs))
         models.record('brief', model, getattr(r, 'usage', None))
         self.considered = turn   # 心が答えた（途中で取り消されたら、次の静かな間に同じ発言をやり直す）
         try:
@@ -504,8 +584,17 @@ class MindRecall:
         use = out.get('use') if isinstance(out.get('use'), list) else []
         items = [by_id[i] for i in dict.fromkeys(str(i) for i in use) if i in by_id][:TOP_K]
         text = ' '.join(str(out.get('thought') or '').split())[:200] if items else ''
-        debug_log.record('recall_mind', candidates=len(pool), chosen=[c.id for c in items], thought=bool(text),
-                         ms=round((time.perf_counter() - t0) * 1000, 1))
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        if self.ideas_on:
+            logprobs = getattr(r.choices[0], 'logprobs', None)
+            self.ideas = parse_ideas(out.get('ideas'), score_weights(_field(logprobs, 'content') if logprobs else None),
+                                     turn, self.monotonic())
+            usage = getattr(r, 'usage', None)
+            debug_log.record('mind_ideas', turn=turn, candidates=len(pool), ms=ms,
+                             output_tokens=getattr(usage, 'completion_tokens', None),
+                             ideas=[{'kind': i.kind, 'about': i.about, 'text': i.text, 'pro': i.pro, 'con': i.con,
+                                     'score': i.score, 'weighted': i.weighted} for i in self.ideas])
+        debug_log.record('recall_mind', candidates=len(pool), chosen=[c.id for c in items], thought=bool(text), ms=ms)
         self.thought = Thought(items, text, s, turn, self.monotonic()) if items else None
         return self.thought
 
