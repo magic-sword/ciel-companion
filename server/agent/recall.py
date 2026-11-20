@@ -495,7 +495,8 @@ def score_weights(tokens) -> list[float | None]:
 
 def _lines(d: dict, key: str) -> list[str]:
     v = d.get(key)
-    return [' '.join(str(x).split())[:80] for x in v if str(x).strip()][:2] if isinstance(v, list) else []
+    v = v if isinstance(v, list) else [v] if isinstance(v, str) else []
+    return [' '.join(str(x).split())[:80] for x in v if str(x).strip()][:2]
 
 
 def parse_ideas(raw, weighted: list, turn: int, at: float) -> list[Idea]:

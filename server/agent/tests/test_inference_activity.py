@@ -14,7 +14,8 @@ class ActivityTest(unittest.IsolatedAsyncioTestCase):
             def __aiter__(self):
                 async def chunks():
                     yield Obj(choices=[], usage=None)  # prefill progress
-                    yield Obj(choices=[Obj(delta=Obj(content='{"ok":true}'))], usage=None)
+                    yield Obj(choices=[Obj(delta=Obj(content='{"ok":'), logprobs=Obj(content=['t1']))], usage=None)
+                    yield Obj(choices=[Obj(delta=Obj(content='true}'))], usage=None)
                     yield Obj(choices=[], usage=usage)
                 return chunks()
         stream = Stream()
@@ -22,6 +23,7 @@ class ActivityTest(unittest.IsolatedAsyncioTestCase):
         result = await models.background_completion(Obj(chat=Obj(completions=Obj(create=create))), model='local')
         self.assertEqual(result.choices[0].message.content, '{"ok":true}')
         self.assertIs(result.usage, usage)
+        self.assertEqual(result.choices[0].logprobs.content, ['t1'])   # 頼んだときの書き出しの確率も集める
         stream.close.assert_awaited_once()
         self.assertTrue(create.call_args.kwargs['stream'])
 

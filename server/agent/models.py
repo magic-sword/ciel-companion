@@ -110,16 +110,20 @@ async def background_completion(client, **kwargs):
     """Collect JSON/text privately while keeping the HTTP stream cancellable."""
     kwargs = {**kwargs, 'stream': True, 'stream_options': {'include_usage': True}}
     stream = await client.chat.completions.create(**kwargs)
-    content, usage = [], None
+    content, usage, tokens = [], None, []
     try:
         async for chunk in stream:
             if chunk.usage is not None:
                 usage = chunk.usage
             if chunk.choices and chunk.choices[0].delta.content:
                 content.append(chunk.choices[0].delta.content)
+            if chunk.choices and (lp := getattr(chunk.choices[0], 'logprobs', None)) is not None:
+                tokens.extend(getattr(lp, 'content', None) or [])   # 頼んだときだけ（recall.MindRecall の点の重み付け）
     finally:
         await stream.close()
-    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=''.join(content)))], usage=usage)
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=''.join(content)),
+                                                    logprobs=SimpleNamespace(content=tokens) if tokens else None)],
+                           usage=usage)
 
 
 def client_for(role: str, default, *, while_speaking: bool = False):
