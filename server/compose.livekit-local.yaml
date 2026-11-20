@@ -42,4 +42,7 @@ services:
       - LIVEKIT_API_KEY=${LIVEKIT_LOCAL_KEY:?}
       - LIVEKIT_API_SECRET=${LIVEKIT_LOCAL_SECRET:?}
       - CIEL_AGENT_PORT=8092            # 開発の会話サーバー（8091）と並べて動かす
+      # 推論先。普段は .env.livekit-local の値、livekit-local.sh measure ではすべてローカル（試験・測定に料金をかけない）
+      - CIEL_LLM_BACKEND=${CIEL_LLM_BACKEND:-local}
+      - CIEL_OPENAI_ROLES=${CIEL_OPENAI_ROLES:-}
     restart: 'no'
