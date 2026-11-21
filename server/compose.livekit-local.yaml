@@ -47,5 +47,5 @@ services:
       - CIEL_OPENAI_ROLES=${CIEL_OPENAI_ROLES:-}
       - CIEL_RECALL_MIND=${CIEL_RECALL_MIND:-1}   # 0 で心の見極め（recall.MindRecall）を切る。測定の比較用
       - CIEL_RECALL_MIND_SPEAKING=${CIEL_RECALL_MIND_SPEAKING:-1}   # 0 で、シエルが話している間は心の見極めを送らない
-      - CIEL_MIND_IDEAS=${CIEL_MIND_IDEAS:-0}   # 1 で心が話したいことと点も出す（記録だけ）、2 で次の返事に置く、3 で話す番に自分から話す（docs/conversation/speaking-motivation-ja.md）
+      - CIEL_MIND_IDEAS=${CIEL_MIND_IDEAS:-3}   # 開発・本番と同じく 3（考えが終わったら自分から話す）。0 で切る（段階0の比較）、1 で記録だけ、2 で次の返事に置く（docs/conversation/speaking-motivation-ja.md）
     restart: 'no'
