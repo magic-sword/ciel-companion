@@ -16,7 +16,6 @@ import { z } from 'zod';
 
 import { registerKnowledge } from '../knowledge/main.js';
 import { CAPABILITIES, MAX_BUDGET_MS, TASK_VERSION } from './tasks.js';
-import { BUILD_BLOCKS } from '../spatial.js';
 import { QUIET_REASONS, WHY_FAILED, facingJa, shortWhy, stateText } from './words.js';
 
 export const PROFILE_VERSION = 2;

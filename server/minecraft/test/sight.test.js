@@ -112,25 +112,6 @@ test('呼び名から集めるブロック', () => {
   assert.deepEqual(names('flowerz'), []);
 });
 
-test('ふだんの歩き方：自然のブロックだけ壊し、手持ちの土・丸石を積み、4 段まで飛び降りる', async () => {
-  const { playerMovements, escapeMovements } = await import('../src/movements.js');
-  const bot = { registry, version: '1.21.11', world: {}, inventory: { items: () => [] } };
-  const m = playerMovements(bot);
-  assert.equal(m.canDig, true);
-  assert.equal(m.allow1by1towers, true);
-  assert.equal(m.maxDropDown, 4);
-  assert.equal(m.liquidCost, 10);   // 水の中はなるべく通らない
-  assert.ok(m.scafoldingBlocks.includes(registry.itemsByName.dirt.id));
-  assert.ok(!m.scafoldingBlocks.includes(registry.itemsByName.oak_planks.id));
-  assert.ok(m.blocksCantBreak.has(registry.blocksByName.oak_planks.id));     // 建物に使うものは壊さない
-  assert.ok(!m.blocksCantBreak.has(registry.blocksByName.oak_leaves.id));
-  assert.ok(!m.blocksCantBreak.has(registry.blocksByName.dirt.id));
-  assert.equal(escapeMovements(bot).maxDropDown, 12);   // 体力 20：12 段まで（ダメージ 9、体力 11 残る）
-  const { escapeDrop } = await import('../src/movements.js');
-  assert.equal(escapeDrop(14), 9);
-  assert.equal(escapeDrop(6), 4);   // 体力が少なければ、ふだんの高さまで
-});
-
 test('ツルハシを作る手順：原木から板・棒・作業台を先に作り、足りなければ原木の数で返す', () => {
   const { Recipe } = require('prismarine-recipe')(registry);
   const recipes = (id) => Recipe.find(id, null);

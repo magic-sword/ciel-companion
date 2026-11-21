@@ -12,7 +12,6 @@ import { makeHub } from './ciel/hub.js';
 import { startHttp } from './ciel/mcp.js';
 import { message, parseCommand } from './protocol.js';
 import { Eye } from './eye.js';
-import { PlayerLocator } from './player-locator.js';
 import { Pointing } from './pointing.js';
 import { facing, isNight, nearbyBlocks, summarize } from './state.js';
 import { worldId } from './world-id.js';
@@ -149,8 +148,6 @@ let retry = RETRY_MIN_MS;
 function connect() {
   log(`マイクラへ入る ${MC.host}:${MC.port} 版 ${MC.version} 名前 ${MC.username}`);
   const b = createMindcraftBot(MC);
-  b.pointing = pointing;
-  b.playerLocator = new PlayerLocator(b);
   bot = b;
   let health = null;
   let night = null;

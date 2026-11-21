@@ -4,7 +4,6 @@ import { test } from 'node:test';
 import { Vec3 } from 'vec3';
 import { summarize } from '../src/state.js';
 import { fingerprint, stateText } from '../src/ciel/words.js';
-import { collectMovements, miningMovements, playerMovements } from '../src/movements.js';
 
 const require = createRequire(import.meta.url);
 const registry = require('prismarine-registry')('1.21.11');
@@ -38,34 +37,3 @@ test('single-count inventory items survive both state serialization and conversa
   assert.notEqual(fingerprint(state), fingerprint({ ...state, inventory: { ...state.inventory, furnace: 2 } }));
 });
 
-test('mining keeps block placement available and prefers non-harvest scaffold',()=>{
-  const {bot}=fixture();
-  const m=miningMovements(bot,null,new Set(),new Set(['cobblestone']));
-  assert.equal(m.allow1by1towers,true);
-  assert.ok(m.scafoldingBlocks.includes(registry.itemsByName.cobblestone.id));
-  assert.ok(m.scafoldingBlocks.indexOf(registry.itemsByName.coarse_dirt.id)<m.scafoldingBlocks.indexOf(registry.itemsByName.cobblestone.id));
-  assert.equal(m.canDig,true);
-  const stone={name:'cobblestone',type:registry.itemsByName.cobblestone.id,count:30};
-  const dirt={name:'coarse_dirt',type:registry.itemsByName.coarse_dirt.id,count:4};
-  bot.inventory.items=()=>[stone,dirt];
-  assert.equal(m.getScaffoldingItem(),dirt);
-  bot.inventory.items=()=>[stone];
-  assert.equal(m.getScaffoldingItem(),stone,'the harvest remains usable when needed');
-});
-
-test('explicit collection allows one crafting table while protecting all other tables', () => {
-  const { bot, target, other } = fixture();
-  assert.equal(playerMovements(bot).safeToBreak(target), false);
-  const allowed = collectMovements(bot, target);
-  assert.equal(allowed.safeToBreak(target), true);
-  assert.equal(allowed.safeToBreak(other), false);
-  assert.ok(allowed.blocksCantBreak.has(registry.blocksByName.oak_planks.id));
-  assert.equal(playerMovements(bot).safeToBreak(target), false);
-});
-
-test('explicit collection does not make an unbreakable target diggable', () => {
-  const { bot, set, target } = fixture();
-  set(target.position, 'bedrock');
-  const bedrock = bot.blockAt(target.position);
-  assert.equal(collectMovements(bot, bedrock).safeToBreak(bedrock), false);
-});

@@ -18,10 +18,6 @@ export const SKILLS = {
     && typeof a.request==='string' && a.request.trim().length>0 && a.request.length<=2000
     && typeof a.goal_id==='string' && /^[a-f0-9-]{36}$/.test(a.goal_id)
     ? {args:{request:a.request,goal_id:a.goal_id}} : {error:'bad_args'},
-  edit_region: a => onlyPlan(a) ? {args:{plan_id:a.plan_id,budget_ms:a.budget_ms}} : {error:'bad_args'},
-  pointed_action: a => typeof a.selection_id==='string' && /^[a-f0-9-]{36}$/.test(a.selection_id)
-    && ['move','recover'].includes(a.action)
-    ? {args:{selection_id:a.selection_id,action:a.action}} : {error:'bad_args'},
   // ついていく（止めるまで続く）。player を省けば持ち主
   follow: (a) => player(a),
   // そばまで来る
@@ -70,11 +66,6 @@ export const SKILLS = {
     return { args: { ...p.args, item: a.item, ...(a.count !== undefined ? { count: a.count } : {}) } };
   },
 };
-
-function onlyPlan(a) {
-  return Object.keys(a).every(k=>['plan_id','budget_ms'].includes(k)) && typeof a.plan_id==='string'
-    && /^[a-f0-9-]{36}$/.test(a.plan_id) && Number.isFinite(a.budget_ms) && a.budget_ms>0 && a.budget_ms<=120000;
-}
 
 function player(a) {
   if (a.player === undefined) return { args: {} };

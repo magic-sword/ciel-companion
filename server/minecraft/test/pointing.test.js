@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync,writeFileSync,rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Pointing,selectedRegion,actOnSelection } from '../src/pointing.js';
+import { Pointing } from '../src/pointing.js';
 import { Vec3 } from 'vec3';
 const id='11111111-1111-4111-8111-111111111111';
 const other='22222222-2222-4222-8222-222222222222';
@@ -26,40 +26,13 @@ test('pointer selection is bounded by expiry, owner, dimension and validated geo
     write([{...s,...patch}]); assert.equal(store.latest(bot),null);
   }
 });
-test('new selection does not change an existing reference; invalidation removes both',t=>{
+test('the newest selection wins, and the gaze is used only while it is fresh',t=>{
   const {store,bot,s,write}=fixture(t);
   write([s,{...s,id:other,points:[{...point,x:12}]}]);
   assert.equal(store.latest(bot).selection_id,other);
-  assert.equal(store.resolve(bot,id).points[0].x,5);
-  write([]); assert.equal(store.resolve(bot,id),null);
-});
-test('captured gaze survives looking away but not logout or a new server session',t=>{
-  const {store,bot,s,write}=fixture(t);
   const live={gaze:{...s,expires_at:2500},published_at:2000,presence:{world:id,player_uuid:id}};
   write([],live);
   assert.equal(store.latest(bot).source,'owner_gaze');
-  write([],{...live,gaze:{...s,id:other,points:[{...point,x:20}]}});
-  store.latest(bot);
-  assert.equal(store.resolve(bot,id).points[0].x,5);
-  write([],{...live,gaze:null});
-  assert.equal(store.resolve(bot,id).points[0].x,5);
-  write([],{...live,presence:null});
-  assert.equal(store.resolve(bot,id),null);
-  write([],{...live,session:other});
-  assert.equal(store.resolve(bot,id),null);
-});
-test('two selected corners preserve all axes and floor is above the surface',()=>{
-  const s={points:[point,{...point,x:7,z:2}]};
-  assert.deepEqual(selectedRegion(s,true,'oak_planks').args,{x1:5,y1:64,z1:0,x2:7,y2:64,z2:2,block:'oak_planks'});
-  assert.equal(selectedRegion({points:[point]},false).error,'selection_needs_two_points');
-  assert.equal(selectedRegion({points:[point,{...point,y:64}]},true,'oak_planks').error,'selection_floor_not_level');
-  assert.equal(selectedRegion({points:[point,{...point,x:30,z:30}]},false).error,'bad_args');
-});
-test('changed block or missing selection cannot start movement or digging',async t=>{
-  const {store,bot,s,write}=fixture(t);
-  bot.pointing=store; bot.blockAt=()=>({name:'crafting_table'});
-  const ctx={Failed:Error};
-  await assert.rejects(actOnSelection(bot,{selection_id:id,action:'clear'},{},ctx),/selection_changed/);
-  write([]);
-  await assert.rejects(actOnSelection(bot,{selection_id:id,action:'recover'},{},ctx),/selection_expired/);
+  write([],{...live,published_at:0});
+  assert.equal(store.latest(bot),null);
 });

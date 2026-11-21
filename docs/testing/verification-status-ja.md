@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+2026-11-21、Mindcraftの体へ切り替えたときから実行経路に無かった体の独自機能を削除した。建物の保護（`src/mindcraft/protection.js`）、座標範囲の施工計画器（`src/spatial.js`、prepare→`edit_region`）、指示棒で選んだ所への作業（`pointing.js`の`actOnSelection`と`pointed_action`）、遠くのプレイヤーの方向探索（`player-locator.js`）、それらだけが使う移動設定（`movements.js`）とテスト。指した場所を会話へ渡す`references`は残した。公開されていたのに体が`unsupported_skill`で断っていた`minecraft_dig_down`は、Mindcraftの`!digDown`へつないだ。体のNode 136件（既存1件skip）が成功。未配布。
+
 2026-11-21、追加を重ねた実装を整理した。配信アプリの「シエルの映像に、目的と処理状態を重ねる」機能（`CielConversationUI.BroadcastOutput.cs`、設定の`showStatusOnOutput`、配信カメラだけに映す層）を削除し、その確認器は`goal.state`の受け取りと作業の表示文を見る`CielGoalStateCheck`に改めた。会話サーバーでは、どこからも使われていなかった`initiative.py`（自発的な発言と作業の終わりの決定に置き換わった）・`listener.py`とその指示文・人格の項目・測定スクリプト、消えたスクリプトを指す料金のかかる試験の項目を削除した。`tests/`の外にあって回帰テストに含まれていなかった`test_ciel_core.py`・`test_core_host.py`を`tests/`へ移した。体では、実行経路から外れていた旧Runner（`src/skills.js`・`goal-plan.js`・`care.js`・`guard.js`）と、それだけを試すテストを削除した。通常回帰unit 852件、体のNode 167件（既存1件skip）、UnityのEditorで`CielGoalStateCheck` 9件・構成44件が成功。未配布。
 
 2026-11-21、体の`!lookAtPosition`・`!lookAtPlayer`を、シエルの目（`eye.js`）で見られるようにした（[設計](../games/minecraft/minecraft-design-ja.md#知識と視覚)、fork `e9b5242`）。上流の`VisionInterpreter`をそのまま使い、撮る部品だけを目に差し替えた。中核の`/v1/respond`は画像を1枚受け付け、最後の発言に添えて`mind`の推論へ渡す。体のNode 206件（既存1件skip）、中核の画像の受付・添付の試験、通常回帰unit 853件が成功。forkの`ciel`・`ciel-vendor`はpush済み。会話サーバーを開発（LiveKit Cloud用・家の中のLiveKit用）と本番へ、体（開発・本番で共用）へ配布した（`74b17f9`。本番の会話サーバーは変更ファイルのハッシュ一致・再起動0回・設定維持・worker登録、体はコンテナ内のテスト成功・ソース159件一致・他のサービス不変・ワールドへ参加を確認）。実際の景色をモデルが読めるかは未確認。

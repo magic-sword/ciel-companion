@@ -100,13 +100,6 @@ test('activity updates match the running operation and cannot revive terminal wo
   work.activity({request_id:work.active.operation,stage:'thinking'});assert.equal(work.active.revision,rev);work.close();
 });
 
-test('legacy construction is not advertised or substituted for native Agent execution',()=>{
-  const {work,link}=fixture();
-  assert.equal(CAPABILITIES.some(c=>c.name==='minecraft.edit_region'),false);
-  const result=work.submit(request({capability:'minecraft.edit_region',arguments:{plan_id:'11111111-1111-4111-8111-111111111111'},constraints:{failure_policy:'stop'}}));
-  assert.equal(result.reason,'unsupported_skill');assert.equal(link.calls.length,0);work.close();
-});
-
 test('one work may last up to the contract ceiling, and no longer', () => {
   const f = fixture();
   assert.equal(f.work.submit(request({ request_id: 'too-long', budget_ms: MAX_BUDGET_MS + 1 })).reason, 'invalid_request');

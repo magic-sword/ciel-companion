@@ -95,7 +95,6 @@ export class GameTasks {
 
   submit(r) {
     if (this.closed) return { status: 'error', reason: 'unlinked' };
-    if(r?.capability==='minecraft.edit_region')return {status:'error',reason:'unsupported_skill'};
     const validArguments=r?.capability===CAPABILITIES[0].name && keys(r.arguments,['request'])
         && typeof r.arguments.request==='string' && r.arguments.request.trim().length>0 && r.arguments.request.length<=2000
         && keys(r.constraints,[]);

@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ActionScope } from '../src/mindcraft/action-scope.js';
 import { MindcraftRunner, blockedActions, nativeExit } from '../src/mindcraft/runtime.js';
-import { protectWorld } from '../src/mindcraft/protection.js';
 import { Vec3 } from 'vec3';
 import { parseCommand } from '../src/protocol.js';
 import minecraftData from 'minecraft-data';
@@ -51,25 +50,6 @@ test('new action ownership does not reactivate the old continuation', async () =
   assert.equal(attacks, 1);
 });
 
-test('protection keeps scaffold movement and rejects digging another building', async () => {
-  let movement, dug = 0;
-  const bot = { pathfinder: { setMovements: m => { movement = m; }, getPathTo: m => m },
-    dig: async () => { dug++; }, placeBlock: async () => {} };
-  const protection = protectWorld(bot);
-  assert.equal(bot.cielCanBreak({ name: 'oak_planks', position: null }), false);
-  bot.pathfinder.setMovements({ allow1by1towers: true, scafoldingBlocks: [3, 4], exclusionAreasBreak: [] });
-  assert.equal(movement.allow1by1towers, true);
-  assert.deepEqual(movement.scafoldingBlocks, [3, 4]);
-  const block = { name: 'oak_planks', position: new Vec3(1, 64, 1) };
-  assert.equal(movement.exclusionAreasBreak[0](block), 100);
-  await assert.rejects(bot.dig(block), /protected_block/);
-  await protection.permit([block.position], () => bot.dig(block));
-  await assert.rejects(bot.dig(block), /protected_block/);
-  await bot.placeBlock({ position: block.position.offset(0, -1, 0) }, new Vec3(0, 1, 0));
-  await bot.dig(block);
-  assert.equal(dug, 2);
-});
-
 test('stop reaches the native action manager even while inference cancellation is pending', async () => {
   const runner = new MindcraftRunner(() => {}, null);
   let release, interrupted = false, stopped = false;
@@ -93,7 +73,6 @@ test('native collection tolerates Mineflayer palette entries before checking act
       assert.equal(matching({ name: 'oak_log', position: null }), true);
       return [];
     } };
-  protectWorld(bot);
   await collectBlock(bot, 'oak_log', 1);
   assert.equal(searches, 1);
   assert.match(bot.output, /No oak_log nearby/);

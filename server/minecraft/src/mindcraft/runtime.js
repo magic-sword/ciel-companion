@@ -339,7 +339,8 @@ export class MindcraftRunner extends BodyCommands {
       : c.skill==='give' ? `!givePlayer(${JSON.stringify(player)}, ${JSON.stringify(a.item)}, ${a.count})`
       : c.skill==='collect' ? `!collectBlocks(${JSON.stringify(a.block)}, ${a.count})`
       : c.skill==='craft' ? `!craftRecipe(${JSON.stringify(a.item)}, ${a.count})`
-      : c.skill==='find' ? `!searchForBlock(${JSON.stringify(a.block)}, 64)` : null;
+      : c.skill==='find' ? `!searchForBlock(${JSON.stringify(a.block)}, 64)`
+      : c.skill==='dig_down' ? `!digDown(${a.depth})` : null;
     if(!command)throw new Failed('unsupported_skill');
     // A system source bypasses upstream's user-forced-command shortcut; direct
     // controls are parsed by the native command executor without a second plan.
