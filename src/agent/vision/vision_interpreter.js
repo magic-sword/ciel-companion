@@ -4,11 +4,15 @@ const { Camera } = settings.allow_vision ? await import('./camera.js') : {};
 import fs from 'fs';
 
 export class VisionInterpreter {
-    constructor(agent, allow_vision) {
+    // camera: an object whose capture() returns a screenshot file name or a JPEG Buffer; by default
+    // the headless-gl Camera when vision is allowed. A host can give its own renderer.
+    constructor(agent, allow_vision, camera = null) {
         this.agent = agent;
         this.allow_vision = allow_vision;
         this.fp = './bots/'+agent.name+'/screenshots/';
-        if (allow_vision) {
+        if (camera) {
+            this.camera = camera;
+        } else if (allow_vision) {
             this.camera = new Camera(agent.bot, this.fp);
         }
     }
@@ -67,7 +71,7 @@ export class VisionInterpreter {
 
     async analyzeImage(filename) {
         try {
-            const imageBuffer = fs.readFileSync(`${this.fp}/${filename}.jpg`);
+            const imageBuffer = Buffer.isBuffer(filename) ? filename : fs.readFileSync(`${this.fp}/${filename}.jpg`);
             const messages = this.agent.history.getHistory();
 
             const blockInfo = this.getCenterBlockInfo();

@@ -3,7 +3,7 @@
   "commit": "e1c1fc3ffa481506c2445fc639e16dba504b5920",
   "fork": "https://github.com/magic-sword/mindcraft",
   "fork_branch": "ciel",
-  "fork_commit": "0b106e68edc440a6718a9342aab55ead42f43056",
+  "fork_commit": "e9b52428e6b5450ae7651151ed06aa9bd6f7afab",
   "license": "MIT",
   "scope": "Upstream src, profiles, templates, settings, package metadata and selected single-agent task definitions. Native Agent/Prompter/History/SelfPrompter/NPC run with an injected CIEL model; CIEL owns authenticated transport and lifecycle.",
   "patched_files": [
@@ -336,7 +336,7 @@
       "upstream_sha256": "8863fea4034b80ebc31e286c4bbcfc75c3c017c121251cc67f22c9763e9f9215"
     },
     "src/agent/vision/vision_interpreter.js": {
-      "sha256": "6a6e61dcec77b3604feab8cf05093ec3fecee5e4423d91ab2f9eb31e58a43cbf",
+      "sha256": "d93de09b57c3f1516e1f8e0d8c2acf7b7e888aaff674ccfb443ebf5062fe092c",
       "upstream_sha256": "fb219a2fc8f697b1fcbb7ad49f4d9e6255828d644cb6e1ebed086856d04de0e6"
     },
     "src/mindcraft-py/example.py": {
