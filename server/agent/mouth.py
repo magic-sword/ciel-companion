@@ -46,10 +46,12 @@ class Mouth:
         self.counts[why] += 1
         log.info('口：%s', why)
         debug_log.record('speak', why=why)
+        if 'text' in kwargs:
+            # 決まった文を読むだけ。心は返事を作らないので、次の返事のきっかけ（why）を残さない。残すと、次の相手の
+            # 発言への返事が、この知らせへの返事と見なされた（ゲームの判断も心の考えも通らなかった。2026-11-21）
+            return self.session.say(kwargs.pop('text'), **kwargs)
         if self.before_say is not None:
             self.before_say(why)
-        if 'text' in kwargs:
-            return self.session.say(kwargs.pop('text'), **kwargs)
         return self.session.generate_reply(**kwargs)
 
     async def say_when_free(self, why: str, *, wait: float = 30.0, anyway: bool = False, settle: float = 0.0,

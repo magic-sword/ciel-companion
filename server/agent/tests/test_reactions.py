@@ -53,6 +53,26 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ['I will gather wood.'])
         self.assertEqual(self.session.calls, [{}])
 
+    async def test_body_speech_reads_to_the_end_after_its_deadline_and_skips_older_queued_lines(self):
+        self.session.complete = False
+        self.session.say = lambda text, **kw: self.session.generate_reply(**kw)
+        first = self.mouth.say_latest('game', text='first')
+        await self.until(lambda: first.handle is not None)
+        older = self.mouth.say_latest('game', text='older')
+        self.now += 1
+        newest = self.mouth.say_latest('game', text='newest')
+        self.now += 60   # 待つ間に期限を過ぎても、話し始めた文は切らない
+        await asyncio.sleep(.06)
+        self.assertFalse(first.handle.interrupted)
+        self.assertTrue(self.hub.allowed(first.handle.id))
+        self.assertEqual(first.status, 'generating')
+        self.assertEqual((older.status, newest.status), ('queued', 'queued'))
+        self.now -= 60
+        first.handle.done.set_result(None)   # 読み終えた。溜まった中から、いちばん新しい言葉だけを読む
+        await self.until(lambda: newest.handle is not None)
+        self.assertEqual(older.status, 'superseded')
+        self.assertIsNone(older.handle)
+
     async def test_body_speech_waits_and_old_work_is_discarded(self):
         self.session.user_state = 'speaking'
         valid = True
@@ -67,8 +87,8 @@ class ReactionsTests(unittest.IsolatedAsyncioTestCase):
         self.session.complete = False
         self.session.say = lambda text, **kw: self.session.generate_reply(**kw)
         first = self.mouth.say_latest('game', text='first')
-        second = self.mouth.say_latest('game', text='second')
         await self.until(lambda: first.handle is not None)
+        second = self.mouth.say_latest('game', text='second')
         self.hub.on_user_state(Obj(new_state='speaking'))
         self.assertTrue(first.handle.interrupted)
         self.assertEqual((first.status, second.status), ('cancelled', 'cancelled'))

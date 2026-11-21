@@ -47,7 +47,11 @@ class Reaction:
         return self.key[0] in ('game', 'work') and self.kind != 'work.speech'
 
     def expired(self, now):
-        return (self.deadline is not None and now >= self.deadline) or (self.valid is not None and not self.valid())
+        return (self.deadline is not None and now >= self.deadline) or self.stale()
+
+    def stale(self):
+        """伝える中身がもう正しくない（作業が替わった・止まった）。期限とは別に、話し始めたあとも見る"""
+        return self.valid is not None and not self.valid()
 
 
 class Reactions:
@@ -221,8 +225,10 @@ class Reactions:
 
     def allowed(self, speech_id):
         event = self.speeches.get(speech_id)
+        # 体の言葉（決まった文）の期限は、話し始めるまで。話し始めたら、中身が正しくなくなったときだけ止める
         return event is None or (not self.closed and event.status == 'generating' and
-                                 not getattr(event.handle, 'interrupted', False) and not event.expired(self.clock()))
+                                 not getattr(event.handle, 'interrupted', False) and
+                                 not (event.stale() if event.kind == 'work.speech' else event.expired(self.clock())))
 
     def current(self):
         return self.speeches.get(getattr(getattr(self.mouth.session, 'current_speech', None), 'id', None))
@@ -295,6 +301,13 @@ class Reactions:
                     await asyncio.sleep(self.POLL)
                     continue
                 event = max(ready, key=lambda e: (e.priority, -e.ready_at))
+                if event.kind == 'work.speech':
+                    # 体の言葉は読み上げより速く届いて溜まる。いちばん新しいものだけを読み、古いものは読まない
+                    speeches = [e for e in ready if e.kind == 'work.speech' and e.key[0] == event.key[0]]
+                    event = max(enumerate(speeches), key=lambda p: (p[1].ready_at, p[0]))[1]   # 同じ時刻なら後に届いた方
+                    for e in speeches:
+                        if e is not event:
+                            self.finish(e, 'superseded')
                 self.queue.pop(event.key, None)
                 self.active = event
                 event.status = 'generating'
@@ -309,7 +322,9 @@ class Reactions:
                             self.speeches.popitem(last=False)
                     if inspect.isawaitable(handle):
                         playout = asyncio.ensure_future(handle)
-                        if event.conversation:
+                        if event.conversation or event.kind == 'work.speech':
+                            # 体の言葉の期限は、話し始めるまで。話し始めたら最後まで読む（順番待ちで期限を使い切り、
+                            # 文の途中で切れていた。2026-11-21）。相手が話し始めたら on_user_state が止める
                             await asyncio.shield(playout)
                         else:
                             await asyncio.wait_for(asyncio.shield(playout), max(.001, event.deadline - self.clock()))

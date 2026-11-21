@@ -26,6 +26,17 @@ class MouthTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(s.calls, [{'instructions': 'x'}])
         self.assertEqual(m.counts['reply'], 1)
 
+    async def test_reading_fixed_text_leaves_no_reason_for_the_next_reply(self):
+        s = FakeSession()
+        s.say = lambda text, **kw: 'read'
+        m = mouth.Mouth(s)
+        seen = []
+        m.before_say = seen.append
+        self.assertEqual(m.say('game', text='きのこを取ったのです'), 'read')
+        self.assertEqual(seen, [])   # 心は返事を作らない。次の相手の発言への返事を、この知らせへの返事にしない
+        m.say('game', instructions='x')
+        self.assertEqual(seen, ['game'])
+
     async def test_of_uses_the_session_mouth(self):
         s = FakeSession()
         s.userdata.mouth = m = mouth.Mouth(s)
