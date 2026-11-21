@@ -37,6 +37,24 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.lines, [])   # 終わりの言葉は体がもう話す
         self.assertEqual(recorded, [('server:task:succeeded', '頼まれた作業「木のシャベルを作って」が終わった（できた）')])
 
+    async def test_a_finished_work_goes_to_cieles_own_decision_with_the_bodys_words(self):
+        recorded, ended = [], []
+        self.runner.record = lambda event_id, fact: recorded.append(fact)
+        self.runner.ended = lambda w: ended.append(w['state']) or True
+        await self.runner.start('puzzle.solve', {}, title='小屋を作って')
+        self.runner.accept({**self.remote, 'revision': 2, 'state': 'failed', 'reason': 'stalled',
+                            'evidence': {'response': '手でなら進められます。'}})
+        self.assertEqual(ended, ['failed'])
+        self.assertEqual(self.lines, [])   # 知らせの返事は作らない。シエルの決定が話す
+        self.assertEqual(recorded, ['頼まれた作業「小屋を作って」が終わった（できなかった：stalled）。体の言葉：手でなら進められます。'])
+
+    async def test_a_finished_work_is_told_as_before_when_ciel_cannot_decide(self):
+        self.runner.record = lambda event_id, fact: None
+        self.runner.ended = lambda w: False
+        await self.runner.start('puzzle.solve', {})
+        self.runner.accept({**self.remote, 'revision': 2, 'state': 'succeeded'})
+        self.assertEqual(len(self.lines), 1)
+
     async def test_doing_lists_the_works_done_together_without_a_long_gap(self):
         self.assertIsNone(self.runner.doing())
         now = goals.time.time()

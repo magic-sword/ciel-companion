@@ -23,6 +23,8 @@ const inventory = bot => {
 export const spoken = text => String(text ?? '').replace(/!\w+(?:\((?:[^)"]|"[^"]*")*\))?/g, '').replace(/[ \t]+\n/g, '\n').trim();
 // A reply that ends asking something leaves the work to the owner's answer.
 export const asks = text => /[?？]$/.test(spoken(text));
+// Upstream's self-prompting message (self_prompter.js), to tell its replies from the owner's and the modes'.
+const SELF_PROMPT = /^You are self-prompting with the goal:/;
 class Failed extends Error {
   constructor(reason, note) { super(reason); this.note = note; }
 }
@@ -107,8 +109,23 @@ export class MindcraftRunner extends BodyCommands {
     const handleMessage = agent.handleMessage.bind(agent);
     agent.handleMessage = async (...args) => {
       this.replying++;
-      try { return await handleMessage(...args); } finally { this.replying--; }
+      try {
+        const used = await handleMessage(...args);
+        // Carrying on by itself, the model answered with words only: it is talking to the owner, not acting.
+        // Stop at once (upstream waits three times, voicing each) and leave the work to the owner or to Ciel.
+        const c = this.selfPrompting;
+        if (c && !used && args[0] === 'system' && SELF_PROMPT.test(String(args[1] ?? ''))) {
+          c.stalled = true;
+          void agent.self_prompter.stop(false);
+        }
+        return used;
+      } finally { this.replying--; }
     };
+  }
+
+  async settle(c) {
+    while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
+        || this.agent.self_prompter.isActive() || this.modeActions.size || this.replying)) await pause(100);
   }
 
   attach(bot) {
@@ -157,7 +174,11 @@ export class MindcraftRunner extends BodyCommands {
     this.agent=agent;
     agent.bot=bot;
     this.trackReplies(agent);
-    agent.onCommand=command=>{if(this.current)this.activity(this.current,'executing',command);};
+    agent.onCommand=command=>{
+      if(!this.current)return;
+      if(command==='!endGoal')this.current.goalEnded=true;   // the model said the work is done
+      this.activity(this.current,'executing',command);
+    };
     // The plan graph the executor shows (planview.js), for the app's plan view (ciel/tasks.js).
     bot.reportPlan=plan=>{const c=this.current;if(c&&!c.token.cancelled)this.report('activity',{id:c.id,
       request_id:c.request_id,command_scope:c.scope??'',stage:'plan',command:'',plan});};
@@ -246,8 +267,15 @@ export class MindcraftRunner extends BodyCommands {
     this.activity(c,'thinking');
     // The upstream loop owns interpretation, history, commands and recovery.
     await this.agent.handleMessage(this.owner || 'user',c.args.request);
-    while(!c.token.cancelled && (this.agent.actions.executing || this.agent.self_prompter.loop_active
-        || this.agent.self_prompter.isActive() || this.modeActions.size || this.replying)) await pause(100);
+    await this.settle(c);
+    // The model stopped without saying the work is done (!endGoal) and without asking the owner: it carries on
+    // by itself (upstream self-prompting toward the request) until it says so. Before, its words alone ended the
+    // work, so "I can go on by hand" and "I'll keep going" ended it as if done (2026-11-21).
+    if(!c.token.cancelled && !c.goalEnded && !this.bot.pendingChoice && !asks(this.nativeResponse)){
+      this.selfPrompting=c;
+      try { this.agent.self_prompter.start(c.args.request); await this.settle(c); }
+      finally { this.selfPrompting=null; }
+    }
     if(c.token.cancelled)throw new Failed(c.token.reason??'stopped');
     // The model left the owner to decide: a plan waits on a choice it did not make, or its last
     // words ask the owner something. Either way the work waits for the reply.
@@ -255,6 +283,7 @@ export class MindcraftRunner extends BodyCommands {
     const waiting=choice?{choice:choice.question,options:Object.keys(choice.options)}
       :asks(this.nativeResponse)?{choice:null,options:[]}:null;
     return {native_finished:true,objective_verified:false,response:spoken(this.nativeResponse),
+      ...(c.goalEnded?{goal_done:true}:c.stalled&&!waiting?{stalled:true}:{}),
       ...(waiting?{waiting_owner:waiting}:{}),inventory:inventory(this.bot)};
   }
 

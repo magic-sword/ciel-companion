@@ -44,6 +44,18 @@ STOP = re.compile(r'^(?:今の作業を)?(?:止まって|止めて|やめて|待
 REASONING = os.environ.get('CIEL_MIND_REASONING', 'none')   # a cloud mind's reasoning effort (agent.MIND_REASONING)
 
 
+# 持ち主が止めた作業のあとは、自分から動かない（止めたのは持ち主の意思）。期限切れ・失敗のあとは続けてよい
+SELF_STOPPED = ('deadline', 'execution_error')
+
+
+def after_work(work) -> bool:
+    """自分の決定で次の行動を始めてよいか：作業が無いか、終わったか（持ち主が止めたときを除く）"""
+    if work is None:
+        return True
+    state = work.get('state')
+    return state in ('succeeded', 'failed') or (state == 'cancelled' and work.get('reason') in SELF_STOPPED)
+
+
 def capabilities(env):
     """Work capabilities the decision can start: those that take the request as it is."""
     work = env.profile.get('work') or {}
@@ -388,7 +400,7 @@ class GameDecision:
         epoch = getattr(env, '_connection_epoch', None)
         generation = self._generation
         can_act = bool(env is not None and self.supported() and self.authorized()
-                       and self.autonomy_allowed and (work is None or work.get('state') == 'succeeded'))
+                       and self.autonomy_allowed and after_work(work))
         alternatives = acts(env, work) if can_act else [(NONE, 'none')]
         out = await self._decide((list(messages), list(tools), game), alternatives, work,
                                  template=template, silent=True)

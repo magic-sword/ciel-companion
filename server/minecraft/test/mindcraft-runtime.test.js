@@ -122,7 +122,7 @@ test('the upstream restart after smelting resyncs the inventory instead of disco
 test('a work waits for the reply a mode asks for after interrupting its action', async () => {
   const runner = new MindcraftRunner(() => {}, null);
   const order = [];
-  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false },
+  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false, start() {} },
     async handleMessage(source, text) {
       if (source === 'system') {
         await new Promise(r => setTimeout(r, 300));
@@ -148,6 +148,57 @@ test('a work waits for the reply a mode asks for after interrupting its action',
   assert.equal(result.response, 'carried on');
 });
 
+function selfPromptingAgent(runner, replies) {
+  // A fake upstream agent: its self-prompter asks the model in a loop until it says !endGoal or stops.
+  const asked = [];
+  const agent = { shut_up: false, actions: { executing: false },
+    self_prompter: { loop_active: false, state: 0, isActive() { return this.state === 1; },
+      start(goal) { this.state = 1; this.loop_active = true; asked.push(goal);
+        void (async () => { while (this.state === 1) await agent.handleMessage('system', `You are self-prompting with the goal: '${goal}'. Respond:`, -1);
+          this.loop_active = false; })(); },
+      async stop() { this.state = 0; } },
+    async handleMessage(source, text) {
+      await new Promise(r => setTimeout(r, 5));
+      const reply = replies.shift() ?? { say: 'Done.', command: '!endGoal' };
+      runner.nativeResponse = reply.say + (reply.command ? ` ${reply.command}` : '');
+      if (reply.command) { agent.onCommand?.(reply.command); if (reply.command === '!endGoal') agent.self_prompter.state = 0; }
+      return Boolean(reply.command);
+    } };
+  agent.onCommand = command => { if (runner.current && command === '!endGoal') runner.current.goalEnded = true; };
+  return { agent, asked };
+}
+
+test('a work the model stops without saying it is done carries on by itself until it says so', async () => {
+  const runner = new MindcraftRunner(() => {}, 'Owner');
+  const { agent, asked } = selfPromptingAgent(runner, [
+    { say: '今は自動で組み立てられないのです。手でなら進められますよ。' },
+    { say: '木を集めます。', command: '!collectBlocks("oak_log", 4)' },
+    { say: 'できました。', command: '!endGoal' }]);
+  runner.agent = agent; runner.trackReplies(agent);
+  runner.coreModel = {}; runner.activity = () => {}; runner.bot = { inventory: { items: () => [] } };
+  const c = { id: 1, skill: 'pursue', args: { request: '小屋を作って' }, token: { cancelled: false } };
+  runner.current = c;
+  const done = await runner.pursue(c);
+  assert.deepEqual(asked, ['小屋を作って']);
+  assert.equal(done.goal_done, true);
+  assert.equal(done.stalled, undefined);
+});
+
+test('carrying on by itself, a reply of words only stops at once and the work ends unfinished', async () => {
+  const runner = new MindcraftRunner(() => {}, 'Owner');
+  const { agent } = selfPromptingAgent(runner, [
+    { say: '手でなら進められます。' },
+    { say: '次の指示をくださいね。' }]);
+  runner.agent = agent; runner.trackReplies(agent);
+  runner.coreModel = {}; runner.activity = () => {}; runner.bot = { inventory: { items: () => [] } };
+  const c = { id: 2, skill: 'pursue', args: { request: '小屋を作って' }, token: { cancelled: false } };
+  runner.current = c;
+  const done = await runner.pursue(c);
+  assert.equal(done.stalled, true);
+  assert.equal(done.goal_done, undefined);
+  assert.equal(done.response, '次の指示をくださいね。');
+});
+
 test('only model dialogue is voiced, without action syntax or cancelled output', async () => {
   const events=[];
   const runner=new MindcraftRunner((kind,event)=>events.push({kind,...event}),'Owner');
@@ -168,7 +219,7 @@ test('a pursue left at a plan choice says so, and the owner speaks into the runn
   const runner = new MindcraftRunner(() => {}, 'Owner');
   const heard = [];
   let reply;
-  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false },
+  const agent = { shut_up: false, actions: { executing: false }, self_prompter: { loop_active: false, isActive: () => false, start() {} },
     async handleMessage(source, text) {
       heard.push([source, text]);
       if (text === 'shear them') { runner.bot.pendingChoice = null; runner.nativeResponse = 'Shearing them.'; return; }

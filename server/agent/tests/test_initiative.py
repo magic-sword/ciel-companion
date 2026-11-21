@@ -176,8 +176,9 @@ class AutonomousDecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.consider())['status'], 'cancelled')
         self.runner.start.assert_not_awaited()
 
-    async def test_active_failed_cancelled_and_confirmation_only_allow_speech(self):
-        for state in ('running', 'accepted', 'needs_decision', 'cancelling', 'cancelled', 'failed', 'unknown'):
+    async def test_active_stopped_and_confirmation_only_allow_speech(self):
+        # 失敗・期限切れの作業のあとは、自分で次の一手を始めてよい（2026-11-21）。持ち主が止めたあとは動かない
+        for state in ('running', 'accepted', 'needs_decision', 'cancelling', 'cancelled', 'unknown'):
             with self.subTest(state=state):
                 self.runner.work = {'state': state}
                 self.create.return_value = self.response({'kind': 'work', 'request': 'new goal'})

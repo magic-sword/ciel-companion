@@ -75,6 +75,8 @@ class Persona:
     # 段階3：返事を話し終えた番で、高い考えを自分から話すときの指示（speak_up.py。{idea} に考えが入る）
     idea_voice: str = ''
     thought_note: str = ''
+    # 体の作業が終わったとき、シエルが次にどうするかを一つの決定で決める指示（game_decision.consider。{actions} に行動）
+    work_end_instructions: str = ''
 
     @property
     def fingerprint(self) -> str:
@@ -93,6 +95,7 @@ class Persona:
              self.game_instructions, self.app_instructions, self.execution_instructions,
              self.image_voice_instructions, self.image_caption_instructions, self.comment_instructions, self.stream_note, self.voice_warmup, self.voice_first_sentence, self.stt_vocabulary, self.reply_frame, self.continuation_experiment, self.continuation_chunk_experiment, self.continuation_memo_experiment,
              self.recall_note, self.memory_keys_instructions, self.recall_mind_instructions, self.recall_mind_ideas_instructions, self.idea_voice, self.thought_note,
+             self.work_end_instructions,
              hashlib.sha256(self.self_image.encode('ascii')).hexdigest()],
             ensure_ascii=False,
         )
@@ -120,7 +123,7 @@ def load_persona() -> Persona:
                 'research_instructions', 'research_voice_instructions', 'singing_voice_instructions', 'singing_feedback',
                 'mind_instructions', 'initiative_instructions', 'initiative_trigger', 'mind_brief_instructions', 'listener_instructions', 'game_decide_instructions', 'tool_decide_instructions', 'tool_decide_state_instructions', 'tool_discovery_instructions', 'tasks_instructions',
                 'game_instructions', 'app_instructions', 'execution_instructions',
-                'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'stream_note', 'voice_warmup', 'voice_first_sentence', 'stt_vocabulary', 'reply_frame', 'continuation_experiment', 'continuation_chunk_experiment', 'continuation_memo_experiment', 'recall_note', 'memory_keys_instructions', 'recall_mind_instructions', 'recall_mind_ideas_instructions', 'idea_voice', 'thought_note'):
+                'image_voice_instructions', 'image_caption_instructions', 'comment_instructions', 'stream_note', 'voice_warmup', 'voice_first_sentence', 'stt_vocabulary', 'reply_frame', 'continuation_experiment', 'continuation_chunk_experiment', 'continuation_memo_experiment', 'recall_note', 'memory_keys_instructions', 'recall_mind_instructions', 'recall_mind_ideas_instructions', 'idea_voice', 'thought_note', 'work_end_instructions'):
         file_key = f'{key}_file'
         value = config.get(file_key)
         if not isinstance(value, str) or not value.strip():

@@ -38,7 +38,7 @@ WINDOW_MAX = 60            # 心に渡す最近の発言：これを超えたら
 TURN_CHARS = 1200          # 1 つの発言から渡す文字数
 BRIEF_TURNS = 60           # 今のまとめを書くときに渡す発言の数（前に書いてからの分）
 BRIEF_TIMEOUT = 20.0
-EVENT_REPLIES = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image', 'initiative', 'idea')
+EVENT_REPLIES = ('minutes', 'song', 'enrolled', 'research', 'comment', 'game', 'image', 'initiative', 'idea', 'work_end')
 MINUTES_ASK = re.compile(r'録|まとめ|終わ|終了|止め|ストップ|送って')
 MINUTES_MOVES = ('start_minutes', 'finish_minutes', 'summarize_past_minutes')
 # 目的の道具のうち、相手の発言で呼ぶもの（育つ例文の印）・体を動かすもの。係の知らせで心が呼ぶ道具（小さな目標・心に任せた段を

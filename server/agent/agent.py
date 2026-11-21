@@ -394,6 +394,17 @@ class Ciel(Agent):
         # Shown but not run this time (mind.refused_now); a call to them is dropped like an ungiven tool.
         refused = self.mind.refused_now(chat_ctx)
         decision = getattr(self, 'game_decision', None)
+        if (decision is not None and decision.supported() and self.mind.reply_origin == 'work_end'
+                and self.persona.work_end_instructions):
+            # 体の作業が終わった：次にどうするかを、話すことと動くことの一つの決定で決める（続きを自分で始める）
+            result = await decision.consider(ctx.to_provider_format('openai')[0],
+                                             to_fnc_ctx(llm.ToolContext(fns), strict=True),
+                                             self.persona.work_end_instructions, game=self._game_text())
+            debug_log.record('work_end_decision', status=result['status'], acted=result['acted'],
+                             speaks=bool(result['say']))
+            if result['say']:
+                yield result['say']
+            return
         if (decision is not None and decision.supported() and self.mind.is_owner() and not self.mind.from_comment
                 and self.mind.reply_origin == 'reply'):
             tail = mind._tail(list(chat_ctx.items))
@@ -778,6 +789,16 @@ async def entrypoint(ctx: JobContext) -> None:
                 if h is not None:
                     h.event(source='work', event_id=event_id, occurred_at=time.time(), kind='work.result', fact=fact)
             goal_runner.record = goal_record
+
+            def goal_ended(w: dict) -> bool:
+                # 作業が終わった：シエルが次の一手を自分で決める。持ち主が止めた・決定を使えないときは、今までどおり知らせる
+                decision = getattr(agent, 'game_decision', None)
+                if (decision is None or not decision.supported() or not decision.autonomy_allowed
+                        or not game_decision.after_work(w) or not agent.persona.work_end_instructions):
+                    return False
+                asyncio.create_task(voice.say_when_free('work_end', wait=60.0, settle=0.5, anyway=True))
+                return True
+            goal_runner.ended = goal_ended
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:

@@ -187,6 +187,18 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.env.use.await_args.args, ('game_go', {'x': 10, 'z': -4}))
 
 
+class AfterWorkTest(unittest.TestCase):
+    def test_ciel_may_act_after_a_work_ended_unless_the_owner_stopped_it(self):
+        from game_decision import after_work
+        self.assertTrue(after_work(None))
+        for state, reason in [('succeeded', ''), ('failed', 'stalled'), ('cancelled', 'deadline'),
+                              ('cancelled', 'execution_error')]:
+            self.assertTrue(after_work({'state': state, 'reason': reason}), (state, reason))
+        for state, reason in [('cancelled', 'stopped'), ('cancelled', 'owner_no_answer'), ('running', ''),
+                              ('needs_decision', 'owner_question')]:
+            self.assertFalse(after_work({'state': state, 'reason': reason}), (state, reason))
+
+
 class SayTest(unittest.TestCase):
     def test_each_part_is_led_by_its_feeling_and_stray_marks_are_taken_out(self):
         self.assertEqual(game_decision.spoken([{'feeling': 'happy', 'text': '[relaxed]わあ！'},

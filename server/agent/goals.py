@@ -47,6 +47,8 @@ class GoalRunner:
         # 作業の終わりを会話の流れ（conversation.Conversation の出来事）へ残す。終わりの言葉を体がもう話すときも、
         # 心がそれをきっかけに考えられるように（agent.py が置く）
         self.record = None
+        # 作業が終わったとき、シエルが次にどうするかを決める（agent.py が置く）。引き受けたら True
+        self.ended = None
 
     def _tool(self, key):
         return (self.env.profile.get('work') or {}).get(key)
@@ -136,6 +138,10 @@ class GoalRunner:
                 self._notified.add(key)
                 if w['state'] in TERMINAL:
                     self.recent.append({'title': self.title, 'state': w['state'], 'at': time.time()})
+                    if self.ended is not None and self.record is not None and self.ended(dict(w)):
+                        # 終わりは会話の流れへ出来事として残し、シエルが自分で次の一手を決める（話すことも一緒に）
+                        self.record(f"{w['session']}:{w['task_id']}:{w['state']}", self.end_fact(w))
+                        return True
                 repeated = ((w.get('decision') or {}).get('message') if w['state'] == 'needs_decision'
                             else (w.get('evidence') or {}).get('response') if w['state'] == 'succeeded' else None)
                 # Inventory/evidence remain in the current-state supplement, not the event timeline.
@@ -268,6 +274,13 @@ class GoalRunner:
             self._last_body_speech = (*identity, text)
             self._last_body_event = event
         return True
+
+    def end_fact(self, w) -> str:
+        """作業の終わりを、会話の流れに残す一文（体の言葉も添える。体が何を言って終えたかで、次の一手が変わる）"""
+        result = RESULT_WORDS.get(w['state'], w['state'])
+        why = f"：{w['reason']}" if w.get('reason') else ''
+        said = ((w.get('evidence') or {}).get('response') or '').strip()[:300]
+        return f"頼まれた作業「{self.title}」が終わった（{result}{why}）" + (f"。体の言葉：{said}" if said else '')
 
     def doing(self) -> dict | None:
         """心へ渡す「今一緒にしていること」：間を空けずに続けている作業（古い順）と、その長さ"""

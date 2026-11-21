@@ -63,7 +63,9 @@ export class GameTasks {
   view(t = this.active) {
     if (!t) return null;
     let message = t.reason === 'stop_unconfirmed' ? '停止を確認できません。新しい作業は始めていません。'
+      : t.state === 'succeeded' && t.evidence.goal_done ? `体が作業を終えたと言いました。成果は未検証です。${t.evidence.response??''}`
       : t.state === 'succeeded' ? `Mindcraftの応答処理が終了しました。成果は未検証です。${t.evidence.response??''}`
+      : t.state === 'failed' && t.reason === 'stalled' ? `体が行動を止めて、途中で手を止めました。${t.evidence.response??''}`
       : t.state === 'needs_decision' && t.decision?.kind === 'question' ? `オーナーの返事を待っています。${t.decision.message}`
       : t.state === 'needs_decision' ? `作業を止めて待っています。${t.evidence.clarification || shortWhy(t.reason,t.evidence)}。`
       : t.state === 'cancelled' ? `${shortWhy(t.reason,t.evidence)}。作業を中止して待っています。`
@@ -236,6 +238,10 @@ export class GameTasks {
       // The body stopped at a choice and spoke to the owner instead: the work waits for the reply.
       if(done.ok && e.native_finished===true && e.waiting_owner && idle)
         this.ask(t,e);
+      // It stopped acting and talked instead, without saying the work is done: the work ends unfinished, so
+      // Ciel (or the owner) decides the next step. Its words go with it.
+      else if(done.ok && e.native_finished===true && e.stalled && idle)
+        this.changed(t,'failed','stalled',e);
       else if(done.ok && e.native_finished===true && e.objective_verified===false && idle)
         this.changed(t,'succeeded','',e);
       else if(['unlinked','disconnected','died','replaced','stopped','no_answer','stop_timeout'].includes(done.reason))

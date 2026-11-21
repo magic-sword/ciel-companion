@@ -45,6 +45,15 @@ test('processing completion requires a native result and never verifies the obje
   }
 });
 
+test('a body that stopped acting ends the work unfinished, and one that said it is done ends it done',async()=>{
+  for(const [note,state,reason] of [[{native_finished:true,objective_verified:false,stalled:true,response:'次の指示をくださいね。'},'failed','stalled'],
+      [{native_finished:true,objective_verified:false,goal_done:true,response:'できました。'},'succeeded','']]) {
+    const {link,work}=fixture();link.runSkill=async()=>({ok:true,note});work.submit(request());
+    await wait(()=>work.active.state===state);assert.equal(work.active.reason,reason);
+    assert.ok(work.view().message.endsWith(note.response));work.close();
+  }
+});
+
 test('runtime errors are surfaced without an outer recipe repair loop',async()=>{
   const {link,work}=fixture();link.runSkill=async()=>({ok:false,reason:'execution_error',note:{action:'collectBlocks'}});
   work.submit(request());await wait(()=>work.active.state==='needs_decision');
