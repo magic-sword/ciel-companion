@@ -6,7 +6,7 @@
 
 ## 表示する事実
 
-継続中は発話だけでなく無言の判断も含むため、会話グラフと配信カードは「続きの判断中」と表示する。活動通知はactivity.state v3のままで、思考内容やmemoは表示しない。確認範囲と配布済み版は[確認状況](../testing/verification-status-ja.md)で区別する。
+継続中は発話だけでなく無言の判断も含むため、会話グラフと配信カードは「続きの判断中」と表示する。活動通知はactivity.state v3のままで、思考内容やmemoは表示しない。心が考えた話したいことだけは、別の通知[mind.ideas v1](#心の考えmindideas-v1)で会話グラフの窓の下の欄に表示する。確認範囲と配布済み版は[確認状況](../testing/verification-status-ja.md)で区別する。
 
 Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのmessageに判断中・実行中を反映する。上流Agentの応答終了は目的達成を保証しないため、succeededの見出しは「処理終了」とし、本文へ「成果は未検証」とMindcraftの応答を表示する。evidenceのnative_finished=true・objective_verified=falseを、所持数や帰還の検証成功へ読み替えない。Unity側の文言変更も必要であり、旧アプリの「できた！」表示で検証済みと判断しない。
 
@@ -30,7 +30,7 @@ Mindcraftの自然文依頼でもgoal.state/control v2を維持する。workのm
 
 通常会話が待機へ移った後の発声では、終了済みの判断を中断表示へ変更しない。ゲーム専用の判断経路へ新しい入力を渡す際は、通常会話の古い生成を失効させ、decision=idle・continuation=waitingへ戻す。ゲーム側の実行・成功はbody/workで表示し、通常会話の節として代用しない。
 
-通常会話の単一say/actループを、生成・道具・音声の実状態から表示する。旧initiativeコントローラーとactivity.state v2の受信は撤去し、送信・受信・操作画面・配信カード・会話グラフをv3へ統一する。内面の文章や記憶を新たに公開しない。
+通常会話の単一say/actループを、生成・道具・音声の実状態から表示する。旧initiativeコントローラーとactivity.state v2の受信は撤去し、送信・受信・操作画面・配信カード・会話グラフをv3へ統一する。activity.stateには内面の文章や記憶を載せない。心の考えはmind.ideasに分ける。
 
 | 行 | 表示する事実 |
 |---|---|
@@ -58,6 +58,27 @@ continuation.phaseはwaiting / responding / continuing / tool_result / cancelled
 未対応版・必須コントローラー欠落・不正なphaseは未確認にし、旧形式へフォールバックしない。古いrevisionと退役streamは無視する。通知停止から6秒を超えたら現在位置・体の現在状態・経過秒数の強調を解除する。goal.stateの鮮度と終端保持は独立して扱う。
 
 配信版Windowsの「設定 → 配信 → シエルの会話グラフを開く」で独立出力 `CIEL Broadcast 会話グラフ` を開く。モデル・接続・音声を追加起動しない。右側のシエルとゲーム小窓の領域は維持する。[配信画面の配置](../../../ciel-crafters-live/docs/streams/minecraft/shared/layout-ja.md#状態と計画の表示を再設計する)は別の正本。通知の版変更は会話サーバーとUnityを一組で配布し、起動済みアプリは再起動・再接続する。反映範囲は[確認状況](../testing/verification-status-ja.md)を参照する。
+
+## 心の考え（mind.ideas v1）
+
+シエルの心（システム2、`recall.MindRecall`）が相手の発言ごとに考えた話したいこと、その点と理由、自分から話したか落としたかを表示する。[話し出す動機](../conversation/speaking-motivation-ja.md)の段階1以降（`CIEL_MIND_IDEAS`が1〜3）で送る。送信は`server/agent/mind_view.py`、受信は`CielConversation.Mind.cs`、表示は会話グラフの窓（`CielProcessWindow.cs`）の下の帯。中身は会話ログの`mind_ideas`・`speak_up`と同じにし、ログと画面を食い違わせない。
+
+`ciel.event`の`mind.ideas`は`v=1`、`stream_id`、送信ごとの`revision`、`presence`、`speak`（自分から話すのが動いているか）、`threshold`（自分から話す基準。無ければ-1）、`cards`を持つ。cardsは相手の発言ごとに1枚、新しい順に3枚まで。記録なので鮮度は数えず、変わったときだけ送る。
+
+```json
+{"v": 1, "type": "mind.ideas", "presence": "solo", "speak": true, "threshold": 3.5,
+ "cards": [{"id": 3, "turn": 9, "heard": "夜になる前に何を準備したらいい？", "phase": "spoken", "reason": "",
+            "ms": 6200.0, "chosen": 0, "ago": 4.2,
+            "ideas": [{"kind": "suggest", "text": "丸石で小さな家を作ろう", "pro": "役に立つ", "con": "話がそれる",
+                       "score": 4, "weighted": 4.12, "level": 4.12}]}]}
+```
+
+phaseはwaiting_reply（シエルの返事を読むのを待つ）/ thinking / thought / none（話したいことなし）/ scheduled（話す言葉を作っている）/ spoken / dropped / aborted（相手が話し始めた）。droppedのreasonはlow / mode / no_reply / user_speaking / repeat。weightedは1〜5の書き出し確率で重みを付けた点で、取れないときは-1。levelは比べるのに使う点（weightedがあればweighted）。chosenは最も高い考えの位置。
+
+- 送るのは考えだけ。記憶の候補・選んだ記憶・思ったこと（thought）は送らない。heardは相手の発言の先頭40字。
+- presenceがsolo以外のときは、アプリが相手の発言・考えの文・理由を隠して、種類と点だけを表示する。考えに記憶から誰かの話が入ることがあるため。配信者は設定の「心の考えの文を隠す」で、ひとりのときも文を隠せる。
+- 考えの文は、シエルがそれを話す数秒前に表示される。
+- 窓は1552×1293。上の1552×873は今までの会話グラフで、下の420が心の欄。OBSでは同じウィンドウキャプチャを複製し、切り抜きでグラフ（下を420切る）と心の欄（上を873切る）を別々に置く。前の大きさ（1552×873）を覚えていた窓は、新しい大きさで開き直す。
 
 ## ciel.goalの状態通知
 
@@ -112,6 +133,8 @@ continuation.phaseはwaiting / responding / continuing / tool_result / cancelled
 操作はstopまたはretry。Unityは表示中のスナップショットと最新状態のID・版・判断IDを照合する。ホストもロック取得後に再検証する。古い画面の操作を新しい作業に付け替えない。retryは確認が新鮮なneeds_decisionだけ。状態不明でも最後の作業を指定したstopは可能だが、送信しただけで停止済みと表示しない。cancellingからの再試行や終端への操作は表示しない。
 
 ## 実装と検証
+
+心の考えの送信は`server/agent/mind_view.py`（テストは`tests/test_mind_view.py`）、描画の確認はEditorの`CielProcessWindowCheck.Run`（`.local/app-refactor/process-mind.png`と、文を隠した`process-mind-hidden.png`）。
 
 送信と操作検証は`server/agent/goals.py`。Unityの受信と共通表示モデルは`CielConversation.Goal.cs`の`CielWorkPresentation`で、操作パネル・配信映像・独立カードが使用する。ベンチマークもtask.stateを参照し、RCONの実物による採点を維持する。
 

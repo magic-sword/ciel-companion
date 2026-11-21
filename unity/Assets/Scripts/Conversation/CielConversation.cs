@@ -1225,6 +1225,7 @@ namespace Ciel.Conversation
             else if (e.type == "voice.test") OnVoiceTest(e);
             else if (e.type == "agent.problem") OnProblem(e);
             else if (e.type == "activity.state") OnActivity(data);   // いまのシエル（CielConversation.Activity.cs）
+            else if (e.type == "mind.ideas") OnMindIdeas(data);   // 心の考え（CielConversation.Mind.cs）
             else if (e.type == "env.list") OnEnvList(data);   // つなげるゲームの一覧（CielConversation.Game.cs）
             else if (e.type == "env.state") OnEnvState(e);   // ゲームの体を受け持ったか（CielConversation.Game.cs）
             else if (e.type == "image.state") OnImageState(e);   // 見せた画像を受け取ったか（CielConversation.Image.cs）
@@ -1566,6 +1567,7 @@ namespace Ciel.Conversation
             ResetYouTube();
             ResetGoal();
             ResetActivity();
+            ResetMind();
             Card = null;
             DisposeVoice();
             DisposeAizuchi();

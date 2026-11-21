@@ -559,6 +559,7 @@ class MindRecall:
         self.monotonic = monotonic
         self.thought: Thought | None = None
         self.considered = 0   # 見極めた最後の発言
+        self.view = None      # mind_view.MindView（考えをアプリへ見せる。話したいことを考えるときだけ）
         self._task: asyncio.Task | None = None
 
     async def consider(self, rows: list, query: str, s: Situation, turn: int) -> Thought | None:
@@ -582,6 +583,8 @@ class MindRecall:
         if self.client is None:
             self.client = models.create_client('brief')
         model = models.model('brief')
+        if self.ideas_on and self.view is not None:
+            self.view.thinking(turn, query)
         # 点の重み付けに、書き出しの確率を使う（共有GPU API。クラウドの考えるモデルは返さないので頼まない）
         probs = {'logprobs': True, 'top_logprobs': 5} if self.ideas_on and models.is_local('brief') else {}
         r = await models.client_for('brief', self.client, while_speaking=self.WHILE_SPEAKING).chat.completions.create(**models.options(
@@ -609,6 +612,8 @@ class MindRecall:
                              output_tokens=getattr(usage, 'completion_tokens', None),
                              ideas=[{'kind': i.kind, 'about': i.about, 'text': i.text, 'pro': i.pro, 'con': i.con,
                                      'score': i.score, 'weighted': i.weighted} for i in self.ideas])
+            if self.view is not None:
+                self.view.thought(turn, self.ideas, ms)
         debug_log.record('recall_mind', candidates=len(pool), chosen=[c.id for c in items], thought=bool(text), ms=ms)
         self.thought = Thought(items, text, s, turn, self.monotonic()) if items else None
         return self.thought
@@ -700,6 +705,8 @@ class MindRecall:
                 if self._reply_wait is None or self._reply_wait[0] != last.id:
                     self._reply_wait = (last.id, self.monotonic())
                 if self.monotonic() - self._reply_wait[1] < self.REPLY_WAIT:
+                    if self.view is not None:
+                        self.view.waiting(last.id, query)
                     return None
             elif not any(r['role'] == 'assistant' and r['text'] == self.reply[1]
                          for r in shown[next(i for i, t in enumerate(rows) if t is last):]):

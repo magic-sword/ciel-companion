@@ -128,6 +128,19 @@ class SpeakUpTest(unittest.IsolatedAsyncioTestCase):
         finally:
             ticker.cancel()
 
+    def test_outcomes_are_shown(self):
+        self.up.view = MagicMock()
+        self.up.replied('倒れないための準備ですね。')
+        self.playing()
+        self.mind.ideas = [self.idea(level=3.2)]
+        self.up.step()
+        self.up.view.outcome.assert_called_with(1, 'dropped', 'low', speak_up.SpeakUp.HIGH)
+        self.mind.ideas = [self.idea()]
+        self.up.step()
+        self.up.view.outcome.assert_called_with(1, 'scheduled', '', speak_up.SpeakUp.HIGH)
+        self.up.on_user_state(SimpleNamespace(new_state='speaking'))
+        self.up.view.outcome.assert_called_with(1, 'aborted', 'user_spoke', speak_up.SpeakUp.HIGH)
+
     def test_overlap(self):
         self.assertEqual(speak_up.overlap('', 'x'), 0.0)
         self.assertGreater(speak_up.overlap('鉄インゴット1個', '鉄インゴット1個と鉄塊'), 0.9)

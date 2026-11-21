@@ -34,7 +34,7 @@ namespace Ciel.Conversation
         Image _youtubeSwitch, _youtubeKnob;
         InputField _youtubeUrl, _localServerUrl;
         Image _cardOutputSwitch, _cardOutputKnob, _planOutputSwitch, _planOutputKnob;
-        Image _processOutputSwitch, _processOutputKnob, _planFocusSwitch, _planFocusKnob;
+        Image _processOutputSwitch, _processOutputKnob, _planFocusSwitch, _planFocusKnob, _mindHideSwitch, _mindHideKnob;
         RectTransform _destList;
         InputField _destName, _destUrl;
         Text _destError;
@@ -394,12 +394,18 @@ namespace Ciel.Conversation
                 process.Output.SetOpen(!process.Output.IsOpen);
                 Refresh();
             });
+            (_mindHideSwitch, _mindHideKnob) = SwitchRow(sec, "心の考えの文を隠す", () =>
+            {
+                CielMindPresentation.HideText = !CielMindPresentation.HideText;
+                Refresh();
+            });
             (_planFocusSwitch, _planFocusKnob) = SwitchRow(sec, "計画を現在の作業周辺に絞る", () =>
             {
                 CielPlanWindow.FocusCurrent = !CielPlanWindow.FocusCurrent;
                 Refresh();
             });
-            Note(sec, $"「{CielProcessWindow.Title}」は会話の判断・機能ロード・操作・結果確認と、発話の継続・待機の状態を映します。");
+            Note(sec, $"「{CielProcessWindow.Title}」は会話の判断・機能ロード・操作・結果確認と、発話の継続・待機の状態を映します。"
+                + "下の欄には、シエルの心が考えた話したいこと・点・話したかを映します。ひとり以外の場では文を隠し、種類と点だけにします");
             Note(sec, $"「{CielStreamWindow.PlanTitle}」は、シエルが進めている計画（依存のつながり・いまの段・選択）を映します。"
                 + "表示だけで、計画の変更は言葉で頼みます");
             Note(sec, $"「{CielStreamWindow.CardTitle}」をOBSのウィンドウキャプチャで取り込みます。"
@@ -662,6 +668,7 @@ namespace Ciel.Conversation
             if (_processOutputSwitch != null && process?.Output != null)
                 ShowSwitch(_processOutputSwitch, _processOutputKnob, process.Output.IsOpen);
             if (_planFocusSwitch != null) ShowSwitch(_planFocusSwitch, _planFocusKnob, CielPlanWindow.FocusCurrent);
+            if (_mindHideSwitch != null) ShowSwitch(_mindHideSwitch, _mindHideKnob, CielMindPresentation.HideText);
         }
     }
 }

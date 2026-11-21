@@ -853,6 +853,11 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions,
                 ideas_instructions=agent.persona.recall_mind_ideas_instructions, game=lambda: (
                 agent.game.context() if getattr(agent, 'game', None) is not None else None))
+            if agent.mind_recall.ideas_on:
+                # 心の考えをアプリの会話グラフの窓へ見せる（mind_view.py）。ひとり以外では、アプリが文を隠す
+                import mind_view
+                agent.mind_recall.view = mind_view.MindView(
+                    notify, presence=lambda: agent.style.presence if agent.style is not None else '')
             agent.mind_recall.start(history, agent.recall_situation)
             if agent.mind_recall.speak and agent.persona.idea_voice:
                 # 段階3：高い考えを、返事を話し終えた番で自分から話す（docs/conversation/speaking-motivation-ja.md）
@@ -861,6 +866,9 @@ async def entrypoint(ctx: JobContext) -> None:
                     allowed=lambda: (agent.style is None or (agent.style.talk in ('normal', 'chatty')
                                                               and agent.style.presence == 'solo')))
                 session.on('user_state_changed', agent.speak_up.on_user_state)
+                agent.speak_up.view = agent.mind_recall.view
+                if agent.speak_up.view is not None:
+                    agent.speak_up.view.speak, agent.speak_up.view.threshold = True, agent.speak_up.threshold
                 agent.speak_up.start()
     session.userdata.notes = note_taker   # 道具 remember_about_speaker が、覚えることを記録係に預ける
     # シエルがその人をどう思っているか（relationship.py）。会話の終わりに、この会話を振り返って書き直す

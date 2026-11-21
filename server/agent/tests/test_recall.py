@@ -424,6 +424,26 @@ class MindReadsReplyTest(unittest.IsolatedAsyncioTestCase):
         request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
         self.assertEqual(request['conversation'][-1], {'speaker': 'シエル', 'text': '怖くないのです！'})
 
+    async def test_the_view_sees_waiting_thinking_and_ideas(self):
+        from conversation import Conversation
+        from mind_view import MindView
+        history = Conversation()
+        history.complete(history.reserve(), 'ゾンビと戦うのって怖くない？', label='ユウ')
+        client = mind_client('{"use": [], "ideas": [{"kind": "ask", "about": "怖くない", "text": "剣はあるかな",'
+                             ' "pro": "備え", "con": "しつこい", "score": 4}]}')
+        with patch.object(recall.MindRecall, 'IDEAS', True):
+            m = recall.MindRecall(recall.Recall(FakeStore([]), None, clock=lambda: NOW), '指示',
+                                  ideas_instructions='考えの指示', client=client, monotonic=lambda: 0.0)
+        sent = []
+        m.view = MindView(sent.append, presence=lambda: 'solo')
+        with patch('models.is_local', return_value=False):
+            await m.step(history, lambda: Situation())
+            await m.step(history, lambda: Situation())
+            m.replied(history.last_id, '怖くないのです！')
+            await m.step(history, lambda: Situation())
+        self.assertEqual([x['cards'][0]['phase'] for x in sent], ['waiting_reply', 'thinking', 'thought'])
+        self.assertEqual(sent[-1]['cards'][0]['ideas'][0]['text'], '剣はあるかな')
+
     async def test_no_reply_after_a_while_thinks_without_it(self):
         from conversation import Conversation
         t = [0.0]

@@ -52,6 +52,8 @@ class SpeakUp:
         self._user_seen = 0
         self._task: asyncio.Task | None = None
         self._user_spoke = asyncio.Event()
+        self.view = None              # mind_view.MindView（話した・落とした、をアプリへ見せる）
+        self._turn: int | None = None # 頼んだ考えの発言
 
     # ---- 会話から知らせる ----
 
@@ -60,6 +62,7 @@ class SpeakUp:
             self._user_spoke.set()
             if self.handle is not None and not getattr(self.handle, 'done', lambda: True)():
                 debug_log.record('speak_up', status='aborted', reason='user_spoke')
+                self._show('aborted', 'user_spoke')
                 self.handle.interrupt(force=True)
                 self.handle = None
 
@@ -67,6 +70,10 @@ class SpeakUp:
         """返事を作り終えた（agent._pipeline_llm）。自分から話す返事の文は数えない"""
         if text.strip():
             self.reply_text = text
+
+    def _show(self, status: str, reason: str = '', turn: int | None = None) -> None:
+        if self.view is not None:
+            self.view.outcome(self._turn if turn is None else turn, status, reason, self.threshold)
 
     @property
     def threshold(self) -> float:
@@ -124,8 +131,11 @@ class SpeakUp:
                       reply_playing=self.reply_ended is None, reply=self.reply_text[:120])
         if drop is not None:
             debug_log.record('speak_up', status='dropped', reason=drop, **fields)
+            self._show('dropped', drop, best.turn)
             return
         debug_log.record('speak_up', status='scheduled', **fields)
+        self._turn = best.turn
+        self._show('scheduled')
         self._user_spoke.clear()
         self.handle = self.mouth.say('idea', instructions=self.template.replace('{idea}', best.text),
                                      tool_choice='none')
@@ -158,6 +168,7 @@ class SpeakUp:
         debug_log.record('speak_up', status='spoken' if ok else 'aborted', reason=None if ok else 'user_spoke',
                          generate_s=round(made - began, 2), waited_s=round(self.clock() - made, 2),
                          after_reply_s=after_end)
+        self._show('spoken' if ok else 'aborted', '' if ok else 'user_spoke')
         if not ok:
             if self.handle is not None:
                 self.handle.interrupt(force=True)
