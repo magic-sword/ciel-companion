@@ -88,7 +88,7 @@ namespace Ciel.Conversation
         public static string Reason(string reason) => reason switch
         {
             "low" => "基準より低い",
-            "mode" => "ひとりで、ふつう・おしゃべりのときだけ話す",
+            "mode" => "おしゃべり度がひかえめ",
             "no_reply" => "返事がまだ無い",
             "user_speaking" => "相手が話している",
             "repeat" => "返事と同じことになる",

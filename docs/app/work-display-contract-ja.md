@@ -73,7 +73,7 @@ continuation.phaseはwaiting / responding / continuing / tool_result / cancelled
                        "score": 4, "weighted": 4.12, "level": 4.12}]}]}
 ```
 
-phaseはwaiting_reply（シエルの返事を読むのを待つ）/ thinking / thought / none（話したいことなし）/ scheduled（話す言葉を作っている）/ spoken / dropped / aborted（相手が話し始めた）。droppedのreasonはlow / mode / no_reply / user_speaking / repeat。weightedは1〜5の書き出し確率で重みを付けた点で、取れないときは-1。levelは比べるのに使う点（weightedがあればweighted）。chosenは最も高い考えの位置。
+phaseはwaiting_reply（シエルの返事を読むのを待つ）/ thinking / thought / none（話したいことなし）/ scheduled（話す言葉を作っている）/ spoken / dropped / aborted（相手が話し始めた）。droppedのreasonはlow / mode（おしゃべり度がひかえめ）/ no_reply / user_speaking / repeat。weightedは1〜5の書き出し確率で重みを付けた点で、取れないときは-1。levelは比べるのに使う点（weightedがあればweighted）。chosenは最も高い考えの位置。
 
 - 送るのは考えだけ。記憶の候補・選んだ記憶・思ったこと（thought）は送らない。heardは相手の発言の先頭40字。
 - presenceがsolo以外のときは、アプリが相手の発言・考えの文・理由を隠して、種類と点だけを表示する。考えに記憶から誰かの話が入ることがあるため。配信者は設定の「心の考えの文を隠す」で、ひとりのときも文を隠せる。

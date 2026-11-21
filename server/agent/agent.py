@@ -860,11 +860,11 @@ async def entrypoint(ctx: JobContext) -> None:
                     notify, presence=lambda: agent.style.presence if agent.style is not None else '')
             agent.mind_recall.start(history, agent.recall_situation)
             if agent.mind_recall.speak and agent.persona.idea_voice:
-                # 段階3：高い考えを、返事を話し終えた番で自分から話す（docs/conversation/speaking-motivation-ja.md）
+                # 段階3：高い考えを、考えが終わったら自分から話す（docs/conversation/speaking-motivation-ja.md）。
+                # 元の論文は何人かの会議が前提なので、ひとり・親しい人・人前のどれでも話す（2026-11-21 利用者が決めた）
                 import speak_up
                 agent.speak_up = speak_up.SpeakUp(session, voice, agent.mind_recall, history, agent.persona.idea_voice,
-                    allowed=lambda: (agent.style is None or (agent.style.talk in ('normal', 'chatty')
-                                                              and agent.style.presence == 'solo')))
+                    allowed=lambda: agent.style is None or agent.style.talk in ('normal', 'chatty'))
                 session.on('user_state_changed', agent.speak_up.on_user_state)
                 agent.speak_up.view = agent.mind_recall.view
                 if agent.speak_up.view is not None:
