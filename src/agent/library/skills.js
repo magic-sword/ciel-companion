@@ -1791,6 +1791,30 @@ export async function sow(bot, x, y, z, seedType) {
     return true;
 }
 
+export async function activateBlockAt(bot, x, y, z) {
+    /**
+     * Use (right click) the block at the given position with an empty hand: open or close a door,
+     * trapdoor or gate, flip a lever, press a button.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {number} x, y, z, the position of the block.
+     * @returns {Promise<boolean>} true if the block was used, false otherwise.
+     * @example
+     * await skills.activateBlockAt(bot, 10, 64, -3);
+     **/
+    let block = bot.blockAt(new Vec3(Math.floor(x), Math.floor(y), Math.floor(z)));
+    if (!block || block.name === 'air') {
+        log(bot, `There is no block to use at ${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}.`);
+        return false;
+    }
+    if (bot.entity.position.distanceTo(block.position) > 4.5)
+        await goToPosition(bot, block.position.x, block.position.y, block.position.z, 2);
+    await bot.unequip('hand');
+    await bot.lookAt(block.position.offset(0.5, 0.5, 0.5));
+    await bot.activateBlock(block);
+    log(bot, `Used the ${block.name} at ${block.position}.`);
+    return true;
+}
+
 export async function activateNearestBlock(bot, type) {
     /**
      * Activate the nearest block of the given type.
