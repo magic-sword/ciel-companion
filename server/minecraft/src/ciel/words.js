@@ -47,7 +47,7 @@ export const NEXT_STEP = {
 };
 export const SKILL_NAMES = {
   follow: 'ついていく', come: 'そばへ行く', go_to: '場所へ行く', collect: '集める', give: '渡す',
-  dig_down: '足元を掘って降りる', craft: '作る', find: '探す',
+  craft: '作る', find: '探す',
 };
 const FACING = {
   north: '北', northwest: '北西', west: '西', southwest: '南西', south: '南', southeast: '南東', east: '東', northeast: '北東',
@@ -83,7 +83,6 @@ export function title(skill, args = {}) {
     case 'come': return `${who}のそばへ行く`;
     case 'go_to': return args.player !== undefined ? `${who}のところへ行く` : `（${args.x}, ${args.z}）へ行く`;
     case 'collect': return `${args.block} を ${args.count ?? 1} 個集める`;
-    case 'dig_down': return `足元を ${args.depth} ブロック掘る`;
     case 'craft': return `${args.item} を ${args.count ?? 1} 個作る`;
     case 'find': return `${args.block} を探す`;
     case 'give': return `${args.item} を${args.count !== undefined ? ` ${args.count} 個` : ''}${who}に渡す`;

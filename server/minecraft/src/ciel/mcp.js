@@ -113,11 +113,6 @@ export function makeServer(hub, sessionId) {
     description: 'マイクラで、持ち物を持ち主に渡す（そばへ行って投げる）。item は英語の ID（oak_log など）。count を省けば持っている分すべて。',
     inputSchema: { item: z.string(), count: z.number().int().optional() }, ...ACT('minecraft_give_item', { 'ciel/long_running': true }),
   }, ({ item, count }) => body((l) => l.do('give', { item, ...(count != null ? { count } : {}) })));
-  server.registerTool('minecraft_dig_down', {
-    title: '足元を掘る',
-    description: 'マイクラで、足元を depth ブロック（1〜32）掘って降りる。葉・原木・土・石など自然のブロックだけ掘る。',
-    inputSchema: { depth: z.number().int() }, ...ACT('minecraft_dig_down', { 'ciel/long_running': true }),
-  }, ({ depth }) => body((l) => l.do('dig_down', { depth })));
   server.registerTool('minecraft_stop_moving', {
     title: '止まる',
     description: 'マイクラで、今している技（ついていく・行く・集める）をやめて、その場で待つ。',

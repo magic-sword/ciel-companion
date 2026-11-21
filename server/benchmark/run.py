@@ -156,7 +156,7 @@ def stop_ack(driver, events):
 
 
 MOVING_TOOLS = {'minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item','minecraft_give_item',
-                'minecraft_go_to_place','minecraft_follow_me','minecraft_come_here','minecraft_find_blocks','minecraft_dig_down'}
+                'minecraft_go_to_place','minecraft_follow_me','minecraft_come_here','minecraft_find_blocks'}
 
 
 def restarted(events):

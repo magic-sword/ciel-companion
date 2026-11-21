@@ -27,7 +27,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 FAMILY = {
     'minecraft_come_here': 'come', 'minecraft_follow_me': 'follow', 'minecraft_go_to_place': 'goto',
-    'minecraft_find_blocks': 'find', 'minecraft_give_item': 'give', 'minecraft_dig_down': 'dig',
+    'minecraft_find_blocks': 'find', 'minecraft_give_item': 'give',
     'minecraft_stop_moving': 'stop', 'stop_game_task': 'stop', 'submit_game_task': 'work', 'answer_game_task': 'answer',
     'tell_game_task': 'tell', 'resume_game_task': 'resume',
 }

@@ -70,12 +70,6 @@ test('渡す技の引数', () => {
   assert.equal(p({ v: 1, type: 'do', id: 7, skill: 'give', args: { item: 'oak_log', count: 0 } }).error, 'bad_args');
 });
 
-test('足元を掘る技の引数', () => {
-  assert.equal(p({ v: 1, type: 'do', id: 8, skill: 'dig_down' }).error, 'bad_args');   // 深さは要る
-  assert.deepEqual(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 3 } }).cmd.args, { depth: 3 });
-  assert.equal(p({ v: 1, type: 'do', id: 8, skill: 'dig_down', args: { depth: 100 } }).error, 'bad_args');
-});
-
 test('景色を見る命令には id が要る', () => {
   assert.deepEqual(parseCommand(JSON.stringify({ v: 1, type: 'look', id: 7 })), { cmd: { type: 'look', id: 7 } });
   assert.equal(parseCommand(JSON.stringify({ v: 1, type: 'look' })).error, 'bad_id');

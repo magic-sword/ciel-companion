@@ -21,7 +21,7 @@ DEFAULT = {'seconds':90, 'first_action':30, 'no_progress':30, 'same_failure':2,
            'blocked_grace':10, 'stop_grace':5}
 ACTION_TOOLS = {'minecraft_collect_blocks','minecraft_goal_step','minecraft_craft_item',
                 'minecraft_give_item','minecraft_go_to_place','minecraft_follow_me',
-                'minecraft_come_here','minecraft_find_blocks','minecraft_dig_down','minecraft_look_around'}
+                'minecraft_come_here','minecraft_find_blocks','minecraft_look_around'}
 CONSTRAINT = r'(原木|木材|木|材料|作業台|道具|資源).{0,40}(不足|見つから|見当たら|ありません|無い|ない|足り|用意でき)'
 DECLINE = r'(できません|作れません|続けられません|作るのは難しい|製作は難しい|中止します|断念します|停止します|作業を止めます)'
 

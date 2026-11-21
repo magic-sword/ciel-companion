@@ -8,7 +8,6 @@ const CHAT_CHARS = 256;                      // マイクラのチャットの�
 const TELL_CHARS = 2000;                     // オーナーの言葉を作業へ渡す上限（作業の依頼文と同じ）
 const COLLECT_MAX = 64;
 const CRAFT_MAX = 64;
-const DIG_MAX = 32;
 const GIVE_MAX = 64 * 36;   // 持ち物の欄すべて
 const COORD_MAX = 30_000_000;
 
@@ -45,10 +44,6 @@ export const SKILLS = {
     if (!['walk', 'dig', 'auto'].includes(how)) return { error: 'bad_args' };
     if (a.max !== undefined && (!Number.isInteger(a.max) || a.max < 1 || a.max > 48)) return { error: 'bad_args' };
     return { args: { block: a.block, how, ...(a.max !== undefined ? { max: a.max } : {}) } };
-  },
-  // 足元を depth ブロック掘って降りる（自然のブロックだけ掘る）
-  dig_down: (a) => {
-    return Number.isInteger(a.depth) && a.depth >= 1 && a.depth <= DIG_MAX ? { args: { depth: a.depth } } : { error: 'bad_args' };
   },
   // 持ち物から物を作る（板・棒・作業台・ツルハシなど）。count は作りたい数
   craft: (a) => {
