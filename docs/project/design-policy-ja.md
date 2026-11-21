@@ -113,7 +113,7 @@ LLMに公開する操作と、基盤専用の操作を分けます。対象人�
 
 実用的な時間内に成功できなければ理由を報告して終了・確認待ちにします。[practical-v1](../games/minecraft/minecraft-benchmark-ja.md)の期限を、GPU待ちや失敗の救済のために延長しません。構成・モデル・共有負荷を揃えて改修前後を比較します。[共有GPU API](../operations/shared-llm-api-ja.md)を利用し、Minecraft実測は自宅サーバーの専用環境で行います。
 
-Minecraft段階1の施工（整地・床・壁・埋め戻し）は、ゲーム側のMindcraftの命令（`!buildStructure`と座標命令）に委ね、会話側は自然文の依頼と対象候補だけを渡す。数値計算と施工手順、停止と実状態の証拠はゲーム側が所有する。CIEL独自の施工計画器（prepare→edit_region）と建物の保護は、Mindcraftの体へ切り替えた時点で実行経路から外れており、2026-11-21に削除した。[システム設計](../games/minecraft/minecraft-design-ja.md#主要タスクの拡張計画)と[完了ゲート](../games/minecraft/minecraft-benchmark-ja.md#段階1施工の評価)を参照する。
+Minecraft段階1の施工（整地・床・壁・埋め戻し）は、ゲーム側のMindcraftの命令（`!buildStructure`と座標命令）に委ね、会話側は自然文の依頼と対象候補だけを渡す。数値計算と施工手順、停止と実状態の証拠はゲーム側が所有する。CIEL独自の施工計画器（prepare→edit_region）と建物の保護は、Mindcraftの体へ切り替えた時点で実行経路から外れており、2026-11-21に削除した。旧方式の施工・指差しのベンチマーク課題も同日に削除し、今の命令に合わせて改めて作る。[システム設計](../games/minecraft/minecraft-design-ja.md#主要タスクの拡張計画)と[ベンチマーク](../games/minecraft/minecraft-benchmark-ja.md#段階1施工の評価)を参照する。
 
 ## 開発時の不具合再現
 

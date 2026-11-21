@@ -42,48 +42,9 @@ CIEL固有の課題（指差し・目線・座標指定、保護物、停止・�
 
 ## 課題と評価モード
 
-### 指差し・目線と座標指定の比較
-
-専用MinecraftはPaper 1.21.11 build 132、`minecraft-pointing`のプラグイン付きイメージを使う。通常のVanillaワールドは変更しない。体と会話の設定は既存と同じで、追加の推論モデルは起動しない。プラグインのAPI依存は1.21.11のsnapshotのため、評価時のjarのSHA-256と実際のPaper版も保存する。
-
-`point_move`・`point_recover`・`point_clear`・`point_floor`は、指定地点への接近、作業台1個の回収、土2×2の除去、板材2×2の床。`gaze_move`はクリックなしで見ている地点への接近。`point_move_coordinates`・`point_clear_coordinates`・`point_floor_coordinates`は同じ配置を座標で指定する比較課題。移動の到着許容は3ブロック以内だが、座標操作は中心まで、指差し操作は近くまで進むため、走行時間が完全に同じになる比較ではない。
-
-`pointing.py`の初期化はリースを保持した採点器が対象役を移動し、`owner.js`が実際の向き変更・指示棒使用パケットを送る。モデル入力へ正解座標を差し込まず、通常プラグインが生成したIDを受け取る。始点・終点が期待ブロックと一致しなければ環境障害とする。床では上面の一致も要求する。評価用actorだけをcreative飛行で対象の真上へ配置し、通常プラグインへ実操作を送る。開始時にactorを明示的に再起動し、応答の起動ソースSHA-256をfixture側のファイルと照合する。orchestratorの排他ロックと実行中runnerの確認により、評価の重複起動を拒否する。指示棒課題では選択後に目線と位置を変え、元の対象で作業することを確認する。目線課題は対象を見続ける条件で、人の発話と視線変更の時刻対応は別の評価とする。
-
-actorのup/recreate直後は、同じDocker接続元からの即時ログインをPaperが制限するため、5秒置いてから明示再起動する。即時再接続の`Connection throttled`と5秒後の参加成功を専用環境で再現している。Minecraftの接続制限を無効化せず、準備に失敗した実行と、入力送信後の受付・作業期限を区別する。
-
-`spatial.py`がRCONで対象・保護点・移動位置・作業台の所持数を確認する。回収は対象ブロックの消失だけで合格にしない。文字の会話評価にはクリック操作の準備時間や音声認識を含めず、入力送信から初回操作・目的到達までを測る。`pointing_capture`の時間は選択操作の準備を含む別指標。反復のない1回の値を統計的な速度改善へ換算しない。
-
-```powershell
-.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py body --task point_move --task point_recover --task point_clear --task point_floor --task gaze_move --failure-streak 0
-.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py conversation --task point_floor
-.\.venv\Scripts\python.exe -X utf8 scripts/server/pointing-home.py --snapshot
-```
-
-同配置の座標比較と既存採集の回帰では対応するIDと`gather_logs`を加え、各モード9課題・seed 11・各1回、全体600秒以内とする。選択ファイルの権限・プラグイン起動・実IDは`pointing-home.py`で確認できる。`--snapshot`は資格情報・ワールドを除く評価ソース、プラグインjar、モデルとコンテナの識別情報を`results/pointing-evidence-*/`へ保存する。結果取得後は通常どおり専用サービスを停止する。
-
-### 整地・建築の第一段階
-
-`clear_small_area`（土12マスの除去）、`build_floor`（板材3×3）、`build_wall`（丸石3×3）、`build_missing_materials`（材料2個で9マスを依頼）、`clear_protected`（範囲内に板材が混じる）を追加。各90秒・初回操作30秒・不進行30秒、seed 11・各1回から評価する。建築の材料は与え、調達能力と分離する。初版と修正版の5課題比較、修正版の既存採集・追従の回帰、会話からの整地・床・壁の3課題を初回の測定範囲とする。各実行全体600秒で、失敗を理由に期限を延ばさない。
-
-課題の`spatial.initial`は初期配置、`expected`は期待する各マスの状態、`preserve`は地面・範囲外・保護物の代表点。各行は`[x,y,z,block_id]`。`body_call`は会話にも公開する整地・建築操作で、RCONによる施工はしない。`spatial.py`がRCONのブロック一致と今回のbody命令の終了・停止を突き合わせる。古い終了や完成発話だけでは合格しない。保護物の変更は失敗、完成通知と配置の不一致は`false_completion`。ブロック一致数の最高値も不進行監視に使う。
-
-初期化の後、評価用body observerが読んだ全対象マスと保護点が初期配置に一致するまで最大5秒待つ。同期しなければ環境障害とし、古い空気の観測で始めない。observerは観測だけを行い、操作は追加しない。
-
-別配置・別表現の`clear_small_area_holdout`、`build_floor_holdout`、`build_wall_holdout`も定義する。X方向-13・Z方向+8に移した固定配置で、seedを変えるだけでは施工位置は変わらない。この3件は最初の未使用評価後、床の失敗を修正に利用したため、現在は回帰課題である。`split=holdout`は初出時の区分であり、現在も未使用である保証ではない。通常の5課題と合わせた8課題を会話でも測定する。新たな未使用地形・寸法での評価は別途必要。
-
-材料不足・保護ブロックの課題は、明示した理由でのbody停止と、作業対象・保護点が変更されていないことを要求する。`appropriate_stop`として完成数と分ける。理由を自然文で説明したか、停止後に長時間再開しないかはこの初版oracleでは保証しない。保護点は範囲外の全世界の監査ではない。自由建築の意匠、自然地形、足場の自動作成、複合施工、実マイク入力は対象外。
-
-```powershell
-.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py body --task clear_small_area --task build_floor --task build_wall --task build_missing_materials --task clear_protected --failure-streak 0
-.\.venv\Scripts\python.exe -X utf8 scripts/server/benchmark-home.py conversation --task clear_small_area --task build_floor --task build_wall --failure-streak 0
-```
-
-拡張の優先順位と研究上の根拠は[Minecraftサービスの計画](minecraft-design-ja.md#主要タスクの拡張計画)、測定値は[Minecraftの実測](../../testing/minecraft-results-ja.md)へ置く。
-
 ## 段階1（施工）の評価
 
-範囲を指定した整地・建築（`minecraft.edit_region`）は体が受け付けなくなり（`unsupported_skill`）、施工の受付（`GameIntake`の準備・草案・確認）とG1の受付評価・G0〜G3の実行helperは2026-11-16に撤去した。施工課題の展開（`stage1.py`）・空間の採点（`spatial.py`）・監査（`audit.py`）は`run.py`の課題定義と一緒に残る。施工を戻すときは、一つの決定から施工の行動を選べる形で設計し直す。以前の設計と結果はGitの履歴と[Minecraftの実測](../../testing/minecraft-results-ja.md)にある。
+範囲を指定した整地・建築・指差しの課題（`clear_small_area`・`build_floor`・`build_wall`などの施工8件、`point_move`・`point_recover`・`gaze_move`などの指差し8件、`s1_*`の段階1の12件）と、その採点（`spatial.py`・`stage1.py`・`audit.py`・`pointing.py`）は、CIEL独自の施工計画器と指した所への作業を前提にしていた。どちらも体から削除したため、課題・採点・指示棒を操作する評価用の手順（`owner.js`の指示棒操作、`pointing-home.py`）と一緒に2026-11-21に削除した。施工は今はMindcraftの`!buildStructure`と座標命令が受け持つ（[設計](minecraft-design-ja.md#主要タスクの拡張計画)）。それを測る課題は、今の命令に合わせて改めて作る。以前の課題と結果はGitの履歴と[Minecraftの実測](../../testing/minecraft-results-ja.md)にある。
 
 ## 既存の採集・製作・移動
 
@@ -97,19 +58,17 @@ actorのup/recreate直後は、同じDocker接続元からの即時ログイン�
 | `find_logs` | 近くに原木が無い状態から、探して8個集める |
 | `stop_collecting` | 原木64個の採集中、最初の取得を確認したら停止を指示。5秒以内の停止応答、その後5秒の持ち物・位置の安定と再実行なしを確認 |
 | `come_here` | 「シエル、こっちに来て」。約20ブロック先の持ち主へ接近し、3ブロック以内で2秒間、今回のcome命令の完了と停止を確認 |
-| `come_here_locator` | 「シエル、マインクラフトでこっちに来て」。約256ブロック先。開始時に相手entityが未取得でLocator Barの手掛かりがあることを確認し、接近を採点 |
-| `come_here_azimuth` | 約384ブロック先。開始時に相手entityが未取得で、手掛かりがazimuth（角度だけ）であることを必須にする。チャンク情報だけの試行を代用しない |
 | `follow_owner` | 「シエル、ついてきて」。持ち主を3地点へ順に移し、各地点3ブロック以内で追従中の2秒保持を確認。その後停止指示、5秒以内の停止と5秒間の安定を確認 |
 | `go_to_coordinates` | X=20、Z=-12へ移動。1.5ブロック以内で2秒間、今回のgo_to命令の完了と停止を確認 |
 | `stone_pickaxe_unavailable` | 木も所持品もない砂漠の専用領域。会話モードのみ。材料不足の理由を報告し、作業を止めて待てるかを評価。製作成功とは別に集計 |
 
-原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は対象外。世界のseedは `771023`。`--seed` は**ワールド生成のseedではなく、資源配置のseed**。既定は11・各1回（全課題は体45試行、うちMindcraft定義5課題。会話41試行）。複数配置・反復は明示し、全体予算や連続失敗による未実施も記録する。
+原木は固定した配置の丸太で、自然生成の木・戦闘・食料管理・精錬は対象外。世界のseedは `771023`。`--seed` は**ワールド生成のseedではなく、資源配置のseed**。既定は11・各1回（課題の一覧は`--list`で確認する）。複数配置・反復は明示し、全体予算や連続失敗による未実施も記録する。
 
 毎回、専用領域 x/z=-48〜48、y=60〜81 のブロック・落ちている物・持ち物・位置・体力・死亡数・時刻・天候を復元する。地面の下に石があり、周囲は岩盤の壁。課題ごとに会話と目的実行器を作り直す。経験や記憶を持ち越す評価は行わない。会話側の DB と Discord への送信先は空に固定する。
 
-移動課題では専用の対象役`Bench_Owner`を追加し、採点器のRCONだけが位置を変える。方向探索用にはx=32〜288（384ブロック課題では416まで）、z=−16〜16の閉じた通路も復元する。対象役は試験用ワールドにだけ接続し、採集・製作課題では領域外に待機させる。追従の3地点は走行・回避全般の評価ではなく、停止した対象への追従先更新と継続を測る。
+移動課題では専用の対象役`Bench_Owner`を追加し、採点器のRCONだけが位置を変える。対象役は試験用ワールドにだけ接続し、採集・製作課題では領域外に待機させる。追従の3地点は走行・回避全般の評価ではなく、停止した対象への追従先更新と継続を測る。
 
-`benchmark/body-observer.js`は同じRunnerの状態と相手entity・方向の手掛かりを200msごとに読み取り、別の移動ロジックは持たない。採点はRCONの位置・距離と、今回の命令の開始後に確定したbody状態を突き合わせる。古い完了、返答だけの約束、探索の目安への到着では合格しない。初期化の位置通知が体へ届くまで最大5秒待ち、届かない場合や方向探索の前提が成立しない場合は環境障害として停止する。
+`benchmark/body-observer.js`は同じRunnerの状態と相手entityを200msごとに読み取り、別の移動ロジックは持たない。採点はRCONの位置・距離と、今回の命令の開始後に確定したbody状態を突き合わせる。古い完了や返答だけの約束では合格しない。初期化の位置通知が体へ届くまで最大5秒待ち、届かない場合は環境障害として停止する。
 
 `benchmark/agent_observer.py`は元の会話エントリポイントを呼び、起動が5秒以上待つときだけタスクの関数名・行番号を記録する。依頼解釈のロジックは変更しない。以下の能力増加条件では、試験用の能力だけを追加する。
 

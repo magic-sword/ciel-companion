@@ -147,7 +147,6 @@ class World:
         if not self.lease:
             raise RuntimeError('Fixture reset requires the world lease')
         self.navigation = task.get('navigation')
-        self.spatial = task.get('spatial')
         self.farm = None
         self.house = None
         self.mobs = dict(task.get('mobs', {}))
@@ -177,15 +176,6 @@ class World:
         # Contain exploration, so changes outside the arena cannot affect later trials.
         for x1, z1, x2, z2 in [(-48,-48,48,-48),(-48,48,48,48),(-48,-48,-48,48),(48,-48,48,48)]:
             self._write(f'fill {x1} 60 {z1} {x2} 81 {z2} minecraft:bedrock')
-        if self.navigation and self.navigation.get('locator_only'):
-            end = 416 if self.navigation['targets'][0][0] > 270 else 288
-            self._write(f'forceload add 32 -16 {end} 16')
-            for y in range(60, 82):
-                block = 'bedrock' if y == 60 else 'stone' if y < 63 else 'grass_block' if y == 63 else 'air'
-                self._write(f'fill 32 {y} -16 {end} {y} 16 minecraft:{block}')
-            for z in (-16, 16):
-                self._write(f'fill 32 60 {z} {end} 81 {z} minecraft:bedrock')
-            self._write(f'fill {end} 60 -16 {end} 81 16 minecraft:bedrock')
         rng = random.Random(seed)
         if task['forest'] == 'none':
             trees = []
@@ -239,9 +229,6 @@ class World:
             if not ITEM.fullmatch(item) or not 1 <= count <= 64:
                 raise ValueError('Invalid fixture inventory')
             self._write(f'give {self.player} minecraft:{item} {count}')
-        if self.spatial:
-            for x,y,z,name in self.spatial['initial'] + self.spatial['preserve']:
-                self._write(f'setblock {x} {y} {z} minecraft:{name}')
         for command in ['time set noon', 'weather clear', 'difficulty peaceful',
                         f'effect give {self.player} minecraft:saturation 1 10 true',
                         f'effect give {self.player} minecraft:instant_health 1 10 true',
@@ -292,10 +279,6 @@ class World:
         health = self.scalar(f'data get entity {self.player} Health 1000') / 1000
         deaths = self.scalar(f'scoreboard players get {self.player} cieldeaths')
         result = {'inventory': inventory, 'position': position, 'health': health, 'deaths': deaths}
-        if getattr(self, 'spatial', None):
-            for key, group in [('spatial_expected','expected'),('spatial_preserved','preserve')]:
-                result[key] = [bool(self.scalar(f'execute if block {x} {y} {z} minecraft:{name}', success=True))
-                               for x,y,z,name in self.spatial[group]]
         if getattr(self, 'mobs', None):
             result['mobs'] = {name: self.scalar(f'execute if entity @e[type=minecraft:{name}]') for name in sorted(self.mobs)}
         if getattr(self, 'farm', None):

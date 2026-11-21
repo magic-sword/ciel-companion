@@ -83,15 +83,6 @@ class NavigationTest(unittest.IsolatedAsyncioTestCase):
         result, _ = await self.trial(task_id='follow_owner', active=True, move=True, resume=True)
         self.assertEqual(result['reason'], 'resumed_after_stop')
 
-    async def test_locator_precondition_cannot_be_silently_relaxed(self):
-        for kw in [{'locator_known': True}, {'no_hint': True}]:
-            with self.assertRaisesRegex(RuntimeError, 'Locator fixture'):
-                await self.trial(task_id='come_here_locator', **kw)
-        task = next(t for t in load_tasks() if t['id'] == 'come_here_azimuth')
-        with self.assertRaisesRegex(RuntimeError, 'Locator fixture'):
-            await evaluate_navigation(task, None, None, None, {}, seconds=120, max_llm=30, max_calls=80,
-                observe=lambda: {'target_entity_known':False,'hint':{'source':'chunk'}})
-
     def test_mismatched_body_operation_and_out_of_bounds_target_are_rejected(self):
         task = copy.deepcopy(next(t for t in load_tasks() if t['id'] == 'come_here'))
         task['body_call']['name'] = 'minecraft_follow_me'
@@ -105,7 +96,7 @@ class NavigationTest(unittest.IsolatedAsyncioTestCase):
         world = World(Rcon())
         with self.assertRaisesRegex(RuntimeError, 'Not a marked'): world.move_target([20, 64, 0])
 
-    def test_corridor_is_bounded_and_owner_is_a_fixture_not_an_agent_tool(self):
+    def test_arena_fills_are_bounded_and_owner_is_a_fixture_not_an_agent_tool(self):
         commands = []
         class Rcon:
             def command(self, text):
@@ -114,9 +105,9 @@ class NavigationTest(unittest.IsolatedAsyncioTestCase):
         world = World(Rcon())
         world.lease = 'test'
         world.scalar = lambda *a, **kw: 1
-        task = next(t for t in load_tasks() if t['id'] == 'come_here_azimuth')
+        task = next(t for t in load_tasks() if t['id'] == 'come_here')
         world.reset(task, 11)
-        self.assertIn('tp Bench_Owner 384 64 0', commands)
+        self.assertTrue(any(c.startswith('tp Bench_Owner 20') for c in commands), commands)
         for command in commands:
             if command.startswith('fill '):
                 xyz = list(map(int, command.split()[1:7]))

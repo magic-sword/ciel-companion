@@ -26,14 +26,10 @@ def validate_navigation(task):
     for p in targets:
         if not isinstance(p, list) or len(p) != 3 or any(type(v) not in (int, float) or not math.isfinite(v) for v in p):
             raise ValueError('Invalid navigation target')
-        if not (-40 <= p[0] <= 400 and p[1] == 64 and -40 <= p[2] <= 40):
+        if not (-40 <= p[0] <= 40 and p[1] == 64 and -40 <= p[2] <= 40):
             raise ValueError('Target outside fixture')
     if nav['kind'] != 'follow' and len(targets) != 1:
         raise ValueError('Only following has moving targets')
-    if nav.get('locator_only') and (nav['kind'] != 'come' or targets[0][0] < 200 or abs(targets[0][2]) > 10):
-        raise ValueError('Locator-only fixture requires the long corridor')
-    if nav.get('hint_source') not in (None, 'azimuth') or (nav.get('hint_source') and not nav.get('locator_only')):
-        raise ValueError('Invalid required locator precision')
     expected_args = {'x': targets[0][0], 'z': targets[0][2]} if nav['kind'] == 'coordinates' else {}
     if task.get('body_call') != {'name': TOOLS[nav['kind']][0], 'arguments': expected_args}:
         raise ValueError('Body and conversation tasks must use the same public operation')
@@ -59,11 +55,7 @@ async def prepare_navigation(task, initial):
             known = value['target_entity_known']
             target = initial['target_position']
             synced = p and math.dist([p['x'], p['y'], p['z']], target) < 0.1
-            hint = value.get('hint')
-            if task['navigation'].get('locator_only'):
-                if not known and hint and (not task['navigation'].get('hint_source') or hint['source'] == task['navigation']['hint_source']):
-                    return
-            elif known and synced:
+            if known and synced:
                 return
             await asyncio.sleep(0.1)
 
@@ -74,9 +66,6 @@ async def evaluate_navigation(task, world, driver, trace, initial, *, seconds, m
     nav = task['navigation']
     limits = budget(task, seconds)
     opening = observe()
-    if nav.get('locator_only') and (opening['target_entity_known'] or not opening.get('hint')
-            or (nav.get('hint_source') and opening['hint']['source'] != nav['hint_source'])):
-        raise RuntimeError('Locator fixture must start with direction data and no target entity')
     trace('navigation_precondition', observation=opening)
     started, wall_started = clock(), time.time()
     trace.phase, trace.started_at = 'execution', wall_started
@@ -164,7 +153,7 @@ async def evaluate_navigation(task, world, driver, trace, initial, *, seconds, m
                     'elapsed_seconds': round(clock() - started, 3), 'final': current, 'metrics': data,
                     'budget': limits, 'first_action_seconds': watch.first_action,
                     'time_to_goal_seconds': stage_times[-1] if stage_times else None,
-                    'navigation_stages': stage_times, 'locator_precondition': opening,
+                    'navigation_stages': stage_times, 'precondition': opening,
                     'stop_latency_seconds': None if stable_since is None else round(stable_since - stopping, 3),
                     'body_completion_confirmed': passed,
                     'reply_observed': bool(driver.report_complete(wall_started)),
