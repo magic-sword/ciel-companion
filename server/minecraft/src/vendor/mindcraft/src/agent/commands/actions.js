@@ -1,6 +1,7 @@
 import * as skills from '../library/skills.js';
 import { obtainItem } from '../library/obtain.js';
 import { makeFarm, sowFarmland } from '../library/farm.js';
+import { buildStructure } from '../library/structure.js';
 import { buildHouse, houseNames } from '../library/house.js';
 import { setBase, describeBase } from '../library/base.js';
 import settings from '../settings.js';
@@ -375,6 +376,67 @@ export const actionsList = [
         params: { },
         perform: runAsAction(async (agent) => {
             await skills.clearNearestFurnace(agent.bot);
+        })
+    },
+    {
+        name: '!placeBlockAt',
+        description: 'Place one block or item (such as a torch) at the given position, walking there and building off a block next to it. For several blocks in a shape, use !buildStructure; for seeds, !sowFarmland.',
+        params: {
+            'type': { type: 'BlockOrItemName', description: 'The block type to place.' },
+            'x': { type: 'int', description: 'The x coordinate.' },
+            'y': { type: 'int', description: 'The y coordinate.' },
+            'z': { type: 'int', description: 'The z coordinate.' },
+        },
+        perform: runAsAction(async (agent, type, x, y, z) => {
+            await skills.placeBlock(agent.bot, type, x, y, z);
+        })
+    },
+    {
+        name: '!breakBlockAt',
+        description: 'Break the one block at the given position, walking there. To gather blocks of a type, use !collectBlocks.',
+        params: {
+            'x': { type: 'int', description: 'The x coordinate.' },
+            'y': { type: 'int', description: 'The y coordinate.' },
+            'z': { type: 'int', description: 'The z coordinate.' },
+        },
+        perform: runAsAction(async (agent, x, y, z) => {
+            await skills.breakBlockAt(agent.bot, x, y, z);
+        })
+    },
+    {
+        name: '!useBlockAt',
+        description: 'Use (right click with an empty hand) the block at the given position: open or close a door, trapdoor or gate, flip a lever, press a button.',
+        params: {
+            'x': { type: 'int', description: 'The x coordinate.' },
+            'y': { type: 'int', description: 'The y coordinate.' },
+            'z': { type: 'int', description: 'The z coordinate.' },
+        },
+        perform: runAsAction(async (agent, x, y, z) => {
+            await skills.activateBlockAt(agent.bot, x, y, z);
+        })
+    },
+    {
+        name: '!wait',
+        description: 'Wait where you are for the given number of seconds, such as for crops to grow or for the night to pass. Stops when you are told to.',
+        params: {
+            'seconds': { type: 'int', description: 'How long to wait.', domain: [1, 601] }
+        },
+        perform: runAsAction(async (agent, seconds) => {
+            await skills.wait(agent.bot, seconds * 1000);
+        })
+    },
+    {
+        name: '!buildStructure',
+        description: "Build a small structure (a wall, tower, bridge, fence, room) from a plan: gets the materials, and a pickaxe if stone is in the way, clears what is in the way and places the blocks bottom up. legend: symbol=block_name pairs, such as \"c=cobblestone, g=glass\". layers: bottom layer first, separated by /; each layer is rows separated by commas, one symbol per block along +x, rows along +z. \".\" leaves a cell as it is and \"_\" clears it. x, y, z is the first block of the bottom layer. Example, a 3 x 3 cobblestone ring 2 high with a glass window: !buildStructure(10, 64, -5, \"c=cobblestone, g=glass\", \"ccc,c_c,ccc/cgc,c_c,ccc\"). At most 16 on each side and 512 blocks. Giving the same plan again carries it on.",
+        params: {
+            'x': { type: 'int', description: 'The x coordinate.' },
+            'y': { type: 'int', description: 'The y coordinate.' },
+            'z': { type: 'int', description: 'The z coordinate.' },
+            'legend': { type: 'string', description: 'symbol=block_name pairs separated by commas.' },
+            'layers': { type: 'string', description: 'Layers bottom first separated by /, rows separated by commas.' }
+        },
+        perform: runAsAction(async (agent, x, y, z, legend, layers) => {
+            await buildStructure(agent, x, y, z, legend, layers);
         })
     },
         {
