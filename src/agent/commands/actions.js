@@ -1,6 +1,6 @@
 import * as skills from '../library/skills.js';
 import { obtainItem } from '../library/obtain.js';
-import { makeFarm } from '../library/farm.js';
+import { makeFarm, sowFarmland } from '../library/farm.js';
 import { buildHouse, houseNames } from '../library/house.js';
 import { setBase, describeBase } from '../library/base.js';
 import settings from '../settings.js';
@@ -289,6 +289,16 @@ export const actionsList = [
         })
     },
     {
+        name: '!sowFarmland',
+        description: 'Plant wheat seeds on the empty farmland near you (already tilled, nothing growing), up to num cells. Gets seeds from grass when there are not enough. Without empty farmland near, it lists what to do instead (till the ground here, or go back to the farm at the base) to choose from with !chooseOption.',
+        params: {
+            'num': { type: 'int', description: 'The most cells to sow.', domain: [1, 65] }
+        },
+        perform: runAsAction(async (agent, num) => {
+            await sowFarmland(agent, num);
+        })
+    },
+    {
         name: '!setBase',
         description: 'Make the place where you stand your base. A crafting table, furnace or chest within 8 blocks, or placed there later, stays as the base\'s own, and plans walk back to use them instead of making new ones. Choose it with the owner or where you have built a house.',
         params: {},
@@ -369,7 +379,7 @@ export const actionsList = [
     },
         {
         name: '!placeHere',
-        description: 'Place a given block in the current location. Do NOT use to build structures, only use for single blocks/torches.',
+        description: 'Place a given block in the current location. Do NOT use to build structures, only use for single blocks/torches. Seeds go on farmland with !sowFarmland.',
         params: {'type': { type: 'BlockOrItemName', description: 'The block type to place.' }},
         perform: runAsAction(async (agent, type) => {
             let pos = agent.bot.entity.position;
