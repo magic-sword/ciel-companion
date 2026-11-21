@@ -26,6 +26,30 @@ class WorkTest(unittest.IsolatedAsyncioTestCase):
         self.runner.work = {**self.runner.work, 'state': 'running', 'task_id': 'new'}
         self.assertFalse(valid())
 
+    async def test_a_finished_work_spoken_by_the_body_is_still_recorded_for_the_mind(self):
+        recorded = []
+        self.runner.record = lambda event_id, fact: recorded.append((event_id, fact))
+        await self.runner.start('puzzle.solve', {}, title='木のシャベルを作って')
+        self.runner.say = lambda why, **kw: types.SimpleNamespace(status='queued')
+        self.runner.message({'task_id': 'task', 'revision': 1, 'text': 'できました。'})
+        self.runner.say = lambda why, **kw: self.lines.append(kw)
+        self.runner.accept({**self.remote, 'revision': 2, 'state': 'succeeded', 'evidence': {'response': 'できました。'}})
+        self.assertEqual(self.lines, [])   # 終わりの言葉は体がもう話す
+        self.assertEqual(recorded, [('server:task:succeeded', '頼まれた作業「木のシャベルを作って」が終わった（できた）')])
+
+    async def test_doing_lists_the_works_done_together_without_a_long_gap(self):
+        self.assertIsNone(self.runner.doing())
+        now = goals.time.time()
+        self.runner.recent.extend([{'title': '昔の遊び', 'state': 'succeeded', 'at': now - 3600},
+                                   {'title': '木のシャベル', 'state': 'succeeded', 'at': now - 300},
+                                   {'title': '土をならす', 'state': 'failed', 'at': now - 60}])
+        d = self.runner.doing()
+        self.assertEqual([w['request'] for w in d['works']], ['木のシャベル', '土をならす'])
+        self.assertEqual(d['works'][1]['result'], 'できなかった')
+        self.assertEqual(d['minutes'], 5.0)
+        await self.runner.start('puzzle.solve', {}, title='庭を作る')
+        self.assertEqual(self.runner.doing()['works'][-1], {'request': '庭を作る', 'result': 'している途中'})
+
     def setUp(self):
         self.remote = {'version': 1, 'session': 'server', 'task_id': 'task', 'request_id': 'request',
                        'revision': 1, 'state': 'running', 'evidence': {}, 'message': ''}

@@ -141,6 +141,18 @@ class SpeakUpTest(unittest.IsolatedAsyncioTestCase):
         self.up.on_user_state(SimpleNamespace(new_state='speaking'))
         self.up.view.outcome.assert_called_with(1, 'aborted', 'user_spoke', speak_up.SpeakUp.HIGH)
 
+    def test_an_idea_about_a_finished_work_is_said_and_checked_against_the_bodys_report(self):
+        ev = turn(2, role='event', text='頼まれた作業「土をならす」が終わった（できた）')
+        self.history.turns += [ev, turn(3, role='assistant', text='できたのです。地面をきれいにならしました')]
+        self.up.replied('いいですね。')
+        self.playing()
+        self.mind.ideas = [self.idea(text='地面をきれいにならしました', turn=2)]
+        self.up.step()
+        self.assertEqual(self.said, [])   # 体の報告と同じことは言わない
+        self.mind.ideas = [self.idea(text='次は花を植えて庭にしませんか', turn=2)]
+        self.up.step()
+        self.assertEqual(len(self.said), 1)
+
     def test_overlap(self):
         self.assertEqual(speak_up.overlap('', 'x'), 0.0)
         self.assertGreater(speak_up.overlap('鉄インゴット1個', '鉄インゴット1個と鉄塊'), 0.9)

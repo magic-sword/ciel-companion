@@ -84,6 +84,16 @@ class SpeakUp:
     def _latest_user(self):
         return next((t for t in reversed(self.history.turns) if t.role == 'user' and t.text and t.ready.is_set()), None)
 
+    def _latest_cue(self):
+        """考えのきっかけになる最後の発言か出来事（作業が終わったなど）"""
+        return next((t for t in reversed(self.history.turns)
+                     if t.role in ('user', 'event') and t.text and t.ready.is_set()), None)
+
+    def _said_since(self, turn: int) -> str:
+        """きっかけのあとにシエルが話したこと。体が話した言葉（作業の報告）も入る"""
+        said = [t.text for t in self.history.turns if t.role == 'assistant' and t.id > turn and t.text]
+        return ' '.join(said) or self.reply_text
+
     def _track(self) -> None:
         current = getattr(self.session, 'current_speech', None)
         if current is not None and current is not self.handle and not current.done():
@@ -105,7 +115,7 @@ class SpeakUp:
                 self.handle = None
             return
         ideas = self.mind_recall.ideas
-        latest = self._latest_user()
+        latest = self._latest_cue()
         if not ideas or latest is None:
             return
         fresh = [i for i in ideas if i.turn == latest.id]
@@ -123,12 +133,13 @@ class SpeakUp:
             drop = 'user_speaking'
         elif self.reply_ended is None and not self._reply_generated():
             return   # 返事 N を作っている途中。作り終えるのを待つ（新しさを見るのに返事の文が要る）
-        elif overlap(best.text, self.reply_text) >= self.REPEAT:
+        elif overlap(best.text, self._said_since(best.turn)) >= self.REPEAT:
             drop = 'repeat'
         self.mind_recall.ideas = []   # 1 つの発言の考えは 1 回だけ見る
+        said = self._said_since(best.turn)
         fields = dict(level=round(best.level, 2), idea_kind=best.kind, text=best.text, turn=best.turn,
-                      threshold=self.threshold, overlap=round(overlap(best.text, self.reply_text), 2),
-                      reply_playing=self.reply_ended is None, reply=self.reply_text[:120])
+                      threshold=self.threshold, overlap=round(overlap(best.text, said), 2),
+                      reply_playing=self.reply_ended is None, reply=said[:120], cue=latest.role)
         if drop is not None:
             debug_log.record('speak_up', status='dropped', reason=drop, **fields)
             self._show('dropped', drop, best.turn)

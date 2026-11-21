@@ -424,6 +424,29 @@ class MindReadsReplyTest(unittest.IsolatedAsyncioTestCase):
         request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
         self.assertEqual(request['conversation'][-1], {'speaker': 'シエル', 'text': '怖くないのです！'})
 
+    async def test_a_finished_work_is_thought_about_after_cieles_words_with_what_we_are_doing(self):
+        from conversation import Conversation
+        t = [0.0]
+        history = Conversation()
+        history.complete(history.reserve(), 'シャベルで何かしよう', label='ユウ')
+        history.event(source='work', event_id='w1', occurred_at=0.0, kind='work.result',
+                      fact='頼まれた作業「土をならす」が終わった（できた）')
+        client = mind_client('{"use": [], "ideas": []}')
+        doing = {'works': [{'request': '土をならす', 'result': 'できた', 'minutes_ago': 0.1}], 'minutes': 3.0}
+        with patch.object(recall.MindRecall, 'IDEAS', True):
+            m = recall.MindRecall(recall.Recall(FakeStore([]), None, clock=lambda: NOW), '指示',
+                                  ideas_instructions='考えの指示', client=client, doing=lambda: doing,
+                                  monotonic=lambda: t[0])
+        with patch('models.is_local', return_value=False):
+            await m.step(history, lambda: Situation())
+            self.assertEqual(client.chat.completions.create.await_count, 0)   # シエルの言葉を待つ
+            history.complete(history.reserve(role='assistant'), 'できたのです。地面がきれいになりました。')
+            await m.step(history, lambda: Situation())
+        request = __import__('json').loads(client.chat.completions.create.await_args.kwargs['messages'][1]['content'])
+        self.assertEqual(request['doing'], doing)
+        self.assertEqual(request['conversation'][-1]['text'], 'できたのです。地面がきれいになりました。')
+        self.assertEqual(m.considered, 2)
+
     async def test_the_view_sees_waiting_thinking_and_ideas(self):
         from conversation import Conversation
         from mind_view import MindView

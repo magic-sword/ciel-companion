@@ -543,9 +543,11 @@ class MindRecall:
     # 話したいことを考えるときは、シエル自身の返事を読んでから考える（返事と食い違う・同じことを言う考えが出た。
     # 2026-11-21）。返事が来ないとき（黙った・道具だけ）は、これだけ待ってから返事なしで考える
     REPLY_WAIT = 30.0
+    # 出来事（作業が終わったなど）で考えるときは、それを受けたシエルの言葉を読むまで、これだけ待つ
+    EVENT_WAIT = 10.0
 
     def __init__(self, recall: Recall, instructions: str, *, ideas_instructions: str = '', client=None, game=None,
-                 monotonic=time.monotonic) -> None:
+                 doing=None, monotonic=time.monotonic) -> None:
         self.recall, self.client = recall, client
         self.ideas_on = self.IDEAS and bool(ideas_instructions)
         self.instructions = ideas_instructions if self.ideas_on else instructions
@@ -556,6 +558,7 @@ class MindRecall:
         self.reply: tuple[int, str] | None = None   # 最後の返事：(答えた相手の発言, 文)
         self._reply_wait: tuple[int, float] | None = None
         self.game = game      # 今のゲームの様子を返す関数（今の拠点で、思い出した拠点を照らし合わせる）
+        self.doing = doing    # 今一緒にしていること（goals.GoalRunner.doing）を返す関数。話したいことを考えるときだけ渡す
         self.monotonic = monotonic
         self.thought: Thought | None = None
         self.considered = 0   # 見極めた最後の発言
@@ -579,6 +582,7 @@ class MindRecall:
         request = {'now': f'{now:%Y-%m-%d %H:%M}',
                    'conversation': [{'speaker': t.name, 'text': t.text[:300]} for t in rows[-self.TURNS:]],
                    **({'game': g} if (g := self.game() if self.game is not None else None) else {}),
+                   **({'doing': d} if self.ideas_on and (d := self.doing() if self.doing is not None else None) else {}),
                    'candidates': [{'id': r.id, 'when': ago(r.at, now), 'text': r.text} for r in pool]}
         if self.client is None:
             self.client = models.create_client('brief')
@@ -711,6 +715,14 @@ class MindRecall:
             elif not any(r['role'] == 'assistant' and r['text'] == self.reply[1]
                          for r in shown[next(i for i, t in enumerate(rows) if t is last):]):
                 shown.append({'role': 'assistant', 'name': 'シエル', 'text': self.reply[1]})
+        elif self.ideas_on and last.role == 'event' and last is rows[-1]:
+            # 出来事（作業が終わった）を受けたシエルの言葉を読んでから考える。言葉が来なければ、待ってから考える
+            if self._reply_wait is None or self._reply_wait[0] != last.id:
+                self._reply_wait = (last.id, self.monotonic())
+            if self.monotonic() - self._reply_wait[1] < self.EVENT_WAIT:
+                if self.view is not None:
+                    self.view.waiting(last.id, query)
+                return None
         return await self.consider([_Row(**r) for r in shown], query, situation(), last.id)
 
 

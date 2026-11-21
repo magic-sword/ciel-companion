@@ -5,6 +5,7 @@ import json
 import math
 import time
 import uuid
+from collections import deque
 
 import debug_log
 
@@ -17,6 +18,10 @@ MAX_SECONDS = 1800
 MAX_MESSAGE = 2000
 ACTIVE = frozenset(('accepted', 'running', 'needs_decision', 'cancelling'))
 STATES = ACTIVE | TERMINAL
+# 心（recall.MindRecall）へ渡す、最近の作業の数。これより前の間が空いたら、別の遊びとして数え直す
+RECENT = 6
+STREAK_GAP_S = 600
+RESULT_WORDS = {'succeeded': 'できた', 'failed': 'できなかった', 'cancelled': '止めた'}
 
 
 class GoalRunner:
@@ -37,6 +42,11 @@ class GoalRunner:
         self.presence = lambda: 'solo'
         self.owner_name = lambda: None
         self._plan = None   # the game's plan graph (plan v1) for the current work
+        self.recent: deque = deque(maxlen=RECENT)   # 終わった作業：{title, state, at}（time.time()）
+        self.started_at: float | None = None        # 今の作業を始めた時刻
+        # 作業の終わりを会話の流れ（conversation.Conversation の出来事）へ残す。終わりの言葉を体がもう話すときも、
+        # 心がそれをきっかけに考えられるように（agent.py が置く）
+        self.record = None
 
     def _tool(self, key):
         return (self.env.profile.get('work') or {}).get(key)
@@ -57,6 +67,7 @@ class GoalRunner:
                 return {'status': 'error', 'reason': 'work_protocol_mismatch'}
             if type(seconds) not in (int, float) or not 0 < seconds <= MAX_SECONDS:
                 return {'status': 'error', 'reason': 'invalid_budget'}
+            self.started_at = time.time()
             self._deadline = time.monotonic() + seconds
             self.title = title or capability
             r = await self._call('submit', {'request_id': request_id or uuid.uuid4().hex, 'capability': capability,
@@ -123,14 +134,21 @@ class GoalRunner:
             key = (w['task_id'], w['state'], (w.get('decision') or {}).get('decision_id'))
             if key not in self._notified:
                 self._notified.add(key)
+                if w['state'] in TERMINAL:
+                    self.recent.append({'title': self.title, 'state': w['state'], 'at': time.time()})
                 repeated = ((w.get('decision') or {}).get('message') if w['state'] == 'needs_decision'
                             else (w.get('evidence') or {}).get('response') if w['state'] == 'succeeded' else None)
-                if (repeated and self._last_body_speech == (w['session'], w['task_id'], repeated.strip()[:600])
-                        and getattr(self._last_body_event, 'status', None) in ('queued', 'generating', 'spoken')):
-                    return True
                 # Inventory/evidence remain in the current-state supplement, not the event timeline.
                 fact = {k: w.get(k) for k in ('task_id', 'state', 'message', 'reason', 'decision')}
-                self.say('game', settle=0.2, instructions=json.dumps({'work_result': fact, 'title': self.title}, ensure_ascii=False), merge=True)
+                line = json.dumps({'work_result': fact, 'title': self.title}, ensure_ascii=False)
+                if (repeated and self._last_body_speech == (w['session'], w['task_id'], repeated.strip()[:600])
+                        and getattr(self._last_body_event, 'status', None) in ('queued', 'generating', 'spoken')):
+                    # 体が終わりの言葉をもう話す。話さずに、終わったことだけを会話の流れへ残す
+                    if self.record is not None and w['state'] in TERMINAL:
+                        self.record(f"{w['session']}:{w['task_id']}:{w['state']}",
+                                    f"頼まれた作業「{self.title}」が終わった（{RESULT_WORDS[w['state']]}）")
+                    return True
+                self.say('game', settle=0.2, instructions=line, merge=True)
         return True
 
     def _follow_deadline(self, w):
@@ -250,6 +268,28 @@ class GoalRunner:
             self._last_body_speech = (*identity, text)
             self._last_body_event = event
         return True
+
+    def doing(self) -> dict | None:
+        """心へ渡す「今一緒にしていること」：間を空けずに続けている作業（古い順）と、その長さ"""
+        now = time.time()
+        works = list(self.recent)
+        running = self.work and self.work['state'] in ACTIVE
+        # 間が空いた前の作業は別の遊び
+        start = 0
+        for i in range(1, len(works)):
+            if works[i]['at'] - works[i - 1]['at'] > STREAK_GAP_S:
+                start = i
+        works = works[start:]
+        if works and now - works[-1]['at'] > STREAK_GAP_S and not running:
+            works = []
+        items = [{'request': w['title'], 'result': RESULT_WORDS.get(w['state'], w['state']),
+                  'minutes_ago': round((now - w['at']) / 60, 1)} for w in works]
+        if running:
+            items.append({'request': self.title, 'result': 'している途中'})
+        if not items:
+            return None
+        first = works[0]['at'] if works else (self.started_at or now)
+        return {'works': items, 'minutes': round((now - min(first, self.started_at or first)) / 60, 1)}
 
     def body_step(self):
         return self.title if self.work and self.work['state'] in ACTIVE else None

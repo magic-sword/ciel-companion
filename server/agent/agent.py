@@ -409,6 +409,7 @@ class Ciel(Agent):
                                               to_fnc_ctx(llm.ToolContext(fns), strict=True), note=self._game_text())
                 if reply is not None:
                     yield reply
+                    self._replied(str(reply))   # ゲーム中の返事も、心が読んでから考える
                     return
                 # The decision chose not to act; the conversation model answers in words.
                 refused |= self.mind.one_call_tools()
@@ -476,18 +477,23 @@ class Ciel(Agent):
             debug_log.record('model_response', id=request_id, role=who, seconds=round(time.monotonic()-generation_started,3))
             debug_log.record('mind_output', who=who, speech=speech, text=''.join(text), tools=calls, done=done,
                              tools_given=len(fns), blocked=blocked)
-            if self.speak_up is not None and not idea and done:
-                self.speak_up.replied(''.join(text))   # 話す考えが、この返事と重なっていないかを見る
-            if (self.mind_recall is not None and not idea and done and self.mind.reply_origin == 'reply'
-                    and (history := getattr(self.session.userdata, 'history', None)) is not None):
-                # 心は、この返事を読んでから話したいことを考える（返事と食い違わない・同じことを言わない）
-                answered = next((x.id for x in reversed(history.turns) if x.role == 'user' and x.text), None)
-                if answered is not None:
-                    self.mind_recall.replied(answered, ''.join(text))
+            if not idea and done:
+                self._replied(''.join(text))
             try:
                 self.mind.after_reply(done)
             except Exception:
                 logger.exception('心：返事のあとの処理に失敗')
+
+    def _replied(self, text: str) -> None:
+        """返事を作り終えた。話す考えが返事と重ならないかを見るのと、心が返事を読んでから考えるのに渡す"""
+        if self.speak_up is not None:
+            self.speak_up.replied(text)
+        if (self.mind_recall is not None and self.mind.reply_origin == 'reply'
+                and (history := getattr(self.session.userdata, 'history', None)) is not None):
+            # 心は、この返事を読んでから話したいことを考える（返事と食い違わない・同じことを言わない）
+            answered = next((x.id for x in reversed(history.turns) if x.role == 'user' and x.text), None)
+            if answered is not None:
+                self.mind_recall.replied(answered, text)
 
     def _game_text(self) -> str:
         """ゲームで遊ぶときの指示：どのゲームでも同じシエルの振る舞い（game.md）と、ゲームの遊び方（MCP の prompt play）"""
@@ -765,6 +771,13 @@ async def entrypoint(ctx: JobContext) -> None:
             goal_runner.presence = lambda: style.presence
             goal_runner.owner_name = lambda: (book.owner_name or None) if book is not None else None   # 名簿の呼び名（値）
             body.goals = goal_runner   # 係が体を使っているあいだは、心の体の道具を断る
+
+            def goal_record(event_id: str, fact: str) -> None:
+                # 体が終わりの言葉を話すときも、作業が終わったことを会話の流れへ残す（心がそれをきっかけに考える）
+                h = getattr(session.userdata, 'history', None)
+                if h is not None:
+                    h.event(source='work', event_id=event_id, occurred_at=time.time(), kind='work.result', fact=fact)
+            goal_runner.record = goal_record
             ctx.room.on('data_received', goal_runner.on_data)   # アプリの「止める」「続ける」（goal.control）
         session.userdata.goals = goal_runner
         if body is not None:
@@ -852,7 +865,9 @@ async def entrypoint(ctx: JobContext) -> None:
             # システム2：静かな間に、心が思い出しを見極める（返事の始まりを待たせない。docs/services/associative-memory-ja.md）
             agent.mind_recall = recall.MindRecall(agent.recall, agent.persona.recall_mind_instructions,
                 ideas_instructions=agent.persona.recall_mind_ideas_instructions, game=lambda: (
-                agent.game.context() if getattr(agent, 'game', None) is not None else None))
+                agent.game.context() if getattr(agent, 'game', None) is not None else None),
+                doing=lambda: (session.userdata.goals.doing()
+                               if getattr(session.userdata, 'goals', None) is not None else None))
             if agent.mind_recall.ideas_on:
                 # 心の考えをアプリの会話グラフの窓へ見せる（mind_view.py）。ひとり以外では、アプリが文を隠す
                 import mind_view
