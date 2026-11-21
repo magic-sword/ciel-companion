@@ -1693,8 +1693,6 @@ export async function tillAndSow(bot, x, y, z, seedType=null) {
      * let position = world.getPosition(bot);
      * await skills.tillAndSow(bot, position.x, position.y - 1, position.x, "wheat");
      **/
-    let pos = new Vec3(Math.floor(x), Math.floor(y), Math.floor(z));
-    let block = bot.blockAt(pos);
     log(bot, `Planting ${seedType} at x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`);
 
     if (bot.modes.isOn('cheat')) {
@@ -1708,52 +1706,88 @@ export async function tillAndSow(bot, x, y, z, seedType=null) {
         placeBlock(bot, seedType, x, y+1, z);
         return true;
     }
+    if (!await till(bot, x, y, z)) return false;
+    return seedType ? await sow(bot, x, y, z, seedType) : true;
+}
 
-    if (block.name !== 'grass_block' && block.name !== 'dirt' && block.name !== 'farmland') {
-        log(bot, `Cannot till ${block.name}, must be grass_block or dirt.`);
-        return false;
-    }
-    let above = bot.blockAt(new Vec3(x, y+1, z));
-    if (above.name !== 'air') {
-        if (block.name === 'farmland') {
-            log(bot, `Land is already farmed with ${above.name}.`);
-            return true;
-        }
-        let broken = await breakBlockAt(bot, x, y+1, z);
-        if (!broken) {
-            log(bot, `Cannot cannot break above block to till.`);
-            return false;
-        }
-    }
+async function nearFarmland(bot, block) {
     // if distance is too far, move to the block
     if (bot.entity.position.distanceTo(block.position) > 4.5) {
         let pos = block.position;
         bot.pathfinder.setMovements(new pf.Movements(bot));
         await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
     }
-    if (block.name !== 'farmland') {
-        let hoe = bot.inventory.items().find(item => item.name.includes('hoe'));
-        let to_equip = hoe?.name || 'diamond_hoe';
-        if (!await equip(bot, to_equip)) {
-            log(bot, `Cannot till, no hoes.`);
-            return false;
-        }
-        await bot.activateBlock(block);
-        log(bot, `Tilled block x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`);
-    }
-    
-    if (seedType) {
-        if (seedType.endsWith('seed') && !seedType.endsWith('seeds'))
-            seedType += 's'; // fixes common mistake
-        let equipped_seeds = await equip(bot, seedType);
-        if (!equipped_seeds) {
-            log(bot, `No ${seedType} to plant.`);
-            return false;
-        }
+}
 
-        await bot.activateBlock(block);
-        log(bot, `Planted ${seedType} at x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`);
+export async function till(bot, x, y, z) {
+    /**
+     * Till the grass or dirt at the given position into farmland with a hoe. Farmland is left as it is.
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {number} x, y, z, the position of the ground to till.
+     * @returns {Promise<boolean>} true if the ground is farmland, false otherwise.
+     * @example
+     * let position = world.getPosition(bot);
+     * await skills.till(bot, position.x, position.y - 1, position.z);
+     **/
+    let pos = new Vec3(Math.floor(x), Math.floor(y), Math.floor(z));
+    let block = bot.blockAt(pos);
+    if (block.name !== 'grass_block' && block.name !== 'dirt' && block.name !== 'farmland') {
+        log(bot, `Cannot till ${block.name}, must be grass_block or dirt.`);
+        return false;
     }
+    if (block.name === 'farmland') return true;
+    let above = bot.blockAt(pos.offset(0, 1, 0));
+    if (above.name !== 'air') {
+        let broken = await breakBlockAt(bot, pos.x, pos.y+1, pos.z);
+        if (!broken) {
+            log(bot, `Cannot cannot break above block to till.`);
+            return false;
+        }
+    }
+    await nearFarmland(bot, block);
+    let hoe = bot.inventory.items().find(item => item.name.includes('hoe'));
+    let to_equip = hoe?.name || 'diamond_hoe';
+    if (!await equip(bot, to_equip)) {
+        log(bot, `Cannot till, no hoes.`);
+        return false;
+    }
+    await bot.activateBlock(block);
+    log(bot, `Tilled block x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`);
+    return true;
+}
+
+export async function sow(bot, x, y, z, seedType) {
+    /**
+     * Plant the given seed type on the farmland at the given position (the farmland, not the air above it).
+     * @param {MinecraftBot} bot, reference to the minecraft bot.
+     * @param {number} x, y, z, the position of the farmland.
+     * @param {string} seedType, the seed item to plant, such as "wheat_seeds".
+     * @returns {Promise<boolean>} true if the farmland holds a plant, false otherwise.
+     * @example
+     * await skills.sow(bot, 10, 62, -4, "wheat_seeds");
+     **/
+    let pos = new Vec3(Math.floor(x), Math.floor(y), Math.floor(z));
+    let block = bot.blockAt(pos);
+    if (block.name !== 'farmland') {
+        log(bot, `Cannot sow on ${block.name}, it must be farmland (tilled with a hoe).`);
+        return false;
+    }
+    let above = bot.blockAt(pos.offset(0, 1, 0));
+    if (above.name !== 'air') {
+        log(bot, `Land is already farmed with ${above.name}.`);
+        return true;
+    }
+    await nearFarmland(bot, block);
+    if (seedType.endsWith('seed') && !seedType.endsWith('seeds'))
+        seedType += 's'; // fixes common mistake
+    let equipped_seeds = await equip(bot, seedType);
+    if (!equipped_seeds) {
+        log(bot, `No ${seedType} to plant.`);
+        return false;
+    }
+
+    await bot.activateBlock(block);
+    log(bot, `Planted ${seedType} at x:${x.toFixed(1)}, y:${y.toFixed(1)}, z:${z.toFixed(1)}.`);
     return true;
 }
 
