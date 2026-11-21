@@ -172,7 +172,7 @@
 
 2026-11-16、利用者の追加方針により、新しい自発判断を今後の基準として実装した。旧「内なる考え」は機能していなかったとの説明を受け、旧版や特定の論文との一致を採用条件にはしない。実装の契機・実行権限・取消は[会話pipeline](../conversation/conversation-pipeline-ja.md#発話自発的な思考付箋)。
 
-`scripts/server/benchmark-initiative.py`は実際の`Ciel._pipeline_llm`を共有GPU APIで実行し、`server/benchmark/initiative_cases.json`の6場面を各3回評価する。ローカルモデル、温度0、出力上限800トークン。人物の保存や実ワールドには接続せず、ゲームの作業開始はモックに渡した回数で確認する。起動までの8秒待ち・音声再生はこの測定に含めない。課題・実行器・ソースの指紋、モデル名、使用量、timings、出力を結果に保存する。
+（この測定に使った`initiative.py`・`scripts/server/benchmark-initiative.py`・場面の`initiative_cases.json`は、自発的な発言（`speak_up.py`）と作業の終わりの決定に置き換わったため2026-11-21に削除した。Gitの履歴に残る。）`scripts/server/benchmark-initiative.py`は実際の`Ciel._pipeline_llm`を共有GPU APIで実行し、`server/benchmark/initiative_cases.json`の6場面を各3回評価する。ローカルモデル、温度0、出力上限800トークン。人物の保存や実ワールドには接続せず、ゲームの作業開始はモックに渡した回数で確認する。起動までの8秒待ち・音声再生はこの測定に含めない。課題・実行器・ソースの指紋、モデル名、使用量、timings、出力を結果に保存する。
 
 | 場面 | 最初の候補 | 判断方法を明確にした初版 |
 |---|---:|---:|

@@ -372,7 +372,6 @@ namespace Ciel.Conversation
             var sec = Section(content);
             SectionLabel(Row(sec, 20), "配信");
             (_streamSwitch, _streamKnob) = SwitchRow(sec, "シエルの映像ウィンドウを開く", () => _stream.SetOpen(!_stream.IsOpen));
-            BuildStreamGoalSwitch(sec);   // いまの目的の札（CielConversationUI.Goal.cs）
             (_cardOutputSwitch, _cardOutputKnob) = SwitchRow(sec, "視聴者向けの目的カードを開く", () =>
             {
                 var card = GetComponent<CielAudienceCard>();
@@ -615,7 +614,6 @@ namespace Ciel.Conversation
                 _youtubeNow.text = YouTubeNow(c);
                 if (!_youtubeUrl.isFocused && _youtubeUrl.text != c.YouTubeUrl) _youtubeUrl.SetTextWithoutNotify(c.YouTubeUrl);
             }
-            RefreshStreamGoalSwitch();
             RefreshCardOutputSwitch();
             RefreshMinutesDestinations();
         }

@@ -1,5 +1,7 @@
 # 現在の確認範囲と配布状況
 
+2026-11-21、追加を重ねた実装を整理した。配信アプリの「シエルの映像に、目的と処理状態を重ねる」機能（`CielConversationUI.BroadcastOutput.cs`、設定の`showStatusOnOutput`、配信カメラだけに映す層）を削除し、その確認器は`goal.state`の受け取りと作業の表示文を見る`CielGoalStateCheck`に改めた。会話サーバーでは、どこからも使われていなかった`initiative.py`（自発的な発言と作業の終わりの決定に置き換わった）・`listener.py`とその指示文・人格の項目・測定スクリプト、消えたスクリプトを指す料金のかかる試験の項目を削除した。`tests/`の外にあって回帰テストに含まれていなかった`test_ciel_core.py`・`test_core_host.py`を`tests/`へ移した。体では、実行経路から外れていた旧Runner（`src/skills.js`・`goal-plan.js`・`care.js`・`guard.js`）と、それだけを試すテストを削除した。通常回帰unit 852件、体のNode 167件（既存1件skip）、UnityのEditorで`CielGoalStateCheck` 9件・構成44件が成功。未配布。
+
 2026-11-21、体の`!lookAtPosition`・`!lookAtPlayer`を、シエルの目（`eye.js`）で見られるようにした（[設計](../games/minecraft/minecraft-design-ja.md#知識と視覚)、fork `e9b5242`）。上流の`VisionInterpreter`をそのまま使い、撮る部品だけを目に差し替えた。中核の`/v1/respond`は画像を1枚受け付け、最後の発言に添えて`mind`の推論へ渡す。体のNode 206件（既存1件skip）、中核の画像の受付・添付の試験、通常回帰unit 853件が成功。forkの`ciel`・`ciel-vendor`はpush済み。会話サーバーを開発（LiveKit Cloud用・家の中のLiveKit用）と本番へ、体（開発・本番で共用）へ配布した（`74b17f9`。本番の会話サーバーは変更ファイルのハッシュ一致・再起動0回・設定維持・worker登録、体はコンテナ内のテスト成功・ソース159件一致・他のサービス不変・ワールドへ参加を確認）。実際の景色をモデルが読めるかは未確認。
 
 2026-11-21、上流の技のうち命令から呼べなかったものに命令を付けた（[設計](../games/minecraft/minecraft-design-ja.md)、fork `0b106e6`）。`!placeBlockAt`・`!breakBlockAt`・`!useBlockAt`・`!wait`と、記号の対応表と段の文字列で小さな建物を建てる`!buildStructure`である。どの技も命令・modes・計画のどれかから呼ばれることを確かめる検査（`test/skill-reach.test.js`）を置いた。体のNode 203件（既存1件skip）は成功。forkの`ciel`・`ciel-vendor`はpush済み。体（開発・本番で共用）へ配布した（`4aeea8a`。コンテナ内で体のテスト成功・ソース159件一致・他のサービス不変・ワールドへ参加を確認）。普段のワールドでは未確認。

@@ -15,4 +15,3 @@ MonoBehaviour:
   broadcast: 1
   windowSize: {x: 1100, y: 800}
   openOutputOnStart: 1
-  showStatusOnOutput: 0

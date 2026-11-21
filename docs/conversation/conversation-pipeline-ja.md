@@ -101,7 +101,7 @@ mindへは能力の概要と少数の個別操作を渡す。他の道具は`loa
 | 経路と履歴の組み立て | `mind.py`、`turns.py`、`conversation.py` |
 | 指示本文 | [プロンプト管理](prompt-management-ja.md)、`config/persona.toml` |
 | 本人確認・保存 | `speakers.py`、`speaker_store.py`、`tools/memory.py` |
-| 受付・付箋・発話 | `listener.py`、`game_decision.py`、`board.py`、`mouth.py` |
+| 受付・付箋・発話 | `game_decision.py`、`board.py`、`mouth.py` |
 | 反応・音声・表情 | `reactions.py`、`emotion.py`、`irodori_tts.py` |
 
 試験コマンドは[回帰テスト](../testing/regression-tests-ja.md)、確認済み範囲と未確認項目は[確認状況](../testing/verification-status-ja.md)を参照する。

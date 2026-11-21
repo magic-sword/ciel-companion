@@ -5,7 +5,6 @@ import { Vec3 } from 'vec3';
 import { summarize } from '../src/state.js';
 import { fingerprint, stateText } from '../src/ciel/words.js';
 import { collectMovements, miningMovements, playerMovements } from '../src/movements.js';
-import { Runner } from '../src/skills.js';
 
 const require = createRequire(import.meta.url);
 const registry = require('prismarine-registry')('1.21.11');
@@ -62,29 +61,6 @@ test('explicit collection allows one crafting table while protecting all other t
   assert.equal(allowed.safeToBreak(other), false);
   assert.ok(allowed.blocksCantBreak.has(registry.blocksByName.oak_planks.id));
   assert.equal(playerMovements(bot).safeToBreak(target), false);
-});
-
-test('collect command recovers a requested table and restores normal movement protection', async () => {
-  const { bot, set, target, other } = fixture();
-  let count = 0;
-  bot.inventory.items = () => count ? [{ name: 'crafting_table', count, type: registry.itemsByName.crafting_table.id }] : [];
-  bot.collectBlock = { async collect(block) {
-    // collectblock uses the active pathfinder's real safeToBreak check before digging.
-    bot.pathfinder.setMovements(this.movements);
-    assert.equal(bot.pathfinder.movements.safeToBreak(other), false);
-    if (!bot.pathfinder.movements.safeToBreak(block)) return;
-    set(block.position, 'air'); count++;
-  } };
-  const events = [];
-  const runner = new Runner((type, fields) => events.push({ type, ...fields }));
-  runner.bot = bot;
-  await runner.start({ id: 1, skill: 'collect', args: { block: 'crafting_table', count: 1 } });
-  const done = events.find(e => e.type === 'done');
-  assert.equal(done.ok, true, JSON.stringify(done));
-  assert.deepEqual(done.note.gained, { crafting_table: 1 });
-  assert.equal(bot.blockAt(target.position).name, 'air');
-  assert.equal(bot.blockAt(other.position).name, 'crafting_table');
-  assert.ok(bot.pathfinder.movements.blocksCantBreak.has(target.type));
 });
 
 test('explicit collection does not make an unbreakable target diggable', () => {

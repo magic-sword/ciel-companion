@@ -364,7 +364,7 @@ class GameDecision:
             decision_schema['properties']['say']['minItems'] = 0
         request, began = uuid.uuid4().hex, time.monotonic()
         timings = {}
-        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='initiative' if silent else 'decide' if not note else 'decide_speak',
+        debug_log.record('work_inference', id=request, model=models.model('mind'), stage='consider' if silent else 'decide' if not note else 'decide_speak',
                          state=(work or {}).get('state'), temperature=self.TEMPERATURE if local else None)
         try:
             from decision_format import DecisionFormat
@@ -384,7 +384,7 @@ class GameDecision:
             debug_log.record('game_decision_error', error=type(e).__name__)
             return None
         finally:
-            debug_log.record('model_response', role='initiative' if silent else 'game_decision', id=request,
+            debug_log.record('model_response', role='consider' if silent else 'game_decision', id=request,
                              seconds=round(time.monotonic()-began, 3),
                              prompt_ms=timings.get('prompt_ms'), predicted_ms=timings.get('predicted_ms'))
         debug_log.record('work_decision', stage='decide', operation=(out.get('act') or {}).get('kind'))

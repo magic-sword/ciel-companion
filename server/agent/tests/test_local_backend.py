@@ -185,22 +185,19 @@ class LocalBackendTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(str(client.base_url), models.LOCAL_URL + '/')
         await client.close()
 
-    async def test_listener_and_minutes_use_local_options(self):
-        import listener
+    async def test_minutes_use_local_options(self):
         import minutes
         from conversation import Conversation
         response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{}'))], usage=None)
         local, cloud = mock.AsyncMock(), mock.AsyncMock()
         local.chat.completions.create.return_value = response
         with mock.patch.object(models, '_local_client', local), mock.patch.object(models, 'create_client', return_value=cloud):
-            ear = listener.Listener(None, None, 'test', client=cloud)
-            await ear._check('議事録をお願い')
             worker = minutes.Minutes(None, 'test', Conversation(), 'test')
             worker.start()
             meeting = worker.meeting
             await worker._live_update(meeting, [], [])
             await worker._summarize(meeting.started, meeting.started, None, [])
-        self.assertEqual(local.chat.completions.create.await_count, 3)
+        self.assertEqual(local.chat.completions.create.await_count, 2)
         for call in local.chat.completions.create.call_args_list:
             self.assertEqual(call.kwargs['model'], models.LOCAL_MODEL)
             self.assertNotIn('reasoning_effort', call.kwargs)

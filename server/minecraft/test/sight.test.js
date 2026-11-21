@@ -6,7 +6,6 @@ import { Vec3 } from 'vec3';
 import { blocksFor } from '../src/names.js';
 import { canSee, known, knows, notices, remember, rememberAround } from '../src/sight.js';
 import { commandBot } from '../src/body-command.js';
-import { harvestable, weakestTool } from '../src/skills.js';
 import { planCraft } from '../src/craft-plan.js';
 import { nearbyBlocks } from '../src/state.js';
 
@@ -113,18 +112,6 @@ test('呼び名から集めるブロック', () => {
   assert.deepEqual(names('flowerz'), []);
 });
 
-test('掘る道具と、作る材料', () => {
-  const bot = { registry, inventory: { items: () => [] } };
-  assert.equal(harvestable(bot, registry.blocksByName.dandelion), true);
-  assert.equal(harvestable(bot, registry.blocksByName.stone), false);
-  assert.equal(weakestTool(bot, [registry.blocksByName.iron_ore]), 'stone_pickaxe');
-  assert.equal(weakestTool(bot, [registry.blocksByName.stone]), 'wooden_pickaxe');
-  const pick = registry.itemsByName.wooden_pickaxe.id;
-  bot.inventory.items = () => [{ name: 'wooden_pickaxe', type: pick, count: 1 }];
-  assert.equal(harvestable(bot, registry.blocksByName.stone), true);
-
-});
-
 test('ふだんの歩き方：自然のブロックだけ壊し、手持ちの土・丸石を積み、4 段まで飛び降りる', async () => {
   const { playerMovements, escapeMovements } = await import('../src/movements.js');
   const bot = { registry, version: '1.21.11', world: {}, inventory: { items: () => [] } };
@@ -142,71 +129,6 @@ test('ふだんの歩き方：自然のブロックだけ壊し、手持ちの�
   const { escapeDrop } = await import('../src/movements.js');
   assert.equal(escapeDrop(14), 9);
   assert.equal(escapeDrop(6), 4);   // 体力が少なければ、ふだんの高さまで
-});
-
-test('見張り：動かず・掘らず・置かずのままなら、行き先を取り消して Stuck で終える', async () => {
-  const { watched } = await import('../src/skills.js');
-  const { EventEmitter } = await import('node:events');
-  const bot = new EventEmitter();
-  bot.entity = { position: new Vec3(0, 64, 0) };
-  let goal = 'log';
-  bot.pathfinder = { isMining: () => false, isBuilding: () => false, setGoal: (g) => { goal = g; bot.emit('goal_updated', g); } };
-  // 行き先が変わるまで終わらない goto（止まったままの経路探索）
-  const goto = () => new Promise((_, reject) => bot.once('goal_updated', () => reject(Object.assign(new Error('changed'), { name: 'GoalChanged' }))));
-  await assert.rejects(watched(bot, goto, 1500), { name: 'Stuck' });
-  assert.equal(goal, null);
-  // 動いていれば取り消さない
-  const moving = setInterval(() => { bot.entity.position = bot.entity.position.offset(1, 0, 0); }, 300);
-  assert.equal(await watched(bot, () => new Promise((r) => setTimeout(() => r('ok'), 2500)), 1500), 'ok');
-  clearInterval(moving);
-});
-
-test('掘る前に、足が地面に着くのを待つ', async () => {
-  const { groundedDig } = await import('../src/skills.js');
-  let ticks = 0;
-  const started = [];
-  const bot = {
-    entity: { onGround: false, isInWater: false },
-    dig: async (b) => { started.push({ block: b.name, onGround: bot.entity.onGround }); },
-    waitForTicks: async () => { ticks += 1; if (ticks === 3) bot.entity.onGround = true; },
-    digTime: () => (bot.entity.onGround ? 3000 : 15000),
-    heldItem: null,
-  };
-  const logs = [];
-  groundedDig(bot, (m) => logs.push(m));
-  await bot.dig({ name: 'oak_log' });
-  assert.deepEqual(started, [{ block: 'oak_log', onGround: true }]);
-  assert.equal(logs.length, 0);
-  // 水の中では待たない（待っても速くならない）。時間のかかる掘り方はログに残す
-  bot.entity.onGround = false;
-  bot.entity.isInWater = true;
-  await bot.dig({ name: 'oak_log' });
-  assert.equal(started[1].onGround, false);
-  assert.match(logs[0], /掘るのに時間がかかる block=oak_log ms=15000/);
-});
-
-test('掘ったあと、まわりに落ちた物を拾いに行く（真ん中から離れて落ちた物も）', async () => {
-  const { pickUpNear } = await import('../src/skills.js');
-  const { EventEmitter } = await import('node:events');
-  const bot = new EventEmitter();
-  bot.entity = { position: new Vec3(0, 64, 0) };
-  bot.entities = {
-    7: { id: 7, name: 'item', position: new Vec3(3.2, 64, 1.1) },    // 原木から 2 ブロックずれて落ちた
-    8: { id: 8, name: 'item', position: new Vec3(30, 64, 30) },      // 遠くの物は拾いに行かない
-  };
-  const went = [];
-  bot.waitForTicks = async () => {};
-  bot.pathfinder = {
-    setMovements: () => {},
-    goto: async (goal) => { went.push([goal.x, goal.z]); bot.entity.position = new Vec3(goal.x, goal.y, goal.z); delete bot.entities[7]; },
-    setGoal: () => {},
-  };
-  bot.registry = registry;
-  bot.inventory = { items: () => [] };
-  await pickUpNear(bot, new Vec3(1, 66, 1), null, { cancelled: false });
-  assert.equal(went.length, 1);
-  assert.ok(bot.entities[8]);
-  assert.equal(bot.entities[7], undefined);
 });
 
 test('ツルハシを作る手順：原木から板・棒・作業台を先に作り、足りなければ原木の数で返す', () => {

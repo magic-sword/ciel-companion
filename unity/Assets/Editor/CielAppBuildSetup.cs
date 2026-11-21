@@ -55,7 +55,6 @@ namespace Ciel.EditorTools
             profile.broadcast = broadcast;
             profile.windowSize = broadcast ? new Vector2Int(1100, 800) : new Vector2Int(540, 960);
             profile.openOutputOnStart = broadcast;
-            profile.showStatusOnOutput = false;   // 詳細は操作画面。映像への札は任意に有効にする
             AssetDatabase.CreateAsset(profile, path);
             return profile;
         }

@@ -3,20 +3,6 @@
 # cost：1 回の目安（2026-10 の単価。docs/testing/paid-checks-ja.md の計算）。covers：このファイルを変えたら回す候補（server/agent からの相対パス、前方一致）。
 # command：開発用の会話サーバー（ciel-dev-agent-dev-1）の中で動かす。
 
-[eval_thoughts]
-what = "内なる考えの質（決まった場面を考える係に通し、gpt-5.4 が採点する）"
-cost = "全場面 1 回で約 2〜3.5 ドル（採点の gpt-5.4 が 7 割）。--only で 1 場面なら約 0.3〜0.5 ドル。--no-judge（採点せず気持ちの付き方だけ）なら全場面 1 回で約 0.1 ドル"
-cost_max_usd = 3.5
-command = "docker exec ciel-dev-agent-dev-1 python eval_thoughts.py [--only 場面] [--no-judge] > 結果.json"
-covers = ["initiative.py", "eval_thoughts.py", "config/prompts/inner_thoughts.md", "config/prompts/eval_thought_judge.md"]
-
-[bench_thoughts]
-what = "内なる考えの話しかける頃合い（声で話して黙り、シエルがいつ話しかけるか）"
-cost = "1 回で約 0.1〜0.3 ドル（会話モデル数回と、考える係。黙る時間が長いほど考える係が増える）"
-cost_max_usd = 0.3
-command = "docker exec ciel-dev-agent-dev-1 python bench_thoughts.py [--silence 150]"
-covers = ["initiative.py", "turns.py", "tools/thoughts.py", "config/prompts/inner_thoughts", "config/prompts/talk_"]
-
 [bench_latency]
 what = "返事の速さ（話し終わりからシエルの声まで）"
 cost = "1 回（--rounds 1）で約 0.05〜0.1 ドル"
@@ -43,18 +29,5 @@ what = "作り直しの前と後の比べ（速さ・料金・依頼の拾い方
 cost = "全場面 1 回で約 0.3〜0.6 ドル（solo 0.05〜0.1、long_request 0.05〜0.15、meeting 0.1〜0.2、idle 0.1〜0.2）。--only で場面を絞れる"
 cost_max_usd = 0.6
 command = "docker exec ciel-dev-agent-dev-1 python bench_compare.py --label 名前 [--only solo,meeting] > 結果.json"
-covers = ["turns.py", "agent.py", "initiative.py", "minutes.py", "mode.py", "mouth.py", "models.py", "config/prompts/talk_"]
+covers = ["turns.py", "agent.py", "minutes.py", "mode.py", "mouth.py", "models.py", "config/prompts/talk_"]
 
-[bench_ttft]
-what = "心（全部の指示と道具）と小脳（短い指示・道具なし）で、文字のモデルが書き始めるまでの秒数（声は使わない）"
-cost = "既定（各 10 回）で約 0.02〜0.03 ドル"
-cost_max_usd = 0.05
-command = "docker exec ciel-dev-agent-dev-1 python bench_ttft.py [--rounds 10]"
-covers = ["mind.py", "config/prompts/mind.md"]
-
-[initiative]
-what = "自発判断の沈黙・発話・行動の選択。実pipelineとローカルモデルを使い、ゲーム操作は模擬する"
-cost = "ローカル専用、外部API料金なし。共有GPUを6場面×3回使用。CIEL_LOCAL_LLM_URLに共有APIを指定する"
-cost_max_usd = 0.0
-command = "python scripts/server/benchmark-initiative.py --output .local/initiative/result.json --rounds 3"
-covers = ["initiative.py", "game_decision.py", "mind.py", "config/prompts/initiative", "config/prompts/mind.md"]

@@ -21,7 +21,7 @@ namespace Ciel.EditorTools
             _checks = 0;
             CheckScene(CielAppBuildSetup.CompanionScene, false);
             CheckScene(CielAppBuildSetup.BroadcastScene, true);
-            CielStreamStatusCheck.Run();
+            CielGoalStateCheck.Run();
             Debug.Log("CIEL_APP_COMPOSITION_CHECK_OK " + _checks);
         }
 
@@ -80,7 +80,6 @@ namespace Ciel.EditorTools
             Check((canvas.Find("BroadcastSurface") != null) == broadcast, "operator screen has an opaque surface");
             Check((canvas.Find("SafeArea/BroadcastMonitor") != null) == broadcast, "operator monitor belongs only to broadcast app");
             Check((ui.GetComponent<CielStreamWindow>() != null) == broadcast, "output belongs only to broadcast app");
-            Check(!CielAppComposition.Profile.showStatusOnOutput, "status stays on controls by default");
             Check(canvas.GetComponent<CanvasScaler>().referenceResolution == (broadcast ? new Vector2(960, 720) : new Vector2(390, 844)), "product layout size");
             Invoke(ui, "Refresh");
             Invoke(ui, "UpdateStatusLine");

@@ -1,9 +1,9 @@
-// 経路探索の歩き方の決まり（技 skills.js と、身を守る係 guard.js が使う）
+// 経路探索の歩き方の決まり
 import pathfinderPkg from 'mineflayer-pathfinder';
 
 const { Movements } = pathfinderPkg;
 
-// 守るとき（guard.js）の決まり：ブロックを壊さない・置かない（戦いながら掘ったり積んだりしない）
+// 慎重な歩き方：ブロックを壊さない・置かない
 export function carefulMovements(bot) {
   const m = new Movements(bot);
   m.canDig = false;

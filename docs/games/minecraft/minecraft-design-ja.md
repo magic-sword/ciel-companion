@@ -169,7 +169,7 @@ flowchart LR
 
 現在は上流Agentの命令選択と採集・製作skillsをそのまま使う。以下の旧CIEL方式の目標固定・帰還後補充・修復は実行しない。標準動作の使用感を確認するまでは独自方式へ戻さない。
 
-採集・移動・製作はMindcraftのnative skillsを使う。ブロック配置や積み上げ移動は維持し、建物の保護は`protection.js`で適用する。旧Runnerの採掘計画・土4個の事前調達・階段掘りは現在の実行経路ではなく、Mindcraftの動作として保証しない。
+採集・移動・製作はMindcraftのnative skillsを使う。ブロック配置や積み上げ移動は維持し、建物の保護は`protection.js`で適用する。食べる・身を守るはMindcraftのmodesが受け持つ。CIEL独自の旧Runner（`src/skills.js`の採掘計画・土4個の事前調達・階段掘り、`goal-plan.js`、`care.js`、`guard.js`）は、実行経路から外れていたため2026-11-21に削除した。
 
 座標施工は例外として、CIELの検証済み計画の立ち位置・設置面・carefulMovementsを維持する。Mindcraftの汎用goToGoal/placeBlockでこれを上書きすると、移動中の掘削・足場設置が計画外の変更になるため、region executorから同じMineflayerの原子的な移動・採掘・配置を使う。通常の採集・移動にこの施工制限を適用しない。遠距離の持ち主はLocator Barの通知を短い移動目標へ変換してMindcraftの移動へ渡し、実体が見えてから接近する。
 

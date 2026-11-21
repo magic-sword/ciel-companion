@@ -30,6 +30,6 @@ Windows版では、マウスの横ボタン（既定は「戻る」。設定の�
 
 ## 検証
 
-`CielAppCompositionCheck`でシーンと共通構成、`CielStreamStatusCheck`で状態通知と重畳表示、`CielAudienceCardCheck`で独立カードを確認する。Unityのライセンス・起動権限の切り分けとC#検証器は[回帰テスト](../testing/regression-tests-ja.md)。Editor描画とWindows/Android実機・配布済みアプリの確認は分け、[確認状況](../testing/verification-status-ja.md)を更新する。
+`CielAppCompositionCheck`でシーンと共通構成、`CielGoalStateCheck`で状態通知と作業の表示文、`CielAudienceCardCheck`で独立カードを確認する。Unityのライセンス・起動権限の切り分けとC#検証器は[回帰テスト](../testing/regression-tests-ja.md)。Editor描画とWindows/Android実機・配布済みアプリの確認は分け、[確認状況](../testing/verification-status-ja.md)を更新する。
 
 `CielMicrophoneReconnectCheck.Run`は、公開待ちの切断・旧機器切替の再開・旧ルームの切断通知・録音フラグの残存を、マイクやLiveKitを開かずに再現する。`VerifyAndBuildBroadcast`は既存のシーン・UI検証後に標準のWindows配信版ビルドを行う。実機での確認は、ON→再接続→ON、公開中の再接続、機器切替中の再接続、通信切断後の再接続を分け、録音と相手側への入力到達も確認する。

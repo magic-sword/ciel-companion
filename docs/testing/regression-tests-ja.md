@@ -101,6 +101,6 @@ python scripts/server/run-regression.py --suite all
 | Unity作業表示 | `dotnet run --project scripts/unity/work-display-check/WorkDisplayCheck.csproj`、本体・Editorのコンパイル |
 | Unityマイク再接続 | Editorで`Ciel.EditorTools.CielMicrophoneReconnectCheck.Run`。マイクやLiveKitを開かず、切断時のbusy解除・旧coroutineと旧通知の無効化を確認 |
 
-Unityの実パーサー・描画はEditorで`CielStreamStatusCheck.Run`、`CielAudienceCardCheck.Run`、`CielPlanWindowCheck.Run`（計画グラフを`.local/app-refactor/plan-graph-house.png`に描く）を実行する。CLIでは`run`管理下の`-quit`を二重指定せず、描画確認には`-nographics`を使わない。制限環境でEditorやライセンスが見えない場合は、通常の端末権限で`unity license status`とEditorの登録を切り分ける。ライセンス情報を変更する前にアクセス失敗を調べる。
+Unityの実パーサー・描画はEditorで`CielGoalStateCheck.Run`、`CielAudienceCardCheck.Run`、`CielPlanWindowCheck.Run`（計画グラフを`.local/app-refactor/plan-graph-house.png`に描く）を実行する。CLIでは`run`管理下の`-quit`を二重指定せず、描画確認には`-nographics`を使わない。制限環境でEditorやライセンスが見えない場合は、通常の端末権限で`unity license status`とEditorの登録を切り分ける。ライセンス情報を変更する前にアクセス失敗を調べる。
 
 実行したソースと条件、結果、未確認範囲は[確認状況](verification-status-ja.md)の該当項目を更新する。手順書へ試験結果の履歴を追記しない。

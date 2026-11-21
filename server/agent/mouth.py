@@ -21,7 +21,7 @@ from reactions import Reactions
 log = logging.getLogger('ciel-agent.mouth')
 
 WHY = ('greeting', 'reply', 'minutes', 'song', 'touch', 'enrolled', 'research', 'comment',
-       'game', 'image', 'initiative')   # comment：配信のコメントへの返事。game：ゲームの出来事・頼まれた技の結果（game_env.py）。
+       'game', 'image')   # comment：配信のコメントへの返事。game：ゲームの出来事・頼まれた技の結果（game_env.py）。
                           # image：見せてもらった画像を見る（eyes.py）
 FREE_POLL = 0.25
 

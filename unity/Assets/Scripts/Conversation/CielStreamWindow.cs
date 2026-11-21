@@ -49,8 +49,6 @@ namespace Ciel.Conversation
             Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor;
 
         public bool IsOpen => _hwnd != IntPtr.Zero;
-        /// 配信用のカメラにだけ映す物の層（いまの目的の札。CielConversationUI.Goal.cs）。アプリのカメラは映さない
-        public const int OverlayLayer = 31;
         /// 配信用のカメラ（開いていなければ null）
         public Camera StreamCamera => _hwnd != IntPtr.Zero ? _camera : null;
         public event Action Changed;
@@ -122,11 +120,6 @@ namespace Ciel.Conversation
             _camera.enabled = true;
             go.tag = "Untagged";   // Camera.main（タッチ・背景が使う）はアプリのカメラのまま
             _camera.depth = _main.depth - 1;
-            if (!CardOutput)
-            {
-                _main.cullingMask &= ~(1 << OverlayLayer);
-                _camera.cullingMask |= 1 << OverlayLayer;
-            }
             Debug.Log($"[CielStreamWindow] 配信用のウィンドウ「{OutputTitle}」を開いた");
         }
 

@@ -9,6 +9,5 @@ namespace Ciel.Conversation
         public bool broadcast;
         public Vector2Int windowSize = new Vector2Int(540, 960);
         public bool openOutputOnStart;
-        public bool showStatusOnOutput;
     }
 }

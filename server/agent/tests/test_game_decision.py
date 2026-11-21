@@ -1,10 +1,14 @@
+import asyncio
 import json
 import jsonschema
 import types
 import unittest
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace as Obj
+from unittest.mock import AsyncMock, Mock, patch
 
 from livekit.agents import llm
+
+from conversation import Conversation
 
 import game_decision
 from game_decision import GameDecision
@@ -208,6 +212,75 @@ class SayTest(unittest.TestCase):
         feelings = game_decision.SAY['items']['properties']['feeling']['enum']
         self.assertIn('neutral', feelings)
         self.assertIn('jitome', feelings)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class AutonomousDecisionTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.create = AsyncMock()
+        self.client = Obj(chat=Obj(completions=Obj(create=self.create)), close=AsyncMock())
+        self.env = Obj(playing=lambda: True, _connection_epoch=1, tools=[], meta={},
+            profile={'work': {'version': 1, 'capabilities': [{'name': 'game.goal',
+                'handoff': {'version': 1, 'argument': 'request', 'constraints': {}, 'seconds': 120}}]}})
+        self.runner = Obj(env=self.env, work=None, body_step=lambda: None,
+                          start=AsyncMock(return_value={'status': 'accepted'}))
+        self.decision = GameDecision(self.runner, 'regular', client=self.client)
+
+    def response(self, act, say=None):
+        return Obj(usage=None, choices=[Obj(message=Obj(content=json.dumps({'say': say or [], 'act': act})))])
+
+    async def consider(self, **kwargs):
+        return await self.decision.consider([{'role': 'system', 'content': 'same prefix'}], [],
+                                           'initiative {actions}', **kwargs)
+
+    async def test_silence_uses_same_prefix_and_does_not_need_a_game(self):
+        self.decision.runner = None
+        self.create.return_value = self.response({'kind': 'none'})
+        out = await self.consider()
+        self.assertEqual(out['status'], 'silent')
+        sent = self.create.await_args.kwargs
+        self.assertEqual(sent['messages'][0], {'role': 'system', 'content': 'same prefix'})
+        self.assertEqual(sent['response_format']['json_schema']['schema']['properties']['say']['minItems'], 0)
+
+    async def test_new_self_chosen_work_uses_existing_runner(self):
+        self.create.return_value = self.response({'kind': 'work', 'request': 'collect wood'})
+        out = await self.consider()
+        self.assertEqual(out['status'], 'acted')
+        self.runner.start.assert_awaited_once()
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': 'collect wood'}))
+
+    async def test_work_state_change_during_inference_blocks_action(self):
+        async def change(**kwargs):
+            self.runner.work = {'state': 'running'}
+            return self.response({'kind': 'work', 'request': 'new goal'})
+        self.create.side_effect = change
+        self.assertEqual((await self.consider())['status'], 'cancelled')
+        self.runner.start.assert_not_awaited()
+
+    async def test_active_stopped_and_confirmation_only_allow_speech(self):
+        # 失敗・期限切れの作業のあとは、自分で次の一手を始めてよい（2026-11-21）。持ち主が止めたあとは動かない
+        for state in ('running', 'accepted', 'needs_decision', 'cancelling', 'cancelled', 'unknown'):
+            with self.subTest(state=state):
+                self.runner.work = {'state': state}
+                self.create.return_value = self.response({'kind': 'work', 'request': 'new goal'})
+                self.assertEqual((await self.consider())['status'], 'failed')
+        self.runner.start.assert_not_awaited()
+
+    async def test_stop_or_authority_loss_blocks_autonomous_work(self):
+        self.create.return_value = self.response({'kind': 'work', 'request': 'new goal'})
+        self.decision.autonomy_allowed = False
+        self.assertEqual((await self.consider())['status'], 'failed')
+        self.decision.autonomy_allowed = True
+        self.decision.authorized = lambda: False
+        self.assertEqual((await self.consider())['status'], 'failed')
+        self.runner.start.assert_not_awaited()
+
+    async def test_cancelled_input_never_speaks_or_acts(self):
+        self.assertEqual((await self.consider(valid=lambda: False))['status'], 'cancelled')
+        self.create.assert_not_awaited()
 
 
 if __name__ == '__main__':

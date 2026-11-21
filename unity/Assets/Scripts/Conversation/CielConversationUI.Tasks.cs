@@ -91,7 +91,6 @@ namespace Ciel.Conversation
             _songTask.dot.color = WithAlpha(Mint, pulse);
             UpdateGoal(connected);   // 目的の札（CielConversationUI.Goal.cs）
             UpdateActivity(connected);   // いまのシエルの札（CielConversationUI.Activity.cs）
-            UpdateBroadcastOutput(connected);
         }
 
         static void SetTask((GameObject go, Text label, Image dot) task, bool on, string text)

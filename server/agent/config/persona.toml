@@ -51,11 +51,7 @@ singing_voice_instructions_file = "prompts/singing_voice.md"
 singing_feedback_file = "prompts/singing_feedback.md"
 # 小脳と心（CIEL_MODEL=pipeline。mind.py）：すぐの返事をする係の決まりと、心が「今のまとめ」を書く指示
 mind_instructions_file = "prompts/mind.md"
-initiative_instructions_file = "prompts/initiative.md"
-initiative_trigger_file = "prompts/initiative_trigger.md"
 mind_brief_instructions_file = "prompts/mind_brief.md"
-# 聞く係（listener.py）：話の途中の一言が、シエルへの議事録の頼みかを決める
-listener_instructions_file = "prompts/listener.md"
 # ゲーム中の持ち主の発言に、話す言葉としてすることを一つの決定で返す（game_decision.py）。{actions} にその状態でできることが入る
 game_decide_instructions_file = "prompts/game_decide.md"
 # 通常の会話の say/act の決定（tool_decision.py）。書き方は会話の間変わらないので、固定の指示の最後（返事の前提の直前）に置く。
