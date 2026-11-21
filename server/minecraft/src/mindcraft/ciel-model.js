@@ -50,12 +50,26 @@ export class CielModel {
     // Requests may overlap (e.g. memory summaries during the next turn). CIEL decides how to
     // schedule them; this client only says which ones are the action decisions.
     const priority = decision || !this.reference ? 'decision' : 'background';
+    return await this.respond(id, controller, text, turns, { response_format: responseFormat, priority });
+  }
+
+  // Mindcraft's vision: the screenshot goes with the last message; CIEL decides which model reads it.
+  async sendVisionRequest(turns, systemMessage, imageBuffer) {
+    const id = randomUUID();
+    const controller = new AbortController();
+    this.pending.set(id, controller);
+    const looking = [...turns, { role: 'system', content: 'Here is the screenshot of your current view.' }];
+    return await this.respond(id, controller, systemMessage, looking, { response_format: 'text', priority: 'decision',
+      image: { mime_type: 'image/jpeg', data: imageBuffer.toString('base64') } });
+  }
+
+  async respond(id, controller, text, turns, fields) {
     try {
       // strictFormat rewrites the objects it reads; give it copies of Mindcraft's history.
       const messages = strictFormat([{ role: 'system', content: text },
         ...turns.map(turn => ({ role: ['assistant', 'system'].includes(turn.role) ? turn.role : 'user', content: turn.content }))]);
       const response = await this.transport(`${this.url}/v1/respond`, {
-        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, response_format: responseFormat, priority }),
+        method: 'POST', headers: this.headers(), body: JSON.stringify({ request_id: id, messages, ...fields }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(125000)]),
       });
       if (!response.ok) throw new Error(`CIEL inference failed: ${response.status}`);

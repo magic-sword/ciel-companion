@@ -27,6 +27,26 @@ class HostTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(options['messages'][-1]['content'], 'craft a wooden pickaxe')
         await host.close()
 
+    async def test_a_screenshot_goes_with_the_last_message_to_the_model(self):
+        create = AsyncMock(return_value=SimpleNamespace(usage=None,
+            choices=[SimpleNamespace(message=SimpleNamespace(content='a tree'))]))
+        client = SimpleNamespace(close=AsyncMock(), chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+        records = []
+        with patch('core_host.models.create_client', return_value=client):
+            host = CoreHost(SimpleNamespace(persona=SimpleNamespace(execution_instructions='x')), None,
+                            record=lambda event, **k: records.append((event, k)))
+        for local in (False, True):
+            with patch('core_host.models.is_local', return_value=local),                  patch('core_host.models.options', side_effect=lambda role, **kw: kw),                  patch('core_host.models.record'):
+                await host.infer([{'role':'system','content':'identity'}], [{'role':'user','content':'SYSTEM: describe'}],
+                                 image={'mime_type':'image/jpeg','data':'AAAA'})
+            last = create.call_args.kwargs['messages'][-1]
+            self.assertEqual(last['role'], 'user')
+            self.assertEqual(last['content'][-1], {'type':'image_url','image_url':{'url':'data:image/jpeg;base64,AAAA'}})
+            self.assertIn('describe', last['content'][0]['text'])
+        self.assertEqual([k['images'] for e, k in records if e == 'core_request'], [1, 1])
+        self.assertNotIn('AAAA', repr(records))
+        await host.close()
+
     async def test_bound_http_uses_current_persona_memory_and_conversation(self):
         client = SimpleNamespace(close=AsyncMock())
         turns = [SimpleNamespace(role='user', name='owner', text='remember this request')]

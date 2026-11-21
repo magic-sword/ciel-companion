@@ -1,5 +1,7 @@
 """Session-bound CIEL inference API. Context and inference are owned by the host."""
 import asyncio
+import base64
+import binascii
 import copy
 import secrets
 import time
@@ -76,8 +78,11 @@ class CoreSession:
         if self.closed:
             raise web.HTTPGone()
         if (not isinstance(request, dict) or not {'request_id', 'messages', 'response_format'} <= set(request)
-                or not set(request) <= {'request_id', 'messages', 'response_format', 'priority'}):
+                or not set(request) <= {'request_id', 'messages', 'response_format', 'priority', 'image'}):
             raise web.HTTPBadRequest(reason='invalid_request')
+        image = request.get('image')
+        if image is not None:
+            image = valid_image(image)
         priority = request.get('priority', 'decision')
         if priority not in inference_scheduler.PRIORITY:
             raise web.HTTPBadRequest(reason='invalid_priority')
@@ -110,7 +115,7 @@ class CoreSession:
             async with asyncio.timeout(120), self.scheduler.slot(priority) as queued:
                 context = await self._context()
                 result = await self.infer(context, copy.deepcopy(messages), response_format=request['response_format'],
-                                          queued_seconds=queued)
+                                          queued_seconds=queued, **({'image': image} if image else {}))
                 if self.closed or asyncio.current_task().cancelling():
                     raise asyncio.CancelledError()
                 if not isinstance(result, str):
@@ -137,6 +142,30 @@ class CoreSession:
         await asyncio.gather(*self.tasks.values(), return_exceptions=True)
 
 
+# One screenshot per request (a game's view, for its vision): JPEG or PNG, base64, at most this many characters.
+IMAGE_TYPES = ('image/jpeg', 'image/png')
+IMAGE_CHARS = 700_000
+JPEG_START = bytes([0xFF, 0xD8, 0xFF])
+PNG_START = bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+
+def valid_image(image):
+    """The request's image as {mime_type, data}, or a 400/413 when it is not one image the core can pass on."""
+    if (not isinstance(image, dict) or set(image) != {'mime_type', 'data'} or image['mime_type'] not in IMAGE_TYPES
+            or not isinstance(image['data'], str) or not image['data']):
+        raise web.HTTPBadRequest(reason='invalid_image')
+    if len(image['data']) > IMAGE_CHARS:
+        raise web.HTTPRequestEntityTooLarge(max_size=IMAGE_CHARS, actual_size=len(image['data']))
+    try:
+        raw = base64.b64decode(image['data'], validate=True)
+    except (binascii.Error, ValueError):
+        raise web.HTTPBadRequest(reason='invalid_image')
+    signature = JPEG_START if image['mime_type'] == 'image/jpeg' else PNG_START
+    if not raw.startswith(signature):
+        raise web.HTTPBadRequest(reason='invalid_image')
+    return {'mime_type': image['mime_type'], 'data': image['data']}
+
+
 class CielCore:
     def __init__(self, scheduler=None):
         self.sessions = {}
@@ -155,7 +184,7 @@ class CielCore:
             await session.close()
 
     def application(self):
-        app = web.Application(client_max_size=300000)
+        app = web.Application(client_max_size=1_000_000)  # text and one screenshot
 
         def session(request):
             authorization = request.headers.get('Authorization', '')

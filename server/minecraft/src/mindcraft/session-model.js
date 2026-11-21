@@ -2,12 +2,14 @@
 // detached rejected History summarization promise or a late physical command.
 export class SessionModel {
   constructor(session, activity=()=>{}) {this.session=session;this.activity=activity;}
-  async sendRequest(...args) {
+  async sendRequest(...args) {return this.call('sendRequest',args);}
+  async sendVisionRequest(...args) {return this.call('sendVisionRequest',args);}
+  async call(method,args) {
     const {model,token}=this.session();
     if(!model || token?.cancelled)return '';
     this.activity();
     try {
-      const result=await model.sendRequest(...args);
+      const result=await model[method](...args);
       return token?.cancelled || this.session().model!==model ? '' : result;
     }
     catch(error) {

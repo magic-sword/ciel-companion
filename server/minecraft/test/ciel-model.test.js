@@ -122,3 +122,20 @@ test('cancellation aborts the in-flight HTTP request before server acknowledgeme
   acknowledge();
   await stop;
 });
+
+test('a vision request sends the screenshot with the view prompt to the bound CIEL session', async () => {
+  let request;
+  const model = new CielModel(null, 'http://localhost:8775', { token: 'session',
+    fetch: async (url, options) => {
+      request = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ request_id: request.request_id, text: 'a tree and a stone block' }) };
+    } });
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  assert.equal(await model.sendVisionRequest([{ role: 'user', content: 'owner: what is there?' }], 'describe the view', jpeg),
+    'a tree and a stone block');
+  assert.deepEqual(request.image, { mime_type: 'image/jpeg', data: jpeg.toString('base64') });
+  assert.equal(request.priority, 'decision');
+  assert.equal(request.messages.at(-1).role, 'user');
+  assert.match(request.messages.at(-1).content, /screenshot of your current view/);
+  assert.match(request.messages[0].content, /^SYSTEM: describe the view/);
+});

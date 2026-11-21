@@ -23,6 +23,30 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, ['json'])
         await core.release(token)
 
+    async def test_one_screenshot_reaches_inference_and_other_images_are_refused(self):
+        import base64
+        core = CielCore(InferenceScheduler(1))
+        seen = []
+        async def context(): return []
+        async def infer(ctx, messages, *, response_format, **options):
+            seen.append(options.get('image'))
+            return 'a tree'
+        token = core.bind(context=context, infer=infer)
+        bound = core.sessions[token]
+        jpeg = base64.b64encode(bytes([0xFF, 0xD8, 0xFF, 0xE0, 1, 2])).decode()
+        payload = {'request_id':'look','messages':[{'role':'user','content':'SYSTEM: describe'}],'response_format':'text'}
+        await bound.respond({**payload, 'image': {'mime_type':'image/jpeg','data':jpeg}})
+        await bound.respond({**payload, 'request_id':'plain'})
+        self.assertEqual(seen, [{'mime_type':'image/jpeg','data':jpeg}, None])
+        not_jpeg = base64.b64encode(b'GIF89a').decode()
+        for n, image in enumerate(({'mime_type':'image/gif','data':jpeg}, {'mime_type':'image/jpeg','data':'not base64!'},
+                                   {'mime_type':'image/jpeg','data':not_jpeg}, {'mime_type':'image/jpeg'}, 'x')):
+            with self.assertRaises(web.HTTPBadRequest):
+                await bound.respond({**payload, 'request_id': f'bad{n}', 'image': image})
+        with self.assertRaises(web.HTTPRequestEntityTooLarge):
+            await bound.respond({**payload, 'request_id':'big', 'image': {'mime_type':'image/jpeg','data':'A' * 700_004}})
+        await core.release(token)
+
     async def test_http_authentication_and_response(self):
         core = CielCore(InferenceScheduler(1))
         async def context(): return {'persona': 'CIEL'}

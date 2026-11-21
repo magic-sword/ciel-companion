@@ -51,8 +51,8 @@ function send(type, fields) {
   if (link?.readyState === 1) link.send(message(type, fields));
 }
 
-const runner = new MindcraftRunner(send, OWNER);
 const eye = new Eye({ host: BODY_HOST, port: EYE_PORT, log });
+const runner = new MindcraftRunner(send, OWNER, { eye });
 let bot = null;
 
 const wss = new WebSocketServer({ host: BODY_HOST, port: BODY_PORT });

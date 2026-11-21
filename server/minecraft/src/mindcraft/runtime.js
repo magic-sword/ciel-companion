@@ -55,6 +55,15 @@ export function createMindcraftBot(options) {
   return initBot(options.username);
 }
 
+// The eye as Mindcraft's camera: capture() returns the JPEG of the current view.
+export function eyeCamera(eye) {
+  return { async capture() {
+    const seen=await eye.look();
+    if(!seen?.jpeg)throw new Error(`Could not see: ${seen?.error ?? 'no image'}.`);
+    return seen.jpeg;
+  } };
+}
+
 export class MindcraftRunner extends BodyCommands {
   async bindCore(url, token) {
     await this.ready;
@@ -80,10 +89,11 @@ export class MindcraftRunner extends BodyCommands {
     try { await model?.cancel(); }
     catch (e) { console.warn('CIEL session closed before cancellation acknowledgement'); }
   }
-  constructor(report, owner) {
+  constructor(report, owner, { eye = null } = {}) {
     super({ report, available: () => Boolean(this.bot?.entity), run: c => this.execute(c),
       halt: () => this.haltExecution() });
     this.owner = owner;
+    this.eye = eye;
     this.bot = null;
     this.modeActions = new Set();
     this.replying = 0;
@@ -187,7 +197,9 @@ export class MindcraftRunner extends BodyCommands {
       request_id:c.request_id,command_scope:c.scope??'',stage:'estimate',command:'',seconds:Math.round(seconds)});};
     agent.task=new Task(agent,null,Date.now());
     const { VisionInterpreter }=await import('../vendor/mindcraft/src/agent/vision/vision_interpreter.js');
-    agent.vision_interpreter=new VisionInterpreter(agent,false);
+    // Mindcraft's own vision, with CIEL's eye (eye.js) as its camera: it renders apart from the body's
+    // process and keeps no screenshots. Without an eye, vision stays off.
+    agent.vision_interpreter=new VisionInterpreter(agent,Boolean(this.eye),this.eye ? eyeCamera(this.eye) : null);
     agent.blocked_actions=blockedActions();
     if(agent.blocked_actions.length>defaultSettings.blocked_actions.length)console.log('Blocked commands:',agent.blocked_actions.join(', '));
     blacklistCommands(agent.blocked_actions);

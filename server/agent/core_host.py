@@ -10,6 +10,18 @@ import mind
 from ciel_core import CielCore
 
 
+def with_image(context, image):
+    """The context with the image added to its last user message (or to a new one after the last message)."""
+    context = list(context)
+    part = {'type': 'image_url', 'image_url': {'url': f"data:{image['mime_type']};base64,{image['data']}"}}
+    if context and context[-1]['role'] == 'user':
+        last = context[-1]
+        context[-1] = {'role': 'user', 'content': [{'type': 'text', 'text': last['content']}, part]}
+    else:
+        context.append({'role': 'user', 'content': [part]})
+    return context
+
+
 class CoreHost:
     def __init__(self, agent, book, *, record=debug_log.record):
         self.agent, self.book = agent, book
@@ -34,7 +46,7 @@ class CoreHost:
         return context
 
     async def infer(self, context, messages, *, response_format='text', max_tokens=256, purpose='game_core',
-                    queued_seconds=0):
+                    queued_seconds=0, image=None):
         context.extend(messages)
         if models.is_local('mind'):
             source = llm.ChatContext()
@@ -44,7 +56,10 @@ class CoreHost:
                        for item in mind.local_context(source).items]
         ident, began = uuid.uuid4().hex, time.monotonic()
         self.record('core_request', role=purpose, id=ident, model=models.model('mind'),
-                         input_chars=sum(len(m['content']) for m in context), queued_seconds=queued_seconds)
+                         input_chars=sum(len(m['content']) for m in context), queued_seconds=queued_seconds,
+                         images=1 if image else 0)
+        if image:
+            context = with_image(context, image)
         try:
             options = models.options('mind', model=models.model('mind'), messages=context,
                 # Hosted preparation must have room to finish a response. A one-token
