@@ -1,6 +1,6 @@
 # 現在の確認範囲と配布状況
 
-2026-11-21、体の`!lookAtPosition`・`!lookAtPlayer`を、シエルの目（`eye.js`）で見られるようにした（[設計](../games/minecraft/minecraft-design-ja.md#知識と視覚)、fork `e9b5242`）。上流の`VisionInterpreter`をそのまま使い、撮る部品だけを目に差し替えた。中核の`/v1/respond`は画像を1枚受け付け、最後の発言に添えて`mind`の推論へ渡す。体のNode 206件（既存1件skip）、中核の画像の受付・添付の試験、通常回帰unit 853件が成功。forkはまだpushしていない。体・会話サーバーは未配布で、実際の景色をモデルが読めるかは未確認。
+2026-11-21、体の`!lookAtPosition`・`!lookAtPlayer`を、シエルの目（`eye.js`）で見られるようにした（[設計](../games/minecraft/minecraft-design-ja.md#知識と視覚)、fork `e9b5242`）。上流の`VisionInterpreter`をそのまま使い、撮る部品だけを目に差し替えた。中核の`/v1/respond`は画像を1枚受け付け、最後の発言に添えて`mind`の推論へ渡す。体のNode 206件（既存1件skip）、中核の画像の受付・添付の試験、通常回帰unit 853件が成功。forkの`ciel`・`ciel-vendor`はpush済み。会話サーバーを開発（LiveKit Cloud用・家の中のLiveKit用）と本番へ、体（開発・本番で共用）へ配布した（`74b17f9`。本番の会話サーバーは変更ファイルのハッシュ一致・再起動0回・設定維持・worker登録、体はコンテナ内のテスト成功・ソース159件一致・他のサービス不変・ワールドへ参加を確認）。実際の景色をモデルが読めるかは未確認。
 
 2026-11-21、上流の技のうち命令から呼べなかったものに命令を付けた（[設計](../games/minecraft/minecraft-design-ja.md)、fork `0b106e6`）。`!placeBlockAt`・`!breakBlockAt`・`!useBlockAt`・`!wait`と、記号の対応表と段の文字列で小さな建物を建てる`!buildStructure`である。どの技も命令・modes・計画のどれかから呼ばれることを確かめる検査（`test/skill-reach.test.js`）を置いた。体のNode 203件（既存1件skip）は成功。forkの`ciel`・`ciel-vendor`はpush済み。体（開発・本番で共用）へ配布した（`4aeea8a`。コンテナ内で体のテスト成功・ソース159件一致・他のサービス不変・ワールドへ参加を確認）。普段のワールドでは未確認。
 
