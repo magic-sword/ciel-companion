@@ -5,7 +5,7 @@ import { Vec3 } from 'vec3';
 import { runPlan } from '../src/vendor/mindcraft/src/agent/library/plan.js';
 import { remaining, materials } from '../src/vendor/mindcraft/src/agent/library/region.js';
 import { findSites } from '../src/vendor/mindcraft/src/agent/library/sites.js';
-import { farmBlueprint, farmSteps } from '../src/vendor/mindcraft/src/agent/library/farm.js';
+import { farmBlueprint, farmSteps, sowSteps, sowFarmland, emptyFarmland } from '../src/vendor/mindcraft/src/agent/library/farm.js';
 import { limit } from '../src/vendor/mindcraft/src/agent/library/estimate.js';
 
 const require = createRequire(import.meta.url);
@@ -129,4 +129,63 @@ test('a running plan is shown as a graph: states from the world, obtain steps un
   assert.deepEqual(last.nodes.map(n => [n.id, n.kind, n.label, n.state, n.needs]),
     [['a', 'obtain', 'a ×1', 'done', []], ['b', 'build', 'b', 'done', ['a']]]);
   assert.ok(shown.every((p, i) => i === 0 || p.revision > shown[i - 1].revision));
+});
+
+// findBlocks over the fixture's world, as mineflayer searches around a point.
+function searching(bot) {
+  bot.findBlocks = ({ matching, maxDistance, count, point = bot.entity.position }) => {
+    const found = [];
+    for (let x = -16; x < 16; x++) for (let z = -16; z < 16; z++) for (let y = 58; y < 70; y++) {
+      const p = new Vec3(x, y, z);
+      if (p.distanceTo(point) <= maxDistance && matching(bot.blockAt(p))) found.push(p);
+    }
+    return found.slice(0, count);
+  };
+  return bot;
+}
+
+test('sowing reads the bare farmland from the world: seeds for each bare cell, done once each holds a plant', () => {
+  const { bot, set, items } = fixture({ wheat_seeds: 1 });
+  searching(bot);
+  for (const x of [1, 2, 3]) set(x, 63, 0, 'farmland');
+  set(3, 64, 0, 'wheat');
+  const cells = emptyFarmland(bot);
+  assert.deepEqual(cells.map(p => p.x), [1, 2]);
+  const steps = Object.fromEntries(sowSteps(cells).map(s => [s.id, s]));
+  assert.deepEqual(Object.keys(steps), ['seeds', 'sow']);
+  assert.deepEqual(steps.sow.needs, ['seeds']);
+  assert.equal(steps.seeds.done(bot), false);
+  items.wheat_seeds = 2;
+  assert.equal(steps.seeds.done(bot), true);
+  assert.equal(steps.sow.done(bot), false);
+  set(1, 64, 0, 'wheat');
+  set(2, 64, 0, 'wheat');
+  assert.equal(steps.sow.done(bot), true);
+});
+
+test('tilling and sowing are steps of their own: a hoe and tilling before the sowing, then sowing the tilled ground', () => {
+  const { bot, set } = fixture({ wheat_seeds: 2 });
+  const cells = [new Vec3(1, 63, 0), new Vec3(2, 63, 0)];
+  const steps = Object.fromEntries(sowSteps(cells, 'wheat', { tilling: true }).map(s => [s.id, s]));
+  assert.deepEqual(Object.keys(steps), ['hoe', 'seeds', 'till', 'sow']);
+  assert.deepEqual(steps.till.needs, ['hoe']);
+  assert.deepEqual(steps.sow.needs, ['seeds', 'till']);
+  assert.equal(steps.hoe.done(bot), false);
+  assert.equal(steps.till.done(bot), false);
+  for (const p of cells) set(p.x, p.y, p.z, 'farmland');
+  assert.equal(steps.hoe.done(bot), true);
+  assert.equal(steps.till.done(bot), true);
+  assert.equal(steps.sow.done(bot), false);
+});
+
+test('without bare farmland near, sowing offers to till here or go back to the farm at the base', async () => {
+  const { bot, set } = fixture();
+  searching(bot);
+  bot.entity.position = new Vec3(-12.5, 64, -12.5);
+  for (const x of [8, 9]) set(x, 63, 8, 'farmland');
+  bot.base = { home: [9, 64, 9], stations: {} };
+  assert.equal(await sowFarmland({ bot }, 4), false);
+  assert.deepEqual(Object.keys(bot.pendingChoice.options).sort(), ['base_farm', 'till_here']);
+  assert.match(bot.output, /no empty farmland within 16 blocks/);
+  assert.match(bot.output, /!buildFarm/);
 });
