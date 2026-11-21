@@ -22,8 +22,10 @@ function timeout(promise, ms, onTimeout) {
 export class CielLink {
   // command(raw)：体へ命令を送る（main.js）。notice(e)：シエルへの知らせ（mcp.js が MCP の知らせにする）。
   // changed()：様子が変わった（mcp.js が resources/updated を送る）
-  constructor({ command, owner = null, notice = () => {}, changed = () => {} }) {
+  // place(id)：指した場所をIDから引く（main.js、無ければ null）
+  constructor({ command, owner = null, notice = () => {}, changed = () => {}, place = () => null }) {
     this.command = command;
+    this.place = place;
     this.owner = owner;
     this.notice = notice;
     this.changed = changed;

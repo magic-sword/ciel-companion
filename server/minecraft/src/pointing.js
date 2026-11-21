@@ -3,7 +3,9 @@ const UUID = /^[a-f0-9-]{36}$/;
 const dimension = s => String(s ?? '').replace(/^minecraft:/, '');
 
 export class Pointing {
-  constructor(path, owner, now = Date.now) { this.path=path; this.owner=owner; this.now=now; }
+  // given: what latest() handed the conversation, so a work submitted a few seconds later can
+  // still be resolved by its id after the owner looks elsewhere.
+  constructor(path, owner, now = Date.now) { this.path=path; this.owner=owner; this.now=now; this.given=new Map(); }
   read(bot) {
     if (!this.path || !this.owner || !bot?.entity) return null;
     try {
@@ -34,6 +36,31 @@ export class Pointing {
       source='owner_gaze';
       s={...data.gaze,created_at:this.now(),expires_at:this.now()+60000};
     }
-    return s ? { selection_id:s.id, points:s.points, expires_at:s.expires_at, source } : null;
+    if(!s) return null;
+    const ref={ selection_id:s.id, points:s.points, expires_at:s.expires_at, source };
+    for(const [id,g] of this.given) if(g.expires_at<=this.now()) this.given.delete(id);
+    this.given.set(ref.selection_id, ref);
+    while(this.given.size>16) this.given.delete(this.given.keys().next().value);
+    return ref;
   }
+  // What the owner pointed at, by the id the conversation was given; null once it has expired.
+  place(bot,id) {
+    if(!UUID.test(String(id))) return null;
+    const s=this.selections(bot).find(s=>s.id===id);
+    if(s) return { selection_id:s.id, points:s.points, expires_at:s.expires_at, source:'owner_pointer' };
+    const g=this.given.get(id);
+    return g && g.expires_at>this.now() ? g : null;
+  }
+}
+
+// The words a work's request carries for Mindcraft's planner about the place the owner meant.
+export function placeNote(ref) {
+  const at = p => `x=${p.x}, y=${p.y}, z=${p.z}（${p.block}）`;
+  if (ref.points.length===1) {
+    const how = ref.source==='owner_gaze' ? '見ていた' : '指していた';
+    return `持ち主が依頼のときに${how}ブロックは ${at(ref.points[0])}。依頼の「ここ」「あそこ」「これ」はこの場所のこと。`;
+  }
+  const [a,b]=ref.points;
+  const span = k => a[k]===b[k] ? `${k}=${a[k]}` : `${k}=${Math.min(a[k],b[k])}〜${Math.max(a[k],b[k])}`;
+  return `持ち主が依頼のときに選んでいた範囲は ${['x','y','z'].map(span).join(', ')}（端のブロックは ${a.block} と ${b.block}）。依頼の「ここ」「この辺」「この範囲」はこの範囲のこと。`;
 }

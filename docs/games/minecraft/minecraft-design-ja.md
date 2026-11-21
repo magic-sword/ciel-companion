@@ -148,7 +148,7 @@ Mindcraftの`!getCraftingPlan`は、3×3のレシピが必要で作業台を持�
 
 体は読取専用の選択ファイルからID・期限・次元・持ち主を検証し、最新の1件を`references`として会話へ渡す（`hub.references`）。会話ホストは発話終了または文字入力の受付時に対象を取得し、その発言に固定する。行き先のある行動（`minecraft_go_to_place`）は[対象候補の契約](../game-environment-mcp-design-ja.md)で、指した場所か発言の座標を対象の番号で選ぶ。明示座標がある依頼では前の指差しを候補から外す。
 
-指した場所への作業（`minecraft_pointed_action`の移動・作業台回収、2点の除去・床）は、Mindcraftの体へ切り替えた時点で実行経路から外れており、2026-11-21に削除した。指した座標で建てる・置く・壊すは、座標を添えた自然文の依頼でMindcraftの座標命令へ渡る。照準の観測は目線指定中に毎250ms、会話への受け渡しは短い`references`だけで、DBへの音声・照準履歴の永続化は持たない。
+指した場所への作業（`minecraft_pointed_action`の移動・作業台回収、2点の除去・床）は、Mindcraftの体へ切り替えた時点で実行経路から外れており、2026-11-21に削除した。作業の依頼（`minecraft.pursue_goal`）は`reference`引数で参照IDを受け取る（[作業契約](../game-work-contract-ja.md)）。体は受付時に`Pointing.place`でIDを引き（目線の指定は`latest`で会話へ渡した分を60秒まで覚えておく）、「持ち主が依頼のときに指していたブロックは x=…（ブロック名）」のような一文を依頼文の後へ添える。Mindcraftの計画はこの座標で座標命令（`!placeBlockAt`・`!breakBlockAt`・`!buildStructure`・`!goToCoordinates`）を使える。照準の観測は目線指定中に毎250ms、会話への受け渡しは短い`references`だけで、DBへの音声・照準履歴の永続化は持たない。
 
 ## プレイヤーへの移動
 

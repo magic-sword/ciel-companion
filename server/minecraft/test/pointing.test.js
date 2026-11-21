@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync,writeFileSync,rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Pointing } from '../src/pointing.js';
+import { Pointing, placeNote } from '../src/pointing.js';
 import { Vec3 } from 'vec3';
 const id='11111111-1111-4111-8111-111111111111';
 const other='22222222-2222-4222-8222-222222222222';
@@ -35,4 +35,24 @@ test('the newest selection wins, and the gaze is used only while it is fresh',t=
   assert.equal(store.latest(bot).source,'owner_gaze');
   write([],{...live,published_at:0});
   assert.equal(store.latest(bot),null);
+});
+test('a work resolves what the conversation was given, after the owner looks away, until it expires',t=>{
+  let now=2000;
+  const {store,bot,s,write}=fixture(t);
+  store.now=()=>now;
+  write([],{gaze:{...s,expires_at:2500},published_at:2000,presence:{world:id,player_uuid:id}});
+  const given=store.latest(bot);
+  write([]);   // looked away
+  assert.deepEqual(store.place(bot,given.selection_id).points,[point]);
+  assert.equal(store.place(bot,other),null);
+  assert.equal(store.place(bot,'not-an-id'),null);
+  write([{...s,id:other}]);
+  assert.equal(store.place(bot,other).source,'owner_pointer');
+  now=70000;
+  assert.equal(store.place(bot,given.selection_id),null);
+});
+test('the place note names the block, or the range by axis',()=>{
+  assert.match(placeNote({points:[point],source:'owner_gaze'}),/見ていた.*x=5, y=63, z=0（grass_block）/);
+  const range=placeNote({points:[point,{...point,x:9,z:-2,block:'stone'}],source:'owner_pointer'});
+  assert.match(range,/x=5〜9, y=63, z=-2〜0/); assert.match(range,/grass_block と stone/);
 });

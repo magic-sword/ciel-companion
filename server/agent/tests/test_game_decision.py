@@ -191,6 +191,28 @@ class DecisionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.env.use.await_args.args, ('game_go', {'x': 10, 'z': -4}))
 
 
+    async def test_what_was_pointed_at_goes_with_the_work_only_when_the_game_takes_it(self):
+        pointed = '11111111-1111-4111-8111-111111111111'
+        self.env.profile['reference_context'] = True
+        self.env._refresh = AsyncMock(return_value=True)
+        self.env.state = {'references': {'selection_id': pointed, 'points': [{'x': 1, 'y': 64, 'z': 2}], 'source': 'owner_gaze'}}
+        self.respond({'say': '掘りますね', 'act': {'kind': 'work', 'request': 'あそこを掘って'}})
+        await self.say('あそこを掘って')
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': 'あそこを掘って'}))   # not declared
+        self.env.profile['work']['capabilities'][0]['handoff'] = {**HANDOFF, 'reference_argument': 'reference'}
+        await self.say('あそこを掘って')
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': 'あそこを掘って', 'reference': pointed}))
+        await self.say('x 10 z -4 を掘って')   # coordinates in the words: the pointing is not used
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': 'あそこを掘って'}))
+        # A restart later is the same request, without the id of a pointing that has passed
+        self.runner.work = {'state': 'failed', 'reason': 'deadline', 'capability': 'game.goal',
+                            'arguments': {'request': 'あそこを掘って', 'reference': pointed}}
+        self.assertNotIn(pointed, json.dumps(game_decision.acts(self.env, self.runner.work), ensure_ascii=False))
+        self.respond({'say': '続けますね', 'act': {'kind': 'resume'}})
+        await self.say('続けて')
+        self.assertEqual(self.runner.start.await_args.args, ('game.goal', {'request': 'あそこを掘って'}))
+
+
 class AfterWorkTest(unittest.TestCase):
     def test_ciel_may_act_after_a_work_ended_unless_the_owner_stopped_it(self):
         from game_decision import after_work

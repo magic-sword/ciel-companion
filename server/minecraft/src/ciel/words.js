@@ -6,6 +6,7 @@ export const WHY_FAILED = {
   core_unavailable: 'シエルの判断APIに接続できない',
   execution_error: 'ゲームの実行処理でエラーが起きた',
   goal_unclear: '依頼の完了条件を確認したい',
+  reference_unavailable: '指した場所の期限が切れていた（作業は始めていない）',
   stop_timeout: '前の作業の停止を確認できない（次の作業は開始していない）',
   no_owner: '相手が分からない（持ち主のプレイヤー名が設定されていない）',
   not_found: '見える所に無い（今いる所から見えない・まだ見ていない。地中に埋まっている物は分からない）',

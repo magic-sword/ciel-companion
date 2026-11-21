@@ -19,6 +19,7 @@ export function makeHub({ command, owner = null, isBusy = () => false, onClaim =
       const l = new CielLink({
         command,
         owner,
+        place: (ref) => hub.place?.(ref) ?? null,
         notice: (e) => server()?.sendLoggingMessage({ level: 'info', logger: 'ciel.event', data: { ...e, input_v: 1, event_id: `${sourceEpoch}:${++eventSequence}`,
           source_epoch: sourceEpoch, seq: eventSequence, occurred_at: Date.now() / 1000 } }, id)?.catch(() => {}),
         changed: () => server()?.server.sendResourceUpdated({ uri: 'game://state' })?.catch(() => {}),

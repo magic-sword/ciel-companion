@@ -112,8 +112,8 @@ def acts(env, work, targets=None):
                 out.append((_alt({'kind': {'const': action}}),
                             {'retry': 'retry：作業をもう一度試す', 'cancel': 'cancel：作業をやめる'}[action]))
     elif state not in ACTIVE:
-        if state in ENDED and _handoff(env, work.get('capability')) and (work.get('arguments') or {}):
-            request = json.dumps(work['arguments'], ensure_ascii=False)
+        if state in ENDED and _handoff(env, work.get('capability')) and _words_of(env, work):
+            request = json.dumps(_words_of(env, work), ensure_ascii=False)
             out.append((_alt({'kind': {'const': 'resume'}}),
                         f"resume：止まった作業（{request}）を、同じ依頼でもう一度始める。体は進んだ分を見て続きから計画する"))
         for capability in capabilities(env)[:1]:   # one work kind: a game declares one entry that takes the request
@@ -134,7 +134,7 @@ def acts(env, work, targets=None):
             params['additionalProperties'] = False
             out.append((_alt({'kind': {'const': fn.id}, 'arguments': params}), f"{fn.id}：{description}"))
     if state in ('accepted', 'running', 'needs_decision') and capabilities(env):
-        current = json.dumps(work.get('arguments') or {}, ensure_ascii=False)
+        current = json.dumps(_words_of(env, work), ensure_ascii=False)
         out.append((_alt({'kind': {'const': 'replace'}, 'request': STRING}),
                     f'replace：現在の目的は{current}。相手が別の最終成果を依頼・訂正したら、停止を確認してその目的へ切り替える。requestは新しい目的の全体'))
     return out
@@ -143,6 +143,27 @@ def acts(env, work, targets=None):
 def _handoff(env, name):
     # The capability's declared handoff, or None.
     return next((c.get('handoff') for c in capabilities(env) if c.get('name') == name), None)
+
+
+def _words_of(env, work):
+    """A work's arguments without the reference id its game declared: the id belongs to the
+    utterance that pointed, so it is neither shown to the model nor handed to a later restart."""
+    arguments = copy.deepcopy(work.get('arguments') or {})
+    name = (_handoff(env, work.get('capability')) or {}).get('reference_argument')
+    if name:
+        arguments.pop(name, None)
+    return arguments
+
+
+def _pointed(handoff, targets, references):
+    """{argument: id} when the game takes a reference with its work and this utterance pointed at
+    something (no coordinates in its words). The id is passed as it is; the game resolves it."""
+    name = (handoff or {}).get('reference_argument')
+    target = (getattr(targets, 'targets', None) or [None])[0]
+    if not isinstance(name, str) or not target or target.get('source') == 'explicit_coordinates':
+        return {}
+    selection = (references or {}).get('selection_id')
+    return {name: selection} if isinstance(selection, str) and selection else {}
 
 
 def instructions(template, alternatives):
@@ -185,7 +206,7 @@ def operations(act, work, env):
     if kind in ('reply', 'retry', 'cancel'):
         return [('answer_game_task', {'decision_id': decision.get('decision_id'), 'action': kind})]
     if kind == 'resume':
-        return [('resume_game_task', {'capability': work.get('capability'), 'arguments': copy.deepcopy(work.get('arguments') or {})})]
+        return [('resume_game_task', {'capability': work.get('capability'), 'arguments': _words_of(env, work)})]
     if kind == 'work':
         name = (capabilities(env) or [{}])[0].get('name')
         return [('submit_game_task', {'capability': name, 'arguments': {'request': act.get('request')}})]
@@ -449,7 +470,7 @@ class GameDecision:
                     return '新しい目的を受け付ける入口がありません'
                 request = str(args['arguments']['request'])[:2000]
                 generation = self._generation
-                r = await runner.replace(args['capability'], {handoff['argument']: request},
+                r = await runner.replace(args['capability'], {handoff['argument']: request, **_pointed(handoff, targets, references)},
                     constraints=copy.deepcopy(handoff['constraints']), seconds=handoff['seconds'], title=request[:100],
                     valid=lambda: self.authorized() and generation == self._generation)
             elif runner.body_step():
@@ -465,7 +486,7 @@ class GameDecision:
                 capability = (capabilities(env) or [{}])[0]
                 handoff = capability['handoff']
                 request = str(args['arguments'].get('request') or text)
-                r = await runner.start(capability['name'], {handoff['argument']: request[:2000]},
+                r = await runner.start(capability['name'], {handoff['argument']: request[:2000], **_pointed(handoff, targets, references)},
                                        constraints=copy.deepcopy(handoff['constraints']), title=request[:100],
                                        seconds=handoff['seconds'], request_id=uuid.uuid4().hex)
             else:

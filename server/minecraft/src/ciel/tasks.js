@@ -1,15 +1,18 @@
 // Game-owned work. The client sees tasks and decisions, never our recipe/repair loop.
 import { randomUUID } from 'node:crypto';
 import { shortWhy } from './words.js';
+import { placeNote } from '../pointing.js';
 
 export const TASK_VERSION = 1;
 export const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const definitions = [{
   name: 'minecraft.pursue_goal', description: 'マイクラで、物を集める・作る・掘ってくる、家や農場を作るなど、時間をかけて仕上げる作業を頼む。計画と実行はゲームが行う。',
-  arguments: {type:'object',additionalProperties:false,required:['request'],properties:{request:{type:'string',minLength:1,maxLength:2000}}},
+  // reference: the id of what the owner pointed at (game://state.references); the body resolves it.
+  arguments: {type:'object',additionalProperties:false,required:['request'],properties:{request:{type:'string',minLength:1,maxLength:2000},
+    reference:{type:'string',pattern:'^[a-f0-9-]{36}$'}}},
   constraints: {type:'object',additionalProperties:false,properties:{}},
-  handoff: {version:1,argument:'request',constraints:{},seconds:120},
-  interpretation: '依頼文をそのまま渡す。品目・数量・材料不足時の方針は現在のゲーム状態と合わせてMindcraftが判断する。',
+  handoff: {version:1,argument:'request',reference_argument:'reference',constraints:{},seconds:120},
+  interpretation: '依頼文をそのまま渡す。品目・数量・材料不足時の方針は現在のゲーム状態と合わせてMindcraftが判断する。referenceがあれば、指した場所の座標を依頼に添える。',
 }];
 export const CAPABILITIES=definitions;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -95,8 +98,9 @@ export class GameTasks {
 
   submit(r) {
     if (this.closed) return { status: 'error', reason: 'unlinked' };
-    const validArguments=r?.capability===CAPABILITIES[0].name && keys(r.arguments,['request'])
+    const validArguments=r?.capability===CAPABILITIES[0].name && keys(r.arguments,['request','reference'])
         && typeof r.arguments.request==='string' && r.arguments.request.trim().length>0 && r.arguments.request.length<=2000
+        && (r.arguments.reference===undefined || typeof r.arguments.reference==='string')
         && keys(r.constraints,[]);
     if (!keys(r, ['request_id', 'capability', 'arguments', 'budget_ms', 'constraints']) || !validId(r.request_id)
         || !validArguments || !Number.isFinite(r.budget_ms) || r.budget_ms < 100 || r.budget_ms > MAX_BUDGET_MS) {
@@ -112,9 +116,12 @@ export class GameTasks {
         || (body?.current && follow == null) || body?.pending || body?.owner) return { status: 'busy' };
     if (!this.link.playing()) return { status: 'unavailable' };
     if (this.tasks.size >= 512) return { status: 'error', reason: 'session_request_limit' };
+    // Resolved once, when the work is accepted: a reply or a retry later keeps the same place.
+    const place = r.arguments.reference===undefined ? null : this.link.place?.(r.arguments.reference) ?? null;
+    if (r.arguments.reference!==undefined && !place) return { status: 'error', reason: 'reference_unavailable' };
     const t = { id: randomUUID(), request: structuredClone(r), signature, revision: 0, state: 'accepted', reason: '',
       evidence: {}, decision: null, started: this.clock(), deadline: this.clock() + r.budget_ms, repairs: 0, replies: 0, failures: new Map(), generation: 0,
-      follow, followStopping: false };
+      follow, followStopping: false, place };
     this.tasks.set(t.id, t); this.requests.set(r.request_id, t); this.active = t;
     // Reject beyond the history bound; never evict a request and execute its retry a second time.
     this.changed(t, 'accepted');
@@ -217,7 +224,9 @@ export class GameTasks {
   }
 
   // request: the words the body works from; the owner's reply when a question is answered.
-  async run(t, request = t.request.arguments.request) {
+  async run(t, request = t.place ? `${t.request.arguments.request}
+
+${placeNote(t.place)}` : t.request.arguments.request) {
     const generation = ++t.generation;
     this.changed(t, 'running');
     if (!await this.leaveFollow(t,generation) || !this.current(t,generation)) return;

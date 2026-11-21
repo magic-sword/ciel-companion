@@ -115,6 +115,7 @@ const hub = makeHub({
 });
 startHttp(hub, { host: BODY_HOST, port: CIEL_PORT, idleMs: CIEL_IDLE_MS, log });
 hub.references = () => pointing.latest(bot);
+hub.place = (id) => pointing.place(bot, id);
 
 // 景色を 1 枚撮って返す。向いている方角も添える（「北を向いている」）
 async function look(id) {

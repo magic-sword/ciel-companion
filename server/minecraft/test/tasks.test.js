@@ -209,3 +209,17 @@ test('waiting for the owner holds the work time, and a wait never answered ends 
   clearTimeout(waiting.active.timer);await waiting.cancel(waiting.active.id,'owner_no_answer');
   assert.equal(waiting.active.state,'cancelled');assert.equal(waiting.active.reason,'owner_no_answer');waiting.close();
 });
+
+test('a pointed place is resolved by the body when accepted and written into the first run only',async()=>{
+  const ref='33333333-3333-4333-8333-333333333333';
+  const {link,work}=fixture();
+  link.place=id=>id===ref?{selection_id:ref,points:[{x:4,y:64,z:-1,block:'oak_log',face:[0,1,0]}],expires_at:0,source:'owner_pointer'}:null;
+  assert.equal(work.submit(request({request_id:'gone',arguments:{request:'あそこを掘って',reference:'44444444-4444-4444-8444-444444444444'}})).reason,'reference_unavailable');
+  assert.equal(work.active,null);
+  work.submit(request({arguments:{request:'あそこを掘って',reference:ref}}));
+  await wait(()=>work.active.state==='succeeded');
+  assert.match(link.calls[0][1].request,/^あそこを掘って\n\n持ち主が依頼のときに指していたブロックは x=4, y=64, z=-1（oak_log）/);
+  assert.equal(work.view().arguments.reference,ref);
+  assert.equal(CAPABILITIES[0].handoff.reference_argument,'reference');
+  work.close();
+});
