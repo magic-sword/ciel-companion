@@ -178,7 +178,7 @@ actorのup/recreate直後は、同じDocker接続元からの即時ログイン�
 
 #### 計画の実行器の有無を比べる
 
-農地の課題で実行器を使わない体と比べるときは、`--blocked-action`を4回付けて`!obtainItem`・`!buildFarm`・`!sowFarmland`・`!chooseOption`を禁止する。`--blocked-action '!obtainItem'`を付けると、専用環境の体だけで`!obtainItem`を使えなくする（`CIEL_MINDCRAFT_BLOCKED_ACTIONS`）。命令の一覧・製作計画の文・失敗文のヒントからも`!obtainItem`への案内が消え、`!getCraftingPlan`の計画は残る。manifestの`body_blocked_actions`に記録する。比べるのは「実行器あり」と「Mindcraftの1手ずつの選択（計画の照会あり）」で、上流そのままの体ではない。
+農地の課題で実行器を使わない体と比べるときは、`--blocked-action`を5回付けて`!obtainItem`・`!buildFarm`・`!sowFarmland`・`!buildStructure`・`!chooseOption`を禁止する。`--blocked-action '!obtainItem'`を付けると、専用環境の体だけで`!obtainItem`を使えなくする（`CIEL_MINDCRAFT_BLOCKED_ACTIONS`）。命令の一覧・製作計画の文・失敗文のヒントからも`!obtainItem`への案内が消え、`!getCraftingPlan`の計画は残る。manifestの`body_blocked_actions`に記録する。比べるのは「実行器あり」と「Mindcraftの1手ずつの選択（計画の照会あり）」で、上流そのままの体ではない。
 
 1回の実行は3600秒までなので、3課題×3配置は2回に分ける（金と鉄で約2400秒、盾で約1800秒）。
 
